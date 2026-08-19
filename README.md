@@ -1,3 +1,5 @@
-# i-want-typegpu-based
+# Code-first graphing (TypeGPU / Desmos notes)
 
-This project was created by a Cursor cloud agent.
+A design-phase project: a graphing environment in the spirit of Desmos, but with TypeScript (and TypeGPU’s operator-overloaded vectors) instead of a LaTeX expression list.
+
+Nothing to run yet. The architecture, what to copy from Desmos, and what to change are in [PLAN.md](./PLAN.md).
