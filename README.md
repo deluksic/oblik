@@ -1,5 +1,5 @@
-# Code-first graphing (TypeGPU / Desmos notes)
+# Code-first designs with mouse-written source
 
-A design-phase project: a graphing environment in the spirit of Desmos, but with TypeScript (and TypeGPU’s operator-overloaded vectors) instead of a LaTeX expression list.
+A design-phase project: TypeScript (TypeGPU, functions, loops) as the design tool, with clicks and drags writing back into literals in the file.
 
-Nothing to run yet. The architecture, what to copy from Desmos, and what to change are in [PLAN.md](./PLAN.md).
+Nothing to run yet. See [PLAN.md](./PLAN.md).
