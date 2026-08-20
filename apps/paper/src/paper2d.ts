@@ -103,7 +103,7 @@ function countEditCalls(source: string): number {
   return source
     .split("\n")
     .filter((ln) =>
-      /\bedit(?:Number|Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln),
+      /\bedit(?:Number|Angle|Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln),
     ).length;
 }
 
@@ -131,7 +131,13 @@ function evaluate(): void {
     selectedId = null;
     selectedGeom = null;
   }
-  if (sceneKey === "plate" || opts.split) publishWidgetOverrides();
+  if (
+    sceneKey === "plate" ||
+    sceneKey === "gear" ||
+    opts.split
+  ) {
+    publishWidgetOverrides();
+  }
   opts.onLiveChange?.();
 }
 
@@ -158,7 +164,9 @@ function render(): void {
   statusEl.textContent = error
     ? "Last good frame · scene threw"
     : opts.split
-          ? "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
+      ? sceneKey === "gear"
+        ? "Drag 2D handles — helix follows live · coral mesh angle on the pinion · Helix ° slider · 3D glider is face width"
+        : "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
       : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
       : sceneKey === "shared"
@@ -170,7 +178,7 @@ function render(): void {
           : sceneKey === "relative"
             ? "Drag the left point: it writes. Drag the right: preview works, write-back cannot patch expressions"
             : sceneKey === "gear"
-              ? "Involute pair. Drag the pinion and pitch radius; sliders are teeth, pressure angle, mesh. The wheel is derived — same module, opposite rotation"
+              ? "Involute pair. Drag the pinion, pitch radius, and coral mesh angle on the pitch circle. Helix ° feeds the 3D scene"
             : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
@@ -208,7 +216,9 @@ async function updateInspect(): Promise<void> {
     crumbEl.textContent = "Nothing selected";
     metaEl.textContent =
       opts.split
-        ? "2D writes plate.ts; 3D thickness writes mill.ts. Mill XY follows these handles while you drag."
+        ? sceneKey === "gear"
+          ? "2D writes gear.ts; 3D face width writes helix.ts. The helix follows these handles while you drag."
+        : "2D writes plate.ts; 3D thickness writes mill.ts. Mill XY follows these handles while you drag."
         : sceneKey === "flat"
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
         : sceneKey === "shared"
@@ -220,7 +230,7 @@ async function updateInspect(): Promise<void> {
               : sceneKey === "relative"
               ? "Right handle is editPoint(a.x + …, a.y + …). Source is the truth only when args are numeric literals."
               : sceneKey === "gear"
-                ? "Click a flank, tip arc, pitch circle, or the line of action. Wheel geometry is derived from the pinion module."
+                ? "Click a flank, tip arc, or the mesh-angle handle on the pinion. Helix ° is a titled slider for the 3D extrude."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
@@ -301,6 +311,10 @@ function applyDrag(
   } else if (g.kind === "glider") {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.index, [quantize(t)]);
+  } else if (g.kind === "angle") {
+    let deg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
+    if (deg < 0) deg += 360;
+    setWidgetOverride(g.index, [Math.round(deg) % 360]);
   } else {
     setWidgetOverride(g.index, [
       numberValueFromPointer(g, screen.x, cssW, cssH, gizmos),

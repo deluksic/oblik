@@ -34,7 +34,16 @@ export type NumberGizmo = {
   step: number;
 };
 
-export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo | NumberGizmo;
+export type AngleGizmo = {
+  kind: "angle";
+  index: number;
+  origin: Vec2;
+  /** Degrees, 0–360, CCW from +X. */
+  deg: number;
+  radius: number;
+};
+
+export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo | NumberGizmo | AngleGizmo;
 
 const gizmos: Gizmo[] = [];
 const overrides = new Map<number, number[]>();
@@ -198,6 +207,44 @@ export function editNumber(n: number, opts: NumberEditOpts): number {
   return v;
 }
 
+export type AngleEditOpts = {
+  /** Gizmo arm length. Default 1.5. */
+  radius?: number;
+};
+
+function wrapDeg(deg: number): number {
+  let d = deg % 360;
+  if (d < 0) d += 360;
+  return Math.round(d);
+}
+
+/**
+ * World-space polar angle around `origin`.
+ * The scene literal is degrees (1° snaps, readable source). Returns radians.
+ */
+export function editAngle(
+  origin: Vec2,
+  degrees: number,
+  opts?: AngleEditOpts,
+): number {
+  const radius = Math.max(0.2, opts?.radius ?? 1.5);
+  if (silent) {
+    const o = silentOverride(takeSilentIndex());
+    const deg = wrapDeg(o?.[0] ?? degrees);
+    return (deg * Math.PI) / 180;
+  }
+  const index = takeIndex();
+  const deg = wrapDeg(overrides.get(index)?.[0] ?? degrees);
+  gizmos.push({
+    kind: "angle",
+    index,
+    origin: { x: origin.x, y: origin.y },
+    deg,
+    radius,
+  });
+  return (deg * Math.PI) / 180;
+}
+
 export function gizmoValues(g: Gizmo): number[] {
   switch (g.kind) {
     case "point":
@@ -208,5 +255,7 @@ export function gizmoValues(g: Gizmo): number[] {
       return [g.t];
     case "number":
       return [g.n];
+    case "angle":
+      return [g.deg];
   }
 }

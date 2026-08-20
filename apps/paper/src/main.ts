@@ -20,6 +20,12 @@ for (const link of document.querySelectorAll<HTMLAnchorElement>(
 
 const inspect = { crumbEl, metaEl, sourceEl, statusEl, errorEl };
 
+function fail3d(err: unknown): void {
+  errorEl.hidden = false;
+  errorEl.textContent = err instanceof Error ? err.message : String(err);
+  statusEl.textContent = "3D view failed to load";
+}
+
 if (sceneKey === "split") {
   document.body.classList.add("view-split");
   paper.hidden = false;
@@ -35,16 +41,31 @@ if (sceneKey === "split") {
   });
   void import("./paper3d.ts")
     .then((m) => {
-      const mill = m.startPaper3d(inspect, { split: true });
+      const mill = m.startPaper3d(inspect, { split: true, sceneKey: "mill" });
       refreshMill = mill.refresh;
       mill.refresh({ quiet: true });
     })
-    .catch((err) => {
-      errorEl.hidden = false;
-      errorEl.textContent =
-        err instanceof Error ? err.message : String(err);
-      statusEl.textContent = "3D view failed to load";
-    });
+    .catch(fail3d);
+} else if (sceneKey === "gearsplit") {
+  document.body.classList.add("view-split");
+  paper.hidden = false;
+  space.hidden = false;
+  titleEl.textContent = "Gears + helix";
+  document.title = "euclid — Gears + helix";
+  statusEl.textContent = "Loading 3D view…";
+  let refreshHelix: ((opts?: { quiet?: boolean }) => void) | undefined;
+  startPaper2d({
+    sceneKey: "gear",
+    split: true,
+    onLiveChange: () => refreshHelix?.({ quiet: true }),
+  });
+  void import("./paper3d.ts")
+    .then((m) => {
+      const view = m.startPaper3d(inspect, { split: true, sceneKey: "helix" });
+      refreshHelix = view.refresh;
+      view.refresh({ quiet: true });
+    })
+    .catch(fail3d);
 } else if (sceneKey === "mill") {
   document.body.classList.add("view-3d");
   paper.hidden = true;
@@ -54,14 +75,21 @@ if (sceneKey === "split") {
   statusEl.textContent = "Loading 3D view…";
   void import("./paper3d.ts")
     .then((m) => {
-      m.startPaper3d(inspect);
+      m.startPaper3d(inspect, { sceneKey: "mill" });
     })
-    .catch((err) => {
-      errorEl.hidden = false;
-      errorEl.textContent =
-        err instanceof Error ? err.message : String(err);
-      statusEl.textContent = "3D view failed to load";
-    });
+    .catch(fail3d);
+} else if (sceneKey === "helix") {
+  document.body.classList.add("view-3d");
+  paper.hidden = true;
+  space.hidden = false;
+  titleEl.textContent = "Helical gears";
+  document.title = "euclid3 — Helical gears";
+  statusEl.textContent = "Loading 3D view…";
+  void import("./paper3d.ts")
+    .then((m) => {
+      m.startPaper3d(inspect, { sceneKey: "helix" });
+    })
+    .catch(fail3d);
 } else {
   document.body.classList.add("view-2d");
   paper.hidden = false;

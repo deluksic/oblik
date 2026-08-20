@@ -1,5 +1,6 @@
-import { line } from "@design-scenes/geom";
+import { line, type Vec2 } from "@design-scenes/geom";
 import {
+  editAngle,
   editDistanceToPoint,
   editNumber,
   editPoint,
@@ -11,51 +12,77 @@ import {
   lineOfAction,
   meshMateRotation,
   pitchRadiusFor,
+  type GearLayout,
 } from "../demo/gear.ts";
 
 export const sceneFile = "gear.ts";
 
 /**
  * Involute spur pair. Module is 2·pitch / z. The wheel is derived
- * (same module, same pressure angle, centres on +X). Mesh ° turns the pinion;
- * the mate rotates opposite so a tooth meets a space.
+ * (same module, same pressure angle, centres on +X). Mesh is a world
+ * angle on the pinion pitch circle; the mate rotates opposite.
+ * Helix ° is unused in 2D — the 3D scene reads it for twist.
  */
-export function scene() {
+export function gearLayout(): GearLayout {
   const pinion = editPoint(-4.75, 0.05);
-  const z1 = editNumber(16, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
-  const z2 = editNumber(24, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
-  const pitch1 = editDistanceToPoint(pinion, 3.2);
-  const pressureDeg = editNumber(20, {
+  const z1 = editNumber(24, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
+  const z2 = editNumber(40, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
+  const pitch1 = editDistanceToPoint(pinion, 1.8);
+  const pressureDeg = editNumber(20.5, {
     label: "Pressure °",
     min: 14.5,
     max: 25,
     step: 0.5,
   });
-  const meshDeg = editNumber(0, { label: "Mesh °", min: 0, max: 360, step: 1 });
+  const rot1 = editAngle(pinion, 53.7, { radius: pitch1 });
+  const helixDeg = editNumber(35, {
+    label: "Helix °",
+    min: 0,
+    max: 35,
+    step: 0.5,
+  });
 
   const m = gearModule(pitch1, z1);
   const pitch2 = pitchRadiusFor(m, z2);
-  const wheel = { x: pinion.x + centerDistance(pitch1, pitch2), y: pinion.y };
+  const wheel: Vec2 = {
+    x: pinion.x + centerDistance(pitch1, pitch2),
+    y: pinion.y,
+  };
   const alpha = (pressureDeg * Math.PI) / 180;
-  const rot1 = (meshDeg * Math.PI) / 180;
   const rot2 = meshMateRotation(z1, z2, rot1);
 
+  return {
+    pinion,
+    wheel,
+    z1,
+    z2,
+    pitch1,
+    pitch2,
+    alpha,
+    rot1,
+    rot2,
+    helixDeg,
+  };
+}
+
+export function scene() {
+  const g = gearLayout();
   return [
-    line(pinion, wheel),
-    lineOfAction(pinion, pitch1, alpha, pitch1 + pitch2 * 0.35),
+    line(g.pinion, g.wheel),
+    lineOfAction(g.pinion, g.pitch1, g.alpha, g.pitch1 + g.pitch2 * 0.35),
     drawSpurGear({
-      center: pinion,
-      teeth: z1,
-      pitchRadius: pitch1,
-      pressureAngle: alpha,
-      rotation: rot1,
+      center: g.pinion,
+      teeth: g.z1,
+      pitchRadius: g.pitch1,
+      pressureAngle: g.alpha,
+      rotation: g.rot1,
     }),
     drawSpurGear({
-      center: wheel,
-      teeth: z2,
-      pitchRadius: pitch2,
-      pressureAngle: alpha,
-      rotation: rot2,
+      center: g.wheel,
+      teeth: g.z2,
+      pitchRadius: g.pitch2,
+      pressureAngle: g.alpha,
+      rotation: g.rot2,
     }),
   ];
 }

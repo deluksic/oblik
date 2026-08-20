@@ -4,7 +4,7 @@ pnpm workspace. Libraries are packages; the paper preview is an app. Domain demo
 
 ```
 packages/
-  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, …), UUID id, path, provenance
+  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude), UUID id, path, provenance
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnLine3
   shell     @design-scenes/shell     Vite plugin: peek source, patch edit* literals
@@ -37,7 +37,7 @@ apps/
 
 Runtime widget index `0..n-1` must match AST visit order of `edit*` in that scene file. Shared helpers that call `edit*` more than once need unrolled call sites (one literal per handle). Widget arguments that are written back must be **numeric literals** — expressions like `a.x + 2.4` preview via in-memory overrides but cannot be patched (`?scene=relative`).
 
-`editNumber(n, { label, min, max, step })` is a **screen-space** titled slider for counts and other non-spatial parameters. World-space gizmos stay for things that live in the drawing (points, radii, extrusion thickness). The patcher writes the first numeric argument.
+`editNumber(n, { label, min, max, step })` is a **screen-space** titled slider for counts and other non-spatial parameters. `editAngle(origin, degrees)` is a **world-space** polar handle (literal is degrees, return value is radians). World gizmos stay for things that live in the drawing (points, radii, angles, extrusion thickness). The patcher writes the first numeric argument of `editNumber` and the degree argument of `editAngle`.
 
 A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …)` from euclid2: `edit*` do not enqueue gizmos or consume write-back indices. Silent reads use a **published snapshot** of another scene’s overrides (`publishWidgetOverrides` after the plate frame), not the live map of the scene that is evaluating. Nest sliders and plate points would otherwise share index 0. Split mill still follows a plate drag because paper2d publishes after each plate evaluate. `?scene=nest` is the same silent read, then a library nest that **steps a parameter by cell** (polar-array count by column).
 

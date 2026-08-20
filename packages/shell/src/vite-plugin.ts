@@ -12,6 +12,7 @@ const EDIT_NAMES = new Set([
   "editPointOnLine",
   "editPointOnLine3",
   "editNumber",
+  "editAngle",
 ]);
 
 export type SceneDevOptions = {
@@ -146,6 +147,13 @@ function patchWidget(
     if (values[0] === undefined) throw new Error("editNumber write needs a value");
     const span = numericSpan(sourceFile, arg);
     if (!span) throw new Error("editNumber value is not a numeric literal");
+    spans.push({ ...span, text: formatNum(values[0]) });
+  } else if (name === "editAngle") {
+    const arg = call.arguments[1];
+    if (!arg) throw new Error("editAngle expects an angle in degrees");
+    if (values[0] === undefined) throw new Error("editAngle write needs a value");
+    const span = numericSpan(sourceFile, arg);
+    if (!span) throw new Error("editAngle angle is not a numeric literal");
     spans.push({ ...span, text: formatNum(values[0]) });
   } else if (name === "editPoint" || name === "editPoint3") {
     const needed = name === "editPoint3" ? 3 : 2;

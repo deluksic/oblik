@@ -335,6 +335,19 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
     group.add(
       new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), edgeMat),
     );
+  } else if (g.kind === "mesh3") {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(g.positions, 3),
+    );
+    geo.setIndex(g.indices);
+    geo.computeVertexNormals();
+    const fill = new THREE.MeshLambertMaterial({
+      color: highlight ? color : COL.geom,
+      side: THREE.DoubleSide,
+    });
+    group.add(new THREE.Mesh(geo, fill));
   } else {
     const s = new THREE.Mesh(
       new THREE.SphereGeometry(0.08, 12, 10),

@@ -79,7 +79,8 @@ function walk(g: Geom, visit2: (s: Geom2) => void, visit3: (s: Geom3) => void) {
     g.kind === "line3" ||
     g.kind === "circle3" ||
     g.kind === "box3" ||
-    g.kind === "cylinder3"
+    g.kind === "cylinder3" ||
+    g.kind === "mesh3"
   ) {
     visit3(g);
     return;

@@ -3,11 +3,14 @@ import {
   ang,
   arc,
   circle,
+  dist,
+  extrude,
   group,
   line,
   polar,
   polyline,
   rotate,
+  sweepCCW,
   type Geom,
   type Vec2,
   vec,
@@ -64,6 +67,7 @@ function toothParts(
   pitchR: number,
   teeth: number,
   alpha: number,
+  flankSamples = 16,
 ): {
   right: Vec2[];
   left: Vec2[];
@@ -86,7 +90,7 @@ function toothParts(
   const spin = half - ang(involuteAt(baseR, -tPitch));
   const t0 = tAtRadius(baseR, Math.max(baseR * 1.001, rootR));
   const t1 = tAtRadius(baseR, addR);
-  const right = flank(baseR, t0, t1, 16, spin);
+  const right = flank(baseR, t0, t1, flankSamples, spin);
   const left = right.map((p) => vec(p.x, -p.y)).reverse();
   const tip = right[right.length - 1] ?? polar(addR, half);
   const rootPt = right[0] ?? polar(Math.max(rootR, baseR), half);
@@ -185,4 +189,111 @@ export function lineOfAction(
   const p = pitchPoint(pinion, pitchRadius);
   const dir = polar(length, Math.PI / 2 - pressureAngle);
   return line(vec(p.x - dir.x, p.y - dir.y), vec(p.x + dir.x, p.y + dir.y));
+}
+
+export type GearLayout = {
+  pinion: Vec2;
+  wheel: Vec2;
+  z1: number;
+  z2: number;
+  pitch1: number;
+  pitch2: number;
+  alpha: number;
+  rot1: number;
+  rot2: number;
+  helixDeg: number;
+};
+
+/** Closed outer tooth loop, CCW, for `extrude`. */
+export function gearOutline(opts: SpurGearOpts, flankSamples = 8): Vec2[] {
+  const z = Math.max(8, Math.round(opts.teeth));
+  const pitchR = Math.max(0.4, Math.abs(opts.pitchRadius));
+  const alpha = Math.min(0.5, Math.max(0.2, opts.pressureAngle));
+  const rot = opts.rotation ?? 0;
+  const c = opts.center;
+  const tooth = toothParts(pitchR, z, alpha, flankSamples);
+  const step = (Math.PI * 2) / z;
+  const ring: Vec2[] = [];
+
+  const sampleArc = (radius: number, a0: number, a1: number): Vec2[] => {
+    const sweep = sweepCCW(a0, a1);
+    const n = Math.max(3, Math.round(8 * (sweep / (Math.PI / 8))));
+    const pts: Vec2[] = [];
+    for (let i = 0; i <= n; i++) {
+      pts.push(add(c, polar(radius, a0 + (sweep * i) / n)));
+    }
+    return pts;
+  };
+
+  const append = (pts: Vec2[]) => {
+    for (const p of pts) {
+      const prev = ring[ring.length - 1];
+      if (prev && dist(prev, p) < 1e-8) continue;
+      ring.push(p);
+    }
+  };
+
+  for (let i = 0; i < z; i++) {
+    const a = rot + i * step;
+    const leftOut = tooth.left.map((p) => at(p, c, a)).reverse();
+    const rightIn = tooth.right.map((p) => at(p, c, a)).reverse();
+    if (tooth.needsRadial) {
+      append([at(polar(tooth.rootR, tooth.root0), c, a)]);
+    }
+    append(leftOut);
+    append(sampleArc(tooth.addR, a + tooth.add0, a + tooth.add1));
+    append(rightIn);
+    if (tooth.needsRadial) {
+      append([at(polar(tooth.rootR, tooth.root1), c, a)]);
+    }
+    append(sampleArc(tooth.rootR, a + tooth.root1, a + step + tooth.root0));
+  }
+  return ring;
+}
+
+/** Total twist (radians) so the pitch helix angle is `helixAngle`. */
+export function helixTwist(
+  faceWidth: number,
+  helixAngle: number,
+  pitchRadius: number,
+): number {
+  if (Math.abs(pitchRadius) < 1e-6) return 0;
+  return (Math.abs(faceWidth) * Math.tan(helixAngle)) / pitchRadius;
+}
+
+export function drawHelicalGear(
+  opts: SpurGearOpts & { height: number; helixAngle: number },
+): Geom {
+  const outline = gearOutline(opts);
+  const twist = helixTwist(opts.height, opts.helixAngle, opts.pitchRadius);
+  return extrude(outline, opts.height, {
+    twist,
+    center: opts.center,
+    closed: true,
+  });
+}
+
+export function drawHelicalPair(layout: GearLayout, height: number): Geom {
+  const h = Math.max(0.35, height);
+  const beta = (layout.helixDeg * Math.PI) / 180;
+  return group(() => [
+    drawHelicalGear({
+      center: layout.pinion,
+      teeth: layout.z1,
+      pitchRadius: layout.pitch1,
+      pressureAngle: layout.alpha,
+      rotation: layout.rot1,
+      height: h,
+      helixAngle: beta,
+    }),
+    drawHelicalGear({
+      center: layout.wheel,
+      teeth: layout.z2,
+      pitchRadius: layout.pitch2,
+      pressureAngle: layout.alpha,
+      rotation: layout.rot2,
+      height: h,
+      helixAngle: -beta,
+    }),
+  ]);
 }

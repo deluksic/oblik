@@ -16,8 +16,15 @@ export type Cylinder3 = Base & {
   top: Point3;
   radius: number;
 };
+export type Mesh3 = Base & {
+  kind: "mesh3";
+  /** Packed xyz. */
+  positions: number[];
+  /** Triangle indices into `positions` (triples). */
+  indices: number[];
+};
 
-export type Geom3 = Point3 | Line3 | Circle3 | Box3 | Cylinder3;
+export type Geom3 = Point3 | Line3 | Circle3 | Box3 | Cylinder3 | Mesh3;
 
 export function point3(x: number, y: number, z: number): Point3 {
   return { ...makeBase("point3", "point3"), kind: "point3", x, y, z };
@@ -58,5 +65,14 @@ export function cylinder3(bottom: Vec3, top: Vec3, radius: number): Cylinder3 {
     bottom: point3(bottom.x, bottom.y, bottom.z),
     top: point3(top.x, top.y, top.z),
     radius,
+  };
+}
+
+export function mesh3(positions: number[], indices: number[]): Mesh3 {
+  return {
+    ...makeBase("mesh3", "mesh3"),
+    kind: "mesh3",
+    positions,
+    indices,
   };
 }

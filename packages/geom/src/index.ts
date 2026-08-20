@@ -2,6 +2,7 @@ export * from "./vec.ts";
 export * from "./vec3.ts";
 export * from "./identity.ts";
 export * from "./geom3.ts";
+export * from "./extrude.ts";
 export {
   point,
   line,

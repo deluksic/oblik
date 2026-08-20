@@ -202,6 +202,25 @@ function drawGizmo(
     ctx.setLineDash([5, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
+  } else if (g.kind === "angle") {
+    const rad = (g.deg * Math.PI) / 180;
+    const tip = {
+      x: g.origin.x + Math.cos(rad) * g.radius,
+      y: g.origin.y + Math.sin(rad) * g.radius,
+    };
+    pathSeg(ctx, cam, w, h, g.origin, tip);
+    ctx.stroke();
+    const c = worldToScreen(cam, g.origin, w, h);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, Math.abs(g.radius) * 0.38 * cam.scale, 0, -rad, true);
+    ctx.stroke();
+    const s = worldToScreen(cam, tip, w, h);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, active ? 7 : 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COL.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 

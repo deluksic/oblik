@@ -10,7 +10,9 @@ import {
   type SceneModule3,
 } from "@design-scenes/euclid3";
 import * as mill from "./scenes/mill.ts";
+import * as helix from "./scenes/helix.ts";
 import "./scenes/plate.ts";
+import "./scenes/gear.ts";
 import {
   commitWidget,
   countEditCalls,
@@ -20,8 +22,14 @@ import {
   type InspectEls,
 } from "./inspect.ts";
 
+const SCENES3: Record<string, { mod: SceneModule3; title: string }> = {
+  mill: { mod: mill, title: "Milled block (3D)" },
+  helix: { mod: helix, title: "Helical gears" },
+};
+
 export type Paper3dOpts = {
   split?: boolean;
+  sceneKey?: string;
 };
 
 export type Paper3dHandle = {
@@ -39,8 +47,13 @@ export function startPaper3d(
     canvas.hidden = false;
   }
 
-  let sceneMod: SceneModule3 = mill;
+  let sceneMod: SceneModule3 =
+    SCENES3[opts.sceneKey ?? "mill"]?.mod ?? mill;
   const space = new SpaceView(canvas);
+  if ((opts.sceneKey ?? "mill") === "helix") {
+    space.camera.position.set(18, -24, 13);
+    space.controls.target.set(0.3, 0, 1.15);
+  }
   const peekCache = new Map<string, string>();
 
   let frame: Frame3 | null = null;
@@ -91,8 +104,12 @@ export function startPaper3d(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Drag 2D handles — mill follows live · coral glider is thickness · LMB orbit"
-        : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
+        ? opts.sceneKey === "helix"
+          ? "Drag 2D handles — helix follows live · coral glider is face width · LMB orbit"
+          : "Drag 2D handles — mill follows live · coral glider is thickness · LMB orbit"
+        : opts.sceneKey === "helix"
+          ? "XY from gear.ts (no gizmos) · coral glider = face width · Helix ° lives in the 2D scene"
+          : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     void updateInspect();
@@ -117,8 +134,12 @@ export function startPaper3d(
     if (!g) {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent = opts.split
-        ? "Stock XY, holes, pocket, and slot come from the 2D plate. Only thickness is a widget here."
-        : "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
+        ? opts.sceneKey === "helix"
+          ? "Section, teeth, mesh angle, and helix come from the 2D gear. Only face width is a widget here."
+          : "Stock XY, holes, pocket, and slot come from the 2D plate. Only thickness is a widget here."
+        : opts.sceneKey === "helix"
+          ? "Section and helix come from gear.ts. Only face width is a widget here."
+          : "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
       return;
     }
@@ -226,7 +247,7 @@ export function startPaper3d(
 
   if (import.meta.hot) {
     import.meta.hot.accept("./scenes/mill.ts", (mod) => {
-      if (!mod || !("scene" in mod)) return;
+      if (!mod || !("scene" in mod) || (opts.sceneKey ?? "mill") !== "mill") return;
       sceneMod = mod as unknown as SceneModule3;
       clearWidgetOverrides3();
       peekCache.clear();
@@ -237,8 +258,25 @@ export function startPaper3d(
         },
       );
     });
-    // plate.ts drives XY; keep the in-memory thickness override if mill.ts did not change.
+    import.meta.hot.accept("./scenes/helix.ts", (mod) => {
+      if (!mod || !("scene" in mod) || opts.sceneKey !== "helix") return;
+      sceneMod = mod as unknown as SceneModule3;
+      clearWidgetOverrides3();
+      peekCache.clear();
+      void peekFile(peekCache, `apps/paper/src/scenes/${sceneMod.sceneFile}`).then(
+        () => {
+          evaluate();
+          sync();
+        },
+      );
+    });
     import.meta.hot.accept("./scenes/plate.ts", () => {
+      if ((opts.sceneKey ?? "mill") !== "mill") return;
+      evaluate();
+      sync(true);
+    });
+    import.meta.hot.accept("./scenes/gear.ts", () => {
+      if (opts.sceneKey !== "helix") return;
       evaluate();
       sync(true);
     });

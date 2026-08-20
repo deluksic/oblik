@@ -6,7 +6,7 @@ export function countEditCalls(source: string): number {
   return source
     .split("\n")
     .filter((ln) =>
-      /\bedit(?:Point3|PointOnLine3|Distance3|Number|Point|DistanceToPoint|PointOnLine)\s*\(/.test(
+      /\bedit(?:Point3|PointOnLine3|Distance3|Number|Angle|Point|DistanceToPoint|PointOnLine)\s*\(/.test(
         ln,
       ),
     ).length;
