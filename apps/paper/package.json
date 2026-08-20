@@ -13,7 +13,8 @@
     "@design-scenes/euclid3": "workspace:*",
     "@design-scenes/geom": "workspace:*",
     "@design-scenes/sdf": "workspace:*",
-    "@design-scenes/shell": "workspace:*"
+    "@design-scenes/shell": "workspace:*",
+    "@design-scenes/hosts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

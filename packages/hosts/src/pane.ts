@@ -1,0 +1,114 @@
+import type { InspectEls } from "@design-scenes/shell";
+import { commitWidget, peekFile } from "./inspect.ts";
+
+export function scenePeekPath(sceneFile: string): string {
+  return `apps/paper/src/scenes/${sceneFile}`;
+}
+
+export function sceneHotKey(sceneFile: string): string {
+  return `./scenes/${sceneFile}`;
+}
+
+export function observePaneResize(
+  canvas: HTMLCanvasElement,
+  onResize: () => void,
+): () => void {
+  const onWinResize = () => onResize();
+  window.addEventListener("resize", onWinResize);
+  const pane = canvas.parentElement;
+  const ro =
+    pane && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => onResize())
+      : null;
+  if (pane && ro) ro.observe(pane);
+  return () => {
+    window.removeEventListener("resize", onWinResize);
+    ro?.disconnect();
+  };
+}
+
+export function cssSize(canvas: HTMLCanvasElement): { w: number; h: number } {
+  const r = canvas.getBoundingClientRect();
+  return { w: r.width, h: r.height };
+}
+
+export function eventPos(
+  canvas: HTMLCanvasElement,
+  e: PointerEvent,
+): { x: number; y: number } {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+export function showWidgetInspect(
+  els: InspectEls,
+  kind: string,
+  site: string,
+  sceneFile: string,
+  meta: string,
+): void {
+  els.crumbEl.textContent = `widget ${kind} ${site} · writes ${sceneFile}`;
+  els.metaEl.textContent = meta;
+  els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneFile}.</code>`;
+}
+
+export function showEmptyInspect(
+  els: InspectEls,
+  crumb: string,
+  meta: string,
+  source: string,
+): void {
+  els.crumbEl.textContent = crumb;
+  els.metaEl.textContent = meta;
+  els.sourceEl.innerHTML = source;
+}
+
+export function setPaneStatus(
+  els: InspectEls,
+  status: string,
+  error: string | null,
+): void {
+  els.statusEl.textContent = status;
+  els.errorEl.hidden = !error;
+  els.errorEl.textContent = error ?? "";
+}
+
+export async function commitGizmoIfChanged(
+  sceneFile: string,
+  peekCache: Map<string, string>,
+  peekPath: string,
+  start: number[],
+  g: { at: { line: number; column: number } } | undefined,
+  now: number[],
+): Promise<string | null> {
+  if (!g) return null;
+  const changed = now.some((v, i) => v !== start[i]);
+  if (!changed) return null;
+  const err = await commitWidget(sceneFile, g.at, now);
+  if (!err) peekCache.delete(peekPath);
+  return err;
+}
+
+export async function warmPeek(
+  peekCache: Map<string, string>,
+  peekPath: string,
+  onReady: () => void,
+): Promise<void> {
+  await peekFile(peekCache, peekPath);
+  onReady();
+}
+
+export function subscribeHotReload(
+  sceneFile: string,
+  subscribe: (
+    cb: (path: string, mod: Record<string, unknown>) => void,
+  ) => () => void,
+  onReload: (mod: Record<string, unknown>) => void,
+): () => void {
+  const key = sceneHotKey(sceneFile);
+  return subscribe((path, next) => {
+    if (path !== key) return;
+    if (!("scene" in next)) return;
+    onReload(next);
+  });
+}

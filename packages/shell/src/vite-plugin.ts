@@ -116,6 +116,7 @@ export function sceneLoadersAcceptTail(keys: string[]): string {
   const lit = JSON.stringify(keys);
   return (
     `\n/* __scene_hmr_accept */\n` +
+    `import { applyHotScenes } from "@design-scenes/shell";\n` +
     `if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });\n`
   );
 }

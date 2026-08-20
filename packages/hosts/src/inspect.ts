@@ -86,11 +86,3 @@ export async function commitEditors(
   }
   return null;
 }
-
-export type InspectEls = {
-  crumbEl: HTMLElement;
-  metaEl: HTMLElement;
-  sourceEl: HTMLElement;
-  statusEl: HTMLElement;
-  errorEl: HTMLElement;
-};

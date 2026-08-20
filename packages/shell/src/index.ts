@@ -16,3 +16,4 @@ export {
   stackedAreas,
 } from "./layout-grid.ts";
 export { startWorkspace, type WorkspaceOpts } from "./workspace.ts";
+export { subscribeSceneHot, applyHotScenes } from "./scene-hmr.ts";

@@ -1,11 +1,8 @@
 import "./style.css";
 import "../../../packages/shell/src/workspace.css";
 import { scenes } from "virtual:scene-catalog";
+import { defaultHosts } from "@design-scenes/hosts";
 import { startWorkspace } from "@design-scenes/shell";
-import { euclid2Host } from "./hosts/euclid2.ts";
-import { euclid3Host } from "./hosts/euclid3.ts";
-import { sdfHost } from "./hosts/sdf.ts";
-import { sdf2Host } from "./hosts/sdf2.ts";
 import { sceneLoaders } from "./scene-loaders.ts";
 
 const crumbEl = document.querySelector<HTMLElement>("#crumb")!;
@@ -20,12 +17,7 @@ const viewportRoot = document.querySelector<HTMLElement>("#viewport")!;
 void startWorkspace({
   scenes,
   loaders: sceneLoaders,
-  hosts: {
-    euclid2: euclid2Host,
-    euclid3: euclid3Host,
-    sdf: sdfHost,
-    sdf2: sdf2Host,
-  },
+  hosts: defaultHosts,
   navRoot,
   viewportRoot,
   inspect: { crumbEl, metaEl, sourceEl, statusEl, errorEl },

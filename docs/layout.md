@@ -9,10 +9,10 @@ packages/
   sdf       @design-scenes/sdf       field CSG (no identity), 2D profile + 3D compile, raymarch view
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnLine3
   shell     @design-scenes/shell     Vite plugin (peek, patch, insert-editor, catalog, create-scene) + pane workspace
+  hosts     @design-scenes/hosts     pane hosts (2D + 3D); may import euclid2, euclid3, sdf, shell
 apps/
-  paper     @design-scenes/paper     hosts + scenes + demos
+  paper     @design-scenes/paper     scenes + demos + startWorkspace({ hosts: defaultHosts })
     src/scenes/   the only scene registry (programs and layout files)
-    src/hosts/    euclid2 / euclid3 / sdf / sdf2 view hosts
     src/demo/     demo-only geometry — not a published lib
 ```
 
@@ -26,8 +26,10 @@ apps/
 | `euclid2` | `geom` | apps, filesystem writes |
 | `sdf` | `geom`, Three.js | widgets, provenance, apps |
 | `euclid3` | `geom`, Three.js | apps, filesystem writes |
-| `shell` | Node, TypeScript, Vite, DOM | geom, euclid2/3, sdf |
+| `shell` | Node, TypeScript, Vite, DOM | geom, euclid2/3, sdf, hosts |
+| `hosts` | `geom`, `euclid2`, `euclid3`, `sdf`, `shell` | apps |
 | `paper` scenes | `geom`, `euclid2` / `euclid3` / `sdf`, `../demo/*` | putting reusable domain in `packages/` until it is real |
+| `paper` app | `hosts`, `shell`, `geom`, `euclid2` / `euclid3` / `sdf`, `demo` | implementing pane hosts |
 | layout files in `scenes/` | string ids / CSS areas only | other scene modules |
 | `paper` demo | `geom` or `sdf` | `euclid2`, `shell` |
 
@@ -53,6 +55,6 @@ A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, sourc
 
 Widget pointer-up patches numeric literals. The Vite plugin swallows HMR when the file still matches the last widget write, so cameras stay put.
 
-A real save (or Space insert) hot-swaps the scene module. `scene-loaders` `hot.accept`s every `./scenes/*.ts` path and applies Vite’s fetched module. Re-`import()` of the glob URL without a timestamp returns the previous `scene()`.
+A real save (or Space insert) hot-swaps the scene module. The Vite plugin appends a `hot.accept` onto `scene-loaders.ts` for every `./scenes/*.ts` path; the callback calls `applyHotScenes` from shell with Vite’s fetched module. Re-`import()` of the glob URL without a timestamp returns the previous `scene()`.
 
 Cross-scene `import.meta.hot.accept("./plate.ts")` in mill/helix/rose updates `let readPlate = plateLayout` on a real save of the imported file. Widget write-back does not use the cross-scene accept.
