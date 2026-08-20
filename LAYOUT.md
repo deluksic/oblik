@@ -33,3 +33,5 @@ apps/
 ## Widget writes
 
 Runtime widget index `0..n-1` must match AST visit order of `edit*` in that scene file. Shared helpers that call `edit*` more than once need unrolled call sites (one literal per handle).
+
+`apps/paper` loads the shell Vite plugin via a **relative `.ts` import**. Vite’s config loader cannot `import` a workspace package whose `exports` point at TypeScript.
