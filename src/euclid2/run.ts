@@ -13,6 +13,7 @@ export type Frame = {
 
 export type SceneModule = {
   scene: () => Geom | Geom[];
+  sceneFile: string;
 };
 
 export function runScene(mod: SceneModule): Frame {

@@ -9,7 +9,7 @@ import {
 } from "./euclid2/camera.ts";
 import { drawFrame, resizeCanvas } from "./euclid2/draw.ts";
 import { hitTest } from "./euclid2/pick.ts";
-import { runScene, type Frame } from "./euclid2/run.ts";
+import { runScene, type Frame, type SceneModule } from "./euclid2/run.ts";
 import {
   clearWidgetOverrides,
   gizmoValues,
@@ -17,6 +17,16 @@ import {
   type Gizmo,
 } from "./euclid2/widgets.ts";
 import * as beam from "./scenes/beam.ts";
+import * as beamFlat from "./scenes/beam-flat.ts";
+
+const SCENES: Record<string, { mod: SceneModule; title: string }> = {
+  beam: { mod: beam, title: "Beam truss (grouped ids)" },
+  flat: { mod: beamFlat, title: "Twin trusses (flat ids)" },
+};
+
+const sceneKey =
+  new URLSearchParams(location.search).get("scene") ?? "beam";
+const active = SCENES[sceneKey] ?? SCENES.beam!;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#paper")!;
 const crumbEl = document.querySelector<HTMLElement>("#crumb")!;
@@ -24,8 +34,18 @@ const metaEl = document.querySelector<HTMLElement>("#meta")!;
 const sourceEl = document.querySelector<HTMLElement>("#source")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const errorEl = document.querySelector<HTMLElement>("#error")!;
+const titleEl = document.querySelector<HTMLElement>("#scene-title")!;
 
-let sceneMod = beam;
+titleEl.textContent = active.title;
+document.title = `euclid2 — ${active.title}`;
+
+for (const link of document.querySelectorAll<HTMLAnchorElement>(
+  "#scene-nav a[data-scene]",
+)) {
+  link.classList.toggle("active", link.dataset.scene === sceneKey);
+}
+
+let sceneMod: SceneModule = active.mod;
 let frame: Frame | null = null;
 let lastGood: Frame | null = null;
 let error: string | null = null;
@@ -86,7 +106,9 @@ function render(): void {
   );
   statusEl.textContent = error
     ? "Last good frame · scene threw"
-    : "Drag handles · click geometry to inspect · wheel zooms";
+    : sceneKey === "flat"
+      ? "Flat ids: upper & lower truss both use line[0], circle[0], … — click ticks on each"
+      : "Grouped ids: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
   updateInspect();
@@ -120,7 +142,9 @@ async function updateInspect(): Promise<void> {
   if (!t) {
     crumbEl.textContent = "Nothing selected";
     metaEl.textContent =
-      "Hover a tick, the roof, or the span. Handles (coral) are scene widgets, not library gizmos.";
+      sceneKey === "flat"
+        ? "Click a tick on the upper truss, then one on the lower — both may read line[4]."
+        : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
   }
@@ -187,7 +211,9 @@ function applyDrag(g: Gizmo, world: { x: number; y: number }): void {
   if (g.kind === "point") {
     setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)]);
   } else if (g.kind === "distance") {
-    setWidgetOverride(g.index, [quantize(Math.max(0.05, dist(world, g.origin)))]);
+    setWidgetOverride(g.index, [
+      quantize(Math.max(0.05, dist(world, g.origin))),
+    ]);
   } else {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.index, [quantize(t)]);
@@ -319,8 +345,16 @@ window.addEventListener("resize", () => render());
 
 if (import.meta.hot) {
   import.meta.hot.accept("./scenes/beam.ts", (mod) => {
-    if (!mod || !("scene" in mod)) return;
-    sceneMod = mod as unknown as typeof beam;
+    if (!mod || !("scene" in mod) || sceneKey !== "beam") return;
+    sceneMod = mod as unknown as SceneModule;
+    clearWidgetOverrides();
+    peekCache.clear();
+    evaluate();
+    render();
+  });
+  import.meta.hot.accept("./scenes/beam-flat.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "flat") return;
+    sceneMod = mod as unknown as SceneModule;
     clearWidgetOverrides();
     peekCache.clear();
     evaluate();

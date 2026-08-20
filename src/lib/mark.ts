@@ -10,8 +10,7 @@ import { add, lerp, mul, norm, perp, sub, type Vec2 } from "./vec.ts";
 
 export type Ring = { post: Vec2; radius: number };
 
-/** Span, a roof through the middle ring, circles from a loop, and tick marks. */
-export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
+function buildBeamParts(opts: { span: Line; rings: Ring[] }): Geom[] {
   const a = opts.span.a;
   const b = opts.span.b;
   const dir = sub(b, a);
@@ -21,21 +20,29 @@ export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
     ? add(hub.post, mul(normal, hub.radius))
     : add(a, mul(normal, 1));
 
-  return group(() => {
-    const parts: Geom[] = [opts.span, polyline([a, peak, b])];
+  const parts: Geom[] = [opts.span, polyline([a, peak, b])];
 
-    for (const ring of opts.rings) {
-      parts.push(line(ring.post, add(ring.post, mul(normal, ring.radius))));
-      parts.push(circle(ring.post, Math.abs(ring.radius)));
-    }
+  for (const ring of opts.rings) {
+    parts.push(line(ring.post, add(ring.post, mul(normal, ring.radius))));
+    parts.push(circle(ring.post, Math.abs(ring.radius)));
+  }
 
-    for (let i = 0; i < 4; i++) {
-      const t = (i + 1) / 5;
-      const q = lerp(a, b, t);
-      const m = mul(normal, 0.22);
-      parts.push(line(sub(q, m), add(q, m)));
-    }
+  for (let i = 0; i < 4; i++) {
+    const t = (i + 1) / 5;
+    const q = lerp(a, b, t);
+    const m = mul(normal, 0.22);
+    parts.push(line(sub(q, m), add(q, m)));
+  }
 
-    return parts;
-  });
+  return parts;
+}
+
+/** Same geometry as assembleBeam, but ids are not namespaced under group[0]. */
+export function assembleBeamFlat(opts: { span: Line; rings: Ring[] }): Geom[] {
+  return buildBeamParts(opts);
+}
+
+/** Span, roof, circles, and ticks — ids live under group[0] › … */
+export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
+  return group(() => buildBeamParts(opts));
 }

@@ -29,6 +29,26 @@ body {
   min-height: 0;
 }
 
+#scene-nav {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
+#scene-nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+#scene-nav a:hover,
+#scene-nav a.active {
+  color: var(--accent);
+}
+
+#scene-nav span {
+  color: var(--stroke);
+  margin: 0 0.35rem;
+}
+
 header {
   display: flex;
   justify-content: space-between;
