@@ -8,31 +8,34 @@ import {
 } from "./geom.ts";
 import { add, lerp, mul, norm, perp, sub, type Vec2 } from "./vec.ts";
 
-/** A beam with a sliding post, a roof, and four tick marks (loop identities). */
-export function assembleBeam(opts: {
-  span: Line;
-  post: Vec2;
-  height: number;
-}): Geom {
+export type Ring = { post: Vec2; radius: number };
+
+/** Span, a roof through the middle ring, circles from a loop, and tick marks. */
+export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
   const a = opts.span.a;
   const b = opts.span.b;
   const dir = sub(b, a);
-  const n = mul(norm(perp(dir)), opts.height);
-  const peak = add(opts.post, n);
+  const normal = norm(perp(dir));
+  const hub = opts.rings[Math.floor(opts.rings.length / 2)] ?? opts.rings[0];
+  const peak = hub
+    ? add(hub.post, mul(normal, hub.radius))
+    : add(a, mul(normal, 1));
 
   return group(() => {
-    const parts: Geom[] = [
-      opts.span,
-      polyline([a, peak, b]),
-      line(opts.post, peak),
-      circle(opts.post, Math.abs(opts.height)),
-    ];
+    const parts: Geom[] = [opts.span, polyline([a, peak, b])];
+
+    for (const ring of opts.rings) {
+      parts.push(line(ring.post, add(ring.post, mul(normal, ring.radius))));
+      parts.push(circle(ring.post, Math.abs(ring.radius)));
+    }
+
     for (let i = 0; i < 4; i++) {
       const t = (i + 1) / 5;
       const q = lerp(a, b, t);
-      const m = mul(norm(perp(dir)), 0.22);
+      const m = mul(normal, 0.22);
       parts.push(line(sub(q, m), add(q, m)));
     }
+
     return parts;
   });
 }
