@@ -2,8 +2,14 @@ import { withoutWidgets } from "@design-scenes/euclid2";
 import { drawRing3 } from "../demo/ring.ts";
 import { ringLayout } from "./ring.ts";
 
+export const title = "Signet wrap";
 export const view = "euclid3" as const;
 export const sceneFile = "ring3.ts";
+export const camera3 = {
+  position: [16, -18, 11],
+  target: [0, 0, 3.2],
+};
+export const hint = "No widgets here — the developed band is ring.ts · LMB orbit";
 
 let readRing = ringLayout;
 

@@ -15,7 +15,9 @@ import {
   type GearLayout,
 } from "../demo/gear.ts";
 
+export const title = "Gears";
 export const sceneFile = "gear.ts";
+export const camera = { x: 0.4, y: 0.15, scale: 28 };
 
 /**
  * Involute spur pair. Module is 2·pitch / z. The wheel is derived

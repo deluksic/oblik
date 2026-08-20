@@ -4,64 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>euclid2 — beam scene</title>
+    <title>euclid — Welcome</title>
   </head>
   <body>
     <div id="app">
       <header>
         <div>
-          <p class="kicker">Prototype 1</p>
-          <h1 id="scene-title">Beam truss</h1>
-          <nav id="scene-nav" aria-label="Scene">
-            <a href="?scene=beam" data-scene="beam">Grouped</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=flat" data-scene="flat">Flat</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=shared" data-scene="shared">Shared radius</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=plate" data-scene="plate">Milled plate</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=nest" data-scene="nest">Print grid</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=relative" data-scene="relative">Relative</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=gear" data-scene="gear">Gears</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=ring" data-scene="ring">Ring</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=ringsplit" data-scene="ringsplit">Ring + wrap</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=rose" data-scene="rose">Cylinder</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=profile" data-scene="profile">Profile</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=helix" data-scene="helix">Helix 3D</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=gearsplit" data-scene="gearsplit">Gears + helix</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=mill" data-scene="mill">Mill 3D</a>
-            <span aria-hidden="true">·</span>
-            <a href="?scene=split" data-scene="split">Plate + mill</a>
-          </nav>
+          <p class="kicker">Prototype 2</p>
+          <h1 id="scene-title">Welcome</h1>
+          <nav id="scene-nav" aria-label="Scene"></nav>
         </div>
-        <p id="status">Loading scene…</p>
+        <p id="status">Loading…</p>
       </header>
       <p id="error" hidden></p>
       <div id="workspace">
-        <div id="viewport">
-          <section id="pane-paper" class="view-pane">
-            <p class="view-label">2D · plate.ts</p>
-            <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
-          </section>
-          <section id="pane-profile" class="view-pane">
-            <p class="view-label">SDF 2D · profile.ts</p>
-            <canvas id="profile" tabindex="0" aria-label="Sweep profile"></canvas>
-          </section>
-          <section id="pane-space" class="view-pane">
-            <p class="view-label">3D · mill.ts</p>
-            <canvas id="space" hidden tabindex="0" aria-label="3D mill block"></canvas>
-          </section>
-        </div>
+        <div id="viewport"></div>
         <aside id="inspect">
           <p class="kicker">Identity</p>
           <h2 id="crumb">Nothing selected</h2>

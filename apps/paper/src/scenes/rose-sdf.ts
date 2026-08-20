@@ -11,8 +11,11 @@ import { profileSdf } from "../demo/profile.ts";
 import { cylinderLayout } from "./cylinder.ts";
 import { profileLayout } from "./profile.ts";
 
+export const title = "Cylinder SDF";
 export const view = "sdf" as const;
 export const sceneFile = "rose-sdf.ts";
+export const hint =
+  "Joined rings + filled disks, then quatrefoil cut · coral glider is height";
 
 let readLayout = cylinderLayout;
 let readProfile = profileLayout;
@@ -41,7 +44,7 @@ export function scene() {
   const layout = withoutWidgets(() => readLayout(), "cylinder");
   const profile = withoutWidgets(() => readProfile(), "profile");
   const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnLine3(mast, 0.09).z;
+  const height = editPointOnLine3(mast, 0.07).z;
   const field = profileSdf(profile);
   const cells = pack7(layout.radius);
   const rings = unionAll(

@@ -1,6 +1,7 @@
 import { circle, group, line } from "@design-scenes/geom";
 import { editPoint } from "@design-scenes/euclid2";
 
+export const title = "Relative";
 export const sceneFile = "relative.ts";
 
 /**

@@ -31,6 +31,10 @@ export default defineConfig({
         workspaceRoot,
         "packages/sdf/src/index.ts",
       ),
+      "@design-scenes/shell": path.resolve(
+        workspaceRoot,
+        "packages/shell/src/index.ts",
+      ),
     },
   },
   server: {
@@ -45,6 +49,7 @@ export default defineConfig({
       "@design-scenes/euclid2",
       "@design-scenes/euclid3",
       "@design-scenes/sdf",
+      "@design-scenes/shell",
     ],
     include: ["three", "three/addons/controls/OrbitControls.js"],
   },

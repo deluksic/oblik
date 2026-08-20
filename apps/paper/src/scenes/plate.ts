@@ -7,6 +7,7 @@ import {
   editPointOnLine,
 } from "@design-scenes/euclid2";
 
+export const title = "Milled plate";
 export const sceneFile = "plate.ts";
 
 function stockEdges(min: Vec2, max: Vec2) {

@@ -132,21 +132,21 @@ export function scene() { /* … */ }
 
 ### Layout-only file (workspace)
 
-A file with `layout` and **no** `scene()` is a workspace. It must not import other scenes.
-
-```ts
-export const title = "Plate + mill";
-export const layout = ["plate", "mill"];
-```
-
-That is the entire replacement for today’s `?scene=split` branch.
+A file with `layout` and **no** `scene()` is a workspace. It must not import other scenes. Layout is CSS Grid: `areas` is `grid-template-areas`, and each pane is `grid-area: <scene-id>`.
 
 ```ts
 export const title = "Cylinder";
-export const layout = ["cylinder", "profile", "rose-sdf"];
+export const layout = {
+  areas: `"cylinder profile rose-sdf"`,
+  columns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr)",
+};
 ```
 
-Replacement for the rose triple. `rose-sdf.ts` stays the SDF program (`view: "sdf"`, has `scene()`). Opening `?scene=rose-sdf` is one field pane. Opening `?scene=rose` is three panes.
+A string or string[] is accepted and turned into a single quoted row of equal columns.
+
+`rose-sdf.ts` stays the SDF program (`view: "sdf"`, has `scene()`). Opening `?scene=rose-sdf` is one field pane. Opening `?scene=rose` is three named grid cells.
+
+The welcome screen (no `?scene=`) has **New scene**, which POSTs `/__create-scene` and writes a starter `scenes/<id>.ts`.
 
 Optional flex (still a flat row):
 

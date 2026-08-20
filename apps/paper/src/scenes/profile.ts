@@ -5,20 +5,23 @@ import {
   type ProfileLayout,
 } from "../demo/profile.ts";
 
+export const title = "Sweep profile";
 export const view = "sdf2" as const;
 export const sceneFile = "profile.ts";
+export const camera = { x: 0.2, y: 0.32, scale: 110 };
+export const hint = "X = radial from each rim · Y is world Z";
 
 /**
  * Meridian of the molding. X is radial from each of the seven rims
  * (0 = on the circle), Y is world Z. Three unrolled circles.
  */
 export function profileLayout(): ProfileLayout {
-  const c0 = editPoint(-0.06, 0.25);
-  const r0 = editDistanceToPoint(c0, 0.26);
-  const c1 = editPoint(-0.06, 0.58);
-  const r1 = editDistanceToPoint(c1, 0.1);
-  const c2 = editPoint(0.23, 0.11);
-  const r2 = editDistanceToPoint(c2, 0.17);
+  const c0 = editPoint(0.02, 0.07);
+  const r0 = editDistanceToPoint(c0, 0.2);
+  const c1 = editPoint(0.02, 0.35);
+  const r1 = editDistanceToPoint(c1, 0.13);
+  const c2 = editPoint(0.2, 0.03);
+  const r2 = editDistanceToPoint(c2, 0.11);
   return {
     circles: [
       { c: c0, r: r0 },

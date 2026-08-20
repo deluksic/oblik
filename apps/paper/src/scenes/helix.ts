@@ -4,8 +4,14 @@ import { editPointOnLine3 } from "@design-scenes/euclid3";
 import { drawHelicalPair } from "../demo/gear.ts";
 import { gearLayout } from "./gear.ts";
 
+export const title = "Helix 3D";
 export const view = "euclid3" as const;
 export const sceneFile = "helix.ts";
+export const camera3 = {
+  position: [18, -24, 13],
+  target: [0.3, 0, 1.15],
+};
+export const hint = "Section from gear.ts · coral glider is face width · LMB orbit";
 
 let readGears = gearLayout;
 

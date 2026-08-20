@@ -6,7 +6,9 @@ import {
 } from "@design-scenes/euclid2";
 import { drawRingPlan, drawUnrolled } from "../demo/ring.ts";
 
+export const title = "Ring";
 export const sceneFile = "ring.ts";
+export const camera = { x: 18, y: 3.2, scale: 14 };
 
 export type RingLayout = {
   center: Vec2;

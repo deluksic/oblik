@@ -6,6 +6,8 @@ import {
   editPointOnLine,
 } from "@design-scenes/euclid2";
 
+export const id = "shared";
+export const title = "Shared radius";
 export const sceneFile = "beam-shared.ts";
 
 /** One radius literal feeds every ring and the roof hub. */

@@ -1,7 +1,12 @@
 import "./style.css";
-import { startPaper2d } from "./paper2d.ts";
-
-const sceneKey = new URLSearchParams(location.search).get("scene") ?? "beam";
+import "../../../packages/shell/src/workspace.css";
+import { scenes } from "virtual:scene-catalog";
+import { startWorkspace } from "@design-scenes/shell";
+import { euclid2Host } from "./hosts/euclid2.ts";
+import { euclid3Host } from "./hosts/euclid3.ts";
+import { sdfHost } from "./hosts/sdf.ts";
+import { sdf2Host } from "./hosts/sdf2.ts";
+import { sceneLoaders } from "./scene-loaders.ts";
 
 const crumbEl = document.querySelector<HTMLElement>("#crumb")!;
 const metaEl = document.querySelector<HTMLElement>("#meta")!;
@@ -9,164 +14,20 @@ const sourceEl = document.querySelector<HTMLElement>("#source")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const errorEl = document.querySelector<HTMLElement>("#error")!;
 const titleEl = document.querySelector<HTMLElement>("#scene-title")!;
-const paper = document.querySelector<HTMLCanvasElement>("#paper")!;
-const space = document.querySelector<HTMLCanvasElement>("#space")!;
+const navRoot = document.querySelector<HTMLElement>("#scene-nav")!;
+const viewportRoot = document.querySelector<HTMLElement>("#viewport")!;
 
-for (const link of document.querySelectorAll<HTMLAnchorElement>(
-  "#scene-nav a[data-scene]",
-)) {
-  link.classList.toggle("active", link.dataset.scene === sceneKey);
-}
-
-const inspect = { crumbEl, metaEl, sourceEl, statusEl, errorEl };
-
-function fail3d(err: unknown): void {
-  errorEl.hidden = false;
-  errorEl.textContent = err instanceof Error ? err.message : String(err);
-  statusEl.textContent = "3D view failed to load";
-}
-
-if (sceneKey === "split") {
-  document.body.classList.add("view-split");
-  paper.hidden = false;
-  space.hidden = false;
-  titleEl.textContent = "Plate + mill";
-  document.title = "euclid — Plate + mill";
-  statusEl.textContent = "Loading 3D view…";
-  let refreshMill: ((opts?: { quiet?: boolean }) => void) | undefined;
-  startPaper2d({
-    sceneKey: "plate",
-    split: true,
-    onLiveChange: () => refreshMill?.({ quiet: true }),
-  });
-  void import("./paper3d.ts")
-    .then((m) => {
-      const mill = m.startPaper3d(inspect, { split: true, sceneKey: "mill" });
-      refreshMill = mill.refresh;
-      mill.refresh({ quiet: true });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "gearsplit") {
-  document.body.classList.add("view-split");
-  paper.hidden = false;
-  space.hidden = false;
-  titleEl.textContent = "Gears + helix";
-  document.title = "euclid — Gears + helix";
-  statusEl.textContent = "Loading 3D view…";
-  let refreshHelix: ((opts?: { quiet?: boolean }) => void) | undefined;
-  startPaper2d({
-    sceneKey: "gear",
-    split: true,
-    onLiveChange: () => refreshHelix?.({ quiet: true }),
-  });
-  void import("./paper3d.ts")
-    .then((m) => {
-      const view = m.startPaper3d(inspect, { split: true, sceneKey: "helix" });
-      refreshHelix = view.refresh;
-      view.refresh({ quiet: true });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "mill") {
-  document.body.classList.add("view-3d");
-  paper.hidden = true;
-  space.hidden = false;
-  titleEl.textContent = "Milled block (3D)";
-  document.title = "euclid3 — Milled block";
-  statusEl.textContent = "Loading 3D view…";
-  void import("./paper3d.ts")
-    .then((m) => {
-      m.startPaper3d(inspect, { sceneKey: "mill" });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "helix") {
-  document.body.classList.add("view-3d");
-  paper.hidden = true;
-  space.hidden = false;
-  titleEl.textContent = "Helical gears";
-  document.title = "euclid3 — Helical gears";
-  statusEl.textContent = "Loading 3D view…";
-  void import("./paper3d.ts")
-    .then((m) => {
-      m.startPaper3d(inspect, { sceneKey: "helix" });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "ringsplit") {
-  document.body.classList.add("view-split");
-  paper.hidden = false;
-  space.hidden = false;
-  titleEl.textContent = "Signet · unrolled + wrap";
-  document.title = "euclid — Signet band";
-  statusEl.textContent = "Loading 3D view…";
-  let refreshRing: ((opts?: { quiet?: boolean }) => void) | undefined;
-  startPaper2d({
-    sceneKey: "ring",
-    split: true,
-    onLiveChange: () => refreshRing?.({ quiet: true }),
-  });
-  void import("./paper3d.ts")
-    .then((m) => {
-      const view = m.startPaper3d(inspect, { split: true, sceneKey: "ring3" });
-      refreshRing = view.refresh;
-      view.refresh({ quiet: true });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "ring3") {
-  document.body.classList.add("view-3d");
-  paper.hidden = true;
-  space.hidden = false;
-  titleEl.textContent = "Signet wrap";
-  document.title = "euclid3 — Signet wrap";
-  statusEl.textContent = "Loading 3D view…";
-  void import("./paper3d.ts")
-    .then((m) => {
-      m.startPaper3d(inspect, { sceneKey: "ring3" });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "rose") {
-  document.body.classList.add("view-triple");
-  paper.hidden = false;
-  space.hidden = false;
-  const profileCanvas = document.querySelector<HTMLCanvasElement>("#profile")!;
-  profileCanvas.hidden = false;
-  titleEl.textContent = "Cylinder · plan + profile + SDF";
-  document.title = "euclid — Cylinder CSG";
-  statusEl.textContent = "Loading field view…";
-  let refreshSdf: ((opts?: { quiet?: boolean }) => void) | undefined;
-  startPaper2d({
-    sceneKey: "cylinder",
-    split: true,
-    onLiveChange: () => refreshSdf?.({ quiet: true }),
-  });
-  void import("./papersdf2.ts")
-    .then((m) => {
-      m.startPaperSdf2(inspect, {
-        split: true,
-        canvas: profileCanvas,
-        onLiveChange: () => refreshSdf?.({ quiet: true }),
-      });
-    })
-    .catch(fail3d);
-  void import("./papersdf.ts")
-    .then((m) => {
-      const view = m.startPaperSdf(inspect, { split: true });
-      refreshSdf = view.refresh;
-      view.refresh({ quiet: true });
-    })
-    .catch(fail3d);
-} else if (sceneKey === "profile") {
-  document.body.classList.add("view-2d");
-  paper.hidden = false;
-  space.hidden = true;
-  titleEl.textContent = "Sweep profile";
-  document.title = "sdf2 — Sweep profile";
-  void import("./papersdf2.ts")
-    .then((m) => {
-      m.startPaperSdf2(inspect);
-    })
-    .catch(fail3d);
-} else {
-  document.body.classList.add("view-2d");
-  paper.hidden = false;
-  space.hidden = true;
-  startPaper2d();
-}
+void startWorkspace({
+  scenes,
+  loaders: sceneLoaders,
+  hosts: {
+    euclid2: euclid2Host,
+    euclid3: euclid3Host,
+    sdf: sdfHost,
+    sdf2: sdf2Host,
+  },
+  navRoot,
+  viewportRoot,
+  inspect: { crumbEl, metaEl, sourceEl, statusEl, errorEl },
+  titleEl,
+});

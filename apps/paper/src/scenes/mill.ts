@@ -4,8 +4,10 @@ import { editPointOnLine3 } from "@design-scenes/euclid3";
 import { drawMill, millFromPlate } from "../demo/mill.ts";
 import { plateLayout } from "./plate.ts";
 
+export const title = "Mill 3D";
 export const view = "euclid3" as const;
 export const sceneFile = "mill.ts";
+export const hint = "XY from plate.ts · coral glider is thickness · LMB orbit";
 
 let readPlate = plateLayout;
 
@@ -25,7 +27,7 @@ if (import.meta.hot) {
  * gizmos (and increment euclid2 indices) while evaluating this scene.
  * Silent evaluation reads a published plate snapshot (split view), not
  * the live widgets of mill/nest — those would collide on index 0.
- * Pass the channel that paper2d published (`"plate"`).
+ * Pass the channel that the 2D pane published (`"plate"`).
  */
 export function scene() {
   const plate = withoutWidgets(() => readPlate(), "plate");

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./workspace.css": "./src/workspace.css"
   },
   "dependencies": {
     "typescript": "~6.0.2"

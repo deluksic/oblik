@@ -2,7 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import * as ts from "typescript";
-import type { Plugin } from "vite";
+import type { ModuleNode, Plugin, ViteDevServer } from "vite";
+import { parseSceneSource } from "./catalog.ts";
+import { isSceneId } from "./layout-grid.ts";
+import type { SceneEntry } from "./types.ts";
+import { newSceneSource, titleFromId } from "./new-scene.ts";
+
+const VIRTUAL_CATALOG = "virtual:scene-catalog";
+const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";
 
 const EDIT_NAMES = new Set([
   "editPoint",
@@ -194,13 +201,64 @@ function sendText(res: ServerResponse, text: string) {
   res.end(text);
 }
 
+function listSceneFiles(sceneDir: string): string[] {
+  if (!fs.existsSync(sceneDir)) return [];
+  return fs
+    .readdirSync(sceneDir)
+    .filter((n) => n.endsWith(".ts") && !n.endsWith(".d.ts"))
+    .map((n) => path.join(sceneDir, n))
+    .sort();
+}
+
+export function scanSceneCatalog(sceneDir: string): SceneEntry[] {
+  const entries = listSceneFiles(sceneDir).map((abs) =>
+    parseSceneSource(abs, fs.readFileSync(abs, "utf8")),
+  );
+  const seen = new Map<string, string>();
+  for (const e of entries) {
+    const prev = seen.get(e.id);
+    if (prev) {
+      e.error = `duplicate id "${e.id}" (also ${prev})`;
+    } else {
+      seen.set(e.id, e.file);
+    }
+  }
+  return entries;
+}
+
+function invalidateCatalog(server: ViteDevServer): void {
+  const mod = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+  if (mod) void server.reloadModule(mod);
+}
+
 export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
+  let vite: ViteDevServer | undefined;
 
   return {
     name: "scene-dev",
+    resolveId(id) {
+      if (id === VIRTUAL_CATALOG) return VIRTUAL_CATALOG_RESOLVED;
+      return undefined;
+    },
+    load(id) {
+      if (id !== VIRTUAL_CATALOG_RESOLVED) return undefined;
+      const scenes = scanSceneCatalog(sceneDir);
+      return `export const scenes = ${JSON.stringify(scenes)};\n`;
+    },
     configureServer(server) {
+      vite = server;
+      server.watcher.add(sceneDir);
+      const onSceneDir = (file: string) => {
+        if (file.startsWith(sceneDir + path.sep) && file.endsWith(".ts")) {
+          invalidateCatalog(server);
+        }
+      };
+      server.watcher.on("add", onSceneDir);
+      server.watcher.on("unlink", onSceneDir);
+      server.watcher.on("change", onSceneDir);
+
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0] ?? "";
         try {
@@ -249,6 +307,38 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             return;
           }
 
+          if (url === "/__create-scene" && req.method === "POST") {
+            const raw = JSON.parse(await readBody(req)) as Record<
+              string,
+              unknown
+            >;
+            const id = raw.id;
+            if (typeof id !== "string" || !isSceneId(id)) {
+              json(res, 400, {
+                ok: false,
+                error:
+                  'id must match [a-z][a-z0-9-]* so it can be a CSS grid area',
+              });
+              return;
+            }
+            const abs = resolveUnder(sceneDir, `${id}.ts`);
+            if (fs.existsSync(abs)) {
+              json(res, 409, {
+                ok: false,
+                error: `${id}.ts already exists`,
+              });
+              return;
+            }
+            const title =
+              typeof raw.title === "string" && raw.title.trim()
+                ? raw.title.trim()
+                : titleFromId(id);
+            fs.writeFileSync(abs, newSceneSource(id, title));
+            if (vite) invalidateCatalog(vite);
+            json(res, 200, { ok: true, id, file: `${id}.ts` });
+            return;
+          }
+
           if (url === "/__peek" && req.method === "GET") {
             const u = new URL(req.url ?? "", "http://127.0.0.1");
             const file = (u.searchParams.get("file") ?? "").replace(/^\/+/, "");
@@ -269,6 +359,17 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
         }
         next();
       });
+    },
+    handleHotUpdate(ctx) {
+      if (ctx.file.startsWith(sceneDir + path.sep) && ctx.file.endsWith(".ts")) {
+        const mods: ModuleNode[] = [...ctx.modules];
+        const catalog = ctx.server.moduleGraph.getModuleById(
+          VIRTUAL_CATALOG_RESOLVED,
+        );
+        if (catalog) mods.push(catalog);
+        return mods;
+      }
+      return undefined;
     },
   };
 }

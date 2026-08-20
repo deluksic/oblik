@@ -6,6 +6,7 @@ import {
   editPointOnLine,
 } from "@design-scenes/euclid2";
 
+export const title = "Grouped";
 export const sceneFile = "beam.ts";
 
 export function scene() {

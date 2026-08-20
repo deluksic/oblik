@@ -15,7 +15,7 @@ pnpm install
 pnpm dev
 ```
 
-Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
+Opens [http://127.0.0.1:43117](http://127.0.0.1:43117) on the welcome screen. **New scene** writes `apps/paper/src/scenes/<id>.ts`. The nav is generated from that folder; a layout file is CSS `grid-template-areas` whose cell names are scene ids (`rose.ts`, `split.ts`, …).
 
 - [?scene=beam](http://127.0.0.1:43117/?scene=beam) — one truss; `group()` namespaces **paths** (`group[0] › line[2]`). The roof uses the middle ring’s `r1`.
 - [?scene=flat](http://127.0.0.1:43117/?scene=flat) — two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.

@@ -1,0 +1,129 @@
+.view-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--stroke, #2a3040);
+}
+
+.view-pane:first-child {
+  border-left: none;
+}
+
+.view-pane.is-focused {
+  box-shadow: inset 0 2px 0 0 var(--accent, #e8876a);
+}
+
+.view-label {
+  display: block;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-bottom: 1px solid var(--stroke, #2a3040);
+  background: #12151c;
+  color: var(--muted, #9a9488);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.view-pane canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  background: #12141c;
+}
+
+.view-pane-error {
+  flex: 1;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  color: #ffd0b8;
+  background: #3a2418;
+}
+
+.shell-welcome {
+  min-height: 0;
+  overflow: auto;
+  padding: 2.2rem 1.6rem 2.4rem;
+  max-width: 36rem;
+}
+
+.shell-welcome h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.shell-welcome .lead {
+  margin: 0 0 1.4rem;
+  color: var(--muted, #9a9488);
+  line-height: 1.45;
+}
+
+.shell-welcome form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.shell-welcome input {
+  flex: 1;
+  min-width: 10rem;
+  background: #10131a;
+  border: 1px solid var(--stroke, #2a3040);
+  color: var(--text, #ece8de);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+}
+
+.shell-welcome button {
+  background: var(--accent, #e8876a);
+  color: #1a120e;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.48rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shell-welcome button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.shell-welcome .form-error {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+  color: #ffd0b8;
+  font-size: 0.85rem;
+}
+
+.shell-welcome .hint {
+  margin: 1.1rem 0 0;
+  color: var(--muted, #9a9488);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 1100px) {
+  .shell-viewport {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: repeat(auto-fit, minmax(8rem, 1fr)) !important;
+    grid-template-areas: var(--stack-areas) !important;
+  }
+
+  .view-pane {
+    border-left: none;
+    border-top: 1px solid var(--stroke, #2a3040);
+  }
+
+  .view-pane:first-child {
+    border-top: none;
+  }
+}

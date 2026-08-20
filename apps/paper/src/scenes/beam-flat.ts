@@ -6,6 +6,8 @@ import {
   editPointOnLine,
 } from "@design-scenes/euclid2";
 
+export const id = "flat";
+export const title = "Flat";
 export const sceneFile = "beam-flat.ts";
 
 /** Two trusses, no group — each handle is its own unrolled edit*. */

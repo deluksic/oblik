@@ -14,8 +14,9 @@ const INFRA = [
   "/@design-scenes/euclid3/",
   "/@design-scenes/shell/",
   "/node_modules/",
-  "/paper2d.ts",
-  "/paper3d.ts",
+  "/hosts/",
+  "/inspect.ts",
+  "/scene-loaders.ts",
 ];
 
 function isInfra(file: string): boolean {
