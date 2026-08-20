@@ -1,7 +1,7 @@
 import { line3 } from "@design-scenes/geom";
 import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnLine3 } from "@design-scenes/euclid3";
-import { dimpledCylinder } from "../demo/rose-sdf.ts";
+import { dimpledCylinderPack } from "../demo/rose-sdf.ts";
 import { cylinderLayout } from "./cylinder.ts";
 
 export const view = "sdf" as const;
@@ -24,8 +24,8 @@ if (import.meta.hot) {
 export function scene() {
   const layout = withoutWidgets(() => readLayout());
   const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnLine3(mast, 0.06).z;
-  return dimpledCylinder({
+  const height = editPointOnLine3(mast, 0.05).z;
+  return dimpledCylinderPack({
     radius: layout.radius,
     height,
     ringR: layout.ringR,

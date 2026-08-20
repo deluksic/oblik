@@ -3,6 +3,14 @@ import { circle, type Geom, type Vec2 } from "@design-scenes/geom";
 /** Stock radius. Not a widget — the dashed handle was covering the plan. */
 export const CYLINDER_RADIUS = 2.2;
 
+/**
+ * Six equal circles around one of the same size: centre-to-centre is 2R.
+ * Not a widget.
+ */
+export function pack7(radius: number): Vec2[] {
+  return [{ x: 0, y: 0 }, ...ringBalls(2 * radius)];
+}
+
 export type CylinderLayout = {
   radius: number;
   ringR: number;
@@ -21,11 +29,17 @@ export function ringBalls(ringR: number): Vec2[] {
   return out;
 }
 
-/** Top view: fixed cylinder, six ring balls, one centre ball. */
-export function drawCylinderPlan(layout: CylinderLayout): Geom[] {
+function dimples(origin: Vec2, layout: CylinderLayout): Geom[] {
   return [
-    circle({ x: 0, y: 0 }, layout.radius),
-    circle({ x: 0, y: 0 }, layout.centerR),
-    ...ringBalls(layout.ringR).map((b) => circle(b, layout.ringBallR)),
+    circle(origin, layout.centerR),
+    ...ringBalls(layout.ringR).map((b) =>
+      circle({ x: origin.x + b.x, y: origin.y + b.y }, layout.ringBallR),
+    ),
   ];
+}
+
+/** Top view: seven cylinders (fixed hex pack) with the same dimple on each. */
+export function drawCylinderPlan(layout: CylinderLayout): Geom[] {
+  const cells = pack7(layout.radius);
+  return cells.flatMap((c) => [circle(c, layout.radius), ...dimples(c, layout)]);
 }

@@ -81,7 +81,7 @@ let cam: Camera =
       : sceneKey === "ring"
         ? { x: 18, y: 3.2, scale: 14 }
         : sceneKey === "cylinder"
-          ? { x: 0, y: 0, scale: 38 }
+          ? { x: 0, y: 0, scale: 16 }
         : defaultCamera();
 let hoverId: string | null = null;
 let selectedId: string | null = null;
@@ -179,7 +179,7 @@ function render(): void {
         : sceneKey === "ring"
           ? "Drag the bore, shank, and signet on the unrolled strip — the wrap has no 3D widgets"
           : sceneKey === "cylinder"
-            ? "Drag ring radius, centre Ø, and outer ball Ø — SDF follows live · coral glider on the right is height"
+            ? "Drag the centre-cell dimple — all seven follow · coral glider on the right is height"
           : "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
       : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
@@ -196,7 +196,7 @@ function render(): void {
             : sceneKey === "ring"
               ? "Unrolled signet. Dashed circle is inner R (strip length 2πR). Shank and signet heights sit on the developed paper; Gauge is thickness"
               : sceneKey === "cylinder"
-                ? "Plan of the cylinder top. Radius is fixed. Drag the six-ball ring, the centre Ø, and the outer ball Ø"
+                ? "Seven cylinders, hex-packed (fixed). Drag the centre cell: dimple ring, centre Ø, outer ball Ø"
             : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
@@ -239,7 +239,7 @@ async function updateInspect(): Promise<void> {
           : sceneKey === "ring"
             ? "2D writes ring.ts. The wrap is a view — ring3.ts has no edit* calls."
             : sceneKey === "cylinder"
-              ? "2D writes cylinder.ts (ring radius + both ball Ø). Cylinder radius is a constant. Height writes rose-sdf.ts."
+              ? "2D writes cylinder.ts (dimple ring + both ball Ø). The hex pack of seven is fixed. Height writes rose-sdf.ts."
             : "2D writes plate.ts; 3D thickness writes mill.ts. Mill XY follows these handles while you drag."
         : sceneKey === "flat"
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
@@ -256,7 +256,7 @@ async function updateInspect(): Promise<void> {
               : sceneKey === "ring"
                 ? "Plan circle is the bore. The long strip is the developed band; signet height is the dashed circle at mid-strip."
                 : sceneKey === "cylinder"
-                  ? "Outer circle is the cylinder (not a handle). Dashed circles are the six-ball ring, the centre Ø, and the outer ball Ø."
+                  ? "Seven equal circles, six around one (not a handle). Dashed gizmos on the centre cell: dimple ring, centre Ø, outer ball Ø."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;

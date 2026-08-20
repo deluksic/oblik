@@ -10,14 +10,14 @@ export const sceneFile = "cylinder.ts";
 const origin = { x: 0, y: 0 };
 
 /**
- * Plan of the cylinder top. Ring radius, centre ball Ø, and outer
- * ball Ø are widgets. Cylinder radius is a constant.
+ * Plan of seven packed cylinders. Widgets live on the centre cell:
+ * dimple ring radius, centre ball Ø, outer ball Ø. The hex pack is fixed.
  */
 export function cylinderLayout(): CylinderLayout {
-  const ringR = editDistanceToPoint(origin, 1.26);
-  const centerR = editDistanceToPoint(origin, 0.77);
+  const ringR = editDistanceToPoint(origin, 1.4);
+  const centerR = editDistanceToPoint(origin, 1.23);
   const ring0 = { x: 0, y: -ringR };
-  const ringBallR = editDistanceToPoint(ring0, 0.5);
+  const ringBallR = editDistanceToPoint(ring0, 0.73);
   return {
     radius: CYLINDER_RADIUS,
     ringR,
