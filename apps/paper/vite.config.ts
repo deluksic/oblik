@@ -13,6 +13,22 @@ export default defineConfig({
       sceneDir: path.join(appRoot, "src/scenes"),
     }),
   ],
+  resolve: {
+    alias: {
+      "@design-scenes/geom": path.resolve(
+        workspaceRoot,
+        "packages/geom/src/index.ts",
+      ),
+      "@design-scenes/euclid2": path.resolve(
+        workspaceRoot,
+        "packages/euclid2/src/index.ts",
+      ),
+      "@design-scenes/euclid3": path.resolve(
+        workspaceRoot,
+        "packages/euclid3/src/index.ts",
+      ),
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 43117,
@@ -25,5 +41,6 @@ export default defineConfig({
       "@design-scenes/euclid2",
       "@design-scenes/euclid3",
     ],
+    include: ["three", "three/addons/controls/OrbitControls.js"],
   },
 });
