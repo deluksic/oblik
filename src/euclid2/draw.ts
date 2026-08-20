@@ -189,9 +189,5 @@ function drawGizmo(
     ctx.setLineDash([5, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
-    const rim = worldToScreen(cam, { x: g.origin.x + g.d, y: g.origin.y }, w, h);
-    ctx.beginPath();
-    ctx.arc(rim.x, rim.y, 5, 0, Math.PI * 2);
-    ctx.fill();
   }
 }
