@@ -9,7 +9,7 @@ import {
 export const sceneFile = "src/scenes/beam.ts";
 
 export function scene() {
-  const a = editPoint(-4, 0);
+  const a = editPoint(-3.5, 0.2);
   const b = editPoint(4, 0.45);
   const span = line(a, b);
   const post = editPointOnLine(span, 0.34);

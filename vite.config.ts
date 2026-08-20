@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { fsBridgePlugin } from "./vite-plugin-fs";
+import { fsBridgePlugin } from "./vite-plugin-fs.ts";
 
 export default defineConfig({
   plugins: [fsBridgePlugin()],
