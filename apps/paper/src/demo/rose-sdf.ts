@@ -21,10 +21,10 @@ export type DimpledCylinderOpts = {
  */
 export function dimpledCylinder(opts: DimpledCylinderOpts): Sdf {
   const R = Math.max(0.4, opts.radius);
-  const h = Math.max(0.25, opts.height);
-  const halfH = h / 2;
-  const ringBallR = Math.max(0.08, opts.ringBallR);
-  const centerR = Math.max(0.08, opts.centerR);
+  const h = opts.height;
+  const halfH = Math.abs(h) / 2;
+  const ringBallR = Math.abs(opts.ringBallR);
+  const centerR = Math.abs(opts.centerR);
   const body = cylinder({ x: 0, y: 0, z: halfH }, R, halfH);
   const top = h;
   const balls = [

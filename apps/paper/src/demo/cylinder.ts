@@ -3,9 +3,6 @@ import { circle, type Geom, type Vec2 } from "@design-scenes/geom";
 /** Stock radius. Not a widget — the dashed handle was covering the plan. */
 export const CYLINDER_RADIUS = 2.2;
 
-/** Outer six balls. Size is a constant; only their ring radius is a widget. */
-export const RING_BALL_RADIUS = 0.5;
-
 export type CylinderLayout = {
   radius: number;
   ringR: number;

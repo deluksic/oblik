@@ -85,20 +85,20 @@ export function startPaperSdf(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Drag the 2D ring and centre Ø — field follows live · coral glider is height · LMB orbit"
+        ? "Drag the 2D ring and both ball Ø — field follows live · coral glider is height · LMB orbit"
         : "SDF CSG — XY from cylinder.ts · coral glider is height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
       els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${sceneMod.sceneFile}`;
       els.metaEl.textContent =
-        "The field has no provenance. Height is the only 3D widget; ring radius and centre Ø live in cylinder.ts.";
+        "The field has no provenance. Height is the only 3D widget; ring radius and both ball Ø live in cylinder.ts.";
       els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneMod.sceneFile}.</code>`;
     } else {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent = opts.split
         ? "Plan writes cylinder.ts. Only height is a widget here. The field itself is not pickable."
-        : "Ring radius and centre Ø come from cylinder.ts. Only height is a widget here.";
+        : "Ring radius and both ball Ø come from cylinder.ts. Only height is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
   }
