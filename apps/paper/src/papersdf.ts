@@ -83,8 +83,8 @@ export function startPaperSdf(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Drag the 2D profile — molding follows around all seven · coral glider is height · LMB orbit"
-        : "SDF CSG — XY from cylinder.ts · coral glider is height · LMB orbit";
+        ? "Seven swept rings, joined, then the quatrefoil is cut out · coral glider is cut height · LMB orbit"
+        : "SDF CSG — join the swept rings, then subtract · coral glider is cut height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
