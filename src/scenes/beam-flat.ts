@@ -14,7 +14,7 @@ export function scene() {
   const bTop = editPoint(2.53, -2.27);
   const spanTop = line(aTop, bTop);
   const p0Top = editPointOnLine(spanTop, 0.25);
-  const r0Top = editDistanceToPoint(p0Top, 3.91);
+  const r0Top = editDistanceToPoint(p0Top, 2.77);
   const p1Top = editPointOnLine(spanTop, 0.5);
   const r1Top = editDistanceToPoint(p1Top, 0.34);
   const p2Top = editPointOnLine(spanTop, 0.75);

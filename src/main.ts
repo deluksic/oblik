@@ -1,5 +1,6 @@
 import "./style.css";
 import { breadcrumb, type Geom } from "./lib/geom.ts";
+import { registerSceneLines } from "./lib/provenance.ts";
 import { dist, projectT } from "./lib/vec.ts";
 import {
   defaultCamera,
@@ -77,10 +78,24 @@ function evaluate(): void {
     frame = runScene(sceneMod);
     lastGood = frame;
     error = null;
+    const gizmoCount = frame?.gizmos.length ?? 0;
+    const editCount = (peekCache.get(sceneMod.sceneFile.replace(/^src\//, "")) ?? "")
+      .split("\n")
+      .filter((ln) => /\bedit(?:Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln))
+      .length;
+    if (gizmoCount > 0 && editCount > 0 && gizmoCount !== editCount) {
+      error = `${gizmoCount} widgets at runtime but ${editCount} edit* calls in scene — unroll helpers`;
+    }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
     frame = lastGood;
   }
+}
+
+async function ensureSceneSource(): Promise<void> {
+  const rel = sceneMod.sceneFile.replace(/^src\//, "");
+  const text = await peekFile(rel);
+  registerSceneLines(text);
 }
 
 function activeGizmo(): number | null {
@@ -232,7 +247,7 @@ async function commitDrag(g: Gizmo): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         file: sceneMod.sceneFile,
-        site: g.site,
+        widgetIndex: g.index,
         values,
       }),
     });
@@ -353,18 +368,24 @@ if (import.meta.hot) {
     sceneMod = mod as unknown as SceneModule;
     clearWidgetOverrides();
     peekCache.clear();
-    evaluate();
-    render();
+    void ensureSceneSource().then(() => {
+      evaluate();
+      render();
+    });
   });
   import.meta.hot.accept("./scenes/beam-flat.ts", (mod) => {
     if (!mod || !("scene" in mod) || sceneKey !== "flat") return;
     sceneMod = mod as unknown as SceneModule;
     clearWidgetOverrides();
     peekCache.clear();
-    evaluate();
-    render();
+    void ensureSceneSource().then(() => {
+      evaluate();
+      render();
+    });
   });
 }
 
-evaluate();
-render();
+void ensureSceneSource().then(() => {
+  evaluate();
+  render();
+});

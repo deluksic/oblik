@@ -74,40 +74,11 @@ function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
   return calls;
 }
 
-function findEditCall(
-  sourceFile: ts.SourceFile,
-  calls: ts.CallExpression[],
-  line: number,
-  column: number,
-): ts.CallExpression | undefined {
-  for (const call of calls) {
-    const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
-    if (pos.line + 1 === line && pos.character + 1 === column) return call;
-  }
-  let best: ts.CallExpression | undefined;
-  let bestDist = Infinity;
-  for (const call of calls) {
-    const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
-    if (pos.line + 1 !== line) continue;
-    const dist = Math.abs(pos.character + 1 - column);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = call;
-    }
-  }
-  return best;
-}
-
 function patchWidget(
   source: string,
-  site: { line: number; column: number; instance: number },
+  widgetIndex: number,
   values: number[],
 ): string {
-  if (site.instance > 0) {
-    throw new Error(
-      `edit* at ${site.line}:${site.column} was invoked ${site.instance + 1} times this frame but the scene has one literal — unroll or duplicate the call in the scene file`,
-    );
-  }
   const sourceFile = ts.createSourceFile(
     "scene.ts",
     source,
@@ -116,10 +87,10 @@ function patchWidget(
     ts.ScriptKind.TS,
   );
   const calls = collectEditCalls(sourceFile);
-  const call = findEditCall(sourceFile, calls, site.line, site.column);
+  const call = calls[widgetIndex];
   if (!call) {
     throw new Error(
-      `edit* at ${site.line}:${site.column} not found (${calls.length} edit* calls in file)`,
+      `widget ${widgetIndex} not found (${calls.length} edit* calls in file)`,
     );
   }
 
@@ -173,15 +144,12 @@ export function fsBridgePlugin(): Plugin {
           if (url === "/__write-widget" && req.method === "POST") {
             const body = JSON.parse(await readBody(req)) as {
               file?: string;
-              site?: { line: number; column: number; instance: number };
+              widgetIndex?: number;
               values?: number[];
             };
             if (
               typeof body.file !== "string" ||
-              !body.site ||
-              typeof body.site.line !== "number" ||
-              typeof body.site.column !== "number" ||
-              typeof body.site.instance !== "number" ||
+              typeof body.widgetIndex !== "number" ||
               !Array.isArray(body.values)
             ) {
               json(res, 400, { ok: false, error: "invalid body" });
@@ -189,7 +157,7 @@ export function fsBridgePlugin(): Plugin {
             }
             const abs = resolveUnder(SCENE_ROOT, path.basename(body.file));
             const source = fs.readFileSync(abs, "utf8");
-            const next = patchWidget(source, body.site, body.values);
+            const next = patchWidget(source, body.widgetIndex, body.values);
             fs.writeFileSync(abs, next);
             json(res, 200, { ok: true });
             return;
