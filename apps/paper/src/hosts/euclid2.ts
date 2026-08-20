@@ -145,7 +145,7 @@ export const euclid2Host: ViewHost = {
         els.crumbEl.textContent = "Nothing selected";
         els.metaEl.textContent = hintOf(
           sceneMod as unknown as Record<string, unknown>,
-          "Hover geometry or a coral handle. Numbers live in the scene file.",
+          "Hover geometry or a handle. Numbers live in the scene file.",
         );
         els.sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
         return;
@@ -153,7 +153,7 @@ export const euclid2Host: ViewHost = {
       els.crumbEl.textContent = t.title;
       if (t.file == null || t.line == null) {
         els.metaEl.textContent =
-          "Coral handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
+          "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
         return;
       }
@@ -192,7 +192,7 @@ export const euclid2Host: ViewHost = {
             tool,
             hintOf(
               sceneMod as unknown as Record<string, unknown>,
-              "Space adds a coral editor · drag handles · wheel zooms",
+              "Space adds an editor · drag handles · wheel zooms",
             ),
           );
       els.errorEl.hidden = !error;

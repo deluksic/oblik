@@ -7,7 +7,7 @@ import { plateLayout } from "./plate.ts";
 export const title = "Mill 3D";
 export const view = "euclid3" as const;
 export const sceneFile = "mill.ts";
-export const hint = "XY from plate.ts · coral glider is thickness · LMB orbit";
+export const hint = "XY from plate.ts · glider is thickness · LMB orbit";
 
 let readPlate = plateLayout;
 

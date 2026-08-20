@@ -436,7 +436,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                     json(res, 400, {
                       ok: false,
                       error:
-                        "That handle is not declared in scene() — place a new point, or pick a coral point that scene() owns.",
+                        "That handle is not declared in scene() — place a new point, or pick a point that scene() owns.",
                     });
                     return;
                   }

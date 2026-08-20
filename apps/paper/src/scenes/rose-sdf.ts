@@ -15,7 +15,7 @@ export const title = "Cylinder SDF";
 export const view = "sdf" as const;
 export const sceneFile = "rose-sdf.ts";
 export const hint =
-  "Joined rings + filled disks, then quatrefoil cut · coral glider is height";
+  "Joined rings + filled disks, then quatrefoil cut · glider is height";
 
 let readLayout = cylinderLayout;
 let readProfile = profileLayout;

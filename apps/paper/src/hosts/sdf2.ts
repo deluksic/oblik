@@ -149,14 +149,14 @@ export const sdf2Host: ViewHost = {
         : editorStatus(
             tool,
             sceneMod.hint ??
-              "Space adds a coral editor · X radial, Y is Z",
+              "Space adds an editor · X radial, Y is Z",
           );
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
       if (hoverGizmo) {
         els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`;
         els.metaEl.textContent =
-          "Coral handles are scene widgets. The filled blob is the 2D SDF.";
+          "Handles are scene widgets. The filled blob is the 2D SDF.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
       } else {
         els.crumbEl.textContent = "Nothing selected";

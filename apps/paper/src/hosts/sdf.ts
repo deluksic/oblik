@@ -60,7 +60,7 @@ export const sdfHost: ViewHost = {
       els.statusEl.textContent = error
         ? "Last good frame · scene threw"
         : (sceneMod.hint ??
-          "Field view — not pickable · coral glider writes this file · LMB orbit");
+          "Field view — not pickable · glider writes this file · LMB orbit");
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
       if (hoverGizmo) {
@@ -71,7 +71,7 @@ export const sdfHost: ViewHost = {
       } else {
         els.crumbEl.textContent = "Nothing selected";
         els.metaEl.textContent =
-          "The field itself is not pickable. Drag a coral handle, or edit a 2D pane.";
+          "The field itself is not pickable. Drag a handle, or edit a 2D pane.";
         els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
       }
     }

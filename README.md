@@ -17,8 +17,8 @@ Scene catalog and controls: [docs/scenes.md](./docs/scenes.md).
 
 ## Try
 
-- **Space** — command palette. **Point** places a coral `editPoint`. **Distance** places a dashed ring (`editDistanceToPoint`).
-- Drag coral **points**, the **glider** on the span, or a **dashed radius**.
+- **Space** — command palette. **Point** places `editPoint`. **Distance** places `editDistanceToPoint`.
+- Drag **points**, the **glider** on the span, or a **dashed radius**.
 - Click a tick: inspector shows **path**, **id**, and the **creation site**.
 - Wheel zooms; drag empty paper (or Alt-drag) to pan.
 

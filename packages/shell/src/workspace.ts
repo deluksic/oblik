@@ -378,7 +378,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     const cmds = h?.commands?.() ?? [];
     if (cmds.length === 0) {
       inspect.statusEl.textContent =
-        "Space adds coral editors on 2D paper. This view has none yet.";
+        "Space adds editors on 2D paper. This view has none yet.";
       return;
     }
     palette.open();

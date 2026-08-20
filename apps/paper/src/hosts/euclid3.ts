@@ -40,7 +40,7 @@ function applyCamera3(space: SpaceView, mod: Record<string, unknown>): void {
 function hintOf(mod: Record<string, unknown>): string {
   return typeof mod.hint === "string"
     ? mod.hint
-    : "LMB orbit · RMB pan · wheel zoom · coral glider writes this file";
+    : "LMB orbit · RMB pan · wheel zoom · glider writes this file";
 }
 
 export const euclid3Host: ViewHost = {
@@ -86,7 +86,7 @@ export const euclid3Host: ViewHost = {
       if (hoverGizmo) {
         els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`;
         els.metaEl.textContent =
-          "Coral handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
+          "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
         return;
       }

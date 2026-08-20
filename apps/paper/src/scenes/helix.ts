@@ -11,7 +11,7 @@ export const camera3 = {
   position: [18, -24, 13],
   target: [0.3, 0, 1.15],
 };
-export const hint = "Section from gear.ts · coral glider is face width · LMB orbit";
+export const hint = "Section from gear.ts · glider is face width · LMB orbit";
 
 let readGears = gearLayout;
 

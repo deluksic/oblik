@@ -44,8 +44,6 @@ Layout files must not import pane modules. Live drag still updates the other pan
 | HUD slider | `editNumber` | `n` |
 | Gold / blue | pick highlight | nothing |
 
-Dashed coral is an editor. Inert reference dimensions use a different style.
-
 ## Space palette
 
 **Space** opens a command palette on the focused pane. Commands come from the view host.
@@ -53,9 +51,9 @@ Dashed coral is an editor. Inert reference dimensions use a different style.
 euclid2 and sdf2:
 
 1. **Point** — click empty paper → insert `const p = editPoint(x, y)` into `scene()`.
-2. **Distance** — click a coral point already bound as a named `const` in `scene()`, then a radius → insert `const d = editDistanceToPoint(p, r)`. Empty paper for a new origin, then a radius → insert both.
+2. **Distance** — click an `editPoint` already bound as a named `const` in `scene()`, then a radius → insert `const d = editDistanceToPoint(p, r)`. Empty paper for a new origin, then a radius → insert both.
 
-Inserts coral handles only. A new point is a coral dot; a new distance is a dashed ring. `scene()` may leave them unused.
+`scene()` may leave new editors unused.
 
 Esc cancels. The completed command is one text edit. Undo is the editor.
 

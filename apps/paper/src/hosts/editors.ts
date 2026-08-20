@@ -6,7 +6,7 @@ export const EDITOR_COMMANDS: CommandSpec[] = [
   {
     id: "point",
     title: "Point",
-    hint: "Coral dot. Click empty paper.",
+    hint: "Click empty paper.",
   },
   {
     id: "distance",
@@ -22,13 +22,13 @@ export type EditorTool =
       origin?: { x: number; y: number; widgetIndex?: number };
     };
 
-const CORAL = "#e8876a";
+const EDITOR = "#e8876a";
 
 export function editorStatus(tool: EditorTool | null, fallback: string): string {
   if (!tool) return fallback;
-  if (tool.id === "point") return "Click to place a coral point · Esc cancels";
+  if (tool.id === "point") return "Click to place a point · Esc cancels";
   if (!tool.origin) {
-    return "Click a coral point in this scene, or empty paper for a new origin · Esc cancels";
+    return "Click a point in this scene, or empty paper for a new origin · Esc cancels";
   }
   return "Click to set the dashed radius · Esc cancels";
 }
@@ -47,8 +47,8 @@ export function drawEditorGhost(
 ): void {
   if (!cursor && !(tool.id === "distance" && tool.origin)) return;
   ctx.save();
-  ctx.strokeStyle = CORAL;
-  ctx.fillStyle = CORAL;
+  ctx.strokeStyle = EDITOR;
+  ctx.fillStyle = EDITOR;
   if (tool.id === "point" && cursor) {
     const s = worldToScreen(cam, cursor, w, h);
     ctx.beginPath();
