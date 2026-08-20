@@ -28,6 +28,9 @@ type MountedPane = {
 };
 
 let activeWorkspaceCleanup: (() => void) | undefined;
+let workspaceGen = 0;
+let navWired: WorkspaceOpts | undefined;
+let navAbort: AbortController | undefined;
 
 function byId(scenes: SceneEntry[]): Map<string, SceneEntry> {
   return new Map(scenes.map((s) => [s.id, s]));
@@ -46,18 +49,81 @@ function renderNav(
   scenes: SceneEntry[],
   activeId: string | null,
 ): void {
-  const parts: string[] = [
-    `<a href="./" data-scene=""${activeId == null ? ' class="active"' : ""}>Welcome</a>`,
+  const welcomeOn = activeId == null ? ' class="active"' : "";
+  const options = [
+    `<option value="" disabled${activeId == null ? " selected" : ""}>Select Scene</option>`,
   ];
   for (const s of navItems(scenes)) {
-    const href = `?scene=${encodeURIComponent(s.id)}`;
-    const on = s.id === activeId ? ' class="active"' : "";
-    parts.push(`<span aria-hidden="true">·</span>`);
-    parts.push(
-      `<a href="${href}" data-scene="${s.id}"${on}>${escapeHtml(s.title)}</a>`,
+    const sel = s.id === activeId ? " selected" : "";
+    options.push(
+      `<option value="${escapeHtml(s.id)}"${sel}>${escapeHtml(s.title)}</option>`,
     );
   }
-  nav.innerHTML = parts.join("\n");
+  nav.innerHTML = `
+    <a href="${sceneHref(null)}" data-scene=""${welcomeOn}>Welcome</a>
+    <select name="scene" aria-label="Select Scene">${options.join("")}</select>
+  `;
+}
+
+function currentSceneId(): string | null {
+  const sceneParam = new URLSearchParams(location.search).get("scene");
+  return sceneParam && sceneParam !== "welcome" ? sceneParam : null;
+}
+
+function sceneHref(id: string | null): string {
+  return id ? `?scene=${encodeURIComponent(id)}` : "./";
+}
+
+function openScene(opts: WorkspaceOpts, id: string | null): void {
+  const url = id
+    ? `${location.pathname}?scene=${encodeURIComponent(id)}`
+    : location.pathname;
+  history.pushState(null, "", url);
+  void startWorkspace(opts);
+}
+
+function wireNav(opts: WorkspaceOpts): void {
+  if (navWired === opts) return;
+  navAbort?.abort();
+  navAbort = new AbortController();
+  const { signal } = navAbort;
+  navWired = opts;
+  opts.navRoot.addEventListener(
+    "click",
+    (e) => {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      const a = t.closest("a[data-scene]");
+      if (!(a instanceof HTMLAnchorElement) || !opts.navRoot.contains(a)) {
+        return;
+      }
+      e.preventDefault();
+      const next = a.dataset.scene === "" ? null : (a.dataset.scene ?? null);
+      if (next === currentSceneId()) return;
+      openScene(opts, next);
+    },
+    { signal },
+  );
+  opts.navRoot.addEventListener(
+    "change",
+    (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLSelectElement) || t.name !== "scene") return;
+      const next = t.value || null;
+      if (!next || next === currentSceneId()) return;
+      openScene(opts, next);
+    },
+    { signal },
+  );
+  window.addEventListener(
+    "popstate",
+    () => {
+      void startWorkspace(opts);
+    },
+    { signal },
+  );
 }
 
 function escapeHtml(s: string): string {
@@ -92,6 +158,7 @@ function showWelcome(
   viewport: HTMLElement,
   titleEl: HTMLElement,
   inspect: InspectEls,
+  opts: WorkspaceOpts,
 ): void {
   viewport.style.display = "block";
   viewport.classList.remove("shell-viewport");
@@ -140,7 +207,7 @@ function showWelcome(
     const input = form.elements.namedItem("id");
     const id =
       input instanceof HTMLInputElement ? input.value.trim().toLowerCase() : "";
-    void createScene(id, form.querySelector("button"), errEl);
+    void createScene(id, form.querySelector("button"), errEl, opts);
   });
 }
 
@@ -148,6 +215,7 @@ async function createScene(
   id: string,
   button: HTMLButtonElement | null,
   errEl: HTMLElement | null | undefined,
+  opts: WorkspaceOpts,
 ): Promise<void> {
   if (errEl) {
     errEl.hidden = true;
@@ -164,7 +232,7 @@ async function createScene(
     if (!res.ok || !body.ok || !body.id) {
       throw new Error(body.error ?? `create failed (${res.status})`);
     }
-    location.assign(`?scene=${encodeURIComponent(body.id)}`);
+    openScene(opts, body.id);
   } catch (err) {
     if (errEl) {
       errEl.hidden = false;
@@ -184,20 +252,20 @@ function errorPane(id: string, message: string): HTMLElement {
 }
 
 export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
+  const gen = ++workspaceGen;
   activeWorkspaceCleanup?.();
   activeWorkspaceCleanup = undefined;
+  wireNav(opts);
 
   const { scenes, loaders, hosts, navRoot, viewportRoot, inspect, titleEl } =
     opts;
   const catalog = byId(scenes);
-  const sceneParam = new URLSearchParams(location.search).get("scene");
-  const activeId =
-    sceneParam && sceneParam !== "welcome" ? sceneParam : null;
+  const activeId = currentSceneId();
 
   renderNav(navRoot, scenes, activeId);
 
   if (activeId == null) {
-    showWelcome(viewportRoot, titleEl, inspect);
+    showWelcome(viewportRoot, titleEl, inspect, opts);
     return;
   }
 
@@ -238,6 +306,14 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   viewportRoot.replaceChildren();
 
   const mounted: MountedPane[] = [];
+  let palette: ReturnType<typeof mountCommandPalette> | undefined;
+  let onKey: ((e: KeyboardEvent) => void) | undefined;
+  activeWorkspaceCleanup = () => {
+    palette?.dispose();
+    for (const p of mounted) p.handle?.dispose?.();
+    if (onKey) window.removeEventListener("keydown", onKey);
+  };
+
   let fanOut = false;
 
   const refreshOthers = (originId: string) => {
@@ -255,6 +331,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   let focused = paneIds[0] ?? entry.id;
 
   for (const id of paneIds) {
+    if (gen !== workspaceGen) return;
     const paneEntry = catalog.get(id);
     if (!paneEntry) {
       viewportRoot.append(errorPane(id, `Unknown scene id "${id}" in layout.`));
@@ -316,6 +393,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
 
     try {
       const loaded = (await loader()) as Record<string, unknown>;
+      if (gen !== workspaceGen) return;
       const handle = host.mount(canvas, loaded, {
         sceneId: id,
         sceneFile:
@@ -332,6 +410,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
         handle.refresh({ quiet: true });
       }
     } catch (err) {
+      if (gen !== workspaceGen) return;
       section.lastChild?.remove();
       const msg = document.createElement("p");
       msg.className = "view-pane-error";
@@ -341,7 +420,9 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     }
   }
 
-  const palette = mountCommandPalette({
+  if (gen !== workspaceGen) return;
+
+  const paletteHandle = mountCommandPalette({
     root: viewportRoot,
     getCommands: () => {
       const h = mounted.find((p) => p.id === focused)?.handle;
@@ -362,8 +443,9 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       canvas?.focus();
     },
   });
+  palette = paletteHandle;
 
-  const onKey = (e: KeyboardEvent) => {
+  const keyHandler = (e: KeyboardEvent) => {
     const t = e.target;
     if (
       t instanceof HTMLInputElement ||
@@ -373,11 +455,11 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       return;
     }
     if (e.key === "Escape") {
-      if (palette.isOpen()) return;
+      if (paletteHandle.isOpen()) return;
       mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
       return;
     }
-    if (e.key !== " " || e.repeat || palette.isOpen()) return;
+    if (e.key !== " " || e.repeat || paletteHandle.isOpen()) return;
     e.preventDefault();
     const h = mounted.find((p) => p.id === focused)?.handle;
     const cmds = h?.commands?.() ?? [];
@@ -386,11 +468,8 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
         "Space adds editors on 2D paper. This view has none yet.";
       return;
     }
-    palette.open();
+    paletteHandle.open();
   };
-  window.addEventListener("keydown", onKey);
-  activeWorkspaceCleanup = () => {
-    for (const p of mounted) p.handle?.dispose?.();
-    window.removeEventListener("keydown", onKey);
-  };
+  onKey = keyHandler;
+  window.addEventListener("keydown", keyHandler);
 }

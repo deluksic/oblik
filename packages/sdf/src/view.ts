@@ -122,13 +122,19 @@ export class SdfView {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     cancelAnimationFrame(this.anim);
+    this.anim = 0;
     this.controls.dispose();
+    this.clearGroup(this.gizmos);
     this.fieldTarget.dispose();
     (this.blitQuad.material as THREE.Material).dispose();
     this.blitQuad.geometry.dispose();
+    (this.quad.material as THREE.Material).dispose();
+    this.quad.geometry.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 
   resize(): void {
@@ -146,7 +152,6 @@ export class SdfView {
 
   private loop = (): void => {
     if (this.disposed) return;
-    this.anim = requestAnimationFrame(this.loop);
     this.controls.update();
     this.pushCamera();
     this.renderer.autoClear = true;
@@ -157,6 +162,8 @@ export class SdfView {
     this.renderer.autoClear = false;
     this.renderer.clearDepth();
     this.renderer.render(this.world, this.camera);
+    if (this.disposed) return;
+    this.anim = requestAnimationFrame(this.loop);
   };
 
   setSdf(sdf: Sdf): void {

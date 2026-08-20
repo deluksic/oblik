@@ -26,18 +26,18 @@ export type RingLayout = {
  */
 export function ringLayout(): RingLayout {
   const center = editPoint(-4.2, 5.5);
-  const innerR = editDistanceToPoint(center, 7.4);
+  const innerR = editDistanceToPoint(center, 4.87);
   const origin: Vec2 = {
     x: center.x + innerR + 2.8,
     y: center.y - innerR,
   };
-  const shank = editDistanceToPoint(origin, 3.95);
+  const shank = editDistanceToPoint(origin, 3.74);
   const mid: Vec2 = {
     x: origin.x + Math.PI * innerR,
     y: origin.y,
   };
-  const signet = editDistanceToPoint(mid, 7.6);
-  const gauge = editNumber(0.7, {
+  const signet = editDistanceToPoint(mid, 6.68);
+  const gauge = editNumber(0.4, {
     label: "Gauge",
     min: 0.4,
     max: 3.2,

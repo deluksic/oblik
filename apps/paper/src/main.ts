@@ -1,5 +1,3 @@
-import "./style.css";
-import "../../../packages/shell/src/workspace.css";
 import { scenes } from "virtual:scene-catalog";
 import { defaultHosts } from "@design-scenes/hosts";
 import { startWorkspace } from "@design-scenes/shell";

@@ -162,6 +162,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let sceneMod = mod as Record<string, unknown>;
       let cam = asCamera(mod, defaultCam);
       let error: string | null = null;
+      let closed = false;
       let hoverGizmo: Gizmo | null = null;
       let drag: { site: string; start: number[]; gizmo: Gizmo } | null = null;
       let pan: { x: number; y: number; camX: number; camY: number } | null = null;
@@ -567,6 +568,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         sceneMod = next;
         peekCache.clear();
         void warmPeek(peekCache, peekPath, () => {
+          if (closed) return;
           rerunFrame();
         });
       }
@@ -577,18 +579,21 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         onHotReload,
       );
       const unsubHelper = subscribeHelperHot(() => {
+        if (closed) return;
         peekCache.clear();
         clearImportedOverrides();
         rerunFrame();
       });
 
       void warmPeek(peekCache, peekPath, () => {
+        if (closed) return;
         evaluate();
         render();
       });
 
       return {
         refresh(opts) {
+          if (closed) return;
           evaluate(false);
           render(opts?.quiet ?? false);
         },
@@ -607,6 +612,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           render();
         },
         dispose() {
+          if (closed) return;
+          closed = true;
           unsub();
           unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);

@@ -44,7 +44,7 @@ export function scene() {
   const layout = withoutWidgets(() => readLayout(), "cylinder");
   const profile = withoutWidgets(() => readProfile(), "profile");
   const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnSegment3(mast, 0.07).z;
+  const height = editPointOnSegment3(mast, 0.04).z;
   const field = profileSdf(profile);
   const cells = pack7(layout.radius);
   const rings = unionAll(

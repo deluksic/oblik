@@ -87,10 +87,15 @@ export class SpaceView {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     cancelAnimationFrame(this.anim);
+    this.anim = 0;
     this.controls.dispose();
+    this.clearGroup(this.content);
+    this.clearGroup(this.gizmos);
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 
   resize(): void {
@@ -104,9 +109,10 @@ export class SpaceView {
 
   private loop = (): void => {
     if (this.disposed) return;
-    this.anim = requestAnimationFrame(this.loop);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    if (this.disposed) return;
+    this.anim = requestAnimationFrame(this.loop);
   };
 
   sync(

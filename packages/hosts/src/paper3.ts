@@ -106,6 +106,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       let fieldGizmos: readonly Gizmo3[] = [];
 
       const view = (mode === "space" ? space : fieldView) as DragView;
+      let closed = false;
 
       function gizmos(): readonly Gizmo3[] {
         return mode === "space" ? (frame?.gizmos ?? []) : fieldGizmos;
@@ -309,6 +310,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         sceneMod = next;
         peekCache.clear();
         void warmPeek(peekCache, peekPath, () => {
+          if (closed) return;
           rerunFrame();
         });
       }
@@ -319,22 +321,27 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         onHotReload,
       );
       const unsubHelper = subscribeHelperHot(() => {
+        if (closed) return;
         peekCache.clear();
         clearImportedOverrides();
         rerunFrame();
       });
 
       void warmPeek(peekCache, peekPath, () => {
+        if (closed) return;
         evaluate();
         sync();
       });
 
       return {
         refresh(opts) {
+          if (closed) return;
           evaluate();
           sync(opts?.quiet ?? false);
         },
         dispose() {
+          if (closed) return;
+          closed = true;
           unsub();
           unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);
@@ -342,6 +349,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           canvas.removeEventListener("pointerup", onPointerUp);
           canvas.removeEventListener("pointercancel", onPointerCancel);
           unobserve();
+          view.dispose();
           clearWidgetOverrides3();
         },
       };
