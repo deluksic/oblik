@@ -83,8 +83,8 @@ export function startPaperSdf(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Seven swept rings, joined, then the quatrefoil is cut out · coral glider is cut height · LMB orbit"
-        : "SDF CSG — join the swept rings, then subtract · coral glider is cut height · LMB orbit";
+        ? "Swept rings joined, cylinders fill the disks, then the quatrefoil is cut · coral glider is height · LMB orbit"
+        : "SDF CSG — join rings + fill cores, then subtract · coral glider is height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
