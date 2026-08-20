@@ -115,17 +115,32 @@
   position: absolute;
   inset: 0;
   z-index: 8;
-  grid-column: 1 / -1;
-  grid-row: 1 / -1;
+  display: none;
+}
+
+.shell-palette.is-picker,
+.shell-palette.is-prompt {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+}
+
+.shell-palette.is-picker {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   padding: 18vh 1rem 1rem;
   background: #0e1016aa;
 }
 
-.shell-palette[hidden] {
-  display: none;
+.shell-palette.is-prompt {
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.shell-palette.is-prompt .shell-palette-prompt {
+  pointer-events: auto;
 }
 
 .shell-palette-panel {
@@ -135,6 +150,94 @@
   border-radius: 10px;
   box-shadow: 0 18px 40px #0008;
   overflow: hidden;
+}
+
+.shell-palette-picker[hidden],
+.shell-palette-prompt[hidden] {
+  display: none !important;
+}
+
+.shell-palette-prompt {
+  width: 100%;
+  max-width: none;
+  background: #171a22;
+  border-top: 1px solid var(--stroke, #2a3040);
+  box-shadow: 0 -8px 24px #0006;
+  padding: 0.55rem 0.75rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.shell-palette-preview-row {
+  position: relative;
+  display: block;
+  min-height: 1.35em;
+}
+
+.shell-palette-preview {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text, #ece8de);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.shell-palette-preview .slot {
+  color: var(--accent, #e8876a);
+  font-weight: 600;
+}
+
+.shell-palette.has-inline-number .shell-palette-preview .slot.is-number {
+  color: transparent;
+  position: relative;
+}
+
+.shell-palette.has-inline-number .shell-palette-preview .slot.is-number::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent, #e8876a);
+  opacity: 0.38;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.shell-palette.has-inline-number.is-typing .shell-palette-preview .slot.is-number::after,
+.shell-palette.has-inline-number .shell-palette-preview .slot.is-number:not([data-placeholder="<radius>"])::after {
+  content: none;
+}
+
+.shell-palette[hidden] {
+  display: none !important;
+}
+
+.shell-palette-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4.5ch;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--accent, #e8876a);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+  outline: none;
+  caret-color: var(--accent, #e8876a);
+}
+
+.shell-palette-hint {
+  margin: 0;
+  color: var(--muted, #9a9488);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .shell-palette-input {

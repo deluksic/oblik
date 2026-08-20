@@ -329,6 +329,58 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   };
 
   let focused = paneIds[0] ?? entry.id;
+  let commandBarForPane: ((state: import("./types.ts").CommandBarState | null) => void) | undefined;
+
+  const paletteHandle = mountCommandPalette({
+    root: viewportRoot,
+    getCommands: () => {
+      const h = mounted.find((p) => p.id === focused)?.handle;
+      return h?.commands?.() ?? [];
+    },
+    onPick: (id) => {
+      const pane = mounted.find((p) => p.id === focused);
+      pane?.handle?.runCommand?.(id);
+      syncCommandBarAnchor();
+      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
+        `.view-pane[data-scene="${focused}"] canvas`,
+      );
+      canvas?.focus();
+    },
+    onClose: () => {
+      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
+        `.view-pane[data-scene="${focused}"] canvas`,
+      );
+      canvas?.focus();
+    },
+  });
+  palette = paletteHandle;
+
+  commandBarForPane = (state) => {
+    syncCommandBarAnchor();
+    if (!state) {
+      paletteHandle.closePrompt();
+      return;
+    }
+    paletteHandle.dockPrompt({
+      previewHtml: state.previewHtml,
+      acceptNumber: state.acceptNumber,
+      hint: state.hint,
+      numberValue: state.numberValue,
+      onNumber: state.onNumber,
+      onNumberDraft: state.onNumberDraft,
+    });
+  };
+
+  function focusedPaneEl(): HTMLElement | null {
+    return viewportRoot.querySelector<HTMLElement>(
+      `.view-pane[data-scene="${focused}"]`,
+    );
+  }
+
+  function syncCommandBarAnchor(): void {
+    const pane = focusedPaneEl();
+    if (pane) paletteHandle.setAnchor(pane);
+  }
 
   for (const id of paneIds) {
     if (gen !== workspaceGen) return;
@@ -381,6 +433,9 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     viewportRoot.append(section);
 
     const focus = () => {
+      if (focused !== id) {
+        mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
+      }
       focused = id;
       for (const el of viewportRoot.querySelectorAll(".view-pane")) {
         el.classList.toggle(
@@ -388,6 +443,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
           (el as HTMLElement).dataset.scene === id,
         );
       }
+      syncCommandBarAnchor();
     };
     section.addEventListener("pointerdown", focus);
 
@@ -401,6 +457,10 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
         inspect,
         onLiveChange: () => refreshOthers(id),
         onFocus: focus,
+        onCommandBar: (state) => {
+          if (id !== focused) return;
+          commandBarForPane?.(state);
+        },
       });
       mounted.push({ id, handle });
       if (id === focused) {
@@ -422,29 +482,6 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
 
   if (gen !== workspaceGen) return;
 
-  const paletteHandle = mountCommandPalette({
-    root: viewportRoot,
-    getCommands: () => {
-      const h = mounted.find((p) => p.id === focused)?.handle;
-      return h?.commands?.() ?? [];
-    },
-    onPick: (id) => {
-      const pane = mounted.find((p) => p.id === focused);
-      pane?.handle?.runCommand?.(id);
-      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
-        `.view-pane[data-scene="${focused}"] canvas`,
-      );
-      canvas?.focus();
-    },
-    onClose: () => {
-      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
-        `.view-pane[data-scene="${focused}"] canvas`,
-      );
-      canvas?.focus();
-    },
-  });
-  palette = paletteHandle;
-
   const keyHandler = (e: KeyboardEvent) => {
     const t = e.target;
     if (
@@ -455,12 +492,27 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       return;
     }
     if (e.key === "Escape") {
-      if (paletteHandle.isOpen()) return;
+      if (paletteHandle.isOpen()) {
+        paletteHandle.close();
+        return;
+      }
+      if (paletteHandle.isPromptOpen()) {
+        mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
+        return;
+      }
       mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
       return;
     }
-    if (e.key !== " " || e.repeat || paletteHandle.isOpen()) return;
+    if (
+      e.key !== " " ||
+      e.repeat ||
+      paletteHandle.isOpen() ||
+      paletteHandle.isPromptOpen()
+    ) {
+      return;
+    }
     e.preventDefault();
+    syncCommandBarAnchor();
     const h = mounted.find((p) => p.id === focused)?.handle;
     const cmds = h?.commands?.() ?? [];
     if (cmds.length === 0) {

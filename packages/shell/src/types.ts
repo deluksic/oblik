@@ -40,12 +40,22 @@ export type PaneHandle = {
   cancelCommand?: () => void;
 };
 
+export type CommandBarState = {
+  previewHtml: string;
+  acceptNumber?: boolean;
+  hint?: string;
+  numberValue?: string;
+  onNumber?: (n: number) => void;
+  onNumberDraft?: (raw: string) => void;
+};
+
 export type PaneContext = {
   sceneId: string;
   sceneFile: string;
   inspect: InspectEls;
   onLiveChange: () => void;
   onFocus: () => void;
+  onCommandBar?: (state: CommandBarState | null) => void;
 };
 
 export type ViewHost = {

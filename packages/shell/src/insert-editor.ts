@@ -7,7 +7,9 @@ export type SourceAt = { line: number; column: number };
 
 export type EditorInsert =
   | { kind: "point"; x: number; y: number }
-  | { kind: "distance"; originName?: string; d: number };
+  | { kind: "distance"; originName?: string; d: number }
+  | { kind: "circle"; center: string; radius: string }
+  | { kind: "line"; a: string; b: string };
 
 export function formatNum(n: number): string {
   const q = Math.round(n * 100) / 100;
@@ -82,6 +84,148 @@ export function widgetInSceneFunction(
   return isInNode(call, fn);
 }
 
+export type ScenePointBinding = {
+  name: string;
+  kind: "editPoint" | "derived";
+};
+
+/**
+ * Named 2D points in exported `scene()`: `editPoint` and derived `const p = point(...)`.
+ * Closest match to (x, y) within `maxDist` wins; `null` if none.
+ */
+export function namedScenePointNear(
+  source: string,
+  x: number,
+  y: number,
+  evals: ReadonlyArray<{ name: string; x: number; y: number }>,
+  maxDist = 0.35,
+): ScenePointBinding | null {
+  const names = namedScenePointBindings(source);
+  let best: { name: string; kind: ScenePointBinding["kind"]; d: number } | null =
+    null;
+  for (const e of evals) {
+    const kind = names.get(e.name);
+    if (!kind) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d > maxDist) continue;
+    if (!best || d < best.d) best = { name: e.name, kind, d };
+  }
+  return best ? { name: best.name, kind: best.kind } : null;
+}
+
+export function namedScenePointBindings(
+  source: string,
+): Map<string, ScenePointBinding["kind"]> {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  const names = new Map<string, ScenePointBinding["kind"]>();
+  if (!fn?.body) return names;
+  for (const stmt of fn.body.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const call = unwrapCall(decl.initializer);
+      if (!call || !ts.isIdentifier(call.expression)) continue;
+      const fnName = call.expression.text;
+      if (fnName === "editPoint") names.set(decl.name.text, "editPoint");
+      else if (fnName === "point") names.set(decl.name.text, "derived");
+    }
+  }
+  return names;
+}
+
+function numericLiteral(node: ts.Expression): number | null {
+  if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (
+    ts.isPrefixUnaryExpression(node) &&
+    node.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(node.operand)
+  ) {
+    return -Number(node.operand.text);
+  }
+  return null;
+}
+
+function evalBinary(
+  node: ts.BinaryExpression,
+  env: Map<string, Vec2Like>,
+): number | null {
+  const l = evalNumber(node.left, env);
+  const r = evalNumber(node.right, env);
+  if (l == null || r == null) return null;
+  switch (node.operatorToken.kind) {
+    case ts.SyntaxKind.PlusToken:
+      return l + r;
+    case ts.SyntaxKind.MinusToken:
+      return l - r;
+    case ts.SyntaxKind.AsteriskToken:
+      return l * r;
+    case ts.SyntaxKind.SlashToken:
+      return r === 0 ? null : l / r;
+    default:
+      return null;
+  }
+}
+
+type Vec2Like = { x: number; y: number };
+
+function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | null {
+  const lit = numericLiteral(node);
+  if (lit != null) return lit;
+  if (ts.isParenthesizedExpression(node)) return evalNumber(node.expression, env);
+  if (ts.isBinaryExpression(node)) return evalBinary(node, env);
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+    const v = env.get(node.expression.text);
+    if (!v) return null;
+    if (node.name.text === "x") return v.x;
+    if (node.name.text === "y") return v.y;
+  }
+  return null;
+}
+
+/** Evaluate named `const p = point(...)` in scene() using known editor positions. */
+export function evalDerivedScenePoints(
+  source: string,
+  known: ReadonlyArray<{ name: string; x: number; y: number }>,
+): { name: string; x: number; y: number }[] {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  if (!fn?.body) return [];
+  const env = new Map<string, Vec2Like>();
+  for (const k of known) env.set(k.name, { x: k.x, y: k.y });
+  const out: { name: string; x: number; y: number }[] = [];
+  for (const stmt of fn.body.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const call = unwrapCall(decl.initializer);
+      if (!call || !ts.isIdentifier(call.expression)) continue;
+      if (call.expression.text !== "point") continue;
+      const ax = call.arguments[0];
+      const ay = call.arguments[1];
+      if (!ax || !ay) continue;
+      const x = evalNumber(ax, env);
+      const y = evalNumber(ay, env);
+      if (x == null || y == null) continue;
+      env.set(decl.name.text, { x, y });
+      out.push({ name: decl.name.text, x, y });
+    }
+  }
+  return out;
+}
+
+function unwrapCall(node: ts.Expression): ts.CallExpression | null {
+  let n: ts.Expression = node;
+  while (
+    ts.isAsExpression(n) ||
+    ts.isParenthesizedExpression(n) ||
+    ts.isSatisfiesExpression(n)
+  ) {
+    n = n.expression;
+  }
+  return ts.isCallExpression(n) ? n : null;
+}
+
 function usedIdentifiers(sf: ts.SourceFile): Set<string> {
   const names = new Set<string>();
   const visit = (node: ts.Node) => {
@@ -150,8 +294,96 @@ export function ensureNamedImport(
   );
 }
 
+/** First argument identifier of editDistanceToPoint(...) at this site, if any. */
+export function distanceOriginName(
+  source: string,
+  at: SourceAt,
+): string | null {
+  const sf = parse(source);
+  const call = findEditCallAt(sf, at.line, at.column);
+  if (!call) return null;
+  const expr = call.expression;
+  if (!ts.isIdentifier(expr) || expr.text !== "editDistanceToPoint") {
+    return null;
+  }
+  const first = call.arguments[0];
+  if (!first || !ts.isIdentifier(first)) return null;
+  return first.text;
+}
+
 function lineStartAt(source: string, pos: number): number {
   return source.lastIndexOf("\n", pos - 1) + 1;
+}
+
+function appendConstructorToReturn(
+  source: string,
+  fn: ts.FunctionDeclaration,
+  ctorExpr: string,
+): string {
+  const body = fn.body;
+  if (!body) throw new Error("scene() has no body");
+  const stmts = body.statements;
+  const last = stmts[stmts.length - 1];
+  if (!last || !ts.isReturnStatement(last) || !last.expression) {
+    throw new Error("scene() must end with a return of some geometry");
+  }
+  const sf = fn.getSourceFile();
+  const retExpr = last.expression;
+  const start = last.getStart(sf);
+  const lineStart = lineStartAt(source, start);
+  const indent = indentAt(source, start);
+
+  if (
+    ts.isCallExpression(retExpr) &&
+    ts.isIdentifier(retExpr.expression) &&
+    retExpr.expression.text === "group"
+  ) {
+    const arrow = retExpr.arguments[0];
+    if (
+      !arrow ||
+      !ts.isArrowFunction(arrow) ||
+      !ts.isArrayLiteralExpression(arrow.body)
+    ) {
+      throw new Error("group return must be group(() => [...])");
+    }
+    const arr = arrow.body;
+    const lastEl = arr.elements[arr.elements.length - 1];
+    if (!lastEl) throw new Error("group array is empty");
+    const insertPos = lastEl.getEnd();
+    return (
+      source.slice(0, insertPos) + `, ${ctorExpr}` + source.slice(insertPos)
+    );
+  }
+
+  if (ts.isIdentifier(retExpr) && retExpr.text === SCENE_DRAWN) {
+    return (
+      source.slice(0, lineStart) +
+      `${indent}return group(() => [${SCENE_DRAWN}, ${ctorExpr}]);\n` +
+      source.slice(last.getEnd())
+    );
+  }
+
+  const exprText = source.slice(retExpr.getStart(sf), retExpr.getEnd());
+  const chunk =
+    `${indent}const ${SCENE_DRAWN} = ${exprText};\n` +
+    `${indent}return group(() => [${SCENE_DRAWN}, ${ctorExpr}]);\n`;
+  return source.slice(0, lineStart) + chunk + source.slice(last.getEnd());
+}
+
+function sceneAlreadyBindsDrawn(
+  fn: ts.FunctionDeclaration,
+): boolean {
+  const body = fn.body;
+  if (!body) return false;
+  for (const stmt of body.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.name.text === SCENE_DRAWN) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function insertBeforeReturn(
@@ -171,7 +403,10 @@ function insertBeforeReturn(
   const lineStart = lineStartAt(source, start);
   const indent = indentAt(source, start);
   const expr = last.expression;
-  if (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) {
+  const keepReturn =
+    (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) ||
+    sceneAlreadyBindsDrawn(fn);
+  if (keepReturn) {
     const chunk = lines.map((ln) => `${indent}${ln}\n`).join("");
     return source.slice(0, lineStart) + chunk + source.slice(lineStart);
   }
@@ -185,6 +420,40 @@ function insertBeforeReturn(
 
 export function insertEditors(source: string, edits: EditorInsert[]): string {
   if (edits.length === 0) return source;
+
+  const constructors = edits.filter(
+    (e) => e.kind === "circle" || e.kind === "line",
+  );
+  const editors = edits.filter(
+    (e) => e.kind === "point" || e.kind === "distance",
+  );
+  if (constructors.length > 0 && editors.length > 0) {
+    throw new Error("cannot mix editor and constructor inserts in one write");
+  }
+  if (constructors.length > 1) {
+    throw new Error("one constructor insert per write");
+  }
+  if (constructors.length === 1) {
+    const c = constructors[0]!;
+    const imports =
+      c.kind === "circle"
+        ? (["circle", "group"] as const)
+        : (["line", "group"] as const);
+    const withImports = ensureNamedImport(
+      source,
+      "@design-scenes/geom",
+      imports,
+    );
+    const sf = parse(withImports);
+    const fn = findSceneFunction(sf);
+    if (!fn) throw new Error("no exported scene() function to insert into");
+    const expr =
+      c.kind === "circle"
+        ? `circle(${c.center}, ${c.radius})`
+        : `line(${c.a}, ${c.b})`;
+    return appendConstructorToReturn(withImports, fn, expr);
+  }
+
   const imports: string[] = [];
   for (const e of edits) {
     if (e.kind === "point" && !imports.includes("editPoint")) {

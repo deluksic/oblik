@@ -1,7 +1,10 @@
 import { expect, test } from "vitest";
 import * as ts from "typescript";
 import {
+  distanceOriginName,
+  evalDerivedScenePoints,
   insertEditors,
+  namedScenePointNear,
   widgetBindingName,
   widgetInSceneFunction,
 } from "./insert-editor.ts";
@@ -97,4 +100,97 @@ export function scene() {
   expect(next).toMatch(
     /import \{ editPoint \} from "@design-scenes\/euclid2";/,
   );
+});
+
+test("circle wraps a plain return in group", () => {
+  const next = insertEditors(hello, [
+    { kind: "circle", center: "c", radius: "r" },
+  ]);
+  expect(next).toMatch(/^  const __scene = circle\(c, r\);$/m);
+  expect(next).toMatch(
+    /^  return group\(\(\) => \[__scene, circle\(c, r\)\]\);$/m,
+  );
+  expect(next).toMatch(/^import \{ circle, group \} from "@design-scenes\/geom";$/m);
+});
+
+test("stacked circle appends inside an existing group", () => {
+  const grouped = `import { circle, group } from "@design-scenes/geom";
+import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
+
+export function scene() {
+  const c = editPoint(0, 0);
+  const r = editDistanceToPoint(c, 1);
+  const __scene = circle(c, r);
+  return group(() => [__scene, circle(c, r)]);
+}
+`;
+  const next = insertEditors(grouped, [
+    { kind: "circle", center: "c", radius: "r" },
+  ]);
+  expect(next.match(/const __scene = /g)?.length).toBe(1);
+  expect(next).toMatch(
+    /return group\(\(\) => \[__scene, circle\(c, r\), circle\(c, r\)\]\);/,
+  );
+});
+
+test("line appends when __scene is already the return", () => {
+  const src = `import { circle } from "@design-scenes/geom";
+import { editPoint } from "@design-scenes/euclid2";
+
+export function scene() {
+  const a = editPoint(0, 0);
+  const b = editPoint(1, 0);
+  const __scene = circle(a, 1);
+  return __scene;
+}
+`;
+  const next = insertEditors(src, [{ kind: "line", a: "a", b: "b" }]);
+  expect(next).toMatch(
+    /^  return group\(\(\) => \[__scene, line\(a, b\)\]\);$/m,
+  );
+  expect(next).toMatch(/^import \{ circle, line, group \} from "@design-scenes\/geom";$/m);
+});
+
+test("distanceOriginName reads the first argument", () => {
+  expect(distanceOriginName(hello, at(hello, 1))).toBe("c");
+});
+
+test("point insert after grouped __scene return does not rebind __scene", () => {
+  const src = `import { circle, group } from "@design-scenes/geom";
+import { editPoint } from "@design-scenes/euclid2";
+
+export function scene() {
+  const a = editPoint(0, 0);
+  const __scene = circle(a, 1);
+  return group(() => [__scene, circle(a, 1)]);
+}
+`;
+  const next = insertEditors(src, [{ kind: "point", x: -1, y: 2 }]);
+  expect(next.match(/const __scene = /g)?.length).toBe(1);
+  expect(next).toMatch(/^  const p = editPoint\(-1, 2\);$/m);
+  expect(next).toMatch(
+    /^  return group\(\(\) => \[__scene, circle\(a, 1\)\]\);$/m,
+  );
+});
+
+test("namedScenePointNear matches a derived point()", () => {
+  const src = `import { point } from "@design-scenes/geom";
+import { editPoint, editVector } from "@design-scenes/euclid2";
+
+export function scene() {
+  const a = editPoint(1, 1);
+  const d = editVector(a, 1, 2);
+  const b = point(a.x + d.x, a.y + d.y);
+  return point(0, 0);
+}
+`;
+  const known = [
+    { name: "a", x: 1, y: 1 },
+    { name: "d", x: 1, y: 2 },
+  ];
+  const derived = evalDerivedScenePoints(src, known);
+  expect(derived).toEqual([{ name: "b", x: 2, y: 3 }]);
+  expect(
+    namedScenePointNear(src, 2.02, 2.97, [...known, ...derived], 0.25)?.name,
+  ).toBe("b");
 });

@@ -1,5 +1,5 @@
 import { dist, type Vec2 } from "@design-scenes/geom";
-import { worldToScreen, type Camera } from "@design-scenes/euclid2";
+import { worldToScreen, type Camera, type Gizmo } from "@design-scenes/euclid2";
 import type { CommandSpec } from "@design-scenes/shell";
 
 export const EDITOR_COMMANDS: CommandSpec[] = [
@@ -15,27 +15,131 @@ export const EDITOR_COMMANDS: CommandSpec[] = [
   },
 ];
 
+export const GEOM_CONSTRUCTOR_COMMANDS: CommandSpec[] = [
+  {
+    id: "circle",
+    title: "Circle",
+    hint: "Named editPoint, then any named editDistanceToPoint ring.",
+  },
+  {
+    id: "line",
+    title: "Line",
+    hint: "Two named points in scene().",
+  },
+];
+
+export type NamedGizmoPick = {
+  name: string;
+  x: number;
+  y: number;
+  at?: { file: string; line: number; column: number };
+};
+
 export type EditorTool =
   | { id: "point" }
   | {
       id: "distance";
-      origin?: { x: number; y: number; at?: { line: number; column: number } };
+      origin?: {
+        x: number;
+        y: number;
+        name?: string;
+        at?: { line: number; column: number };
+      };
+      typedRadius?: string;
+    }
+  | {
+      id: "circle";
+      center?: NamedGizmoPick;
+      hoverRadius?: number;
+    }
+  | {
+      id: "line";
+      a?: NamedGizmoPick;
     };
 
 const EDITOR = "#e8876a";
+const SNAP = "#f0c14a";
+
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function slot(label: string, extraClass = ""): string {
+  const cls = extraClass ? `slot ${extraClass}` : "slot";
+  const attr =
+    extraClass.includes("is-number")
+      ? ` data-placeholder="${escapeHtml(label)}"`
+      : "";
+  return `<span class="${cls}"${attr}>${escapeHtml(label)}</span>`;
+}
+
+export type CommandPreview = {
+  previewHtml: string;
+  acceptNumber?: boolean;
+  hint?: string;
+};
+
+export function commandPreview(tool: EditorTool | null): CommandPreview | null {
+  if (!tool) return null;
+  if (tool.id === "point") {
+    return {
+      previewHtml: `editPoint(${slot("<x>")}, ${slot("<y>")})`,
+      hint: "Click empty paper.",
+    };
+  }
+  if (tool.id === "distance") {
+    if (!tool.origin) {
+      return {
+        previewHtml: `editDistanceToPoint(${slot("<point>")}, ${slot("<radius>")})`,
+        hint: "Click a named point in scene(), or empty paper for a new origin.",
+      };
+    }
+    const point = tool.origin.name
+      ? escapeHtml(tool.origin.name)
+      : slot("<point>");
+    const radiusLabel = tool.typedRadius?.trim() ? tool.typedRadius : "<radius>";
+    return {
+      previewHtml: `editDistanceToPoint(${point}, ${slot(radiusLabel, "is-number")})`,
+      acceptNumber: true,
+      hint: "Type a radius and Enter, or click the canvas.",
+    };
+  }
+  if (tool.id === "circle") {
+    const center = tool.center ? escapeHtml(tool.center.name) : slot("<point>");
+    return {
+      previewHtml: `circle(${center}, ${slot("<distance>")})`,
+      hint: tool.center
+        ? "Click a named dashed ring (any origin)."
+        : "Click a named editPoint in scene().",
+    };
+  }
+  const a = tool.a ? escapeHtml(tool.a.name) : slot("<a>");
+  return {
+    previewHtml: `line(${a}, ${slot("<b>")})`,
+    hint: tool.a
+      ? "Click a second named point in scene()."
+      : "Click a named point in scene().",
+  };
+}
 
 export function editorStatus(tool: EditorTool | null, fallback: string): string {
   if (!tool) return fallback;
-  if (tool.id === "point") return "Click to place a point · Esc cancels";
-  if (!tool.origin) {
-    return "Click a point in this scene, or empty paper for a new origin · Esc cancels";
-  }
-  return "Click to set the dashed radius · Esc cancels";
+  return commandPreview(tool)?.hint ?? fallback;
 }
 
 export function radiusBetween(a: Vec2, b: Vec2): number {
   return Math.max(0.05, dist(a, b));
 }
+
+export type GhostSnap = {
+  kind: "point" | "distance";
+  x: number;
+  y: number;
+  d?: number;
+};
 
 export function drawEditorGhost(
   ctx: CanvasRenderingContext2D,
@@ -44,21 +148,38 @@ export function drawEditorGhost(
   h: number,
   tool: EditorTool,
   cursor: Vec2 | null,
+  snap: GhostSnap | null = null,
 ): void {
-  if (!cursor && !(tool.id === "distance" && tool.origin)) return;
+  const raw =
+    tool.id === "distance" && tool.origin ? tool.typedRadius?.trim() ?? "" : "";
+  const typedNum = raw === "" ? NaN : Number(raw);
+  const typed = Number.isFinite(typedNum) ? Math.max(0.05, typedNum) : null;
+  if (!cursor && !(tool.id === "distance" && tool.origin && typed != null)) {
+    return;
+  }
   ctx.save();
-  ctx.strokeStyle = EDITOR;
-  ctx.fillStyle = EDITOR;
-  if (tool.id === "point" && cursor) {
-    const s = worldToScreen(cam, cursor, w, h);
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
-    ctx.globalAlpha = 0.85;
-    ctx.fill();
+  const ink = snap ? SNAP : EDITOR;
+  ctx.strokeStyle = ink;
+  ctx.fillStyle = ink;
+  if (tool.id === "point") {
+    const p = snap ?? cursor;
+    if (p) {
+      const s = worldToScreen(cam, p, w, h);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.85;
+      ctx.fill();
+    }
   } else if (tool.id === "distance") {
     const origin = tool.origin;
     if (origin) {
-      const r = cursor ? radiusBetween(origin, cursor) : 0.2;
+      const r =
+        typed ??
+        (snap?.kind === "distance" && snap.d != null
+          ? snap.d
+          : cursor
+            ? radiusBetween(origin, snap ?? cursor)
+            : 0.2);
       const c = worldToScreen(cam, origin, w, h);
       ctx.setLineDash([5, 5]);
       ctx.lineWidth = 1.6;
@@ -69,8 +190,61 @@ export function drawEditorGhost(
       ctx.beginPath();
       ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
       ctx.fill();
-    } else if (cursor) {
-      const s = worldToScreen(cam, cursor, w, h);
+    } else if (snap ?? cursor) {
+      const p = snap ?? cursor!;
+      const s = worldToScreen(cam, p, w, h);
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (tool.id === "circle") {
+    const center = tool.center;
+    if (center) {
+      const r =
+        snap?.kind === "distance" && snap.d != null
+          ? snap.d
+          : (tool.hoverRadius ??
+            (cursor ? radiusBetween(center, cursor) : 0.2));
+      const c = worldToScreen(cam, center, w, h);
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, r * cam.scale, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.85;
+      ctx.fill();
+    } else if (snap ?? cursor) {
+      const p = snap ?? cursor!;
+      const s = worldToScreen(cam, p, w, h);
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (tool.id === "line") {
+    const a = tool.a;
+    const end = snap ?? cursor;
+    if (a && end) {
+      const sa = worldToScreen(cam, a, w, h);
+      const sb = worldToScreen(cam, end, w, h);
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sa.x, sa.y);
+      ctx.lineTo(sb.x, sb.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sa.x, sa.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(sb.x, sb.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (end) {
+      const s = worldToScreen(cam, end, w, h);
       ctx.globalAlpha = 0.7;
       ctx.beginPath();
       ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
@@ -78,4 +252,32 @@ export function drawEditorGhost(
     }
   }
   ctx.restore();
+}
+
+export function distanceHoverRadius(
+  tool: EditorTool,
+  gizmo: Gizmo | null,
+): number | undefined {
+  if (tool.id !== "circle" || !tool.center || !gizmo || gizmo.kind !== "distance") {
+    return undefined;
+  }
+  return gizmo.d;
+}
+
+export function gizmoWorldPoint(g: Gizmo): Vec2 | null {
+  if (g.kind === "point") return { x: g.x, y: g.y };
+  if (g.kind === "vector") return { x: g.origin.x + g.dx, y: g.origin.y + g.dy };
+  if (g.kind === "glider") {
+    return {
+      x: g.a.x + (g.b.x - g.a.x) * g.t,
+      y: g.a.y + (g.b.y - g.a.y) * g.t,
+    };
+  }
+  if (g.kind === "lineGlider") {
+    return {
+      x: g.origin.x + g.direction.x * g.s,
+      y: g.origin.y + g.direction.y * g.s,
+    };
+  }
+  return null;
 }

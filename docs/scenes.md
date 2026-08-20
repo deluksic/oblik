@@ -47,16 +47,23 @@ Layout files must not import pane modules. Live drag still updates the other pan
 
 ## Space palette
 
-**Space** opens a command palette on the focused pane. Commands come from the view host.
+**Space** opens a command palette on the focused pane. Pick a command and the palette **docks to the bottom** of that pane as a live preview of the TypeScript call, with the current slot highlighted. No dim overlay while the prompt is active.
+
+Commands come from the view host.
 
 euclid2 and sdf2:
 
 1. **Point** — click empty paper → insert `const p = editPoint(x, y)` into `scene()`.
-2. **Distance** — click an `editPoint` already bound as a named `const` in `scene()`, then a radius → insert `const d = editDistanceToPoint(p, r)`. Empty paper for a new origin, then a radius → insert both.
+2. **Distance** — click an `editPoint` already bound as a named `const` in `scene()`, then type a radius and Enter or click the canvas → insert `const d = editDistanceToPoint(p, r)`. Empty paper for a new origin, then a radius → insert both.
+
+euclid2 only (constructors):
+
+3. **Circle** — click a named `editPoint` in `scene()`, then any named dashed ring → append `circle(p, d)` via `group(() => [__scene, …])`. The ring need not share that center. No new `edit*`.
+4. **Line** — click two named points in `scene()` (`editPoint` or a derived `const b = point(…)`) → append `line(a, b)` the same way.
 
 `scene()` may leave new editors unused.
 
-Esc cancels. The completed command is one text edit. Undo is the editor.
+Esc cancels the active command and closes the docked prompt. The completed command is one text edit. Undo is the editor.
 
 Inserting after `return drawPlate(plateLayout())` rewrites to `const __scene = drawPlate(plateLayout()); …; return __scene` so new editors stay in `scene()`. A handle declared in `plateLayout()` (outside `scene()`) is refused.
 

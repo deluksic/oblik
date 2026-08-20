@@ -24,7 +24,14 @@ import {
 } from "@design-scenes/euclid2";
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneContext, PaneHandle, ViewHost } from "@design-scenes/shell";
-import { subscribeSceneHot, subscribeHelperHot } from "@design-scenes/shell";
+import {
+  evalDerivedScenePoints,
+  namedScenePointNear,
+  subscribeSceneHot,
+  subscribeHelperHot,
+  widgetBindingName,
+  widgetInSceneFunction,
+} from "@design-scenes/shell";
 import {
   commitEditors,
   peekFile,
@@ -32,11 +39,17 @@ import {
   renderSnippet,
 } from "./inspect.ts";
 import {
+  commandPreview,
+  distanceHoverRadius,
   drawEditorGhost,
   EDITOR_COMMANDS,
   editorStatus,
+  GEOM_CONSTRUCTOR_COMMANDS,
+  gizmoWorldPoint,
   radiusBetween,
   type EditorTool,
+  type GhostSnap,
+  type NamedGizmoPick,
 } from "./editors.ts";
 import {
   commitGizmoIfChanged,
@@ -168,6 +181,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let pan: { x: number; y: number; camX: number; camY: number } | null = null;
       let tool: EditorTool | null = null;
       let ghost: Vec2 | null = null;
+      let snap: GhostSnap | null = null;
+      let snapGizmo: Gizmo | null = null;
 
       // geom-only
       let frame: Frame | null = null;
@@ -217,7 +232,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       function activeGizmo(): string | null {
-        return drag?.site ?? hoverGizmo?.site ?? null;
+        return drag?.site ?? snapGizmo?.site ?? hoverGizmo?.site ?? null;
       }
 
       function currentTarget(): {
@@ -315,6 +330,77 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         );
       }
 
+      function clearTool(): void {
+        tool = null;
+        ghost = null;
+        snap = null;
+        snapGizmo = null;
+        ctx.onCommandBar?.(null);
+      }
+
+      function syncCommandBar(): void {
+        if (!ctx.onCommandBar) return;
+        if (!tool) {
+          ctx.onCommandBar(null);
+          return;
+        }
+        const preview = commandPreview(tool);
+        if (!preview) {
+          ctx.onCommandBar(null);
+          return;
+        }
+        ctx.onCommandBar({
+          ...preview,
+          numberValue:
+            tool.id === "distance" ? (tool.typedRadius ?? "") : "",
+          onNumber:
+            tool.id === "distance" && tool.origin
+              ? (n) => {
+                  if (!tool || tool.id !== "distance" || !tool.origin) return;
+                  void finishDistance(tool.origin, null, n);
+                }
+              : undefined,
+          onNumberDraft:
+            tool.id === "distance" && tool.origin
+              ? (raw) => {
+                  if (!tool || tool.id !== "distance") return;
+                  const next = raw.trim() === "" ? undefined : raw;
+                  if (tool.typedRadius === next) return;
+                  tool = { ...tool, typedRadius: next };
+                  render(true);
+                }
+              : undefined,
+        });
+      }
+
+      async function namedPointFromGizmo(
+        g: import("@design-scenes/euclid2").PointGizmo,
+      ): Promise<NamedGizmoPick | string> {
+        const text = await peekFile(peekCache, g.at.file);
+        if (!widgetInSceneFunction(text, g.at)) {
+          return "That handle is not declared in scene() — pick a point that scene() owns.";
+        }
+        const name = widgetBindingName(text, g.at);
+        if (!name) {
+          return "That point is inline, not a named const. Pick a named editPoint in scene().";
+        }
+        return { name, x: g.x, y: g.y, at: g.at };
+      }
+
+      async function namedDistanceFromGizmo(
+        g: import("@design-scenes/euclid2").DistanceGizmo,
+      ): Promise<string | { name: string }> {
+        const text = await peekFile(peekCache, g.at.file);
+        if (!widgetInSceneFunction(text, g.at)) {
+          return "That handle is not declared in scene() — pick a distance that scene() owns.";
+        }
+        const name = widgetBindingName(text, g.at);
+        if (!name) {
+          return "That distance is inline, not a named const.";
+        }
+        return { name };
+      }
+
       function render(quiet = false): void {
         resizeCanvas(canvas);
         const { w, h } = cssSize(canvas);
@@ -339,13 +425,17 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           drawAxes(ctx2d, w, h, cam);
           drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
         }
-        if (tool) drawEditorGhost(ctx2d, cam, w, h, tool, ghost);
-        if (quiet && !error) return;
+        if (tool) drawEditorGhost(ctx2d, cam, w, h, tool, ghost, snap);
+        if (quiet && !error) {
+          if (tool?.id === "distance" && tool.origin) syncCommandBar();
+          return;
+        }
         setPaneStatus(
           els,
           error ? "Last good frame · scene threw" : editorStatus(tool, statusHint()),
           error,
         );
+        if (tool) syncCommandBar();
         void updateInspect();
       }
 
@@ -354,12 +444,131 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         return hitTest(eventPos(canvas, e), cam, w, h, gizmos(), drawables());
       }
 
+      function peekText(file: string): string | undefined {
+        const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
+        return peekCache.get(key) ?? peekCache.get(scenePeekPath(file));
+      }
+
+      function scenePointEvals(): { name: string; x: number; y: number }[] {
+        const out: { name: string; x: number; y: number }[] = [];
+        const seen = new Set<string>();
+        const add = (name: string, x: number, y: number) => {
+          if (seen.has(name)) return;
+          seen.add(name);
+          out.push({ name, x, y });
+        };
+        for (const g of gizmos()) {
+          if (g.kind === "point") {
+            const cached = peekText(g.at.file);
+            if (!cached || !widgetInSceneFunction(cached, g.at)) continue;
+            const name = widgetBindingName(cached, g.at);
+            if (name) add(name, g.x, g.y);
+          } else if (g.kind === "vector") {
+            const cached = peekText(g.at.file);
+            if (!cached || !widgetInSceneFunction(cached, g.at)) continue;
+            const name = widgetBindingName(cached, g.at);
+            if (name) add(name, g.dx, g.dy);
+          }
+        }
+        const sceneSrc = peekText(peekPath);
+        if (sceneSrc) {
+          for (const d of evalDerivedScenePoints(sceneSrc, out)) add(d.name, d.x, d.y);
+        }
+        return out;
+      }
+
+      function namedPointNearWorld(
+        world: Vec2,
+        maxDist = 0.35,
+      ): NamedGizmoPick | null {
+        const src = peekText(peekPath);
+        if (!src) return null;
+        const hitName = namedScenePointNear(
+          src,
+          world.x,
+          world.y,
+          scenePointEvals(),
+          maxDist,
+        );
+        if (!hitName) return null;
+        const pos = scenePointEvals().find((e) => e.name === hitName.name);
+        if (!pos) return null;
+        return { name: hitName.name, x: pos.x, y: pos.y };
+      }
+
+      function namedPointFromHit(
+        h: ReturnType<typeof hit>,
+        world: Vec2,
+      ): NamedGizmoPick | null {
+        if (h?.target === "gizmo") {
+          const p = gizmoWorldPoint(h.gizmo);
+          if (p) {
+            const named = namedPointNearWorld(p, 0.25);
+            if (named) return named;
+          }
+        }
+        if (h?.target === "geom" && h.drawable.geom.kind === "circle") {
+          const c = h.drawable.geom.center;
+          const named = namedPointNearWorld(c, 0.25);
+          if (named) return named;
+        }
+        return namedPointNearWorld(world);
+      }
+
+      function updateSnap(e: PointerEvent, world: Vec2): void {
+        snap = null;
+        snapGizmo = null;
+        if (!tool) return;
+        const h = hit(e);
+        if (tool.id === "circle" && tool.center) {
+          if (h?.target === "gizmo" && h.gizmo.kind === "distance") {
+            snapGizmo = h.gizmo;
+            snap = {
+              kind: "distance",
+              x: h.gizmo.origin.x,
+              y: h.gizmo.origin.y,
+              d: h.gizmo.d,
+            };
+            const hr = distanceHoverRadius(tool, h.gizmo);
+            if (tool.hoverRadius !== hr) tool = { ...tool, hoverRadius: hr };
+          } else if (tool.hoverRadius != null) {
+            tool = { ...tool, hoverRadius: undefined };
+          }
+          return;
+        }
+        if (
+          tool.id === "distance" &&
+          tool.origin &&
+          tool.typedRadius != null &&
+          tool.typedRadius.trim() !== ""
+        ) {
+          return;
+        }
+        const named = namedPointFromHit(h, world);
+        if (named) {
+          if (h?.target === "gizmo") snapGizmo = h.gizmo;
+          snap = { kind: "point", x: named.x, y: named.y };
+        }
+      }
+
+      async function resolveLinePoint(
+        h: ReturnType<typeof hit>,
+        world: Vec2,
+      ): Promise<NamedGizmoPick | string> {
+        await peekFile(peekCache, peekPath).catch(() => "");
+        const named = namedPointFromHit(h, world);
+        if (named) return named;
+        if (h?.target === "gizmo" && h.gizmo.kind === "point") {
+          return namedPointFromGizmo(h.gizmo);
+        }
+        return "Click a named point in scene().";
+      }
+
       async function finishPoint(world: Vec2): Promise<void> {
         const err = await commitEditors(ctx.sceneFile, [
           { kind: "point", x: quantize(world.x), y: quantize(world.y) },
         ]);
-        tool = null;
-        ghost = null;
+        clearTool();
         if (err) error = err;
         else peekCache.delete(peekPath);
         evaluate();
@@ -367,10 +576,22 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       async function finishDistance(
-        origin: { x: number; y: number; at?: { line: number; column: number } },
-        world: Vec2,
+        origin: {
+          x: number;
+          y: number;
+          name?: string;
+          at?: { line: number; column: number };
+        },
+        world: Vec2 | null,
+        typedRadius?: number,
       ): Promise<void> {
-        const d = quantize(radiusBetween(origin, world));
+        const d = quantize(
+          typedRadius != null
+            ? Math.max(0.05, typedRadius)
+            : world
+              ? radiusBetween(origin, world)
+              : 0,
+        );
         const edits =
           origin.at != null
             ? [{ kind: "distance" as const, originAt: origin.at, d }]
@@ -383,12 +604,83 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
                 { kind: "distance" as const, d },
               ];
         const err = await commitEditors(ctx.sceneFile, edits);
-        tool = null;
-        ghost = null;
+        clearTool();
         if (err) error = err;
         else peekCache.delete(peekPath);
         evaluate();
         render();
+      }
+
+      async function finishCircle(center: string, radius: string): Promise<void> {
+        const err = await commitEditors(ctx.sceneFile, [
+          { kind: "circle", center, radius },
+        ]);
+        clearTool();
+        if (err) error = err;
+        else peekCache.delete(peekPath);
+        evaluate();
+        render();
+      }
+
+      async function finishLine(a: string, b: string): Promise<void> {
+        const err = await commitEditors(ctx.sceneFile, [
+          { kind: "line", a, b },
+        ]);
+        clearTool();
+        if (err) error = err;
+        else peekCache.delete(peekPath);
+        evaluate();
+        render();
+      }
+
+      async function pickCircleCenter(
+        g: import("@design-scenes/euclid2").PointGizmo,
+      ): Promise<void> {
+        const picked = await namedPointFromGizmo(g);
+        if (typeof picked === "string") {
+          error = picked;
+          render();
+          return;
+        }
+        tool = { id: "circle", center: picked };
+        render();
+      }
+
+      async function pickCircleRadius(
+        g: import("@design-scenes/euclid2").DistanceGizmo,
+      ): Promise<void> {
+        if (!tool || tool.id !== "circle" || !tool.center) return;
+        const picked = await namedDistanceFromGizmo(g);
+        if (typeof picked === "string") {
+          error = picked;
+          render();
+          return;
+        }
+        await finishCircle(tool.center.name, picked.name);
+      }
+
+      async function pickLinePoint(
+        h: ReturnType<typeof hit>,
+        world: Vec2,
+      ): Promise<void> {
+        const picked = await resolveLinePoint(h, world);
+        if (typeof picked === "string") {
+          error = picked;
+          render();
+          return;
+        }
+        if (!tool || tool.id !== "line") return;
+        if (!tool.a) {
+          tool = { id: "line", a: picked };
+          render();
+          return;
+        }
+        if (tool.a.name === picked.name) {
+          error = "Pick two different named points.";
+          render();
+          return;
+        }
+        await finishLine(tool.a.name, picked.name);
       }
 
       function onPointerDown(e: PointerEvent): void {
@@ -408,27 +700,50 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           const world = screenToWorld(cam, p, w, height);
           e.preventDefault();
           if (tool.id === "point") {
-            void finishPoint(world);
+            void finishPoint(snap ?? world);
+            return;
+          }
+          if (tool.id === "circle") {
+            if (!tool.center) {
+              if (h?.target === "gizmo" && h.gizmo.kind === "point") {
+                void pickCircleCenter(h.gizmo);
+              }
+              return;
+            }
+            if (h?.target === "gizmo" && h.gizmo.kind === "distance") {
+              void pickCircleRadius(h.gizmo);
+            }
+            return;
+          }
+          if (tool.id === "line") {
+            void pickLinePoint(h, world);
             return;
           }
           if (!tool.origin) {
             if (h?.target === "gizmo" && h.gizmo.kind === "point") {
-              tool = {
-                id: "distance",
-                origin: {
-                  x: h.gizmo.x,
-                  y: h.gizmo.y,
-                  at: h.gizmo.at,
-                },
-              };
-              render();
+              void (async () => {
+                const text = await peekFile(peekCache, h.gizmo.at.file);
+                const name = widgetInSceneFunction(text, h.gizmo.at)
+                  ? widgetBindingName(text, h.gizmo.at) ?? undefined
+                  : undefined;
+                tool = {
+                  id: "distance",
+                  origin: {
+                    x: h.gizmo.x,
+                    y: h.gizmo.y,
+                    at: h.gizmo.at,
+                    name,
+                  },
+                };
+                render();
+              })();
               return;
             }
             tool = { id: "distance", origin: { x: world.x, y: world.y } };
             render();
             return;
           }
-          void finishDistance(tool.origin, world);
+          void finishDistance(tool.origin, snap ?? world);
           return;
         }
         if (h?.target === "gizmo") {
@@ -474,6 +789,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         if (tool) {
           ghost = screenToWorld(cam, p, w, height);
+          updateSnap(e, ghost);
           render(true);
           return;
         }
@@ -597,23 +913,30 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           evaluate(false);
           render(opts?.quiet ?? false);
         },
-        commands: () => EDITOR_COMMANDS,
+        commands: () =>
+          mode === "geom"
+            ? [...EDITOR_COMMANDS, ...GEOM_CONSTRUCTOR_COMMANDS]
+            : EDITOR_COMMANDS,
         runCommand(id) {
           if (id === "point") tool = { id: "point" };
           else if (id === "distance") tool = { id: "distance" };
+          else if (mode === "geom" && id === "circle") tool = { id: "circle" };
+          else if (mode === "geom" && id === "line") tool = { id: "line" };
           else return;
           ghost = null;
+          snap = null;
+          snapGizmo = null;
           render();
         },
         cancelCommand() {
           if (!tool) return;
-          tool = null;
-          ghost = null;
+          clearTool();
           render();
         },
         dispose() {
           if (closed) return;
           closed = true;
+          ctx.onCommandBar?.(null);
           unsub();
           unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);

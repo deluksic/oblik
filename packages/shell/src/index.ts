@@ -6,6 +6,7 @@ export type {
   PaneContext,
   PaneHandle,
   CommandSpec,
+  CommandBarState,
   SceneLoaderMap,
   ViewHost,
 } from "./types.ts";
@@ -22,3 +23,11 @@ export {
   applyHotScenes,
   notifyHelperHot,
 } from "./scene-hmr.ts";
+export {
+  widgetBindingName,
+  widgetInSceneFunction,
+  distanceOriginName,
+  namedScenePointNear,
+  namedScenePointBindings,
+  evalDerivedScenePoints,
+} from "./insert-editor.ts";

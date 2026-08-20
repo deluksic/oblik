@@ -353,6 +353,31 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                   originName = name;
                 }
                 edits.push({ kind: "distance", originName, d: e.d });
+              } else if (e.kind === "circle") {
+                if (
+                  typeof e.center !== "string" ||
+                  typeof e.radius !== "string"
+                ) {
+                  json(res, 400, {
+                    ok: false,
+                    error: "circle needs center, radius",
+                  });
+                  return;
+                }
+                edits.push({
+                  kind: "circle",
+                  center: e.center,
+                  radius: e.radius,
+                });
+              } else if (e.kind === "line") {
+                if (typeof e.a !== "string" || typeof e.b !== "string") {
+                  json(res, 400, {
+                    ok: false,
+                    error: "line needs a, b",
+                  });
+                  return;
+                }
+                edits.push({ kind: "line", a: e.a, b: e.b });
               } else {
                 json(res, 400, {
                   ok: false,

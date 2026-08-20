@@ -68,7 +68,9 @@ export type InsertEdit =
       d: number;
       originName?: string;
       originAt?: { line: number; column: number };
-    };
+    }
+  | { kind: "circle"; center: string; radius: string }
+  | { kind: "line"; a: string; b: string };
 
 export async function commitEditors(
   sceneFile: string,
