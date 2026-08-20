@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import * as ts from "typescript";
-import type { ModuleNode, Plugin, ViteDevServer } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import { parseSceneSource } from "./catalog.ts";
 import { isSceneId } from "./layout-grid.ts";
 import type { SceneEntry } from "./types.ts";
@@ -231,10 +231,26 @@ function invalidateCatalog(server: ViteDevServer): void {
   if (mod) void server.reloadModule(mod);
 }
 
+function catalogFingerprint(sceneDir: string): string {
+  return JSON.stringify(scanSceneCatalog(sceneDir));
+}
+
+function isSceneTs(sceneDir: string, file: string): boolean {
+  return file.startsWith(sceneDir + path.sep) && file.endsWith(".ts");
+}
+
 export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
   let vite: ViteDevServer | undefined;
+  let lastCatalog = "";
+
+  function catalogChanged(): boolean {
+    const next = catalogFingerprint(sceneDir);
+    if (next === lastCatalog) return false;
+    lastCatalog = next;
+    return true;
+  }
 
   return {
     name: "scene-dev",
@@ -245,19 +261,18 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
     load(id) {
       if (id !== VIRTUAL_CATALOG_RESOLVED) return undefined;
       const scenes = scanSceneCatalog(sceneDir);
+      lastCatalog = JSON.stringify(scenes);
       return `export const scenes = ${JSON.stringify(scenes)};\n`;
     },
     configureServer(server) {
       vite = server;
       server.watcher.add(sceneDir);
-      const onSceneDir = (file: string) => {
-        if (file.startsWith(sceneDir + path.sep) && file.endsWith(".ts")) {
-          invalidateCatalog(server);
-        }
+      const onSceneTree = (file: string) => {
+        if (!isSceneTs(sceneDir, file)) return;
+        if (catalogChanged()) invalidateCatalog(server);
       };
-      server.watcher.on("add", onSceneDir);
-      server.watcher.on("unlink", onSceneDir);
-      server.watcher.on("change", onSceneDir);
+      server.watcher.on("add", onSceneTree);
+      server.watcher.on("unlink", onSceneTree);
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0] ?? "";
@@ -334,6 +349,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 ? raw.title.trim()
                 : titleFromId(id);
             fs.writeFileSync(abs, newSceneSource(id, title));
+            lastCatalog = "";
             if (vite) invalidateCatalog(vite);
             json(res, 200, { ok: true, id, file: `${id}.ts` });
             return;
@@ -361,15 +377,12 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       });
     },
     handleHotUpdate(ctx) {
-      if (ctx.file.startsWith(sceneDir + path.sep) && ctx.file.endsWith(".ts")) {
-        const mods: ModuleNode[] = [...ctx.modules];
-        const catalog = ctx.server.moduleGraph.getModuleById(
-          VIRTUAL_CATALOG_RESOLVED,
-        );
-        if (catalog) mods.push(catalog);
-        return mods;
-      }
-      return undefined;
+      if (!isSceneTs(sceneDir, ctx.file)) return undefined;
+      if (!catalogChanged()) return undefined;
+      const catalog = ctx.server.moduleGraph.getModuleById(
+        VIRTUAL_CATALOG_RESOLVED,
+      );
+      return catalog ? [...ctx.modules, catalog] : ctx.modules;
     },
   };
 }

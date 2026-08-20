@@ -31,3 +31,10 @@ void startWorkspace({
   inspect: { crumbEl, metaEl, sourceEl, statusEl, errorEl },
   titleEl,
 });
+
+if (import.meta.hot) {
+  import.meta.hot.accept(
+    ["virtual:scene-catalog", "./scene-loaders.ts"],
+    () => {},
+  );
+}
