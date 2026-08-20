@@ -267,6 +267,8 @@ Treat Sketch-n-Sketch as a mood board for *nudge the output*. Treat Antimony/nTo
 
 You write a library. You look at it through scenes (unwrapped, wrapped, sliced). The mouse only edits numbers the program left as numbers. The solid is an SDF all the way to the printer.
 
+Several of those sentences are in conflict. The adversarial pass is [CRITIQUE.md](./CRITIQUE.md).
+
 ---
 
 ## Sources
