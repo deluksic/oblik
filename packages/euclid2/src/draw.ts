@@ -1,6 +1,7 @@
 import type { Drawable, Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
+import { layoutNumberSliders } from "./hud.ts";
 import type { Gizmo } from "./widgets.ts";
 
 const COL = {
@@ -52,9 +53,11 @@ export function drawFrame(
   }
 
   for (const g of gizmos) {
+    if (g.kind === "number") continue;
     const active = g.index === activeGizmo;
     drawGizmo(ctx, cam, cssW, cssH, g, active);
   }
+  drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
 
 function drawGrid(
@@ -180,12 +183,78 @@ function drawGizmo(
       ctx.lineWidth = 4;
       ctx.stroke();
     }
-  } else {
+  } else if (g.kind === "distance") {
     const c = worldToScreen(cam, g.origin, w, h);
     ctx.beginPath();
     ctx.arc(c.x, c.y, Math.abs(g.d) * cam.scale, 0, Math.PI * 2);
     ctx.setLineDash([5, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+}
+
+function drawNumberSliders(
+  ctx: CanvasRenderingContext2D,
+  cssW: number,
+  cssH: number,
+  gizmos: readonly Gizmo[],
+  activeGizmo: number | null,
+): void {
+  for (const L of layoutNumberSliders(gizmos, cssW, cssH)) {
+    const active = L.gizmo.index === activeGizmo;
+    const { x, y, w, h } = L.panel;
+    ctx.save();
+    ctx.fillStyle = active ? "#1c222c" : "#151922";
+    ctx.strokeStyle = active ? COL.gizmo : COL.axis;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(x, y, w, h, 8);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = COL.gizmo;
+    ctx.font = "600 10px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(L.gizmo.label.toUpperCase(), x + 14, y + 18);
+
+    ctx.fillStyle = COL.geom;
+    ctx.textAlign = "right";
+    ctx.font = "600 13px ui-monospace, monospace";
+    const shown =
+      L.gizmo.step >= 1 ? String(Math.round(L.gizmo.n)) : String(L.gizmo.n);
+    ctx.fillText(shown, x + w - 14, y + 18);
+
+    ctx.fillStyle = "#2a3040";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(L.track.x, L.track.y, L.track.w, L.track.h, 3);
+    } else {
+      ctx.rect(L.track.x, L.track.y, L.track.w, L.track.h);
+    }
+    ctx.fill();
+
+    ctx.fillStyle = `${COL.gizmo}55`;
+    ctx.beginPath();
+    const filled = Math.max(0, L.knobX - L.track.x);
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(L.track.x, L.track.y, filled, L.track.h, 3);
+    } else {
+      ctx.rect(L.track.x, L.track.y, filled, L.track.h);
+    }
+    ctx.fill();
+
+    ctx.fillStyle = active ? "#fff3e6" : COL.gizmoFill;
+    ctx.beginPath();
+    ctx.arc(L.knobX, L.knobY, active ? 8 : 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COL.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
   }
 }

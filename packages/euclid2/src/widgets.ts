@@ -24,7 +24,17 @@ export type GliderGizmo = {
   t: number;
 };
 
-export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo;
+export type NumberGizmo = {
+  kind: "number";
+  index: number;
+  n: number;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+};
+
+export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo | NumberGizmo;
 
 const gizmos: Gizmo[] = [];
 const overrides = new Map<number, number[]>();
@@ -128,6 +138,48 @@ export function editPointOnLine(lineSeg: Line, t: number): Point {
   return point(p.x, p.y);
 }
 
+export function snapEditNumber(
+  n: number,
+  min: number,
+  max: number,
+  step: number,
+): number {
+  const clamped = Math.min(max, Math.max(min, n));
+  const k = Math.round(clamped / step) * step;
+  const q = Math.round(k * 1000) / 1000;
+  return Math.min(max, Math.max(min, q));
+}
+
+export type NumberEditOpts = {
+  label: string;
+  min?: number;
+  max?: number;
+  step?: number;
+};
+
+/** Screen-space titled slider. For counts and other non-spatial parameters. */
+export function editNumber(n: number, opts: NumberEditOpts): number {
+  const min = opts.min ?? 0;
+  const max = opts.max ?? Math.max(min + 1, n);
+  const step = opts.step && opts.step > 0 ? opts.step : 1;
+  if (silent) {
+    const o = overrides.get(takeSilentIndex());
+    return snapEditNumber(o?.[0] ?? n, min, max, step);
+  }
+  const index = takeIndex();
+  const v = snapEditNumber(overrides.get(index)?.[0] ?? n, min, max, step);
+  gizmos.push({
+    kind: "number",
+    index,
+    n: v,
+    label: opts.label,
+    min,
+    max,
+    step,
+  });
+  return v;
+}
+
 export function gizmoValues(g: Gizmo): number[] {
   switch (g.kind) {
     case "point":
@@ -136,5 +188,7 @@ export function gizmoValues(g: Gizmo): number[] {
       return [g.d];
     case "glider":
       return [g.t];
+    case "number":
+      return [g.n];
   }
 }

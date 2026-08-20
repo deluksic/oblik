@@ -3,6 +3,7 @@ import {
   clearWidgetOverrides,
   defaultCamera,
   drawFrame,
+  numberValueFromPointer,
   gizmoValues,
   hitTest,
   resizeCanvas,
@@ -92,7 +93,7 @@ function countEditCalls(source: string): number {
   return source
     .split("\n")
     .filter((ln) =>
-      /\bedit(?:Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln),
+      /\bedit(?:Number|Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln),
     ).length;
 }
 
@@ -146,13 +147,13 @@ function render(): void {
   statusEl.textContent = error
     ? "Last good frame · scene threw"
     : opts.split
-      ? "Drag 2D handles — mill follows live · coral glider on the right is thickness"
+          ? "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
       : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
       : sceneKey === "shared"
         ? "One dashed radius — all three rings and the roof follow it while you drag"
         : sceneKey === "plate"
-          ? "Plate: corner bolts, polar array (left glider = count), pocket, slot · wheel zooms"
+          ? "Plate: corner bolts, polar array, titled hole-count slider, pocket, slot · wheel zooms"
           : sceneKey === "relative"
             ? "Drag the left point: it writes. Drag the right: preview works, write-back cannot patch expressions"
           : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
@@ -198,7 +199,7 @@ async function updateInspect(): Promise<void> {
         : sceneKey === "shared"
           ? "One coral radius around the middle post. Library circles on the other posts are not handles."
           : sceneKey === "plate"
-            ? "Drag corner bolts, the polar array (center / PCD / tap Ø / count glider), pocket, or slot."
+            ? "Drag corner bolts, the polar array, the Hole count slider, pocket, or slot."
             : sceneKey === "relative"
               ? "Right handle is editPoint(a.x + …, a.y + …). Source is the truth only when args are numeric literals."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
@@ -264,16 +265,27 @@ function hit(e: PointerEvent) {
   return hitTest(p, cam, w, h, frame?.gizmos ?? [], frame?.drawables ?? []);
 }
 
-function applyDrag(g: Gizmo, world: { x: number; y: number }): void {
+function applyDrag(
+  g: Gizmo,
+  world: { x: number; y: number },
+  screen: { x: number; y: number },
+  cssW: number,
+  cssH: number,
+  gizmos: readonly Gizmo[],
+): void {
   if (g.kind === "point") {
     setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)]);
   } else if (g.kind === "distance") {
     setWidgetOverride(g.index, [
       quantize(Math.max(0.05, dist(world, g.origin))),
     ]);
-  } else {
+  } else if (g.kind === "glider") {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.index, [quantize(t)]);
+  } else {
+    setWidgetOverride(g.index, [
+      numberValueFromPointer(g, screen.x, cssW, cssH, gizmos),
+    ]);
   }
 }
 
@@ -313,6 +325,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   if (h?.target === "gizmo") {
     drag = { index: h.gizmo.index, start: gizmoValues(h.gizmo) };
+    canvas.style.cursor = h.gizmo.kind === "number" ? "ew-resize" : "grab";
     canvas.setPointerCapture(e.pointerId);
     e.preventDefault();
     render();
@@ -347,7 +360,7 @@ canvas.addEventListener("pointermove", (e) => {
   if (drag && frame) {
     const g = frame.gizmos.find((x) => x.index === drag?.index);
     if (g) {
-      applyDrag(g, screenToWorld(cam, p, w, height));
+      applyDrag(g, screenToWorld(cam, p, w, height), p, w, height, frame.gizmos);
       evaluate();
       render();
     }
@@ -360,6 +373,14 @@ canvas.addEventListener("pointermove", (e) => {
   if (nextId !== hoverId || nextG?.index !== hoverGizmo?.index) {
     hoverId = nextId;
     hoverGizmo = nextG;
+    canvas.style.cursor =
+      nextG?.kind === "number"
+        ? "ew-resize"
+        : nextG
+          ? "grab"
+          : nextId
+            ? "pointer"
+            : "crosshair";
     render();
   }
 });

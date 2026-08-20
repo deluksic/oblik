@@ -1,6 +1,7 @@
 import { dist, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
+import { hitNumberSlider } from "./hud.ts";
 import type { Gizmo } from "./widgets.ts";
 
 const GIZMO_PX = 12;
@@ -18,6 +19,9 @@ export function hitTest(
   gizmos: readonly Gizmo[],
   drawables: readonly Drawable[],
 ): Hit | null {
+  const hud = hitNumberSlider(screen, width, height, gizmos);
+  if (hud) return { target: "gizmo", gizmo: hud };
+
   const world = {
     x: cam.x + (screen.x - width / 2) / cam.scale,
     y: cam.y - (screen.y - height / 2) / cam.scale,
@@ -40,7 +44,7 @@ export function hitTest(
       if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
         return { target: "gizmo", gizmo: g };
       }
-    } else {
+    } else if (g.kind === "distance") {
       const radiusPx = Math.abs(g.d) * cam.scale;
       const c = worldToScreen(cam, g.origin, width, height);
       const d = Math.hypot(c.x - screen.x, c.y - screen.y);

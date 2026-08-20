@@ -11,6 +11,7 @@ const EDIT_NAMES = new Set([
   "editDistance3",
   "editPointOnLine",
   "editPointOnLine3",
+  "editNumber",
 ]);
 
 export type SceneDevOptions = {
@@ -139,7 +140,14 @@ function patchWidget(
   const name = (call.expression as ts.Identifier).text;
   const spans: { start: number; end: number; text: string }[] = [];
 
-  if (name === "editPoint" || name === "editPoint3") {
+  if (name === "editNumber") {
+    const arg = call.arguments[0];
+    if (!arg) throw new Error("editNumber expects a numeric value");
+    if (values[0] === undefined) throw new Error("editNumber write needs a value");
+    const span = numericSpan(sourceFile, arg);
+    if (!span) throw new Error("editNumber value is not a numeric literal");
+    spans.push({ ...span, text: formatNum(values[0]) });
+  } else if (name === "editPoint" || name === "editPoint3") {
     const needed = name === "editPoint3" ? 3 : 2;
     if (call.arguments.length < needed) {
       throw new Error(`${name} expects ${needed} arguments`);
