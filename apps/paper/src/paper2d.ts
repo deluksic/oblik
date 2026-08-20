@@ -1,5 +1,6 @@
 import { breadcrumb, dist, projectT, type Geom } from "@design-scenes/geom";
 import {
+  publishWidgetOverrides,
   clearWidgetOverrides,
   defaultCamera,
   drawFrame,
@@ -124,6 +125,7 @@ function evaluate(): void {
     selectedId = null;
     selectedGeom = null;
   }
+  if (sceneKey === "plate" || opts.split) publishWidgetOverrides();
   opts.onLiveChange?.();
 }
 

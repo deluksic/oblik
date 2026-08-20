@@ -23,8 +23,8 @@ if (import.meta.hot) {
  *
  * withoutWidgets is required: otherwise plateLayout() would enqueue 2D
  * gizmos (and increment euclid2 indices) while evaluating this scene.
- * Silent evaluation still reads live 2D overrides, so split view can
- * follow a plate drag before plate.ts is written.
+ * Silent evaluation reads a published plate snapshot (split view), not
+ * the live widgets of mill/nest — those would collide on index 0.
  */
 export function scene() {
   const plate = withoutWidgets(() => readPlate());

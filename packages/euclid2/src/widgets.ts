@@ -38,6 +38,8 @@ export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo | NumberGizmo;
 
 const gizmos: Gizmo[] = [];
 const overrides = new Map<number, number[]>();
+/** Last published non-silent frame — for withoutWidgets in another scene. */
+const imported = new Map<number, number[]>();
 let nextIndex = 0;
 let silent = 0;
 let silentIndex = 0;
@@ -49,7 +51,9 @@ export function beginWidgetFrame(): void {
 
 /**
  * Run edit* without gizmos or write-back indices.
- * Live 2D overrides still apply, so a 3D view can follow a drag in real time.
+ * Reads `publishWidgetOverrides()` from another scene (e.g. plate → mill),
+ * not the live override map of the scene that is currently evaluating.
+ * Nest sliders must not leak into plateLayout().
  */
 export function withoutWidgets<T>(fn: () => T): T {
   silent += 1;
@@ -77,6 +81,20 @@ export function clearWidgetOverrides(): void {
   overrides.clear();
 }
 
+/** Snapshot this frame’s live widgets for silent readers (split mill). */
+export function publishWidgetOverrides(): void {
+  imported.clear();
+  for (const [k, v] of overrides) imported.set(k, [...v]);
+}
+
+export function clearImportedOverrides(): void {
+  imported.clear();
+}
+
+function silentOverride(index: number): number[] | undefined {
+  return imported.get(index);
+}
+
 export function getGizmos(): readonly Gizmo[] {
   return gizmos;
 }
@@ -89,7 +107,7 @@ function takeIndex(): number {
 
 export function editPoint(x: number, y: number): Point {
   if (silent) {
-    const o = overrides.get(takeSilentIndex());
+    const o = silentOverride(takeSilentIndex());
     return point(o?.[0] ?? x, o?.[1] ?? y);
   }
   const index = takeIndex();
@@ -102,7 +120,7 @@ export function editPoint(x: number, y: number): Point {
 
 export function editDistanceToPoint(origin: Vec2, d: number): number {
   if (silent) {
-    const o = overrides.get(takeSilentIndex());
+    const o = silentOverride(takeSilentIndex());
     return o?.[0] ?? d;
   }
   const index = takeIndex();
@@ -119,7 +137,7 @@ export function editDistanceToPoint(origin: Vec2, d: number): number {
 
 export function editPointOnLine(lineSeg: Line, t: number): Point {
   if (silent) {
-    const o = overrides.get(takeSilentIndex());
+    const o = silentOverride(takeSilentIndex());
     const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
     const p = lerp(lineSeg.a, lineSeg.b, tt);
     return point(p.x, p.y);
@@ -163,7 +181,7 @@ export function editNumber(n: number, opts: NumberEditOpts): number {
   const max = opts.max ?? Math.max(min + 1, n);
   const step = opts.step && opts.step > 0 ? opts.step : 1;
   if (silent) {
-    const o = overrides.get(takeSilentIndex());
+    const o = silentOverride(takeSilentIndex());
     return snapEditNumber(o?.[0] ?? n, min, max, step);
   }
   const index = takeIndex();
