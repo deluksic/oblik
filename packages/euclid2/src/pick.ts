@@ -1,5 +1,4 @@
-import type { Drawable } from "../lib/geom.ts";
-import { dist, distToSegment, type Vec2 } from "../lib/vec.ts";
+import { dist, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
 import type { Gizmo } from "./widgets.ts";

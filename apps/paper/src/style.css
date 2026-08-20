@@ -36,6 +36,7 @@ body {
 
 #scene-nav a {
   color: var(--muted);
+  text-transform: none;
   text-decoration: none;
 }
 

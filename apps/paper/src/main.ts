@@ -1,22 +1,21 @@
 import "./style.css";
-import { breadcrumb, type Geom } from "./lib/geom.ts";
-import { registerSceneLines } from "./lib/provenance.ts";
-import { dist, projectT } from "./lib/vec.ts";
-import {
-  defaultCamera,
-  screenToWorld,
-  zoomAt,
-  type Camera,
-} from "./euclid2/camera.ts";
-import { drawFrame, resizeCanvas } from "./euclid2/draw.ts";
-import { hitTest } from "./euclid2/pick.ts";
-import { runScene, type Frame, type SceneModule } from "./euclid2/run.ts";
+import { breadcrumb, dist, projectT, type Geom } from "@design-scenes/geom";
 import {
   clearWidgetOverrides,
+  defaultCamera,
+  drawFrame,
   gizmoValues,
+  hitTest,
+  resizeCanvas,
+  runScene,
+  screenToWorld,
   setWidgetOverride,
+  zoomAt,
+  type Camera,
+  type Frame,
   type Gizmo,
-} from "./euclid2/widgets.ts";
+  type SceneModule,
+} from "@design-scenes/euclid2";
 import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
 
@@ -25,8 +24,7 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
 };
 
-const sceneKey =
-  new URLSearchParams(location.search).get("scene") ?? "beam";
+const sceneKey = new URLSearchParams(location.search).get("scene") ?? "beam";
 const active = SCENES[sceneKey] ?? SCENES.beam!;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#paper")!;
@@ -57,7 +55,9 @@ let hoverGizmo: Gizmo | null = null;
 let selectedGeom: Geom | null = null;
 let drag: { index: number; start: number[] } | null = null;
 let pan: { x: number; y: number; camX: number; camY: number } | null = null;
-let peekCache = new Map<string, string>();
+const peekCache = new Map<string, string>();
+
+const SCENE_PEEK = `apps/paper/src/scenes/${active.mod.sceneFile}`;
 
 function quantize(n: number): number {
   return Math.round(n * 100) / 100;
@@ -73,29 +73,31 @@ function eventPos(e: PointerEvent): { x: number; y: number } {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
+function countEditCalls(source: string): number {
+  return source
+    .split("\n")
+    .filter((ln) =>
+      /\bedit(?:Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln),
+    ).length;
+}
+
 function evaluate(): void {
   try {
     frame = runScene(sceneMod);
     lastGood = frame;
     error = null;
-    const gizmoCount = frame?.gizmos.length ?? 0;
-    const editCount = (peekCache.get(sceneMod.sceneFile.replace(/^src\//, "")) ?? "")
-      .split("\n")
-      .filter((ln) => /\bedit(?:Point|DistanceToPoint|PointOnLine)\s*\(/.test(ln))
-      .length;
-    if (gizmoCount > 0 && editCount > 0 && gizmoCount !== editCount) {
-      error = `${gizmoCount} widgets at runtime but ${editCount} edit* calls in scene — unroll helpers`;
+    const source = peekCache.get(`apps/paper/src/scenes/${sceneMod.sceneFile}`);
+    if (source) {
+      const edits = countEditCalls(source);
+      const gizmos = frame.gizmos.length;
+      if (edits > 0 && gizmos !== edits) {
+        error = `${gizmos} widgets at runtime but ${edits} edit* calls in scene — unroll helpers`;
+      }
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
     frame = lastGood;
   }
-}
-
-async function ensureSceneSource(): Promise<void> {
-  const rel = sceneMod.sceneFile.replace(/^src\//, "");
-  const text = await peekFile(rel);
-  registerSceneLines(text);
 }
 
 function activeGizmo(): number | null {
@@ -107,14 +109,13 @@ function render(): void {
   const { w, h } = cssSize();
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const f = frame;
   drawFrame(
     ctx,
     w,
     h,
     cam,
-    f?.drawables ?? [],
-    f?.gizmos ?? [],
+    frame?.drawables ?? [],
+    frame?.gizmos ?? [],
     hoverId,
     selectedId,
     activeGizmo(),
@@ -122,11 +123,11 @@ function render(): void {
   statusEl.textContent = error
     ? "Last good frame · scene threw"
     : sceneKey === "flat"
-      ? "Flat paths: ticks share mark.ts:34 — each geom has a unique id (uuid)"
+      ? "Flat paths: ticks share mark/beam.ts — each geom has a unique id"
       : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
-  updateInspect();
+  void updateInspect();
 }
 
 function currentTarget(): {
@@ -160,7 +161,7 @@ async function updateInspect(): Promise<void> {
     crumbEl.textContent = "Nothing selected";
     metaEl.textContent =
       sceneKey === "flat"
-        ? "Click ticks on each truss — paths differ (line[4] vs line[12]) but creation site is the same."
+        ? "Click ticks on each truss — paths differ; creation site is the library loop."
         : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
@@ -168,16 +169,15 @@ async function updateInspect(): Promise<void> {
   crumbEl.textContent = t.title;
   if (t.file == null || t.line == null) {
     metaEl.textContent =
-      "Coral handles are scene widgets. Their numbers live in the scene file and are written on pointer-up.";
+      "Coral handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
     sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneMod.sceneFile}.</code>`;
     return;
   }
   metaEl.textContent = t.id
     ? `${t.id} · ${t.file}:${t.line}:${t.column ?? 0}`
     : `${t.file}:${t.line}:${t.column ?? 0}`;
-  const file = t.file.replace(/\?.*$/, "").replace(/^src\//, "");
   try {
-    const text = await peekFile(file);
+    const text = await peekFile(t.file);
     sourceEl.innerHTML = renderSnippet(text, t.line);
   } catch (err) {
     sourceEl.innerHTML = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
@@ -185,11 +185,10 @@ async function updateInspect(): Promise<void> {
 }
 
 async function peekFile(file: string): Promise<string> {
-  const key = file.replace(/^\/+/, "");
+  const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
   const cached = peekCache.get(key);
   if (cached != null) return cached;
-  const rel = key.startsWith("src/") ? key.slice(4) : key;
-  const res = await fetch(`/__peek?file=${encodeURIComponent(rel)}`);
+  const res = await fetch(`/__peek?file=${encodeURIComponent(key)}`);
   if (!res.ok) throw new Error(`Could not read ${key}`);
   const text = await res.text();
   peekCache.set(key, text);
@@ -241,10 +240,6 @@ function applyDrag(g: Gizmo, world: { x: number; y: number }): void {
 
 async function commitDrag(g: Gizmo): Promise<void> {
   const values = gizmoValues(g);
-  if (typeof g.index !== "number") {
-    error = "internal: gizmo has no index";
-    return;
-  }
   try {
     const res = await fetch("/__write-widget", {
       method: "POST",
@@ -257,12 +252,9 @@ async function commitDrag(g: Gizmo): Promise<void> {
     });
     const body = (await res.json()) as { ok?: boolean; error?: string };
     if (!res.ok || !body.ok) {
-      error =
-        body.error ??
-        `write failed (${res.status}) — try a hard refresh (Ctrl+Shift+R)`;
+      error = body.error ?? `write failed (${res.status})`;
     } else {
-      peekCache.delete(sceneMod.sceneFile.replace(/^src\//, ""));
-      await ensureSceneSource();
+      peekCache.delete(`apps/paper/src/scenes/${sceneMod.sceneFile}`);
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
@@ -323,7 +315,8 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
   const hitResult = hit(e);
-  const nextId = hitResult?.target === "geom" ? hitResult.drawable.geom.id : null;
+  const nextId =
+    hitResult?.target === "geom" ? hitResult.drawable.geom.id : null;
   const nextG = hitResult?.target === "gizmo" ? hitResult.gizmo : null;
   if (nextId !== hoverId || nextG?.index !== hoverGizmo?.index) {
     hoverId = nextId;
@@ -362,8 +355,7 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     const { w, h } = cssSize();
-    const p = { x: e.offsetX, y: e.offsetY };
-    cam = zoomAt(cam, p, w, h, e.deltaY < 0 ? 1.08 : 1 / 1.08);
+    cam = zoomAt(cam, { x: e.offsetX, y: e.offsetY }, w, h, e.deltaY < 0 ? 1.08 : 1 / 1.08);
     render();
   },
   { passive: false },
@@ -371,30 +363,28 @@ canvas.addEventListener(
 
 window.addEventListener("resize", () => render());
 
-if (import.meta.hot) {
-  import.meta.hot.accept("./scenes/beam.ts", (mod) => {
-    if (!mod || !("scene" in mod) || sceneKey !== "beam") return;
-    sceneMod = mod as unknown as SceneModule;
-    clearWidgetOverrides();
-    peekCache.clear();
-    void ensureSceneSource().then(() => {
-      evaluate();
-      render();
-    });
-  });
-  import.meta.hot.accept("./scenes/beam-flat.ts", (mod) => {
-    if (!mod || !("scene" in mod) || sceneKey !== "flat") return;
-    sceneMod = mod as unknown as SceneModule;
-    clearWidgetOverrides();
-    peekCache.clear();
-    void ensureSceneSource().then(() => {
-      evaluate();
-      render();
-    });
+function reloadScene(mod: SceneModule): void {
+  sceneMod = mod;
+  clearWidgetOverrides();
+  peekCache.clear();
+  void peekFile(`apps/paper/src/scenes/${sceneMod.sceneFile}`).then(() => {
+    evaluate();
+    render();
   });
 }
 
-void ensureSceneSource().then(() => {
+if (import.meta.hot) {
+  import.meta.hot.accept("./scenes/beam.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "beam") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/beam-flat.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "flat") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+}
+
+void peekFile(SCENE_PEEK).then(() => {
   evaluate();
   render();
 });

@@ -3,29 +3,26 @@
 TypeScript libraries stay pure. **Scenes** attach 2D widgets (`editPoint`, `editDistanceToPoint`, `editPointOnLine`) and a graph-paper view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
 - Intent: [PLAN.md](./PLAN.md)
-- This experiment: [PROTOTYPE_1.md](./PROTOTYPE_1.md)
+- Prototype 1 charter: [PROTOTYPE_1.md](./PROTOTYPE_1.md)
+- What P1 proved: [PROTOTYPE_1_CONCLUSIONS.md](./PROTOTYPE_1_CONCLUSIONS.md)
+- Repo layout: [LAYOUT.md](./LAYOUT.md)
 
 ## Run
 
 ```sh
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-Opens on [http://127.0.0.1:43117](http://127.0.0.1:43117). Use the header links or query params:
+Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 
-- [?scene=beam](http://127.0.0.1:43117/?scene=beam) — one truss; library geometry is wrapped in `group()` so paths are namespaced (`group[0] › line[2]`).
-- [?scene=flat](http://127.0.0.1:43117/?scene=flat) — two trusses with **no** `group()`; paths are global counters (`line[4]` vs `line[12]`) but every geom still has a unique uuid `id` for picking.
-
-Edit `src/scenes/beam.ts`, `src/scenes/beam-flat.ts`, or `src/lib/mark.ts` and save — Vite HMR reloads the scene.
-
-**Widget write-back:** each handle needs its own unrolled `edit*` in the scene file. Writes use evaluation-order index (must match AST order). Stack-based line/column is unreliable under Vite imports.
+- [?scene=beam](http://127.0.0.1:43117/?scene=beam) — one truss; `group()` namespaces **paths** (`group[0] › line[2]`).
+- [?scene=flat](http://127.0.0.1:43117/?scene=flat) — two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.
 
 ## Try
 
-- Drag the coral **points**, the **glider** on the span, or the **dashed radius**.
-- Click a tick mark or the roof: the inspector shows a **path** breadcrumb, a uuid **id**, and the **creation site** in the library.
-- Switch to **Flat** and click ticks on each truss — paths differ; uuid ids always differ; provenance may still point at the same library line.
+- Drag coral **points**, the **glider** on the span, or a **dashed radius**.
+- Click a tick: inspector shows **path**, **id**, and the **creation site**.
 - Wheel zooms; drag empty paper (or Alt-drag) to pan.
 
-Handles are not inside `src/lib`. They only exist in the scene file, which is the source of truth after pointer-up.
+Each handle needs its own unrolled `edit*` in the scene file. Writes use evaluation-order index (must match AST order).

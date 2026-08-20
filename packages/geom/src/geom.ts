@@ -9,9 +9,9 @@ export type Provenance = {
 };
 
 type Base = {
-  /** Opaque pick identity — unique per geometric value. */
+  /** Opaque pick identity — unique per geometric value this frame. */
   id: string;
-  /** Human breadcrumb path (group[0]/line[2]); not used for picking. */
+  /** Human breadcrumb (group[0]/line[2]); groups namespace this, not id. */
   path: string;
   parentId: string | null;
   provenance: Provenance;
@@ -90,6 +90,7 @@ export function polyline(points: Vec2[]): Polyline {
   };
 }
 
+/** Optional path namespace. Does not affect pick identity. */
 export function group(fn: () => Geom[]): Group {
   const local = nextPathLocal("group");
   const path = makePath(local);

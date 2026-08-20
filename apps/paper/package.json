@@ -1,0 +1,21 @@
+{
+  "name": "@design-scenes/paper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --configLoader bundle --host 127.0.0.1 --port 43117 --strictPort",
+    "build": "tsc --noEmit && vite build --configLoader bundle",
+    "preview": "vite preview --configLoader bundle --host 127.0.0.1 --port 43117 --strictPort"
+  },
+  "dependencies": {
+    "@design-scenes/euclid2": "workspace:*",
+    "@design-scenes/geom": "workspace:*",
+    "@design-scenes/mark": "workspace:*",
+    "@design-scenes/shell": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}

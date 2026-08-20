@@ -61,13 +61,15 @@ shell/        run a scene module, show one preview, apply text edits
 
 The long-term analog of LSP is a small **artifact / pick protocol**: what this module exported, which edit sites it declared, what `pick(x,y)` hit. Scene types subscribe. Until that protocol is forced by a second view, keep it implicit in one 2D implementation.
 
+Repo layout: [LAYOUT.md](./LAYOUT.md).
+
 GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs them. They are not the identity of the project.
 
 ---
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem, not from a frozen architecture. This file is the stable *intent*. Immediate work lives in [PROTOTYPE_1.md](./PROTOTYPE_1.md).
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem, not from a frozen architecture. This file is the stable *intent*. Immediate work lives in [PROTOTYPE_1.md](./PROTOTYPE_1.md). Postmortem: [PROTOTYPE_1_CONCLUSIONS.md](./PROTOTYPE_1_CONCLUSIONS.md).
 
 Earlier adversarial notes (literal-vs-composition, fake SDFs, overlap with libfive/Zoo) are why libraries stay pure, editors are declared, and slicing/supports are views. They are not a spec.
 

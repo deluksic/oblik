@@ -1,5 +1,4 @@
-import type { Drawable } from "../lib/geom.ts";
-import type { Vec2 } from "../lib/vec.ts";
+import type { Drawable, Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
 import type { Gizmo } from "./widgets.ts";
@@ -13,7 +12,6 @@ const COL = {
   selected: "#7ec8e3",
   gizmo: "#e8876a",
   gizmoFill: "#e8876a",
-  dim: "#8b8494",
 };
 
 export function resizeCanvas(canvas: HTMLCanvasElement): void {

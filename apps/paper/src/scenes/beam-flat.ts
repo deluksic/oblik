@@ -1,14 +1,14 @@
-import { line } from "../lib/geom.ts";
-import { assembleBeamFlat } from "../lib/mark.ts";
+import { line } from "@design-scenes/geom";
+import { assembleBeamFlat } from "@design-scenes/mark";
 import {
   editDistanceToPoint,
   editPoint,
   editPointOnLine,
-} from "../euclid2/widgets.ts";
+} from "@design-scenes/euclid2";
 
-export const sceneFile = "src/scenes/beam-flat.ts";
+export const sceneFile = "beam-flat.ts";
 
-/** Two trusses, no group — edit* must be unrolled (one literal per handle). */
+/** Two trusses, no group — each handle is its own unrolled edit*. */
 export function scene() {
   const aTop = editPoint(-4.72, 0.37);
   const bTop = editPoint(6.04, -1.86);

@@ -1,4 +1,4 @@
-import type { Vec2 } from "../lib/vec.ts";
+import type { Vec2 } from "@design-scenes/geom";
 
 export type Camera = {
   x: number;

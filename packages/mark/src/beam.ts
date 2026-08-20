@@ -1,12 +1,18 @@
 import {
+  add,
   circle,
   group,
+  lerp,
   line,
+  mul,
+  norm,
+  perp,
   polyline,
+  sub,
   type Geom,
   type Line,
-} from "./geom.ts";
-import { add, lerp, mul, norm, perp, sub, type Vec2 } from "./vec.ts";
+  type Vec2,
+} from "@design-scenes/geom";
 
 export type Ring = { post: Vec2; radius: number };
 
@@ -37,12 +43,12 @@ function buildBeamParts(opts: { span: Line; rings: Ring[] }): Geom[] {
   return parts;
 }
 
-/** Same geometry as assembleBeam, but ids are not namespaced under group[0]. */
+/** Same shapes as assembleBeam, without a group path prefix. */
 export function assembleBeamFlat(opts: { span: Line; rings: Ring[] }): Geom[] {
   return buildBeamParts(opts);
 }
 
-/** Span, roof, circles, and ticks — ids live under group[0] › … */
+/** Span, roof, circles, ticks — paths namespaced under group[0]. */
 export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
   return group(() => buildBeamParts(opts));
 }

@@ -4,13 +4,18 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import * as ts from "typescript";
 import type { Plugin } from "vite";
 
-const SRC_ROOT = path.resolve("src");
-const SCENE_ROOT = path.resolve("src/scenes");
 const EDIT_NAMES = new Set([
   "editPoint",
   "editDistanceToPoint",
   "editPointOnLine",
 ]);
+
+export type SceneDevOptions = {
+  /** Repo root — peek may read any file under here. */
+  workspaceRoot: string;
+  /** Directory that contains scene .ts files (write sandbox). */
+  sceneDir: string;
+};
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -29,7 +34,8 @@ function json(res: ServerResponse, status: number, body: unknown) {
 
 function resolveUnder(root: string, rel: string): string {
   const abs = path.resolve(root, path.normalize(rel));
-  if (!abs.startsWith(root + path.sep) && abs !== root) {
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (abs !== root && !abs.startsWith(prefix)) {
     throw new Error("path escapes sandbox");
   }
   return abs;
@@ -91,18 +97,18 @@ function resolveWidgetIndex(
 
   const onLine = calls
     .map((call, idx) => {
-      const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
+      const pos = sourceFile.getLineAndCharacterOfPosition(
+        call.getStart(sourceFile),
+      );
       return { idx, line: pos.line + 1, column: pos.character + 1 };
     })
     .filter((x) => x.line === line);
 
   if (onLine.length === 0) return null;
-
   if (typeof column === "number") {
     const exact = onLine.find((x) => x.column === column);
     if (exact) return exact.idx;
   }
-
   const n = typeof instance === "number" ? instance : 0;
   return onLine[n]?.idx ?? onLine[0]?.idx ?? null;
 }
@@ -167,15 +173,21 @@ function sendText(res: ServerResponse, text: string) {
   res.end(text);
 }
 
-export function fsBridgePlugin(): Plugin {
+export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
+  const workspaceRoot = path.resolve(opts.workspaceRoot);
+  const sceneDir = path.resolve(opts.sceneDir);
+
   return {
-    name: "fs-bridge",
+    name: "scene-dev",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0] ?? "";
         try {
           if (url === "/__write-widget" && req.method === "POST") {
-            const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+            const raw = JSON.parse(await readBody(req)) as Record<
+              string,
+              unknown
+            >;
             const file = raw.file;
             const values = raw.values;
 
@@ -186,12 +198,12 @@ export function fsBridgePlugin(): Plugin {
             ) {
               json(res, 400, {
                 ok: false,
-                error: `invalid body: expected { file, widgetIndex, values:number[] }; got keys [${Object.keys(raw).join(", ")}]`,
+                error: `invalid body: expected { file, widgetIndex, values }; got keys [${Object.keys(raw).join(", ")}]`,
               });
               return;
             }
 
-            const abs = resolveUnder(SCENE_ROOT, path.basename(file));
+            const abs = resolveUnder(sceneDir, path.basename(file));
             const source = fs.readFileSync(abs, "utf8");
             const sourceFile = ts.createSourceFile(
               "scene.ts",
@@ -206,23 +218,21 @@ export function fsBridgePlugin(): Plugin {
             if (widgetIndex === null) {
               json(res, 400, {
                 ok: false,
-                error: `invalid body: need widgetIndex (hard refresh) or a site on an edit* line; got keys [${Object.keys(raw).join(", ")}]`,
+                error: `invalid body: need widgetIndex; got keys [${Object.keys(raw).join(", ")}]`,
               });
               return;
             }
 
-            const next = patchWidget(source, widgetIndex, values as number[]);
-            fs.writeFileSync(abs, next);
+            fs.writeFileSync(abs, patchWidget(source, widgetIndex, values));
             json(res, 200, { ok: true });
             return;
           }
 
           if (url === "/__peek" && req.method === "GET") {
             const u = new URL(req.url ?? "", "http://127.0.0.1");
-            const file = u.searchParams.get("file") ?? "";
-            const rel = file.replace(/^\/+/, "");
-            const abs = resolveUnder(SRC_ROOT, rel.replace(/^src\//, ""));
-            if (!fs.existsSync(abs)) {
+            const file = (u.searchParams.get("file") ?? "").replace(/^\/+/, "");
+            const abs = resolveUnder(workspaceRoot, file);
+            if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
               json(res, 404, { ok: false, error: "not found" });
               return;
             }
