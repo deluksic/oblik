@@ -8,7 +8,7 @@
     "./workspace.css": "./src/workspace.css"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/insert-editor.test.ts"
+    "test": "node --experimental-strip-types --test src/insert-editor.test.ts src/scene-hmr.test.ts"
   },
   "dependencies": {
     "typescript": "~6.0.2"

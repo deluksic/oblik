@@ -10,30 +10,20 @@ export function subscribeSceneHot(cb: SceneHotCb): () => void {
   };
 }
 
-function sceneKeyFromUrl(url: string): string | null {
-  const m = url.match(/\/scenes\/([^/?#]+)/);
-  if (!m?.[1] || !m[1].endsWith(".ts")) return null;
-  return `./scenes/${m[1]}`;
-}
-
-if (import.meta.hot) {
-  import.meta.hot.on("vite:afterUpdate", ({ updates }) => {
-    const keys = new Set<string>();
-    for (const u of updates) {
-      for (const url of [u.path, u.acceptedPath]) {
-        const key = sceneKeyFromUrl(url);
-        if (key) keys.add(key);
-      }
-    }
-    for (const key of keys) {
-      const loader = sceneLoaders[key];
-      if (!loader) continue;
-      void loader().then((mod) => {
-        if (!mod) return;
-        for (const cb of listeners) {
-          cb(key, mod as Record<string, unknown>);
-        }
-      });
-    }
-  });
+/**
+ * Vite-injected `hot.accept(scenePaths, …)` calls this with the freshly
+ * fetched modules. `mods[i]` is defined only for the file that changed.
+ * Do not re-`import()` the glob URL here — that hits the ESM cache and
+ * returns the previous `scene()`.
+ */
+export function applyHotScenes(
+  keys: string[],
+  mods: ReadonlyArray<Record<string, unknown> | undefined>,
+): void {
+  for (let i = 0; i < keys.length; i++) {
+    const mod = mods[i];
+    const key = keys[i];
+    if (!mod || !key) continue;
+    for (const cb of listeners) cb(key, mod);
+  }
 }

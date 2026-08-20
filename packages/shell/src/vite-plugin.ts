@@ -259,6 +259,25 @@ function sceneGlobKeys(sceneDir: string): string[] {
   return listSceneFiles(sceneDir).map((abs) => `./scenes/${path.basename(abs)}`);
 }
 
+/**
+ * Appended onto scene-loaders.ts. Vite rewrites the first array to absolute
+ * HMR URLs; the copy passed to applyHotScenes stays as glob keys so hosts
+ * can match `./scenes/<file>`. Indices stay aligned.
+ */
+export function sceneLoadersAcceptTail(keys: string[]): string {
+  const lit = JSON.stringify(keys);
+  return (
+    `\n/* __scene_hmr_accept */\n` +
+    `if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });\n`
+  );
+}
+
+function hotReloadSceneFile(server: ViteDevServer, abs: string): void {
+  const mods = server.moduleGraph.getModulesByFile(abs);
+  if (!mods) return;
+  for (const mod of mods) void server.reloadModule(mod);
+}
+
 function fileAliases(file: string): string[] {
   const abs = path.resolve(file);
   const posix = abs.replace(/\\/g, "/");
@@ -442,6 +461,8 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               }
             }
             fs.writeFileSync(abs, insertEditors(source, edits));
+            for (const key of fileAliases(abs)) widgetWrites.delete(key);
+            if (vite) hotReloadSceneFile(vite, abs);
             json(res, 200, { ok: true });
             return;
           }
@@ -506,9 +527,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       const keys = sceneGlobKeys(sceneDir);
       if (keys.length === 0) return undefined;
       return {
-        code:
-          code +
-          `\n/* __scene_hmr_accept */\nif (import.meta.hot) import.meta.hot.accept(${JSON.stringify(keys)}, () => {});\n`,
+        code: code + sceneLoadersAcceptTail(keys),
         map: null,
       };
     },

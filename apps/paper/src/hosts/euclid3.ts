@@ -16,6 +16,7 @@ import {
   peekFile,
   quantize,
   renderSnippet,
+  widgetCountError,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
 
@@ -66,10 +67,7 @@ export const euclid3Host: ViewHost = {
         error = null;
         const source = peekCache.get(`apps/paper/src/scenes/${ctx.sceneFile}`);
         if (source) {
-          const edits = countEditCalls(source);
-          if (edits > 0 && frame.gizmos.length !== edits) {
-            error = `${frame.gizmos.length} widgets at runtime but ${edits} edit* calls in scene — unroll helpers`;
-          }
+          error = widgetCountError(frame.gizmos.length, countEditCalls(source));
         }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
