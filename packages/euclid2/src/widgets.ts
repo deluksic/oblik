@@ -131,8 +131,10 @@ function liveOverride(index: number): number[] | undefined {
   return overridesBySource.get(activeSource)?.get(index);
 }
 
+/** Copy of this frame’s gizmos. Callers must not keep the live array — a
+ * second 2D editor’s beginWidgetFrame() clears it in place. */
 export function getGizmos(): readonly Gizmo[] {
-  return gizmos;
+  return gizmos.slice();
 }
 
 function takeIndex(): number {
