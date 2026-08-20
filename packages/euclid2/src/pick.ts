@@ -1,4 +1,4 @@
-import { dist, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
+import { dist, distToArc, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
 import { hitNumberSlider } from "./hud.ts";
@@ -66,6 +66,8 @@ export function hitTest(
       distW = distToSegment(world, g.a, g.b);
     } else if (g.kind === "circle") {
       distW = Math.abs(dist(world, g.center) - Math.abs(g.radius));
+    } else if (g.kind === "arc") {
+      distW = distToArc(world, g.center, g.radius, g.a0, g.a1);
     } else {
       let min = Infinity;
       for (let i = 0; i < g.points.length - 1; i++) {

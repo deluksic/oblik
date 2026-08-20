@@ -23,6 +23,7 @@ import * as beamShared from "./scenes/beam-shared.ts";
 import * as plate from "./scenes/plate.ts";
 import * as nest from "./scenes/nest.ts";
 import * as relative from "./scenes/relative.ts";
+import * as gear from "./scenes/gear.ts";
 
 export type StartPaper2dOpts = {
   sceneKey?: string;
@@ -38,6 +39,7 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   plate: { mod: plate, title: "Milled plate" },
   nest: { mod: nest, title: "Print nest (grid of plates)" },
   relative: { mod: relative, title: "Relative handle (write-back stress)" },
+  gear: { mod: gear, title: "Involute gears" },
 };
 
 const urlScene = new URLSearchParams(location.search).get("scene") ?? "beam";
@@ -68,7 +70,11 @@ let frame: Frame | null = null;
 let lastGood: Frame | null = null;
 let error: string | null = null;
 let cam: Camera =
-  sceneKey === "nest" ? { x: 0, y: 0, scale: 18 } : defaultCamera();
+  sceneKey === "nest"
+    ? { x: 0, y: 0, scale: 18 }
+    : sceneKey === "gear"
+      ? { x: 0.4, y: 0.15, scale: 28 }
+      : defaultCamera();
 let hoverId: string | null = null;
 let selectedId: string | null = null;
 let hoverGizmo: Gizmo | null = null;
@@ -163,7 +169,9 @@ function render(): void {
             ? "Same plate, instanced. Columns step hole count. Sliders: columns, rows, gap"
           : sceneKey === "relative"
             ? "Drag the left point: it writes. Drag the right: preview works, write-back cannot patch expressions"
-          : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
+            : sceneKey === "gear"
+              ? "Involute pair. Drag the pinion and pitch radius; sliders are teeth, pressure angle, mesh. The wheel is derived — same module, opposite rotation"
+            : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
   void updateInspect();
@@ -211,6 +219,8 @@ async function updateInspect(): Promise<void> {
               ? "Each cell is drawPlate(plateLayout()). Hole count increases left → right. Pick any copy — ids differ, provenance is the same library line."
               : sceneKey === "relative"
               ? "Right handle is editPoint(a.x + …, a.y + …). Source is the truth only when args are numeric literals."
+              : sceneKey === "gear"
+                ? "Click a flank, tip arc, pitch circle, or the line of action. Wheel geometry is derived from the pinion module."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
@@ -473,6 +483,10 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/relative.ts", (mod) => {
     if (!mod || !("scene" in mod) || sceneKey !== "relative") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/gear.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "gear") return;
     reloadScene(mod as unknown as SceneModule);
   });
 }

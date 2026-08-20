@@ -5,9 +5,18 @@ import type { Geom3 } from "./geom3.ts";
 export type Point = Base & { kind: "point"; x: number; y: number };
 export type Line = Base & { kind: "line"; a: Point; b: Point };
 export type Circle = Base & { kind: "circle"; center: Point; radius: number };
+export type Arc = Base & {
+  kind: "arc";
+  center: Point;
+  radius: number;
+  /** Start angle, radians, CCW from +X. */
+  a0: number;
+  /** End angle, radians, CCW from +X. Sweep is CCW from a0 to a1. */
+  a1: number;
+};
 export type Polyline = Base & { kind: "polyline"; points: Point[] };
 
-export type Geom2 = Point | Line | Circle | Polyline;
+export type Geom2 = Point | Line | Circle | Arc | Polyline;
 export type Geom = Geom2 | Geom3 | Group;
 
 export function point(x: number, y: number): Point {
@@ -32,6 +41,17 @@ export function circle(center: Vec2, radius: number): Circle {
   };
 }
 
+export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
+  return {
+    ...makeBase("arc", "arc"),
+    kind: "arc",
+    center: point(center.x, center.y),
+    radius,
+    a0,
+    a1,
+  };
+}
+
 export function polyline(points: Vec2[]): Polyline {
   return {
     ...makeBase("polyline", "polyline"),
@@ -44,6 +64,7 @@ export type Drawable =
   | { geom: Point }
   | { geom: Line }
   | { geom: Circle }
+  | { geom: Arc }
   | { geom: Polyline };
 
 export type Drawable3 = { geom: Geom3 };
@@ -80,6 +101,9 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
             out.push({ geom: s });
             break;
           case "circle":
+            out.push({ geom: s });
+            break;
+          case "arc":
             out.push({ geom: s });
             break;
           case "polyline":

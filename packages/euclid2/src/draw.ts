@@ -122,6 +122,18 @@ function strokeGeom(
     ctx.beginPath();
     ctx.arc(c.x, c.y, Math.abs(g.radius) * cam.scale, 0, Math.PI * 2);
     ctx.stroke();
+  } else if (g.kind === "arc") {
+    const c = worldToScreen(cam, g.center, w, h);
+    ctx.beginPath();
+    ctx.arc(
+      c.x,
+      c.y,
+      Math.abs(g.radius) * cam.scale,
+      -g.a0,
+      -g.a1,
+      true,
+    );
+    ctx.stroke();
   } else {
     if (g.points.length < 2) return;
     ctx.beginPath();

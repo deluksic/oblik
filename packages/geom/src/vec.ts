@@ -53,3 +53,53 @@ export function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   const t = Math.min(1, Math.max(0, projectT(a, b, p)));
   return dist(p, lerp(a, b, t));
 }
+
+export function polar(r: number, radians: number): Vec2 {
+  return vec(r * Math.cos(radians), r * Math.sin(radians));
+}
+
+export function ang(p: Vec2): number {
+  return Math.atan2(p.y, p.x);
+}
+
+/** Rotate `p` around the origin. */
+export function rotate(p: Vec2, radians: number): Vec2 {
+  const c = Math.cos(radians);
+  const s = Math.sin(radians);
+  return vec(p.x * c - p.y * s, p.x * s + p.y * c);
+}
+
+export function rotateAround(p: Vec2, origin: Vec2, radians: number): Vec2 {
+  return add(origin, rotate(sub(p, origin), radians));
+}
+
+export function wrapTau(a: number): number {
+  const tau = Math.PI * 2;
+  let x = a % tau;
+  if (x < 0) x += tau;
+  return x;
+}
+
+/** CCW sweep from `a0` to `a1` in [0, 2π). */
+export function sweepCCW(a0: number, a1: number): number {
+  return wrapTau(a1 - a0);
+}
+
+export function distToArc(
+  p: Vec2,
+  center: Vec2,
+  radius: number,
+  a0: number,
+  a1: number,
+): number {
+  const r = Math.abs(radius);
+  const rel = sub(p, center);
+  const d = len(rel);
+  const theta = ang(rel);
+  const span = sweepCCW(a0, a1);
+  const fromStart = wrapTau(theta - a0);
+  if (fromStart <= span || span < 1e-9) {
+    return Math.abs(d - r);
+  }
+  return Math.min(dist(p, add(center, polar(r, a0))), dist(p, add(center, polar(r, a1))));
+}
