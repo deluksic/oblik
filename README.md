@@ -1,5 +1,8 @@
-# Code-as-graph CAD (SDF → resin)
+# Design programs, viewed in scenes
 
-Design-phase: TypeScript libraries as the model graph, **scenes as visual tests** (2D, 3D, SDF, map, slicer), mouse rewriting numeric literals. Manufacturing path is a signed distance volume sliced directly for resin, not a Fusion timeline.
+A shell for TypeScript programs that define designs. Domain libraries stay pure; **scenes** supply widgets and a view (starting with 2D paper). Other tools — slicers, supports, maps — would be more scene types, not a built-in CAD/CAM stack.
 
-Nothing to run yet. See [PLAN.md](./PLAN.md) and the adversarial pass in [CRITIQUE.md](./CRITIQUE.md).
+- Intent: [PLAN.md](./PLAN.md)
+- Next experiment: [PROTOTYPE_1.md](./PROTOTYPE_1.md)
+
+Nothing to run yet.
