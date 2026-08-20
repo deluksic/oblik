@@ -5,10 +5,10 @@ export const CYLINDER_RADIUS = 2.2;
 
 /**
  * Six equal circles around one of the same size: centre-to-centre is 2R.
- * Not a widget.
+ * Not a widget. Independent of the quatrefoil dimple count.
  */
 export function pack7(radius: number): Vec2[] {
-  return [{ x: 0, y: 0 }, ...ringBalls(2 * radius)];
+  return [{ x: 0, y: 0 }, ...polarRing(6, 2 * radius)];
 }
 
 export type CylinderLayout = {
@@ -18,8 +18,8 @@ export type CylinderLayout = {
   ringBallR: number;
 };
 
-export function ringBalls(ringR: number): Vec2[] {
-  const n = 6;
+export function polarRing(count: number, ringR: number): Vec2[] {
+  const n = Math.max(1, Math.round(count));
   const r = Math.max(0, ringR);
   const out: Vec2[] = [];
   for (let i = 0; i < n; i++) {
@@ -27,6 +27,11 @@ export function ringBalls(ringR: number): Vec2[] {
     out.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
   }
   return out;
+}
+
+/** Quatrefoil: four balls on a ring. */
+export function ringBalls(ringR: number): Vec2[] {
+  return polarRing(4, ringR);
 }
 
 function dimples(origin: Vec2, layout: CylinderLayout): Geom[] {

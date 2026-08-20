@@ -18,8 +18,8 @@ export type DimpledCylinderOpts = {
 };
 
 /**
- * Z-up cylinder from z=0 to z=height. Six balls on a ring plus one at
- * the axis, all sitting on the top face.
+ * Z-up cylinder from z=0 to z=height. Quatrefoil on the top face:
+ * four balls on a ring plus one at the axis.
  */
 export function dimpledCylinder(opts: DimpledCylinderOpts): Sdf {
   const o = opts.origin ?? { x: 0, y: 0 };

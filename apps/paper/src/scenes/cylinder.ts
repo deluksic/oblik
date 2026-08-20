@@ -11,7 +11,7 @@ const origin = { x: 0, y: 0 };
 
 /**
  * Plan of seven packed cylinders. Widgets live on the centre cell:
- * dimple ring radius, centre ball Ø, outer ball Ø. The hex pack is fixed.
+ * quatrefoil ring radius, centre ball Ø, foil Ø. The hex pack is fixed.
  */
 export function cylinderLayout(): CylinderLayout {
   const ringR = editDistanceToPoint(origin, 1.4);

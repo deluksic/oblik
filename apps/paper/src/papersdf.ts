@@ -85,7 +85,7 @@ export function startPaperSdf(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Drag the centre-cell dimple — all seven follow · coral glider is height · LMB orbit"
+        ? "Drag the centre-cell quatrefoil — all seven follow · coral glider is height · LMB orbit"
         : "SDF CSG — XY from cylinder.ts · coral glider is height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
@@ -98,7 +98,7 @@ export function startPaperSdf(
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent = opts.split
         ? "Plan writes cylinder.ts. Only height is a widget here. The field itself is not pickable."
-        : "Dimple ring and both ball Ø come from cylinder.ts. Seven cylinders, hex-packed. Only height is a widget here.";
+        : "Quatrefoil ring and both ball Ø come from cylinder.ts. Seven cylinders, hex-packed. Only height is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
   }
