@@ -48,14 +48,17 @@ function flank(
   const pts: Vec2[] = [];
   for (let i = 0; i <= samples; i++) {
     const t = t0 + ((t1 - t0) * i) / samples;
-    pts.push(rotate(involuteAt(rb, t), spin));
+    // Negative roll: polar angle shrinks toward the tip, so the tooth
+    // tapers and the circular spans sit on the tips and in the roots.
+    pts.push(rotate(involuteAt(rb, -t), spin));
   }
   return pts;
 }
 
 /**
  * One tooth in local coords, centerline on +X.
- * Involute is spun so the pitch point sits at ±π/(2z).
+ * Involute is spun so the pitch point sits at ±π/(2z); roll is
+ * negative so thickness falls toward the addendum.
  */
 function toothParts(
   pitchR: number,
@@ -80,7 +83,7 @@ function toothParts(
   const rootR = Math.max(0.18 * pitchR, pitchR - 1.25 * m);
   const half = Math.PI / (2 * z);
   const tPitch = tAtRadius(baseR, pitchR);
-  const spin = half - ang(involuteAt(baseR, tPitch));
+  const spin = half - ang(involuteAt(baseR, -tPitch));
   const t0 = tAtRadius(baseR, Math.max(baseR * 1.001, rootR));
   const t1 = tAtRadius(baseR, addR);
   const right = flank(baseR, t0, t1, 16, spin);
