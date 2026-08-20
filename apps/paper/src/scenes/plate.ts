@@ -26,22 +26,22 @@ function stockEdges(min: Vec2, max: Vec2) {
  */
 export function plateLayout() {
   const min = editPoint(-5.5, -3.2);
-  const max = editPoint(5.8, 3.5);
+  const max = editPoint(5.75, 3.22);
   const edges = stockEdges(min, max);
 
-  const h0 = editPoint(-4.29, -1.86);
-  const h1 = editPoint(4.46, -2.13);
-  const h2 = editPoint(4.4, 2.3);
-  const h3 = editPoint(-4.3, 2.2);
-  const drillR = editDistanceToPoint(h0, 1.82);
+  const h0 = editPoint(-3.63, -1.63);
+  const h1 = editPoint(4.32, -2.02);
+  const h2 = editPoint(4.36, 2.22);
+  const h3 = editPoint(-3.67, 1.64);
+  const drillR = editDistanceToPoint(h0, 0.71);
 
-  const pocketMin = editPoint(-1.99, -1.43);
-  const pocketMax = editPoint(2.02, 1.03);
-  const filletR = editDistanceToPoint(pocketMin, 0.32);
+  const pocketMin = editPoint(-1.48, -1.06);
+  const pocketMax = editPoint(2.05, 0.89);
+  const filletR = editDistanceToPoint(pocketMin, 0.36);
 
   const slotCenter = editPointOnLine(edges.top, 0.52);
-  const slotLen = editDistanceToPoint(slotCenter, 1.58);
-  const slotW = editDistanceToPoint(slotCenter, 0.5);
+  const slotLen = editDistanceToPoint(slotCenter, 2.1);
+  const slotW = editDistanceToPoint(slotCenter, 0.64);
 
   return {
     stock: { min, max },
