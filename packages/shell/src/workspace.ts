@@ -232,10 +232,17 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   viewportRoot.replaceChildren();
 
   const mounted: MountedPane[] = [];
+  let fanOut = false;
 
   const refreshOthers = (originId: string) => {
-    for (const p of mounted) {
-      if (p.id !== originId) p.handle?.refresh({ quiet: true });
+    if (fanOut) return;
+    fanOut = true;
+    try {
+      for (const p of mounted) {
+        if (p.id !== originId) p.handle?.refresh({ quiet: true });
+      }
+    } finally {
+      fanOut = false;
     }
   };
 

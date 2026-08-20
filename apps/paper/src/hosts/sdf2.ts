@@ -97,7 +97,7 @@ export const sdf2Host: ViewHost = {
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
 
-    function evaluate(): void {
+    function evaluate(propagate = true): void {
       try {
         beginWidgetFrame(sceneId);
         sdf = sceneMod.scene();
@@ -114,7 +114,7 @@ export const sdf2Host: ViewHost = {
         error = err instanceof Error ? err.message : String(err);
       }
       publishWidgetOverrides(sceneId);
-      ctx.onLiveChange();
+      if (propagate) ctx.onLiveChange();
     }
 
     function render(quiet = false): void {
@@ -307,7 +307,7 @@ export const sdf2Host: ViewHost = {
 
     return {
       refresh(opts) {
-        evaluate();
+        evaluate(false);
         render(opts?.quiet ?? false);
       },
       dispose() {

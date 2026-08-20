@@ -75,7 +75,7 @@ export const euclid2Host: ViewHost = {
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
 
-    function evaluate(): void {
+    function evaluate(propagate = true): void {
       try {
         frame = runScene(sceneMod, sceneId);
         lastGood = frame;
@@ -99,7 +99,7 @@ export const euclid2Host: ViewHost = {
         selectedGeom = null;
       }
       publishWidgetOverrides(sceneId);
-      ctx.onLiveChange();
+      if (propagate) ctx.onLiveChange();
     }
 
     function activeGizmo(): number | null {
@@ -391,7 +391,7 @@ export const euclid2Host: ViewHost = {
 
     return {
       refresh(opts) {
-        evaluate();
+        evaluate(false);
         render(opts?.quiet ?? false);
       },
       dispose() {
