@@ -11,8 +11,10 @@ import {
 } from "@design-scenes/euclid3";
 import * as mill from "./scenes/mill.ts";
 import * as helix from "./scenes/helix.ts";
+import * as ring3 from "./scenes/ring3.ts";
 import "./scenes/plate.ts";
 import "./scenes/gear.ts";
+import "./scenes/ring.ts";
 import {
   commitWidget,
   countEditCalls,
@@ -25,6 +27,7 @@ import {
 const SCENES3: Record<string, { mod: SceneModule3; title: string }> = {
   mill: { mod: mill, title: "Milled block (3D)" },
   helix: { mod: helix, title: "Helical gears" },
+  ring3: { mod: ring3, title: "Signet wrap" },
 };
 
 export type Paper3dOpts = {
@@ -53,6 +56,10 @@ export function startPaper3d(
   if ((opts.sceneKey ?? "mill") === "helix") {
     space.camera.position.set(18, -24, 13);
     space.controls.target.set(0.3, 0, 1.15);
+  }
+  if (opts.sceneKey === "ring3") {
+    space.camera.position.set(16, -18, 11);
+    space.controls.target.set(0, 0, 3.2);
   }
   const peekCache = new Map<string, string>();
 
@@ -106,10 +113,14 @@ export function startPaper3d(
       : opts.split
         ? opts.sceneKey === "helix"
           ? "Drag 2D handles — helix follows live · coral glider is face width · LMB orbit"
-          : "Drag 2D handles — mill follows live · coral glider is thickness · LMB orbit"
+          : opts.sceneKey === "ring3"
+            ? "Drag 2D handles — wrap follows live · no 3D gizmos · LMB orbit"
+            : "Drag 2D handles — mill follows live · coral glider is thickness · LMB orbit"
         : opts.sceneKey === "helix"
           ? "XY from gear.ts (no gizmos) · coral glider = face width · Helix ° lives in the 2D scene"
-          : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
+          : opts.sceneKey === "ring3"
+            ? "This view has no widgets. The mesh is wrapBand() of ring.ts — drag the 2D scene or open split"
+            : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     void updateInspect();
@@ -136,10 +147,14 @@ export function startPaper3d(
       els.metaEl.textContent = opts.split
         ? opts.sceneKey === "helix"
           ? "Section, teeth, mesh angle, and helix come from the 2D gear. Only face width is a widget here."
-          : "Stock XY, holes, pocket, and slot come from the 2D plate. Only thickness is a widget here."
+          : opts.sceneKey === "ring3"
+            ? "The developed band is ring.ts. This wrap has no gizmos."
+            : "Stock XY, holes, pocket, and slot come from the 2D plate. Only thickness is a widget here."
         : opts.sceneKey === "helix"
           ? "Section and helix come from gear.ts. Only face width is a widget here."
-          : "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
+          : opts.sceneKey === "ring3"
+            ? "No widgets in ring3.ts. Open ?scene=ring or the split to edit the developed pattern."
+            : "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
       return;
     }
@@ -277,6 +292,23 @@ export function startPaper3d(
     });
     import.meta.hot.accept("./scenes/gear.ts", () => {
       if (opts.sceneKey !== "helix") return;
+      evaluate();
+      sync(true);
+    });
+    import.meta.hot.accept("./scenes/ring3.ts", (mod) => {
+      if (!mod || !("scene" in mod) || opts.sceneKey !== "ring3") return;
+      sceneMod = mod as unknown as SceneModule3;
+      clearWidgetOverrides3();
+      peekCache.clear();
+      void peekFile(peekCache, `apps/paper/src/scenes/${sceneMod.sceneFile}`).then(
+        () => {
+          evaluate();
+          sync();
+        },
+      );
+    });
+    import.meta.hot.accept("./scenes/ring.ts", () => {
+      if (opts.sceneKey !== "ring3") return;
       evaluate();
       sync(true);
     });

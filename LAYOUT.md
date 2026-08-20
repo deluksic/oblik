@@ -4,7 +4,7 @@ pnpm workspace. Libraries are packages; the paper preview is an app. Domain demo
 
 ```
 packages/
-  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude), UUID id, path, provenance
+  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude, wrapBand), UUID id, path, provenance
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnLine3
   shell     @design-scenes/shell     Vite plugin: peek source, patch edit* literals

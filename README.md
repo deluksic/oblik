@@ -23,6 +23,8 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 - [?scene=nest](http://127.0.0.1:43117/?scene=nest) — **print grid.** `withoutWidgets(plateLayout)` instanced in a nest; columns / rows / gap are titled sliders. Polar-array **count steps by column** (programmatic, not a widget per cell).
 - [?scene=relative](http://127.0.0.1:43117/?scene=relative) — **write-back stress.** Left `editPoint` is literals (writes). Right is `a.x + …, a.y + …` (preview only; pointer-up cannot patch expressions).
 - [?scene=gear](http://127.0.0.1:43117/?scene=gear) — **involute spur pair.** Drag the pinion centre, pitch radius, and **mesh angle** (coral arm on the pitch circle). Tooth counts, pressure, and helix are titled sliders. The wheel is derived. Helix ° is for the 3D extrude.
+- [?scene=ring](http://127.0.0.1:43117/?scene=ring) — **signet band, unrolled.** Plan-view bore + developed strip (`2πR`). Shank and signet heights are distances on the paper; Gauge is wall thickness.
+- [?scene=ringsplit](http://127.0.0.1:43117/?scene=ringsplit) — same library wrapped with `wrapBand` around a cylinder. The 3D scene has **no widgets** — it is a second view of `ring.ts`.
 - [?scene=helix](http://127.0.0.1:43117/?scene=helix) — **helical gears (3D).** Closed tooth loops run through `extrude(..., { twist })`. Face width is the 3D glider; helix and the section come from `gear.ts`.
 - [?scene=gearsplit](http://127.0.0.1:43117/?scene=gearsplit) — 2D gear and 3D helix side by side. 2D drags update the helix live.
 - [?scene=mill](http://127.0.0.1:43117/?scene=mill) — **3D** extrusion of the plate scene. XY (stock, holes, pocket, slot) is read from `plate.ts` with gizmos off. The only 3D widget is thickness (vertical glider); write-back patches `mill.ts`.

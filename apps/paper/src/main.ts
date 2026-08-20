@@ -90,6 +90,38 @@ if (sceneKey === "split") {
       m.startPaper3d(inspect, { sceneKey: "helix" });
     })
     .catch(fail3d);
+} else if (sceneKey === "ringsplit") {
+  document.body.classList.add("view-split");
+  paper.hidden = false;
+  space.hidden = false;
+  titleEl.textContent = "Signet · unrolled + wrap";
+  document.title = "euclid — Signet band";
+  statusEl.textContent = "Loading 3D view…";
+  let refreshRing: ((opts?: { quiet?: boolean }) => void) | undefined;
+  startPaper2d({
+    sceneKey: "ring",
+    split: true,
+    onLiveChange: () => refreshRing?.({ quiet: true }),
+  });
+  void import("./paper3d.ts")
+    .then((m) => {
+      const view = m.startPaper3d(inspect, { split: true, sceneKey: "ring3" });
+      refreshRing = view.refresh;
+      view.refresh({ quiet: true });
+    })
+    .catch(fail3d);
+} else if (sceneKey === "ring3") {
+  document.body.classList.add("view-3d");
+  paper.hidden = true;
+  space.hidden = false;
+  titleEl.textContent = "Signet wrap";
+  document.title = "euclid3 — Signet wrap";
+  statusEl.textContent = "Loading 3D view…";
+  void import("./paper3d.ts")
+    .then((m) => {
+      m.startPaper3d(inspect, { sceneKey: "ring3" });
+    })
+    .catch(fail3d);
 } else {
   document.body.classList.add("view-2d");
   paper.hidden = false;

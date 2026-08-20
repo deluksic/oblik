@@ -1,4 +1,5 @@
 import { dist, rotateAround, type Vec2 } from "./vec.ts";
+import { vec3, type Vec3 } from "./vec3.ts";
 import { mesh3, type Mesh3 } from "./geom3.ts";
 
 export type ExtrudeOpts = {
@@ -109,6 +110,73 @@ export function extrude(
       indices.push(topI, j0, j1);
     }
   }
+
+  return mesh3(positions, indices);
+}
+
+export type WrapBandOpts = {
+  /** Radius the 2D x (arc length) is measured on — usually the bore. */
+  radius: number;
+  /** Radial thickness, outward from `radius`. */
+  thickness: number;
+};
+
+function cyl(s: number, z: number, r: number, rMap: number): Vec3 {
+  const theta = s / rMap;
+  return vec3(r * Math.cos(theta), r * Math.sin(theta), z);
+}
+
+function pushV(positions: number[], p: Vec3): void {
+  positions.push(p.x, p.y, p.z);
+}
+
+/**
+ * Wrap a developed band (bottom/top curves in arc-length × axis) onto a
+ * cylinder and give it radial thickness. Each of the four skins (inner,
+ * outer, top, bottom) has its own vertices so sharp edges shade cleanly.
+ * `bottom` and `top` must share sample count; x is arc length at `radius`.
+ * The last sample is welded to the first (a closed ring).
+ */
+export function wrapBand(
+  bottom: readonly Vec2[],
+  top: readonly Vec2[],
+  opts: WrapBandOpts,
+): Mesh3 {
+  const n = Math.min(bottom.length, top.length);
+  if (n < 3) return mesh3([], []);
+  const rMap = Math.max(1e-3, Math.abs(opts.radius));
+  const thick = Math.abs(opts.thickness) < 1e-4 ? 0.05 : opts.thickness;
+  const r0 = rMap;
+  const r1 = r0 + thick;
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  const ribbon = (a: (i: number) => Vec3, b: (i: number) => Vec3) => {
+    const base = positions.length / 3;
+    for (let i = 0; i < n; i++) {
+      pushV(positions, a(i));
+      pushV(positions, b(i));
+    }
+    for (let i = 0; i < n; i++) {
+      const i0 = base + i * 2;
+      const i1 = i0 + 1;
+      const j = (i + 1) % n;
+      const j0 = base + j * 2;
+      const j1 = j0 + 1;
+      indices.push(i0, i1, j1, i0, j1, j0);
+    }
+  };
+
+  const ib = (i: number) => cyl(bottom[i]!.x, bottom[i]!.y, r0, rMap);
+  const it = (i: number) => cyl(top[i]!.x, top[i]!.y, r0, rMap);
+  const ob = (i: number) => cyl(bottom[i]!.x, bottom[i]!.y, r1, rMap);
+  const ot = (i: number) => cyl(top[i]!.x, top[i]!.y, r1, rMap);
+
+  ribbon(ib, it);
+  ribbon(ot, ob);
+  ribbon(it, ot);
+  ribbon(ob, ib);
 
   return mesh3(positions, indices);
 }
