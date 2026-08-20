@@ -8,7 +8,10 @@ export type Provenance = {
 };
 
 type Base = {
+  /** Opaque pick identity — unique per geometric value. */
   id: string;
+  /** Human breadcrumb path (group[0]/line[2]); not used for picking. */
+  path: string;
   parentId: string | null;
   provenance: Provenance;
 };
@@ -20,24 +23,25 @@ export type Polyline = Base & { kind: "polyline"; points: Point[] };
 export type Group = Base & { kind: "group"; children: Geom[] };
 export type Geom = Point | Line | Circle | Polyline | Group;
 
-const counts = new Map<string, number>();
-let currentParent: string | null = null;
+const pathCounts = new Map<string, number>();
+let currentParentPath: string | null = null;
+let currentParentId: string | null = null;
 
 export function beginGeomFrame(): void {
-  counts.clear();
-  currentParent = null;
+  pathCounts.clear();
+  currentParentPath = null;
+  currentParentId = null;
 }
 
-function nextIndex(kind: string): number {
-  const key = `${currentParent ?? ""}::${kind}`;
-  const n = counts.get(key) ?? 0;
-  counts.set(key, n + 1);
-  return n;
+function nextPathLocal(kind: string): string {
+  const key = `${currentParentPath ?? ""}::${kind}`;
+  const n = pathCounts.get(key) ?? 0;
+  pathCounts.set(key, n + 1);
+  return `${kind}[${n}]`;
 }
 
-function makeId(kind: string, index: number): string {
-  const local = `${kind}[${index}]`;
-  return currentParent ? `${currentParent}/${local}` : local;
+function makePath(local: string): string {
+  return currentParentPath ? `${currentParentPath}/${local}` : local;
 }
 
 function captureProvenance(createdBy: string): Provenance {
@@ -69,10 +73,11 @@ function captureProvenance(createdBy: string): Provenance {
 }
 
 function base(kind: string, createdBy: string): Base {
-  const index = nextIndex(kind);
+  const local = nextPathLocal(kind);
   return {
-    id: makeId(kind, index),
-    parentId: currentParent,
+    id: crypto.randomUUID(),
+    path: makePath(local),
+    parentId: currentParentId,
     provenance: captureProvenance(createdBy),
   };
 }
@@ -108,19 +113,24 @@ export function polyline(points: Vec2[]): Polyline {
 }
 
 export function group(fn: () => Geom[]): Group {
-  const index = nextIndex("group");
-  const id = makeId("group", index);
+  const local = nextPathLocal("group");
+  const path = makePath(local);
+  const id = crypto.randomUUID();
   const node: Group = {
     id,
-    parentId: currentParent,
+    path,
+    parentId: currentParentId,
     provenance: captureProvenance("group"),
     kind: "group",
     children: [],
   };
-  const prev = currentParent;
-  currentParent = id;
+  const prevPath = currentParentPath;
+  const prevId = currentParentId;
+  currentParentPath = path;
+  currentParentId = id;
   node.children = fn();
-  currentParent = prev;
+  currentParentPath = prevPath;
+  currentParentId = prevId;
   return node;
 }
 
@@ -159,6 +169,6 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
   return out;
 }
 
-export function breadcrumb(id: string): string {
-  return id.replaceAll("/", " › ");
+export function breadcrumb(path: string): string {
+  return path.replaceAll("/", " › ");
 }

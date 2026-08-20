@@ -20,8 +20,8 @@ import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
 
 const SCENES: Record<string, { mod: SceneModule; title: string }> = {
-  beam: { mod: beam, title: "Beam truss (grouped ids)" },
-  flat: { mod: beamFlat, title: "Twin trusses (flat ids)" },
+  beam: { mod: beam, title: "Beam truss (grouped paths)" },
+  flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
 };
 
 const sceneKey =
@@ -107,8 +107,8 @@ function render(): void {
   statusEl.textContent = error
     ? "Last good frame · scene threw"
     : sceneKey === "flat"
-      ? "Flat ids: upper & lower truss both use line[0], circle[0], … — click ticks on each"
-      : "Grouped ids: group[0] › line[2] · drag handles · wheel zooms";
+      ? "Flat paths: ticks share mark.ts:34 — each geom has a unique id (uuid)"
+      : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
   updateInspect();
@@ -116,6 +116,7 @@ function render(): void {
 
 function currentTarget(): {
   title: string;
+  id?: string;
   file?: string;
   line?: number;
   column?: number;
@@ -130,7 +131,8 @@ function currentTarget(): {
     selectedGeom;
   if (!g) return null;
   return {
-    title: breadcrumb(g.id),
+    title: breadcrumb(g.path),
+    id: g.id,
     file: g.provenance.file,
     line: g.provenance.line,
     column: g.provenance.column,
@@ -143,7 +145,7 @@ async function updateInspect(): Promise<void> {
     crumbEl.textContent = "Nothing selected";
     metaEl.textContent =
       sceneKey === "flat"
-        ? "Click a tick on the upper truss, then one on the lower — both may read line[4]."
+        ? "Click ticks on each truss — paths differ (line[4] vs line[12]) but creation site is the same."
         : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
@@ -155,7 +157,9 @@ async function updateInspect(): Promise<void> {
     sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneMod.sceneFile}.</code>`;
     return;
   }
-  metaEl.textContent = `${t.file}:${t.line}:${t.column ?? 0}`;
+  metaEl.textContent = t.id
+    ? `${t.id} · ${t.file}:${t.line}:${t.column ?? 0}`
+    : `${t.file}:${t.line}:${t.column ?? 0}`;
   const file = t.file.replace(/\?.*$/, "").replace(/^src\//, "");
   try {
     const text = await peekFile(file);
