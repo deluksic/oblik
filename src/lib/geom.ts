@@ -42,19 +42,18 @@ function makeId(kind: string, index: number): string {
 
 function captureProvenance(createdBy: string): Provenance {
   const stack = new Error().stack ?? "";
-  for (const line of stack.split("\n")) {
+  for (const raw of stack.split("\n")) {
+    // Vite stacks look like: .../mark.ts?t=1739:25:18
+    const line = raw.replace(/\.(tsx?|jsx?|mjs)\?[^:]*:/, ".$1:");
     const m = line.match(
-      /(https?:\/\/[^:\s)]+\.(?:ts|js|tsx|mjs)):(\d+):(\d+)/,
+      /(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/,
     );
-    if (!m || !m[1] || !m[2] || !m[3]) continue;
-    const url = m[1];
-    if (url.includes("/node_modules/") || url.includes("/@vite/")) continue;
-    const file = url.replace(/^https?:\/\/[^/]+\/?/, "");
+    if (!m?.[1] || !m[2] || !m[3]) continue;
+    const file = m[1].replace(/^\//, "");
     if (
-      file.includes("/lib/geom.ts") ||
-      file.includes("/lib/vec.ts") ||
+      file.endsWith("/lib/geom.ts") ||
+      file.endsWith("/lib/vec.ts") ||
       file.includes("/euclid2/") ||
-      file.includes("/shell/") ||
       file.endsWith("/main.ts")
     ) {
       continue;

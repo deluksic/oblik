@@ -132,7 +132,7 @@ async function updateInspect(): Promise<void> {
     return;
   }
   metaEl.textContent = `${t.file}:${t.line}:${t.column ?? 0}`;
-  const file = t.file.replace(/\?.*$/, "");
+  const file = t.file.replace(/\?.*$/, "").replace(/^src\//, "");
   try {
     const text = await peekFile(file);
     sourceEl.innerHTML = renderSnippet(text, t.line);
