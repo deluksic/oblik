@@ -20,7 +20,31 @@ export type PlateOpts = {
   pocket: { min: Vec2; max: Vec2; filletR: number };
   /** Slot cut on the top edge of stock. */
   slot: { center: Vec2; length: number; width: number };
+  /** Pitch circle drawn as construction; ring holes are in `holes`. */
+  boltCircle?: { center: Vec2; radius: number; count: number };
 };
+
+/** Polar hole pattern. Loop is the provenance stress: every hole shares one call site. */
+export function boltCircle(
+  center: Vec2,
+  radius: number,
+  count: number,
+  holeR: number,
+): Hole[] {
+  const n = Math.max(3, Math.round(count));
+  const out: Hole[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    out.push({
+      center: {
+        x: center.x + Math.cos(a) * radius,
+        y: center.y + Math.sin(a) * radius,
+      },
+      radius: holeR,
+    });
+  }
+  return out;
+}
 
 function rectOutline(min: Vec2, max: Vec2): Geom {
   return polyline([
@@ -114,6 +138,10 @@ export function drawPlate(opts: PlateOpts): Geom {
       for (const hole of opts.holes) {
         out.push(circle(hole.center, Math.abs(hole.radius)));
         out.push(...crossAt(hole.center, hole.radius * 0.55));
+      }
+      const bc = opts.boltCircle;
+      if (bc) {
+        out.push(circle(bc.center, Math.abs(bc.radius)));
       }
       return out;
     });

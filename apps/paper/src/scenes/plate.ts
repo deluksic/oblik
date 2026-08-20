@@ -1,5 +1,5 @@
-import { line, type Vec2 } from "@design-scenes/geom";
-import { drawPlate } from "../demo/plate.ts";
+import { line, projectT, type Vec2 } from "@design-scenes/geom";
+import { boltCircle, drawPlate } from "../demo/plate.ts";
 import {
   editDistanceToPoint,
   editPoint,
@@ -20,6 +20,7 @@ function stockEdges(min: Vec2, max: Vec2) {
  * Milled plate stress test:
  * - stock corners (2 editPoint)
  * - 4 bolt holes (4 editPoint + 1 shared drillR)
+ * - polar array: center, PCD, tap Ø, count glider (library loop; N changes topology)
  * - pocket corners + fillet (2 editPoint + 1 editDistanceToPoint)
  * - slot on top edge (editPointOnLine + 2 editDistanceToPoint)
  * - demo loops over holes; pocket/slot grouped under group[0]
@@ -34,6 +35,20 @@ export function plateLayout() {
   const h2 = editPoint(4.36, 2.22);
   const h3 = editPoint(-3.67, 1.64);
   const drillR = editDistanceToPoint(h0, 0.71);
+
+  const bc = editPoint(0.12, -0.08);
+  const pcd = editDistanceToPoint(bc, 0.7);
+  const tapR = editDistanceToPoint(bc, 0.21);
+  const countRail = line(
+    { x: min.x - 1.2, y: min.y + 0.25 },
+    { x: min.x - 1.2, y: max.y - 0.25 },
+  );
+  const countAt = editPointOnLine(countRail, 0.33);
+  const ringN =
+    3 +
+    Math.round(
+      Math.min(1, Math.max(0, projectT(countRail.a, countRail.b, countAt))) * 9,
+    );
 
   const pocketMin = editPoint(-1.48, -1.06);
   const pocketMax = editPoint(2.05, 0.89);
@@ -50,9 +65,11 @@ export function plateLayout() {
       { center: h1, radius: drillR },
       { center: h2, radius: drillR },
       { center: h3, radius: drillR },
+      ...boltCircle(bc, pcd, ringN, tapR),
     ],
     pocket: { min: pocketMin, max: pocketMax, filletR },
     slot: { center: slotCenter, length: slotLen, width: slotW },
+    boltCircle: { center: bc, radius: pcd, count: ringN },
   };
 }
 

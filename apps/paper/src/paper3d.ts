@@ -69,6 +69,13 @@ export function startPaper3d(
       error = err instanceof Error ? err.message : String(err);
       frame = lastGood;
     }
+    if (
+      selectedId &&
+      !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)
+    ) {
+      selectedId = null;
+      selectedGeom = null;
+    }
   }
 
   function sync(quiet = false): void {

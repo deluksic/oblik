@@ -16,6 +16,7 @@ export type MillOpts = {
   holes: MillHole[];
   pocket: { min: Vec3; max: Vec3; filletR?: number };
   slot: { center: Vec3; length: number; width: number; depth: number };
+  boltCircle?: { x: number; y: number; radius: number };
 };
 
 /** Extrude a 2D plate layout along Z. */
@@ -48,6 +49,13 @@ export function millFromPlate(plate: PlateOpts, thickness: number): MillOpts {
       width: plate.slot.width,
       depth: z1 - zSlot,
     },
+    boltCircle: plate.boltCircle
+      ? {
+          x: plate.boltCircle.center.x,
+          y: plate.boltCircle.center.y,
+          radius: plate.boltCircle.radius,
+        }
+      : undefined,
   };
 }
 
@@ -92,7 +100,15 @@ export function drawMill(opts: MillOpts): Geom {
   const zTop = Math.max(opts.stock.min.z, opts.stock.max.z);
   return group(() => [
     group(() => [stockBox(opts.stock.min, opts.stock.max)]),
-    group(() => holeSet(opts.stock, opts.holes)),
+    group(() => {
+      const parts = holeSet(opts.stock, opts.holes);
+      const bc = opts.boltCircle;
+      if (bc) {
+        const z1 = Math.max(opts.stock.min.z, opts.stock.max.z);
+        parts.push(circle3({ x: bc.x, y: bc.y, z: z1 }, bc.radius, { x: 0, y: 0, z: 1 }));
+      }
+      return parts;
+    }),
     group(() => {
       const p = opts.pocket;
       const parts: Geom[] = [box3(p.min, p.max)];

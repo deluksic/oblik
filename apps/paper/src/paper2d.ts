@@ -19,6 +19,7 @@ import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
 import * as beamShared from "./scenes/beam-shared.ts";
 import * as plate from "./scenes/plate.ts";
+import * as relative from "./scenes/relative.ts";
 
 export type StartPaper2dOpts = {
   sceneKey?: string;
@@ -32,6 +33,7 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
   shared: { mod: beamShared, title: "Shared radius (one literal)" },
   plate: { mod: plate, title: "Milled plate" },
+  relative: { mod: relative, title: "Relative handle (write-back stress)" },
 };
 
 const urlScene = new URLSearchParams(location.search).get("scene") ?? "beam";
@@ -111,6 +113,13 @@ function evaluate(): void {
     error = err instanceof Error ? err.message : String(err);
     frame = lastGood;
   }
+  if (
+    selectedId &&
+    !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)
+  ) {
+    selectedId = null;
+    selectedGeom = null;
+  }
   opts.onLiveChange?.();
 }
 
@@ -143,7 +152,9 @@ function render(): void {
       : sceneKey === "shared"
         ? "One dashed radius — all three rings and the roof follow it while you drag"
         : sceneKey === "plate"
-          ? "Plate: shared drill Ø, looped holes in demo, slot on top edge · wheel zooms"
+          ? "Plate: corner bolts, polar array (left glider = count), pocket, slot · wheel zooms"
+          : sceneKey === "relative"
+            ? "Drag the left point: it writes. Drag the right: preview works, write-back cannot patch expressions"
           : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
@@ -187,8 +198,10 @@ async function updateInspect(): Promise<void> {
         : sceneKey === "shared"
           ? "One coral radius around the middle post. Library circles on the other posts are not handles."
           : sceneKey === "plate"
-            ? "Drag stock corners, any bolt center, drill Ø, pocket, fillet, or the slot on the top edge."
-            : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
+            ? "Drag corner bolts, the polar array (center / PCD / tap Ø / count glider), pocket, or slot."
+            : sceneKey === "relative"
+              ? "Right handle is editPoint(a.x + …, a.y + …). Source is the truth only when args are numeric literals."
+              : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
   }
@@ -415,6 +428,10 @@ if (import.meta.hot) {
   import.meta.hot.accept("./scenes/plate.ts", (mod) => {
     if (!mod || !("scene" in mod)) return;
     if (sceneKey !== "plate" && !opts.split) return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/relative.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "relative") return;
     reloadScene(mod as unknown as SceneModule);
   });
 }
