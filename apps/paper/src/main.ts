@@ -123,15 +123,23 @@ if (sceneKey === "split") {
     })
     .catch(fail3d);
 } else if (sceneKey === "rose") {
-  document.body.classList.add("view-3d");
-  paper.hidden = true;
+  document.body.classList.add("view-split");
+  paper.hidden = false;
   space.hidden = false;
-  titleEl.textContent = "Cylinder (SDF)";
-  document.title = "sdf — Cylinder";
+  titleEl.textContent = "Cylinder · plan + SDF";
+  document.title = "euclid — Cylinder CSG";
   statusEl.textContent = "Loading field view…";
+  let refreshSdf: ((opts?: { quiet?: boolean }) => void) | undefined;
+  startPaper2d({
+    sceneKey: "cylinder",
+    split: true,
+    onLiveChange: () => refreshSdf?.({ quiet: true }),
+  });
   void import("./papersdf.ts")
     .then((m) => {
-      m.startPaperSdf(inspect);
+      const view = m.startPaperSdf(inspect, { split: true });
+      refreshSdf = view.refresh;
+      view.refresh({ quiet: true });
     })
     .catch(fail3d);
 } else {

@@ -52,9 +52,9 @@ export class SdfView {
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
     this.camera.up.set(0, 0, 1);
-    this.camera.position.set(9, -14, 7);
+    this.camera.position.set(5, -11, 8);
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, 0, 1.7);
+    this.controls.target.set(0, 0, 1.8);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.mouseButtons = {

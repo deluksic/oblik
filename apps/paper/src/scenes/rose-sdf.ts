@@ -1,33 +1,35 @@
 import { line3 } from "@design-scenes/geom";
-import { editDistance3, editPoint3, editPointOnLine3 } from "@design-scenes/euclid3";
+import { withoutWidgets } from "@design-scenes/euclid2";
+import { editPointOnLine3 } from "@design-scenes/euclid3";
 import { dimpledCylinder } from "../demo/rose-sdf.ts";
+import { cylinderLayout } from "./cylinder.ts";
 
 export const view = "sdf" as const;
 export const sceneFile = "rose-sdf.ts";
 
+let readLayout = cylinderLayout;
+
+if (import.meta.hot) {
+  import.meta.hot.accept("./cylinder.ts", (mod) => {
+    if (mod && "cylinderLayout" in mod) {
+      readLayout = mod.cylinderLayout as typeof cylinderLayout;
+    }
+  });
+}
+
 /**
- * Raymarched CSG. No provenance on the field. Gizmos are scene
- * widgets only — the surface itself is not pickable.
+ * Field view of the 2D plan. Ring radius and centre Ø come from
+ * cylinder.ts with gizmos silenced. This file owns height (Z glider).
  */
 export function scene() {
-  const c = editPoint3(0, 0, 1.7);
-  const radius = editDistance3(c, 2.15);
-  const ballAt = {
-    x: c.x,
-    y: c.y - radius,
-    z: c.z,
-  };
-  const ballR = editDistance3(ballAt, 0.95);
-  const mast = line3(
-    { x: c.x, y: c.y, z: 0 },
-    { x: c.x, y: c.y, z: 5 },
-  );
-  const height = Math.max(0.6, editPointOnLine3(mast, 0.68).z);
+  const layout = withoutWidgets(() => readLayout());
+  const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
+  const height = Math.max(0.5, editPointOnLine3(mast, 0.52).z);
   return dimpledCylinder({
-    center: c,
-    radius,
+    radius: layout.radius,
     height,
-    ballR,
-    count: 7,
+    ringR: layout.ringR,
+    centerR: layout.centerR,
+    ringBallR: layout.ringBallR,
   });
 }

@@ -25,6 +25,7 @@ import * as nest from "./scenes/nest.ts";
 import * as relative from "./scenes/relative.ts";
 import * as gear from "./scenes/gear.ts";
 import * as ring from "./scenes/ring.ts";
+import * as cylinder from "./scenes/cylinder.ts";
 
 export type StartPaper2dOpts = {
   sceneKey?: string;
@@ -42,6 +43,7 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   relative: { mod: relative, title: "Relative handle (write-back stress)" },
   gear: { mod: gear, title: "Involute gears" },
   ring: { mod: ring, title: "Signet band (unrolled)" },
+  cylinder: { mod: cylinder, title: "Cylinder top (plan)" },
 };
 
 const urlScene = new URLSearchParams(location.search).get("scene") ?? "beam";
@@ -78,6 +80,8 @@ let cam: Camera =
       ? { x: 0.4, y: 0.15, scale: 28 }
       : sceneKey === "ring"
         ? { x: 18, y: 3.2, scale: 14 }
+        : sceneKey === "cylinder"
+          ? { x: 0, y: 0, scale: 38 }
         : defaultCamera();
 let hoverId: string | null = null;
 let selectedId: string | null = null;
@@ -139,6 +143,7 @@ function evaluate(): void {
     sceneKey === "plate" ||
     sceneKey === "gear" ||
     sceneKey === "ring" ||
+    sceneKey === "cylinder" ||
     opts.split
   ) {
     publishWidgetOverrides();
@@ -173,6 +178,8 @@ function render(): void {
         ? "Drag 2D handles — helix follows live · coral mesh angle on the pinion · Helix ° slider · 3D glider is face width"
         : sceneKey === "ring"
           ? "Drag the bore, shank, and signet on the unrolled strip — the wrap has no 3D widgets"
+          : sceneKey === "cylinder"
+            ? "Drag the ring radius and the centre ball Ø — SDF follows live · coral glider on the right is height"
           : "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
       : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
@@ -188,6 +195,8 @@ function render(): void {
               ? "Involute pair. Drag the pinion, pitch radius, and coral mesh angle on the pitch circle. Helix ° feeds the 3D scene"
             : sceneKey === "ring"
               ? "Unrolled signet. Dashed circle is inner R (strip length 2πR). Shank and signet heights sit on the developed paper; Gauge is thickness"
+              : sceneKey === "cylinder"
+                ? "Plan of the cylinder top. Radius is fixed. Drag the ring the six balls sit on, and the centre ball Ø"
             : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
@@ -229,6 +238,8 @@ async function updateInspect(): Promise<void> {
           ? "2D writes gear.ts; 3D face width writes helix.ts. The helix follows these handles while you drag."
           : sceneKey === "ring"
             ? "2D writes ring.ts. The wrap is a view — ring3.ts has no edit* calls."
+            : sceneKey === "cylinder"
+              ? "2D writes cylinder.ts (ring radius + centre Ø). Cylinder radius is a constant. Height writes rose-sdf.ts."
             : "2D writes plate.ts; 3D thickness writes mill.ts. Mill XY follows these handles while you drag."
         : sceneKey === "flat"
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
@@ -244,6 +255,8 @@ async function updateInspect(): Promise<void> {
                 ? "Click a flank, tip arc, or the mesh-angle handle on the pinion. Helix ° is a titled slider for the 3D extrude."
               : sceneKey === "ring"
                 ? "Plan circle is the bore. The long strip is the developed band; signet height is the dashed circle at mid-strip."
+                : sceneKey === "cylinder"
+                  ? "Outer circle is the cylinder (not a handle). Inner dashed circles are the six-ball ring and the centre ball Ø."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
@@ -518,6 +531,10 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/ring.ts", (mod) => {
     if (!mod || !("scene" in mod) || sceneKey !== "ring") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/cylinder.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "cylinder") return;
     reloadScene(mod as unknown as SceneModule);
   });
 }

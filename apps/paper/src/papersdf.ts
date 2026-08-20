@@ -20,23 +20,34 @@ export type PaperSdfHandle = {
   refresh: (opts?: { quiet?: boolean }) => void;
 };
 
+export type PaperSdfOpts = {
+  split?: boolean;
+};
+
 type SceneMod = {
   view: "sdf";
   scene: () => Sdf;
   sceneFile: string;
 };
 
-export function startPaperSdf(els: InspectEls): PaperSdfHandle {
+export function startPaperSdf(
+  els: InspectEls,
+  opts: PaperSdfOpts = {},
+): PaperSdfHandle {
   const canvas = document.querySelector<HTMLCanvasElement>("#space")!;
   const paper = document.querySelector<HTMLCanvasElement>("#paper")!;
-  paper.hidden = true;
+  if (!opts.split) {
+    paper.hidden = true;
+    const kickers = document.querySelectorAll("#inspect .kicker");
+    if (kickers[0]) kickers[0].textContent = "Widget";
+    if (kickers[1]) kickers[1].textContent = "Scene file";
+  }
   canvas.hidden = false;
 
-  const kickers = document.querySelectorAll("#inspect .kicker");
-  if (kickers[0]) kickers[0].textContent = "Widget";
-  if (kickers[1]) kickers[1].textContent = "Scene file";
   const spaceLabel = document.querySelector("#pane-space .view-label");
   if (spaceLabel) spaceLabel.textContent = "SDF · rose-sdf.ts";
+  const paperLabel = document.querySelector("#pane-paper .view-label");
+  if (paperLabel && opts.split) paperLabel.textContent = "2D · cylinder.ts";
 
   let sceneMod: SceneMod = rose;
   const view = new SdfView(canvas);
@@ -73,18 +84,21 @@ export function startPaperSdf(els: InspectEls): PaperSdfHandle {
     if (quiet && !error) return;
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
-      : "SDF CSG — cylinder minus 7 balls on the barrel. Coral handles: centre, radius, ball Ø, height. LMB orbit";
+      : opts.split
+        ? "Drag the 2D ring and centre Ø — field follows live · coral glider is height · LMB orbit"
+        : "SDF CSG — XY from cylinder.ts · coral glider is height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
       els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${sceneMod.sceneFile}`;
       els.metaEl.textContent =
-        "The field has no provenance. Handles are scene widgets; numbers are literals in rose-sdf.ts.";
+        "The field has no provenance. Height is the only 3D widget; ring radius and centre Ø live in cylinder.ts.";
       els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneMod.sceneFile}.</code>`;
     } else {
       els.crumbEl.textContent = "Nothing selected";
-      els.metaEl.textContent =
-        "Cylinder minus a polar loop of spheres, in demo/rose-sdf.ts. Click a coral handle — the field itself is not pickable.";
+      els.metaEl.textContent = opts.split
+        ? "Plan writes cylinder.ts. Only height is a widget here. The field itself is not pickable."
+        : "Ring radius and centre Ø come from cylinder.ts. Only height is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
   }
