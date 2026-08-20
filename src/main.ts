@@ -241,6 +241,10 @@ function applyDrag(g: Gizmo, world: { x: number; y: number }): void {
 
 async function commitDrag(g: Gizmo): Promise<void> {
   const values = gizmoValues(g);
+  if (typeof g.index !== "number") {
+    error = "internal: gizmo has no index";
+    return;
+  }
   try {
     const res = await fetch("/__write-widget", {
       method: "POST",
@@ -253,7 +257,12 @@ async function commitDrag(g: Gizmo): Promise<void> {
     });
     const body = (await res.json()) as { ok?: boolean; error?: string };
     if (!res.ok || !body.ok) {
-      error = body.error ?? `write failed (${res.status})`;
+      error =
+        body.error ??
+        `write failed (${res.status}) — try a hard refresh (Ctrl+Shift+R)`;
+    } else {
+      peekCache.delete(sceneMod.sceneFile.replace(/^src\//, ""));
+      await ensureSceneSource();
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);

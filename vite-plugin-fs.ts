@@ -74,6 +74,39 @@ function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
   return calls;
 }
 
+function resolveWidgetIndex(
+  sourceFile: ts.SourceFile,
+  calls: ts.CallExpression[],
+  raw: Record<string, unknown>,
+): number | null {
+  if (typeof raw.widgetIndex === "number") return raw.widgetIndex;
+  if (typeof raw.index === "number") return raw.index;
+
+  const site = raw.site;
+  if (!site || typeof site !== "object") return null;
+  const line = (site as { line?: unknown }).line;
+  const column = (site as { column?: unknown }).column;
+  const instance = (site as { instance?: unknown }).instance;
+  if (typeof line !== "number") return null;
+
+  const onLine = calls
+    .map((call, idx) => {
+      const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
+      return { idx, line: pos.line + 1, column: pos.character + 1 };
+    })
+    .filter((x) => x.line === line);
+
+  if (onLine.length === 0) return null;
+
+  if (typeof column === "number") {
+    const exact = onLine.find((x) => x.column === column);
+    if (exact) return exact.idx;
+  }
+
+  const n = typeof instance === "number" ? instance : 0;
+  return onLine[n]?.idx ?? onLine[0]?.idx ?? null;
+}
+
 function patchWidget(
   source: string,
   widgetIndex: number,
@@ -142,22 +175,43 @@ export function fsBridgePlugin(): Plugin {
         const url = req.url?.split("?")[0] ?? "";
         try {
           if (url === "/__write-widget" && req.method === "POST") {
-            const body = JSON.parse(await readBody(req)) as {
-              file?: string;
-              widgetIndex?: number;
-              values?: number[];
-            };
+            const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+            const file = raw.file;
+            const values = raw.values;
+
             if (
-              typeof body.file !== "string" ||
-              typeof body.widgetIndex !== "number" ||
-              !Array.isArray(body.values)
+              typeof file !== "string" ||
+              !Array.isArray(values) ||
+              !values.every((v) => typeof v === "number")
             ) {
-              json(res, 400, { ok: false, error: "invalid body" });
+              json(res, 400, {
+                ok: false,
+                error: `invalid body: expected { file, widgetIndex, values:number[] }; got keys [${Object.keys(raw).join(", ")}]`,
+              });
               return;
             }
-            const abs = resolveUnder(SCENE_ROOT, path.basename(body.file));
+
+            const abs = resolveUnder(SCENE_ROOT, path.basename(file));
             const source = fs.readFileSync(abs, "utf8");
-            const next = patchWidget(source, body.widgetIndex, body.values);
+            const sourceFile = ts.createSourceFile(
+              "scene.ts",
+              source,
+              ts.ScriptTarget.Latest,
+              true,
+              ts.ScriptKind.TS,
+            );
+            const calls = collectEditCalls(sourceFile);
+            const widgetIndex = resolveWidgetIndex(sourceFile, calls, raw);
+
+            if (widgetIndex === null) {
+              json(res, 400, {
+                ok: false,
+                error: `invalid body: need widgetIndex (hard refresh) or a site on an edit* line; got keys [${Object.keys(raw).join(", ")}]`,
+              });
+              return;
+            }
+
+            const next = patchWidget(source, widgetIndex, values as number[]);
             fs.writeFileSync(abs, next);
             json(res, 200, { ok: true });
             return;

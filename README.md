@@ -19,7 +19,7 @@ Opens on [http://127.0.0.1:43117](http://127.0.0.1:43117). Use the header links 
 
 Edit `src/scenes/beam.ts`, `src/scenes/beam-flat.ts`, or `src/lib/mark.ts` and save — Vite HMR reloads the scene.
 
-**Widget write-back:** each handle must be a separate `edit*` call in the scene file (not inside a shared helper). Writes patch by source line/column, not evaluation order.
+**Widget write-back:** each handle needs its own unrolled `edit*` in the scene file. Writes use evaluation-order index (must match AST order). Stack-based line/column is unreliable under Vite imports.
 
 ## Try
 
