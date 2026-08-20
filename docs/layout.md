@@ -57,6 +57,4 @@ A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, sourc
 
 Widget pointer-up patches numeric literals. The Vite plugin swallows HMR when the file still matches the last widget write, so cameras stay put.
 
-A real save (or Space insert) hot-swaps the scene module. The Vite plugin appends a `hot.accept` onto `scene-loaders.ts` for every `./scenes/*.scene.ts` path; the callback calls `applyHotScenes` from shell with Vite’s fetched module. Re-`import()` of the glob URL without a timestamp returns the previous `scene()`.
-
-Cross-scene `import.meta.hot.accept("./plate-layout.ts")` in mill updates `let readPlate = plateLayout` on a real save of the helper. Widget write-back does not use the cross-scene accept.
+A real save (or Space insert) hot-swaps the scene module. The Vite plugin appends a `hot.accept` onto `scene-loaders.ts` for every `./scenes/*.scene.ts` path and side-effect-imports every `scenes/*.ts` helper (not `*.scene.ts`). Helper saves also HMR the importing `*.scene.ts` files (so panes get a fresh `scene()`), then `notifyHelperHot()` re-runs open frames. **Authors never write `import.meta.hot` for layout helpers** — only `import { plateLayout } from "./plate-layout.ts"`.

@@ -29,7 +29,7 @@ export function plateLayout() {
   const max = editPoint(5.75, 3.22);
   const edges = stockEdges(min, max);
 
-  const inset = editVector(min, 1.1, 1.07);
+  const inset = editVector(min, 1.34, 1.11);
   const ix = inset.x;
   const iy = inset.y;
   const corners: Vec2[] = [
@@ -45,16 +45,16 @@ export function plateLayout() {
     radius: cornerR(center),
   }));
 
-  const bc = editPoint(0.04, -0.14);
-  const pcd = editDistanceToPoint(bc, 0.69);
-  const ringN = editNumber(3, {
+  const bc = editPoint(3.73, -0.03);
+  const pcd = editDistanceToPoint(bc, 1.19);
+  const ringN = editNumber(5, {
     label: "Hole count",
     min: 3,
     max: 14,
     step: 1,
   });
 
-  const ringR = (p: Vec2) => editDistanceToPoint(p, 0.14);
+  const ringR = (p: Vec2) => editDistanceToPoint(p, 0.22);
   const ringCount = Math.max(3, Math.round(ringN));
   const ringHoles: { center: Vec2; radius: number }[] = [];
   for (let i = 0; i < ringCount; i++) {
@@ -66,25 +66,25 @@ export function plateLayout() {
     ringHoles.push({ center, radius: ringR(center) });
   }
 
-  const pocketMin = editPoint(-1.97, -1.41);
-  const pocketSpan = editVector(pocketMin, 4, 2.65);
+  const pocketMin = editPoint(-2.11, -1.52);
+  const pocketSpan = editVector(pocketMin, 4.13, 2.6);
   const pocketMax = {
     x: pocketMin.x + pocketSpan.x,
     y: pocketMin.y + pocketSpan.y,
   };
   const filletMax = Math.sqrt(2) * Math.min(pocketSpan.x / 2, pocketSpan.y / 2);
   const onBisector = (origin: Vec2, dir: Vec2) =>
-    editPointOnLine(origin, dir, 0.73, { min: 0, max: filletMax });
+    editPointOnLine(origin, dir, 0.5, { min: 0, max: filletMax });
   const bl = onBisector(pocketMin, { x: 1, y: 1 });
-  const filletR = bl.x - pocketMin.x;
   onBisector({ x: pocketMax.x, y: pocketMin.y }, { x: -1, y: 1 });
   onBisector(pocketMax, { x: -1, y: -1 });
   onBisector({ x: pocketMin.x, y: pocketMax.y }, { x: 1, y: -1 });
+  const filletR = bl.x - pocketMin.x;
 
-  const slotCenter = editPointOnSegment(edges.top, 0.52);
-  const slotLen = editDistanceToPoint(slotCenter, 1.47);
+  const slotCenter = editPointOnSegment(edges.top, 0.49);
+  const slotLen = editDistanceToPoint(slotCenter, 3.91);
   const halfL = slotLen / 2;
-  const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.45);
+  const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
   const slotCapR = slotCapAt({
     x: slotCenter.x - halfL,
     y: slotCenter.y,

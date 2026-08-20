@@ -1,6 +1,7 @@
 import { breadcrumb, dist, projectT, type Geom, type Vec2 } from "@design-scenes/geom";
 import {
   beginWidgetFrame,
+  clearImportedOverrides,
   clearWidgetOverrides,
   defaultCamera,
   drawFrame,
@@ -23,7 +24,7 @@ import {
 } from "@design-scenes/euclid2";
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneContext, PaneHandle, ViewHost } from "@design-scenes/shell";
-import { subscribeSceneHot } from "@design-scenes/shell";
+import { subscribeSceneHot, subscribeHelperHot } from "@design-scenes/shell";
 import {
   commitEditors,
   peekFile,
@@ -556,13 +557,17 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       canvas.addEventListener("wheel", onWheel, { passive: false });
       const unobserve = observePaneResize(canvas, () => render(true));
 
+      function rerunFrame(): void {
+        clearWidgetOverrides(sceneId);
+        evaluate();
+        render();
+      }
+
       function onHotReload(next: Record<string, unknown>): void {
         sceneMod = next;
-        clearWidgetOverrides(sceneId);
         peekCache.clear();
         void warmPeek(peekCache, peekPath, () => {
-          evaluate();
-          render();
+          rerunFrame();
         });
       }
 
@@ -571,6 +576,11 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         subscribeSceneHot,
         onHotReload,
       );
+      const unsubHelper = subscribeHelperHot(() => {
+        peekCache.clear();
+        clearImportedOverrides();
+        rerunFrame();
+      });
 
       void warmPeek(peekCache, peekPath, () => {
         evaluate();
@@ -598,6 +608,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         },
         dispose() {
           unsub();
+          unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);
           canvas.removeEventListener("pointermove", onPointerMove);
           canvas.removeEventListener("pointerup", onPointerUp);

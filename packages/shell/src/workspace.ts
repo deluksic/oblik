@@ -27,6 +27,8 @@ type MountedPane = {
   handle: PaneHandle | null;
 };
 
+let activeWorkspaceCleanup: (() => void) | undefined;
+
 function byId(scenes: SceneEntry[]): Map<string, SceneEntry> {
   return new Map(scenes.map((s) => [s.id, s]));
 }
@@ -182,6 +184,9 @@ function errorPane(id: string, message: string): HTMLElement {
 }
 
 export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
+  activeWorkspaceCleanup?.();
+  activeWorkspaceCleanup = undefined;
+
   const { scenes, loaders, hosts, navRoot, viewportRoot, inspect, titleEl } =
     opts;
   const catalog = byId(scenes);
@@ -384,4 +389,8 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     palette.open();
   };
   window.addEventListener("keydown", onKey);
+  activeWorkspaceCleanup = () => {
+    for (const p of mounted) p.handle?.dispose?.();
+    window.removeEventListener("keydown", onKey);
+  };
 }

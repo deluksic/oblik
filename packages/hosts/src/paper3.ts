@@ -1,4 +1,5 @@
 import { breadcrumb, type Geom3 } from "@design-scenes/geom";
+import { clearImportedOverrides } from "@design-scenes/euclid2";
 import {
   beginWidgetFrame3,
   clearWidgetOverrides3,
@@ -13,7 +14,7 @@ import {
 } from "@design-scenes/euclid3";
 import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
-import { subscribeSceneHot } from "@design-scenes/shell";
+import { subscribeSceneHot, subscribeHelperHot } from "@design-scenes/shell";
 import { peekFile, quantize, renderSnippet } from "./inspect.ts";
 import {
   commitGizmoIfChanged,
@@ -298,13 +299,17 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       canvas.addEventListener("pointercancel", onPointerCancel);
       const unobserve = observePaneResize(canvas, () => view.resize());
 
+      function rerunFrame(): void {
+        clearWidgetOverrides3();
+        evaluate();
+        sync();
+      }
+
       function onHotReload(next: Record<string, unknown>): void {
         sceneMod = next;
-        clearWidgetOverrides3();
         peekCache.clear();
         void warmPeek(peekCache, peekPath, () => {
-          evaluate();
-          sync();
+          rerunFrame();
         });
       }
 
@@ -313,6 +318,11 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         subscribeSceneHot,
         onHotReload,
       );
+      const unsubHelper = subscribeHelperHot(() => {
+        peekCache.clear();
+        clearImportedOverrides();
+        rerunFrame();
+      });
 
       void warmPeek(peekCache, peekPath, () => {
         evaluate();
@@ -326,6 +336,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         },
         dispose() {
           unsub();
+          unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);
           canvas.removeEventListener("pointermove", onPointerMove);
           canvas.removeEventListener("pointerup", onPointerUp);

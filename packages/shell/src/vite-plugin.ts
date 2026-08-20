@@ -14,6 +14,7 @@ import {
 import { injectSceneSites } from "./inject-sites.ts";
 import { patchWidgetAt } from "./patch-widget.ts";
 import { newSceneSource, titleFromId } from "./new-scene.ts";
+import { SCENE_HELPER_HMR_EVENT } from "./scene-hmr.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";
@@ -95,6 +96,18 @@ function isCatalogScene(sceneDir: string, file: string): boolean {
   return abs.startsWith(dir + "/") && abs.endsWith(".scene.ts");
 }
 
+/** Shared layout helpers next to catalog scenes (e.g. plate-layout.ts). */
+function isSceneHelper(sceneDir: string, file: string): boolean {
+  const abs = path.resolve(file).replace(/\\/g, "/");
+  const dir = path.resolve(sceneDir).replace(/\\/g, "/");
+  return (
+    abs.startsWith(dir + "/") &&
+    abs.endsWith(".ts") &&
+    !abs.endsWith(".scene.ts") &&
+    !abs.endsWith(".d.ts")
+  );
+}
+
 function workspaceRelPath(absFile: string, root: string): string {
   return path.relative(root, absFile).replace(/\\/g, "/");
 }
@@ -116,18 +129,39 @@ function sceneGlobKeys(sceneDir: string): string[] {
   return listSceneFiles(sceneDir).map((abs) => `./scenes/${path.basename(abs)}`);
 }
 
+function helperGlobKeys(sceneDir: string): string[] {
+  if (!fs.existsSync(sceneDir)) return [];
+  return fs
+    .readdirSync(sceneDir)
+    .filter((n) => n.endsWith(".ts") && !n.endsWith(".scene.ts"))
+    .map((n) => `./scenes/${n}`)
+    .sort();
+}
+
 /**
  * Appended onto scene-loaders.ts. Vite rewrites the first array to absolute
  * HMR URLs; the copy passed to applyHotScenes stays as glob keys so hosts
  * can match `./scenes/<file>`. Indices stay aligned.
  */
-export function sceneLoadersAcceptTail(keys: string[]): string {
-  const lit = JSON.stringify(keys);
-  return (
-    `\n/* __scene_hmr_accept */\n` +
-    `import { applyHotScenes } from "@design-scenes/shell";\n` +
-    `if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });\n`
-  );
+export function sceneLoadersAcceptTail(
+  keys: string[],
+  helpers: string[] = [],
+): string {
+  const sceneLit = JSON.stringify(keys);
+  const helperLit = JSON.stringify(helpers);
+  let snip = `\n/* __scene_hmr_accept */\n`;
+  snip += `import { applyHotScenes, notifyHelperHot } from "@design-scenes/shell";\n`;
+  for (const h of helpers) {
+    snip += `import ${JSON.stringify(h)};\n`;
+  }
+  snip += `if (import.meta.hot) import.meta.hot.accept(${sceneLit}, (mods) => { if (mods) applyHotScenes(${sceneLit}, mods); });\n`;
+  if (helpers.length > 0) {
+    snip +=
+      `if (import.meta.hot) import.meta.hot.accept(${helperLit}, () => { notifyHelperHot(); });\n`;
+    snip +=
+      `if (import.meta.hot) import.meta.hot.on(${JSON.stringify(SCENE_HELPER_HMR_EVENT)}, () => { notifyHelperHot(); });\n`;
+  }
+  return snip;
 }
 
 function hotReloadSceneFile(server: ViteDevServer, abs: string): void {
@@ -390,16 +424,17 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
     },
     transform(code, id) {
       const file = id.split("?")[0] ?? "";
-      if (isInjectableTs(workspaceRoot, file)) {
+      if (isInjectableTs(workspaceRoot, file) && !isSceneLoadersModule(id)) {
         const rel = workspaceRelPath(path.resolve(file), workspaceRoot);
         return { code: injectSceneSites(code, rel), map: null };
       }
       if (!isSceneLoadersModule(id)) return undefined;
       if (code.includes("/* __scene_hmr_accept */")) return undefined;
       const keys = sceneGlobKeys(sceneDir);
-      if (keys.length === 0) return undefined;
+      const helpers = helperGlobKeys(sceneDir);
+      if (keys.length === 0 && helpers.length === 0) return undefined;
       return {
-        code: code + sceneLoadersAcceptTail(keys),
+        code: code + sceneLoadersAcceptTail(keys, helpers),
         map: null,
       };
     },
@@ -408,12 +443,36 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       handler(ctx) {
         if (ctx.type !== "update") return;
         const written = rememberedWrite(widgetWrites, ctx.file);
+        const helper = isSceneHelper(sceneDir, ctx.file);
         if (written != null) {
           try {
             if (fs.readFileSync(ctx.file, "utf8") === written) return [];
           } catch {
             return [];
           }
+        }
+        if (helper) {
+          if (ctx.modules.length === 0) return;
+          const extra = new Set(ctx.modules);
+          for (const mod of ctx.modules) {
+            for (const importer of mod.importers) {
+              const file = (importer.file ?? importer.id ?? "").replace(
+                /\\/g,
+                "/",
+              );
+              if (file.endsWith(".scene.ts")) extra.add(importer);
+            }
+          }
+          if (vite) {
+            vite.ws.send({
+              type: "custom",
+              event: SCENE_HELPER_HMR_EVENT,
+              data: {
+                file: workspaceRelPath(ctx.file, workspaceRoot),
+              },
+            });
+          }
+          return [...extra];
         }
         if (!isCatalogScene(sceneDir, ctx.file)) return;
         if (!catalogChanged()) return;
