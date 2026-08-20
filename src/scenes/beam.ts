@@ -9,10 +9,10 @@ import {
 export const sceneFile = "src/scenes/beam.ts";
 
 export function scene() {
-  const a = editPoint(-3.5, 0.2);
-  const b = editPoint(4, 0.45);
+  const a = editPoint(-4.12, 3.28);
+  const b = editPoint(6.08, 1.35);
   const span = line(a, b);
-  const post = editPointOnLine(span, 0.34);
-  const height = editDistanceToPoint(a, 1.7);
+  const post = editPointOnLine(span, 0.42);
+  const height = editDistanceToPoint(post, 3.46);
   return assembleBeam({ span, post, height });
 }

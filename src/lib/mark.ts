@@ -25,7 +25,7 @@ export function assembleBeam(opts: {
       opts.span,
       polyline([a, peak, b]),
       line(opts.post, peak),
-      circle(a, Math.abs(opts.height)),
+      circle(opts.post, Math.abs(opts.height)),
     ];
     for (let i = 0; i < 4; i++) {
       const t = (i + 1) / 5;
