@@ -1,5 +1,5 @@
-# Code-first designs with mouse-written source
+# Code-as-graph CAD (SDF → resin)
 
-A design-phase project: TypeScript (TypeGPU, functions, loops) as the design tool, with clicks and drags writing back into literals in the file.
+Design-phase: TypeScript libraries as the model graph, **scenes as visual tests** (2D, 3D, SDF, map, slicer), mouse rewriting numeric literals. Manufacturing path is a signed distance volume sliced directly for resin, not a Fusion timeline.
 
 Nothing to run yet. See [PLAN.md](./PLAN.md).
