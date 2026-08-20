@@ -10,12 +10,22 @@ export function subscribeSceneHot(cb: SceneHotCb): () => void {
   };
 }
 
+function sceneKeyFromUrl(url: string): string | null {
+  const m = url.match(/\/scenes\/([^/?#]+)/);
+  if (!m?.[1] || !m[1].endsWith(".ts")) return null;
+  return `./scenes/${m[1]}`;
+}
+
 if (import.meta.hot) {
   import.meta.hot.on("vite:afterUpdate", ({ updates }) => {
+    const keys = new Set<string>();
     for (const u of updates) {
-      const m = u.path.match(/\/scenes\/([^/?#]+)/);
-      if (!m?.[1] || !m[1].endsWith(".ts")) continue;
-      const key = `./scenes/${m[1]}`;
+      for (const url of [u.path, u.acceptedPath]) {
+        const key = sceneKeyFromUrl(url);
+        if (key) keys.add(key);
+      }
+    }
+    for (const key of keys) {
       const loader = sceneLoaders[key];
       if (!loader) continue;
       void loader().then((mod) => {

@@ -236,7 +236,46 @@ function catalogFingerprint(sceneDir: string): string {
 }
 
 function isSceneTs(sceneDir: string, file: string): boolean {
-  return file.startsWith(sceneDir + path.sep) && file.endsWith(".ts");
+  const abs = path.resolve(file).replace(/\\/g, "/");
+  const dir = path.resolve(sceneDir).replace(/\\/g, "/");
+  return (
+    abs.startsWith(dir + "/") &&
+    abs.endsWith(".ts") &&
+    !abs.endsWith(".d.ts")
+  );
+}
+
+function isSceneLoadersModule(id: string): boolean {
+  return path.basename(id.split("?")[0]) === "scene-loaders.ts";
+}
+
+function sceneGlobKeys(sceneDir: string): string[] {
+  return listSceneFiles(sceneDir).map((abs) => `./scenes/${path.basename(abs)}`);
+}
+
+function fileAliases(file: string): string[] {
+  const abs = path.resolve(file);
+  const posix = abs.replace(/\\/g, "/");
+  return [...new Set([abs, posix, path.basename(abs)])];
+}
+
+function rememberWidgetWrite(
+  writes: Map<string, string>,
+  file: string,
+  content: string,
+): void {
+  for (const key of fileAliases(file)) writes.set(key, content);
+}
+
+function rememberedWrite(
+  writes: Map<string, string>,
+  file: string,
+): string | undefined {
+  for (const key of fileAliases(file)) {
+    const content = writes.get(key);
+    if (content != null) return content;
+  }
+  return undefined;
 }
 
 export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
@@ -244,6 +283,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   const sceneDir = path.resolve(opts.sceneDir);
   let vite: ViteDevServer | undefined;
   let lastCatalog = "";
+  const widgetWrites = new Map<string, string>();
 
   function catalogChanged(): boolean {
     const next = catalogFingerprint(sceneDir);
@@ -317,7 +357,9 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               return;
             }
 
-            fs.writeFileSync(abs, patchWidget(source, widgetIndex, values));
+            const next = patchWidget(source, widgetIndex, values);
+            rememberWidgetWrite(widgetWrites, abs, next);
+            fs.writeFileSync(abs, next);
             json(res, 200, { ok: true });
             return;
           }
@@ -376,13 +418,37 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
         next();
       });
     },
-    handleHotUpdate(ctx) {
-      if (!isSceneTs(sceneDir, ctx.file)) return undefined;
-      if (!catalogChanged()) return undefined;
-      const catalog = ctx.server.moduleGraph.getModuleById(
-        VIRTUAL_CATALOG_RESOLVED,
-      );
-      return catalog ? [...ctx.modules, catalog] : ctx.modules;
+    transform(code, id) {
+      if (!isSceneLoadersModule(id)) return undefined;
+      if (code.includes("/* __scene_hmr_accept */")) return undefined;
+      const keys = sceneGlobKeys(sceneDir);
+      if (keys.length === 0) return undefined;
+      return {
+        code:
+          code +
+          `\n/* __scene_hmr_accept */\nif (import.meta.hot) import.meta.hot.accept(${JSON.stringify(keys)}, () => {});\n`,
+        map: null,
+      };
+    },
+    hotUpdate: {
+      order: "pre",
+      handler(ctx) {
+        if (ctx.type !== "update") return;
+        if (!isSceneTs(sceneDir, ctx.file)) return;
+        const written = rememberedWrite(widgetWrites, ctx.file);
+        if (written != null) {
+          try {
+            if (fs.readFileSync(ctx.file, "utf8") === written) return [];
+          } catch {
+            return [];
+          }
+        }
+        if (!catalogChanged()) return;
+        const catalog = this.environment.moduleGraph.getModuleById(
+          VIRTUAL_CATALOG_RESOLVED,
+        );
+        return catalog ? [...ctx.modules, catalog] : ctx.modules;
+      },
     },
   };
 }
