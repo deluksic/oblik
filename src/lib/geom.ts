@@ -1,4 +1,5 @@
 import type { Vec2 } from "./vec.ts";
+import { captureCallSite } from "./provenance.ts";
 
 export type Provenance = {
   file: string;
@@ -45,31 +46,8 @@ function makePath(local: string): string {
 }
 
 function captureProvenance(createdBy: string): Provenance {
-  const stack = new Error().stack ?? "";
-  for (const raw of stack.split("\n")) {
-    // Vite stacks look like: .../mark.ts?t=1739:25:18
-    const line = raw.replace(/\.(tsx?|jsx?|mjs)\?[^:]*:/, ".$1:");
-    const m = line.match(
-      /(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/,
-    );
-    if (!m?.[1] || !m[2] || !m[3]) continue;
-    const file = m[1].replace(/^\//, "");
-    if (
-      file.endsWith("/lib/geom.ts") ||
-      file.endsWith("/lib/vec.ts") ||
-      file.includes("/euclid2/") ||
-      file.endsWith("/main.ts")
-    ) {
-      continue;
-    }
-    return {
-      file,
-      line: Number(m[2]),
-      column: Number(m[3]),
-      createdBy,
-    };
-  }
-  return { file: "unknown", line: 0, column: 0, createdBy };
+  const site = captureCallSite();
+  return { ...site, createdBy };
 }
 
 function base(kind: string, createdBy: string): Base {

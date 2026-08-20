@@ -232,7 +232,7 @@ async function commitDrag(g: Gizmo): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         file: sceneMod.sceneFile,
-        widgetIndex: g.index,
+        site: g.site,
         values,
       }),
     });
