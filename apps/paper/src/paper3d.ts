@@ -10,6 +10,7 @@ import {
   type SceneModule3,
 } from "@design-scenes/euclid3";
 import * as mill from "./scenes/mill.ts";
+import "./scenes/plate.ts";
 import {
   commitWidget,
   countEditCalls,
@@ -68,7 +69,7 @@ export function startPaper3d(els: InspectEls): void {
     );
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
-      : "Drag coral handles · LMB orbit · RMB pan · wheel zoom · holes share one Ø";
+      : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     void updateInspect();
@@ -88,7 +89,7 @@ export function startPaper3d(els: InspectEls): void {
     if (!g) {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent =
-        "Drag stock corners, hole centers, shared drill Ø, pocket, or the slot on the +Y edge.";
+        "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
       return;
     }
@@ -202,6 +203,11 @@ export function startPaper3d(els: InspectEls): void {
           sync();
         },
       );
+    });
+    // plate.ts drives XY; keep the in-memory thickness override if mill.ts did not change.
+    import.meta.hot.accept("./scenes/plate.ts", () => {
+      evaluate();
+      sync();
     });
   }
 

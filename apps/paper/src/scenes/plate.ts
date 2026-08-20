@@ -24,7 +24,7 @@ function stockEdges(min: Vec2, max: Vec2) {
  * - slot on top edge (editPointOnLine + 2 editDistanceToPoint)
  * - demo loops over holes; pocket/slot grouped under group[0]
  */
-export function scene() {
+export function plateLayout() {
   const min = editPoint(-5.5, -3.2);
   const max = editPoint(5.8, 3.5);
   const edges = stockEdges(min, max);
@@ -40,10 +40,10 @@ export function scene() {
   const filletR = editDistanceToPoint(pocketMin, 0.32);
 
   const slotCenter = editPointOnLine(edges.top, 0.52);
-  const slotLen = editDistanceToPoint(slotCenter, 3.02);
+  const slotLen = editDistanceToPoint(slotCenter, 1.58);
   const slotW = editDistanceToPoint(slotCenter, 0.5);
 
-  return drawPlate({
+  return {
     stock: { min, max },
     holes: [
       { center: h0, radius: drillR },
@@ -53,5 +53,9 @@ export function scene() {
     ],
     pocket: { min: pocketMin, max: pocketMax, filletR },
     slot: { center: slotCenter, length: slotLen, width: slotW },
-  });
+  };
+}
+
+export function scene() {
+  return drawPlate(plateLayout());
 }
