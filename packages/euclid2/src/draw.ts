@@ -60,6 +60,22 @@ export function drawFrame(
   drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
 
+/** Gizmos only — for 2D SDF scenes that paint the field themselves. */
+export function drawGizmoOverlay(
+  ctx: CanvasRenderingContext2D,
+  cssW: number,
+  cssH: number,
+  cam: Camera,
+  gizmos: readonly Gizmo[],
+  activeGizmo: number | null,
+): void {
+  for (const g of gizmos) {
+    if (g.kind === "number") continue;
+    drawGizmo(ctx, cam, cssW, cssH, g, g.index === activeGizmo);
+  }
+  drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
+}
+
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   w: number,

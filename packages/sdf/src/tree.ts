@@ -1,4 +1,5 @@
-import type { Vec3 } from "@design-scenes/geom";
+import type { Vec2, Vec3 } from "@design-scenes/geom";
+import type { Sdf2 } from "./tree2.ts";
 
 /** Field CSG. No id / path / provenance — the surface is not pickable. */
 export type Sdf =
@@ -7,6 +8,7 @@ export type Sdf =
   | { k: "cylinder"; c: Vec3; r: number; halfH: number }
   | { k: "capsule"; a: Vec3; b: Vec3; r: number }
   | { k: "torus"; c: Vec3; R: number; r: number }
+  | { k: "sweep2"; c: Vec2; pathR: number; profile: Sdf2 }
   | { k: "union"; a: Sdf; b: Sdf }
   | { k: "smoothUnion"; a: Sdf; b: Sdf; ksoft: number }
   | { k: "diff"; a: Sdf; b: Sdf }
@@ -33,6 +35,11 @@ export function capsule(a: Vec3, b: Vec3, r: number): Sdf {
 /** Torus in the XY plane (Z-up), major `R`, minor `r`. */
 export function torus(c: Vec3, R: number, r: number): Sdf {
   return { k: "torus", c, R: Math.abs(R), r: Math.abs(r) };
+}
+
+/** Torus-like sweep: 2D profile in (radial, z), around a circle in XY. */
+export function sweep2(c: Vec2, pathR: number, profile: Sdf2): Sdf {
+  return { k: "sweep2", c, pathR: Math.abs(pathR), profile };
 }
 
 export function union(a: Sdf, b: Sdf): Sdf {

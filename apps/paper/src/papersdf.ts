@@ -47,7 +47,7 @@ export function startPaperSdf(
   const spaceLabel = document.querySelector("#pane-space .view-label");
   if (spaceLabel) spaceLabel.textContent = "SDF · rose-sdf.ts";
   const paperLabel = document.querySelector("#pane-paper .view-label");
-  if (paperLabel && opts.split) paperLabel.textContent = "2D · cylinder.ts";
+  if (paperLabel && opts.split) paperLabel.textContent = "SDF 2D · profile.ts";
 
   let sceneMod: SceneMod = rose;
   const view = new SdfView(canvas);
@@ -85,20 +85,20 @@ export function startPaperSdf(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "Drag the centre-cell quatrefoil — all seven follow · coral glider is height · LMB orbit"
+        ? "Drag the 2D profile — molding follows around all seven · coral glider is height · LMB orbit"
         : "SDF CSG — XY from cylinder.ts · coral glider is height · LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
       els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${sceneMod.sceneFile}`;
       els.metaEl.textContent =
-        "The field has no provenance. Height is the only 3D widget; ring radius and both ball Ø live in cylinder.ts.";
+        "The field has no provenance. Height is the only 3D widget; the sweep profile lives in profile.ts.";
       els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneMod.sceneFile}.</code>`;
     } else {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent = opts.split
-        ? "Plan writes cylinder.ts. Only height is a widget here. The field itself is not pickable."
-        : "Quatrefoil ring and both ball Ø come from cylinder.ts. Seven cylinders, hex-packed. Only height is a widget here.";
+        ? "Plan writes profile.ts. Only height is a widget here. The field itself is not pickable."
+        : "Profile from profile.ts is swept around each rim. Only height is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
   }

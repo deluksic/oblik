@@ -25,7 +25,8 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 - [?scene=gear](http://127.0.0.1:43117/?scene=gear) — **involute spur pair.** Drag the pinion centre, pitch radius, and **mesh angle** (coral arm on the pitch circle). Tooth counts, pressure, and helix are titled sliders. The wheel is derived. Helix ° is for the 3D extrude.
 - [?scene=ring](http://127.0.0.1:43117/?scene=ring) — **signet band, unrolled.** Plan-view bore + developed strip (`2πR`). Shank and signet heights are distances on the paper; Gauge is wall thickness.
 - [?scene=ringsplit](http://127.0.0.1:43117/?scene=ringsplit) — same library wrapped with `wrapBand` around a cylinder. The 3D scene has **no widgets** — it is a second view of `ring.ts`.
-- [?scene=rose](http://127.0.0.1:43117/?scene=rose) — **cylinder CSG, plan + SDF.** Seven cylinders hex-packed (fixed 6 around 1). Each top is a quatrefoil; surrounding foils rotate with the pack. Drag the centre cell’s ring, centre Ø, and foil Ø; height is the 3D glider.
+- [?scene=rose](http://127.0.0.1:43117/?scene=rose) — **cylinder CSG, profile + SDF.** Left is a 2D SDF (three smooth-unioned circles; X radial, Y is Z). That profile is swept around each of the seven packed rims. Height is the 3D glider.
+- [?scene=profile](http://127.0.0.1:43117/?scene=profile) — **2D SDF profile** used by the cylinder sweep. Three circles, each with a point and a radius.
 - [?scene=helix](http://127.0.0.1:43117/?scene=helix) — **helical gears (3D).** Closed tooth loops run through `extrude(..., { twist })`. Face width is the 3D glider; helix and the section come from `gear.ts`.
 - [?scene=gearsplit](http://127.0.0.1:43117/?scene=gearsplit) — 2D gear and 3D helix side by side. 2D drags update the helix live.
 - [?scene=mill](http://127.0.0.1:43117/?scene=mill) — **3D** extrusion of the plate scene. XY (stock, holes, pocket, slot) is read from `plate.ts` with gizmos off. The only 3D widget is thickness (vertical glider); write-back patches `mill.ts`.

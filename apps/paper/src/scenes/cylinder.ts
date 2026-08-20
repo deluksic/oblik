@@ -14,10 +14,10 @@ const origin = { x: 0, y: 0 };
  * quatrefoil ring radius, centre ball Ø, foil Ø. The hex pack is fixed.
  */
 export function cylinderLayout(): CylinderLayout {
-  const ringR = editDistanceToPoint(origin, 1.4);
-  const centerR = editDistanceToPoint(origin, 1.23);
+  const ringR = editDistanceToPoint(origin, 1.16);
+  const centerR = editDistanceToPoint(origin, 1);
   const ring0 = { x: 0, y: -ringR };
-  const ringBallR = editDistanceToPoint(ring0, 0.73);
+  const ringBallR = editDistanceToPoint(ring0, 0.94);
   return {
     radius: CYLINDER_RADIUS,
     ringR,

@@ -126,20 +126,34 @@ if (sceneKey === "split") {
   document.body.classList.add("view-split");
   paper.hidden = false;
   space.hidden = false;
-  titleEl.textContent = "Cylinder · plan + SDF";
+  titleEl.textContent = "Cylinder · profile + SDF";
   document.title = "euclid — Cylinder CSG";
   statusEl.textContent = "Loading field view…";
   let refreshSdf: ((opts?: { quiet?: boolean }) => void) | undefined;
-  startPaper2d({
-    sceneKey: "cylinder",
-    split: true,
-    onLiveChange: () => refreshSdf?.({ quiet: true }),
-  });
+  void import("./papersdf2.ts")
+    .then((m) => {
+      m.startPaperSdf2(inspect, {
+        split: true,
+        onLiveChange: () => refreshSdf?.({ quiet: true }),
+      });
+    })
+    .catch(fail3d);
   void import("./papersdf.ts")
     .then((m) => {
       const view = m.startPaperSdf(inspect, { split: true });
       refreshSdf = view.refresh;
       view.refresh({ quiet: true });
+    })
+    .catch(fail3d);
+} else if (sceneKey === "profile") {
+  document.body.classList.add("view-2d");
+  paper.hidden = false;
+  space.hidden = true;
+  titleEl.textContent = "Sweep profile";
+  document.title = "sdf2 — Sweep profile";
+  void import("./papersdf2.ts")
+    .then((m) => {
+      m.startPaperSdf2(inspect);
     })
     .catch(fail3d);
 } else {

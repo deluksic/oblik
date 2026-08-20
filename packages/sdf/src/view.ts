@@ -214,6 +214,8 @@ export class SdfView {
       const slot = mat.uniforms[u.name];
       if (!slot) continue;
       if (u.kind === "f") slot.value = u.value;
+      else if (u.kind === "v2")
+        (slot.value as THREE.Vector2).set(u.value[0], u.value[1]);
       else (slot.value as THREE.Vector3).set(u.value[0], u.value[1], u.value[2]);
     }
   }
@@ -263,13 +265,17 @@ export class SdfView {
 }
 
 function emptySdfMaterial(): THREE.ShaderMaterial {
-  return makeSdfMaterial({ expr: "1000.0", uniforms: [] });
+  return makeSdfMaterial({ expr: "1000.0", map2: "1000.0", uniforms: [] });
 }
 
 function makeSdfMaterial(compiled: CompiledSdf): THREE.ShaderMaterial {
   const decls = compiled.uniforms
     .map((u) =>
-      u.kind === "f" ? `uniform float ${u.name};` : `uniform vec3 ${u.name};`,
+      u.kind === "f"
+        ? `uniform float ${u.name};`
+        : u.kind === "v2"
+          ? `uniform vec2 ${u.name};`
+          : `uniform vec3 ${u.name};`,
     )
     .join("\n");
   const uniforms: Record<string, THREE.IUniform> = {
@@ -281,11 +287,13 @@ function makeSdfMaterial(compiled: CompiledSdf): THREE.ShaderMaterial {
     uniforms[u.name] =
       u.kind === "f"
         ? { value: u.value }
-        : { value: new THREE.Vector3(u.value[0], u.value[1], u.value[2]) };
+        : u.kind === "v2"
+          ? { value: new THREE.Vector2(u.value[0], u.value[1]) }
+          : { value: new THREE.Vector3(u.value[0], u.value[1], u.value[2]) };
   }
   return new THREE.ShaderMaterial({
     vertexShader: SDF_VERT,
-    fragmentShader: sdfFragSource(decls, compiled.expr),
+    fragmentShader: sdfFragSource(decls, compiled.expr, compiled.map2),
     uniforms,
     depthTest: false,
     depthWrite: false,

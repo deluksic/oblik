@@ -21,7 +21,11 @@ void main() {
 }
 `;
 
-export function sdfFragSource(uniformDecls: string, expr: string): string {
+export function sdfFragSource(
+  uniformDecls: string,
+  expr: string,
+  map2: string,
+): string {
   return /* glsl */ `
 precision highp float;
 uniform vec3 uCamPos;
@@ -52,9 +56,15 @@ float sdTorus(vec3 p, vec2 t) {
   return length(q) - t.y;
 }
 
+float sdCircle(vec2 p, float r) { return length(p) - r; }
+
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / max(k, 1e-6), 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float map2(vec2 q) {
+  return ${map2};
 }
 
 float map(vec3 p) {

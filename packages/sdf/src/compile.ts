@@ -1,12 +1,16 @@
 import type { Sdf } from "./tree.ts";
+import type { Sdf2 } from "./tree2.ts";
 
 export type SdfUniform =
   | { name: string; kind: "f"; value: number }
+  | { name: string; kind: "v2"; value: [number, number] }
   | { name: string; kind: "v3"; value: [number, number, number] };
 
 export type CompiledSdf = {
   /** GLSL expression: map(p) uses this as `return <expr>;` */
   expr: string;
+  /** GLSL expression: map2(q) 2D profile, or a far plane if unused. */
+  map2: string;
   uniforms: SdfUniform[];
 };
 
@@ -24,9 +28,30 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
     uniforms.push(
       kind === "f"
         ? { name, kind: "f", value: value as number }
-        : { name, kind: "v3", value: value as [number, number, number] },
+        : kind === "v2"
+          ? { name, kind: "v2", value: value as [number, number] }
+          : { name, kind: "v3", value: value as [number, number, number] },
     );
     return name;
+  };
+
+  let map2 = "1000.0";
+  let mapped = false;
+
+  const emit2 = (s: Sdf2): string => {
+    switch (s.k) {
+      case "circle": {
+        const c = u("v2", [s.c.x, s.c.y]);
+        const r = u("f", s.r);
+        return `sdCircle(q - ${c}, ${r})`;
+      }
+      case "union":
+        return `min(${emit2(s.a)}, ${emit2(s.b)})`;
+      case "smoothUnion": {
+        const k = u("f", Math.max(s.ksoft, 1e-4));
+        return `smin(${emit2(s.a)}, ${emit2(s.b)}, ${k})`;
+      }
+    }
   };
 
   const emit = (s: Sdf): string => {
@@ -59,6 +84,15 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
         const r = u("f", s.r);
         return `sdTorus(p - ${c}, vec2(${R}, ${r}))`;
       }
+      case "sweep2": {
+        if (!mapped) {
+          map2 = emit2(s.profile);
+          mapped = true;
+        }
+        const c = u("v2", [s.c.x, s.c.y]);
+        const R = u("f", s.pathR);
+        return `map2(vec2(length(p.xy - ${c}) - ${R}, p.z))`;
+      }
       case "union":
         return `min(${emit(s.a)}, ${emit(s.b)})`;
       case "smoothUnion": {
@@ -72,9 +106,9 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
     }
   };
 
-  return { expr: emit(sdf), uniforms };
+  return { expr: emit(sdf), map2, uniforms };
 }
 
 export function sdfMapSignature(compiled: CompiledSdf): string {
-  return compiled.expr;
+  return `${compiled.expr}\n${compiled.map2}`;
 }
