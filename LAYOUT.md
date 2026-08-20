@@ -1,15 +1,16 @@
 # Layout
 
-pnpm workspace. Libraries are packages; the paper preview is an app. Domain tools later become more apps or more scene-type packages — not new folders inside `apps/paper`.
+pnpm workspace. Libraries are packages; the paper preview is an app. Domain demos live **inside the app** (`apps/paper/src/demo/`), not in `packages/`.
 
 ```
 packages/
   geom      @design-scenes/geom      vec, geom values, UUID id, path, provenance
-  mark      @design-scenes/mark      example domain lib (beam assembly)
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   shell     @design-scenes/shell     Vite plugin: peek source, patch edit* literals
 apps/
-  paper     @design-scenes/paper     graph-paper demo (scenes + inspector)
+  paper     @design-scenes/paper     graph-paper demo
+    src/scenes/   scene programs (widgets + wiring)
+    src/demo/     demo-only geometry (e.g. beam truss) — not a published lib
 ```
 
 ## Rules
@@ -17,10 +18,10 @@ apps/
 | Layer | May import | Must not |
 | --- | --- | --- |
 | `geom` | nothing in this repo | widgets, canvas, Vite |
-| `mark` | `geom` | `euclid2`, `shell`, apps |
-| `euclid2` | `geom` | `mark`, apps, filesystem writes |
+| `euclid2` | `geom` | apps, filesystem writes |
 | `shell` | Node, TypeScript, Vite | geom/scene types (it only patches text) |
-| `paper` | all of the above | putting domain math in `main.ts` |
+| `paper` scenes | `geom`, `euclid2`, `../demo/*` | putting reusable “domain” in `packages/` until it is real |
+| `paper` demo | `geom` only | `euclid2`, `shell` |
 
 ## Identity
 

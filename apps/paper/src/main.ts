@@ -125,7 +125,7 @@ function render(): void {
   statusEl.textContent = error
     ? "Last good frame · scene threw"
     : sceneKey === "flat"
-      ? "Flat paths: ticks share mark/beam.ts — each geom has a unique id"
+      ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
       : sceneKey === "shared"
         ? "One dashed radius — all three rings and the roof follow it while you drag"
         : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";

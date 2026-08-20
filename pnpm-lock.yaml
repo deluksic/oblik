@@ -20,9 +20,6 @@ importers:
       '@design-scenes/geom':
         specifier: workspace:*
         version: link:../../packages/geom
-      '@design-scenes/mark':
-        specifier: workspace:*
-        version: link:../../packages/mark
       '@design-scenes/shell':
         specifier: workspace:*
         version: link:../../packages/shell
@@ -41,12 +38,6 @@ importers:
         version: link:../geom
 
   packages/geom: {}
-
-  packages/mark:
-    dependencies:
-      '@design-scenes/geom':
-        specifier: workspace:*
-        version: link:../geom
 
   packages/shell:
     dependencies:

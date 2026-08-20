@@ -20,10 +20,6 @@ export default defineConfig({
     fs: { allow: [workspaceRoot] },
   },
   optimizeDeps: {
-    exclude: [
-      "@design-scenes/geom",
-      "@design-scenes/mark",
-      "@design-scenes/euclid2",
-    ],
+    exclude: ["@design-scenes/geom", "@design-scenes/euclid2"],
   },
 });

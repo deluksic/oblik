@@ -1,5 +1,5 @@
 import { line } from "@design-scenes/geom";
-import { assembleBeamFlat } from "@design-scenes/mark";
+import { assembleBeamFlat } from "../demo/beam.ts";
 import {
   editDistanceToPoint,
   editPoint,

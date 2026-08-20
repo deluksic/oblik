@@ -19,7 +19,7 @@ function isInfra(file: string): boolean {
   return INFRA.some((p) => file.includes(p));
 }
 
-/** Repo-relative path: packages/mark/src/beam.ts */
+/** Repo-relative path: apps/paper/src/demo/beam.ts */
 export function normalizeFile(file: string): string {
   const cleaned = file.replace(/^\/+/, "");
   const cut =

@@ -4,7 +4,7 @@ Built a 2D paper preview: pure library geometry, scene-only widgets, hover/selec
 
 ## Pass
 
-- Library (`@design-scenes/mark`) has no widget or preview imports.
+- Library code in `apps/paper/src/demo/` has no widget or preview imports.
 - Scene files contain explicit `edit*` calls; pointer-up rewrites those literals.
 - Hover/select highlights the clicked drawable. `id` is a UUID (pick key); `path` is a human breadcrumb.
 - Jump-to-source uses stack provenance (library line for `line()` inside a loop, not the draw loop).
