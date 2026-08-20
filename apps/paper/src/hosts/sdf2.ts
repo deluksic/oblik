@@ -19,10 +19,8 @@ import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commitEditors,
   commitWidget,
-  countEditCalls,
   peekFile,
   quantize,
-  widgetCountError,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
 import {
@@ -92,7 +90,7 @@ export const sdf2Host: ViewHost = {
     let error: string | null = null;
     let cam = asCamera(mod);
     let hoverGizmo: Gizmo | null = null;
-    let drag: { index: number; start: number[] } | null = null;
+    let drag: { site: string; start: number[]; gizmo: Gizmo } | null = null;
     let pan: { x: number; y: number; camX: number; camY: number } | null = null;
     let tool: EditorTool | null = null;
     let ghost: Vec2 | null = null;
@@ -114,10 +112,6 @@ export const sdf2Host: ViewHost = {
         sdf = sceneMod.scene();
         gizmos = getGizmos();
         error = null;
-        const source = peekCache.get(`apps/paper/src/scenes/${ctx.sceneFile}`);
-        if (source) {
-          error = widgetCountError(gizmos.length, countEditCalls(source));
-        }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
       }
@@ -140,7 +134,7 @@ export const sdf2Host: ViewHost = {
         h,
         cam,
         gizmos,
-        drag?.index ?? hoverGizmo?.index ?? null,
+        drag?.site ?? hoverGizmo?.site ?? null,
       );
       if (tool) drawEditorGhost(ctx2d, cam, w, h, tool, ghost);
       if (quiet && !error) return;
@@ -154,7 +148,7 @@ export const sdf2Host: ViewHost = {
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
       if (hoverGizmo) {
-        els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`;
+        els.crumbEl.textContent = `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${ctx.sceneFile}`;
         els.metaEl.textContent =
           "Handles are scene widgets. The filled blob is the 2D SDF.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
@@ -169,14 +163,20 @@ export const sdf2Host: ViewHost = {
     function applyDrag(g: Gizmo, world: Vec2): void {
       if (g.kind === "point") {
         setWidgetOverride(
-          g.index,
+          g.site,
           [quantize(world.x), quantize(world.y)],
           sceneId,
         );
       } else if (g.kind === "distance") {
         setWidgetOverride(
-          g.index,
+          g.site,
           [quantize(Math.max(0.02, dist(world, g.origin)))],
+          sceneId,
+        );
+      } else if (g.kind === "vector") {
+        setWidgetOverride(
+          g.site,
+          [quantize(world.x - g.origin.x), quantize(world.y - g.origin.y)],
           sceneId,
         );
       }
@@ -195,13 +195,13 @@ export const sdf2Host: ViewHost = {
     }
 
     async function finishDistance(
-      origin: { x: number; y: number; widgetIndex?: number },
+      origin: { x: number; y: number; at?: { line: number; column: number } },
       world: Vec2,
     ): Promise<void> {
       const d = quantize(radiusBetween(origin, world));
       const edits =
-        origin.widgetIndex != null
-          ? [{ kind: "distance" as const, originWidget: origin.widgetIndex, d }]
+        origin.at != null
+          ? [{ kind: "distance" as const, originAt: origin.at, d }]
           : [
               {
                 kind: "point" as const,
@@ -246,7 +246,7 @@ export const sdf2Host: ViewHost = {
               origin: {
                 x: hit.gizmo.x,
                 y: hit.gizmo.y,
-                widgetIndex: hit.gizmo.index,
+                at: hit.gizmo.at,
               },
             };
             render();
@@ -260,7 +260,7 @@ export const sdf2Host: ViewHost = {
         return;
       }
       if (hit?.target === "gizmo") {
-        drag = { index: hit.gizmo.index, start: gizmoValues(hit.gizmo) };
+        drag = { site: hit.gizmo.site, start: gizmoValues(hit.gizmo), gizmo: hit.gizmo };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         render();
@@ -289,17 +289,14 @@ export const sdf2Host: ViewHost = {
         return;
       }
       if (drag) {
-        const g = gizmos.find((x) => x.index === drag?.index);
-        if (g) {
-          applyDrag(g, screenToWorld(cam, p, w, h));
-          evaluate();
-          render();
-        }
+        applyDrag(drag.gizmo, screenToWorld(cam, p, w, h));
+        evaluate();
+        render();
         return;
       }
       const hit = hitTest(p, cam, w, h, gizmos, []);
       const next = hit?.target === "gizmo" ? hit.gizmo : null;
-      if (next?.index !== hoverGizmo?.index) {
+      if (next?.site !== hoverGizmo?.site) {
         hoverGizmo = next;
         canvas.style.cursor = next ? "grab" : "crosshair";
         render();
@@ -316,7 +313,7 @@ export const sdf2Host: ViewHost = {
         return;
       }
       const dragging = drag;
-      const g = gizmos.find((x) => x.index === dragging.index);
+      const g = gizmos.find((x) => x.site === dragging.site);
       drag = null;
       if (!g) {
         render();
@@ -325,7 +322,7 @@ export const sdf2Host: ViewHost = {
       const now = gizmoValues(g);
       const changed = now.some((v, i) => v !== dragging.start[i]);
       if (changed) {
-        const err = await commitWidget(ctx.sceneFile, g.index, now);
+        const err = await commitWidget(ctx.sceneFile, g.at, now);
         if (err) error = err;
         else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
       }

@@ -34,17 +34,17 @@ export function plateLayout() {
 
   const h0 = editPoint(-4.45, -2.27);
   const h1 = editPoint(4.32, -2.02);
-  const h2 = editPoint(4.36, 2.22);
+  const h2 = editPoint(4.47, 1.97);
   const h3 = editPoint(-4.29, 2.01);
-  const drillR = editDistanceToPoint(h0, 0.71);
+  const drillR = editDistanceToPoint(h0, 0.38);
 
   const bc = editPoint(0.12, -0.08);
   const pcd = editDistanceToPoint(bc, 0.77);
   const tapR = editDistanceToPoint(bc, 0.2);
-  const ringN = editNumber(7, {
+  const ringN = editNumber(4, {
     label: "Hole count",
     min: 3,
-    max: 12,
+    max: 14,
     step: 1,
   });
 
@@ -52,8 +52,8 @@ export function plateLayout() {
   const pocketMax = editPoint(2.05, 0.89);
   const filletR = editDistanceToPoint(pocketMin, 0.36);
 
-  const slotCenter = editPointOnLine(edges.top, 0.61);
-  const slotLen = editDistanceToPoint(slotCenter, 3.14);
+  const slotCenter = editPointOnLine(edges.top, 0.5);
+  const slotLen = editDistanceToPoint(slotCenter, 3.04);
   const slotW = editDistanceToPoint(slotCenter, 0.48);
 
   return {

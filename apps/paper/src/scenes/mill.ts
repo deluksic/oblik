@@ -24,9 +24,8 @@ if (import.meta.hot) {
  * owns a single widget: stock thickness (Z).
  *
  * withoutWidgets is required: otherwise plateLayout() would enqueue 2D
- * gizmos (and increment euclid2 indices) while evaluating this scene.
- * Silent evaluation reads a published plate snapshot (split view), not
- * the live widgets of mill/nest — those would collide on index 0.
+ * gizmos while evaluating this scene. Silent evaluation reads a published
+ * plate snapshot (split view), keyed by each edit* UUID, not mill’s live map.
  * Pass the channel that the 2D pane published (`"plate"`).
  */
 export function scene() {

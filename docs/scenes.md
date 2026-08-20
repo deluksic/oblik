@@ -41,6 +41,7 @@ Layout files must not import pane modules. Live drag still updates the other pan
 | Cream solid | Inert geometry (`circle`, `drawPlate`, SDF fill) | nothing |
 | Coral filled dot | `editPoint` / glider | literals |
 | Coral dashed ring | `editDistanceToPoint` | `d` |
+| Coral arrow | `editVector` | `dx`, `dy` |
 | HUD slider | `editNumber` | `n` |
 | Gold / blue | pick highlight | nothing |
 
@@ -57,7 +58,7 @@ euclid2 and sdf2:
 
 Esc cancels. The completed command is one text edit. Undo is the editor.
 
-Inserting after `return drawPlate(plateLayout())` rewrites to `const __scene = drawPlate(plateLayout()); …; return __scene` so AST order still matches evaluation. A handle declared in `plateLayout()` (outside `scene()`) is refused — inserting *before* `plateLayout()` would shift widget indices.
+Inserting after `return drawPlate(plateLayout())` rewrites to `const __scene = drawPlate(plateLayout()); …; return __scene` so new editors stay in `scene()`. A handle declared in `plateLayout()` (outside `scene()`) is refused.
 
 euclid3 and sdf field: Space reports no insert commands yet.
 
@@ -68,9 +69,10 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | [?scene=beam](http://127.0.0.1:43117/?scene=beam) | One truss. `group()` namespaces **paths** (`group[0] › line[2]`). The roof uses the middle ring’s `r1`. |
 | [?scene=flat](http://127.0.0.1:43117/?scene=flat) | Two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line. |
 | [?scene=shared](http://127.0.0.1:43117/?scene=shared) | One `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release. |
+| [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `editPoint`. A `for` calls `editDistanceToPoint(p, 0.4)` and `circle(p, r)`. Five dashed rings, one `0.4`. Drag any ring: all five follow; pointer-up rewrites that single literal. |
 | [?scene=plate](http://127.0.0.1:43117/?scene=plate) | Milled plate: stock, four corner bolts (shared drill Ø), polar array (center, PCD, tap Ø), titled **Hole count** slider, pocket + fillet, slot. |
 | [?scene=nest](http://127.0.0.1:43117/?scene=nest) | Print grid. `withoutWidgets(plateLayout)` instanced in a nest; columns / rows / gap are titled sliders. Polar-array **count steps by column**. |
-| [?scene=relative](http://127.0.0.1:43117/?scene=relative) | Write-back stress. Left `editPoint` is literals (writes). Right is `a.x + …, a.y + …` (preview only; pointer-up cannot patch expressions). |
+| [?scene=relative](http://127.0.0.1:43117/?scene=relative) | Offset handle. Left `editPoint` writes position; `editVector` writes `dx`/`dy`; the second centre is derived. |
 | [?scene=gear](http://127.0.0.1:43117/?scene=gear) | Involute spur pair. Drag the pinion centre, pitch radius, and **mesh angle**. Tooth counts, pressure, and helix are titled sliders. The wheel is derived. |
 | [?scene=ring](http://127.0.0.1:43117/?scene=ring) | Signet band, unrolled. Plan-view bore + developed strip (`2πR`). Shank and signet heights are distances on the paper; Gauge is wall thickness. |
 | [?scene=ringsplit](http://127.0.0.1:43117/?scene=ringsplit) | Same library wrapped with `wrapBand` around a cylinder. The 3D scene has no widgets — a second view of `ring.ts`. |

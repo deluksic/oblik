@@ -41,11 +41,13 @@ apps/
 
 ## Widget writes
 
-Runtime widget index `0..n-1` must match AST visit order of `edit*` in the scene file. Shared helpers that call `edit*` more than once need unrolled call sites (one literal per handle). Written-back arguments must be **numeric literals**. Expressions such as `a.x + 2.4` preview via in-memory overrides and cannot be patched (`?scene=relative`).
+Each `edit*` CallExpression is one write target, identified at compile time (a UUID on the compiled call, plus file/line/column for the patcher). A loop that calls `editDistanceToPoint(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal `edit*` count.
 
-`editNumber(n, { label, min, max, step })` is a screen-space titled slider for counts and other non-spatial parameters. `editAngle(origin, degrees)` is a world-space polar handle (literal is degrees, return value is radians). World gizmos stay for points, radii, angles, and extrusion thickness. The patcher writes the first numeric argument of `editNumber` and the degree argument of `editAngle`.
+Written-back arguments must be **numeric literals**. `editPoint(a.x + 2.4, a.y + 1.05)` cannot be patched (no numeric tokens). Declare the offset with `editVector(origin, dx, dy)` instead (`?scene=relative`).
 
-A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, source)` from euclid2: `edit*` do not enqueue gizmos or consume write-back indices. Silent reads use a **published snapshot** of the source’s overrides (`publishWidgetOverrides(source)` after the 2D frame). **`source` is the catalog id** (filename stem, or `export const id`). Two 2D editors must not share a channel. `getGizmos()` returns a **copy**. Split mill follows a plate drag because the euclid2 host publishes `"plate"` after each plate evaluate. `?scene=nest` is the same silent read, then a library nest that **steps a parameter by cell**. `?scene=rose` silent-reads `"cylinder"` and `"profile"` side by side.
+`editNumber(n, { label, min, max, step })` is a screen-space titled slider for counts and other non-spatial parameters. `editAngle(origin, degrees)` is a world-space polar handle (literal is degrees, return value is radians). World gizmos stay for points, radii, angles, offsets, and extrusion thickness. The patcher writes the first numeric argument of `editNumber` and the degree argument of `editAngle`.
+
+A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, source)` from euclid2: `edit*` do not enqueue gizmos. Silent reads use a **published snapshot** of the source’s overrides (`publishWidgetOverrides(source)` after the 2D frame), keyed by the same compile-time UUID. **`source` is the catalog id** (filename stem, or `export const id`). Two 2D editors must not share a channel. `getGizmos()` returns a **copy**. Split mill follows a plate drag because the euclid2 host publishes `"plate"` after each plate evaluate. `?scene=nest` is the same silent read, then a library nest that **steps a parameter by cell**. `?scene=rose` silent-reads `"cylinder"` and `"profile"` side by side.
 
 ## HMR
 

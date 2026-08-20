@@ -1,10 +1,25 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect, test } from "vitest";
+import * as ts from "typescript";
 import {
   insertEditors,
   widgetBindingName,
   widgetInSceneFunction,
 } from "./insert-editor.ts";
+import { collectEditCalls } from "./patch-widget.ts";
+
+function at(source: string, i = 0): { line: number; column: number } {
+  const sf = ts.createSourceFile(
+    "scene.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const call = collectEditCalls(sf)[i];
+  if (!call) throw new Error(`no edit* at ${i}`);
+  const pos = sf.getLineAndCharacterOfPosition(call.getStart(sf));
+  return { line: pos.line + 1, column: pos.character + 1 };
+}
 
 const hello = `import { circle } from "@design-scenes/geom";
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
@@ -18,11 +33,11 @@ export function scene() {
 
 test("inserts editPoint after existing scene widgets", () => {
   const next = insertEditors(hello, [{ kind: "point", x: 1.25, y: -0.4 }]);
-  assert.match(next, /^  const __scene = circle\(c, r\);$/m);
-  assert.match(next, /^  const p = editPoint\(1\.25, -0\.4\);$/m);
-  assert.match(next, /^  return __scene;$/m);
-  assert.equal(widgetBindingName(hello, 0), "c");
-  assert.equal(widgetInSceneFunction(hello, 0), true);
+  expect(next).toMatch(/^  const __scene = circle\(c, r\);$/m);
+  expect(next).toMatch(/^  const p = editPoint\(1\.25, -0\.4\);$/m);
+  expect(next).toMatch(/^  return __scene;$/m);
+  expect(widgetBindingName(hello, at(hello, 0))).toBe("c");
+  expect(widgetInSceneFunction(hello, at(hello, 0))).toBe(true);
 });
 
 test("stacked inserts keep two-space indent on every line", () => {
@@ -30,13 +45,15 @@ test("stacked inserts keep two-space indent on every line", () => {
   const twice = insertEditors(once, [
     { kind: "distance", originName: "p", d: 0.5 },
   ]);
-  assert.equal((twice.match(/const __scene = /g) ?? []).length, 1);
-  assert.match(twice, /const d = editDistanceToPoint\(p, 0\.5\);/);
+  expect(twice.match(/const __scene = /g)?.length).toBe(1);
+  expect(twice).toMatch(/const d = editDistanceToPoint\(p, 0\.5\);/);
   const inner = twice.split("export function scene() {\n")[1]?.split("\n}")[0] ?? "";
   for (const line of inner.split("\n")) {
     if (!line.trim()) continue;
-    assert.equal(line.slice(0, 2), "  ", `bad indent: ${JSON.stringify(line)}`);
-    assert.notEqual(line.slice(0, 4), "    ", `over-indented: ${JSON.stringify(line)}`);
+    expect(line.slice(0, 2), `bad indent: ${JSON.stringify(line)}`).toBe("  ");
+    expect(line.slice(0, 4), `over-indented: ${JSON.stringify(line)}`).not.toBe(
+      "    ",
+    );
   }
 });
 
@@ -54,10 +71,10 @@ export function scene() {
 }
 `;
   const next = insertEditors(plate, [{ kind: "point", x: 0, y: 1 }]);
-  assert.match(next, /const __scene = drawPlate\(plateLayout\(\)\);/);
-  assert.match(next, /const p = editPoint\(0, 1\);/);
-  assert.equal(widgetInSceneFunction(plate, 0), false);
-  assert.equal(widgetBindingName(plate, 0), "min");
+  expect(next).toMatch(/const __scene = drawPlate\(plateLayout\(\)\);/);
+  expect(next).toMatch(/const p = editPoint\(0, 1\);/);
+  expect(widgetInSceneFunction(plate, at(plate, 0))).toBe(false);
+  expect(widgetBindingName(plate, at(plate, 0))).toBe("min");
 });
 
 test("point then distance in one write shares the new name", () => {
@@ -65,8 +82,8 @@ test("point then distance in one write shares the new name", () => {
     { kind: "point", x: 2, y: 1 },
     { kind: "distance", d: 0.75 },
   ]);
-  assert.match(next, /const p = editPoint\(2, 1\);/);
-  assert.match(next, /const d = editDistanceToPoint\(p, 0\.75\);/);
+  expect(next).toMatch(/const p = editPoint\(2, 1\);/);
+  expect(next).toMatch(/const d = editDistanceToPoint\(p, 0\.75\);/);
 });
 
 test("adds a named import when euclid2 is missing", () => {
@@ -77,8 +94,7 @@ export function scene() {
 }
 `;
   const next = insertEditors(src, [{ kind: "point", x: 0, y: 0 }]);
-  assert.match(
-    next,
+  expect(next).toMatch(
     /import \{ editPoint \} from "@design-scenes\/euclid2";/,
   );
 });

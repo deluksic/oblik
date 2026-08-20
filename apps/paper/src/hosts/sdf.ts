@@ -10,10 +10,8 @@ import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commitWidget,
-  countEditCalls,
   peekFile,
   quantize,
-  widgetCountError,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
 
@@ -35,7 +33,7 @@ export const sdfHost: ViewHost = {
     let gizmos: readonly Gizmo3[] = [];
     let error: string | null = null;
     let hoverGizmo: Gizmo3 | null = null;
-    let drag: { index: number; start: number[] } | null = null;
+    let drag: { site: string; start: number[]; gizmo: Gizmo3 } | null = null;
 
     function evaluate(): void {
       try {
@@ -43,10 +41,6 @@ export const sdfHost: ViewHost = {
         sdf = sceneMod.scene();
         gizmos = getGizmos3();
         error = null;
-        const source = peekCache.get(`apps/paper/src/scenes/${ctx.sceneFile}`);
-        if (source) {
-          error = widgetCountError(gizmos.length, countEditCalls(source));
-        }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
       }
@@ -55,7 +49,7 @@ export const sdfHost: ViewHost = {
     function sync(quiet = false): void {
       view.resize();
       if (sdf) view.setSdf(sdf);
-      view.syncGizmos(gizmos, drag?.index ?? hoverGizmo?.index ?? null);
+      view.syncGizmos(gizmos, drag?.site ?? hoverGizmo?.site ?? null);
       if (quiet && !error) return;
       els.statusEl.textContent = error
         ? "Last good frame · scene threw"
@@ -64,7 +58,7 @@ export const sdfHost: ViewHost = {
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
       if (hoverGizmo) {
-        els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`;
+        els.crumbEl.textContent = `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${ctx.sceneFile}`;
         els.metaEl.textContent =
           "The field has no provenance. Widget values live in this scene file.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
@@ -83,7 +77,7 @@ export const sdfHost: ViewHost = {
       const h = view.hitTest(e.clientX, e.clientY);
       if (h?.target === "gizmo") {
         view.controls.enabled = false;
-        drag = { index: h.gizmo.index, start: gizmoValues3(h.gizmo) };
+        drag = { site: h.gizmo.site, start: gizmoValues3(h.gizmo), gizmo: h.gizmo };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
@@ -93,12 +87,11 @@ export const sdfHost: ViewHost = {
 
     function onPointerMove(e: PointerEvent): void {
       if (drag) {
-        const g = gizmos.find((x) => x.index === drag?.index);
-        if (g) {
-          if (g.kind === "point3") {
+        const g = drag.gizmo;
+        if (g.kind === "point3") {
             const p = view.dragPoint(g, e.clientX, e.clientY);
             if (p) {
-              setWidgetOverride3(g.index, [
+              setWidgetOverride3(g.site, [
                 quantize(p.x),
                 quantize(p.y),
                 quantize(p.z),
@@ -106,20 +99,19 @@ export const sdfHost: ViewHost = {
             }
           } else if (g.kind === "distance3") {
             const d = view.dragDistance(g.origin, e.clientX, e.clientY);
-            if (d != null) setWidgetOverride3(g.index, [quantize(d)]);
+            if (d != null) setWidgetOverride3(g.site, [quantize(d)]);
           } else {
             const t = view.dragGlider(g.a, g.b, e.clientX, e.clientY);
-            if (t != null) setWidgetOverride3(g.index, [quantize(t)]);
+            if (t != null) setWidgetOverride3(g.site, [quantize(t)]);
           }
           evaluate();
           ctx.onLiveChange();
           sync();
-        }
         return;
       }
       const h = view.hitTest(e.clientX, e.clientY);
       const next = h?.target === "gizmo" ? h.gizmo : null;
-      if (next?.index !== hoverGizmo?.index) {
+      if (next?.site !== hoverGizmo?.site) {
         hoverGizmo = next;
         canvas.style.cursor = next ? "grab" : "crosshair";
         sync();
@@ -133,7 +125,7 @@ export const sdfHost: ViewHost = {
         return;
       }
       const dragging = drag;
-      const g = gizmos.find((x) => x.index === dragging.index);
+      const g = gizmos.find((x) => x.site === dragging.site);
       drag = null;
       if (!g) {
         sync();
@@ -142,7 +134,7 @@ export const sdfHost: ViewHost = {
       const now = gizmoValues3(g);
       const changed = now.some((v, i) => v !== dragging.start[i]);
       if (changed) {
-        const err = await commitWidget(ctx.sceneFile, g.index, now);
+        const err = await commitWidget(ctx.sceneFile, g.at, now);
         if (err) error = err;
         else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
       }

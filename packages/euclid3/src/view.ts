@@ -35,7 +35,6 @@ export class SpaceView {
   private content = new THREE.Group();
   private gizmos = new THREE.Group();
   private geomById = new Map<string, Geom3>();
-  private gizmoByIndex = new Map<number, Gizmo3>();
   private anim = 0;
   private disposed = false;
 
@@ -115,12 +114,11 @@ export class SpaceView {
     gizmos: readonly Gizmo3[],
     hoverId: string | null,
     selectedId: string | null,
-    activeGizmo: number | null,
+    activeGizmo: string | null,
   ): void {
     this.clearGroup(this.content);
     this.clearGroup(this.gizmos);
     this.geomById.clear();
-    this.gizmoByIndex.clear();
 
     for (const d of drawables) {
       const g = d.geom;
@@ -137,10 +135,9 @@ export class SpaceView {
     }
 
     for (const gizmo of gizmos) {
-      this.gizmoByIndex.set(gizmo.index, gizmo);
-      const active = gizmo.index === activeGizmo;
+      const active = gizmo.site === activeGizmo;
       const obj = meshGizmo(gizmo, active);
-      obj.userData.gizmoIndex = gizmo.index;
+      obj.userData.gizmo = gizmo;
       this.gizmos.add(obj);
     }
   }
@@ -150,10 +147,9 @@ export class SpaceView {
     this.raycaster.setFromCamera(ndc, this.camera);
     const giz = this.raycaster.intersectObject(this.gizmos, true);
     for (const hit of giz) {
-      const idx = findUserData(hit.object, "gizmoIndex");
-      if (typeof idx === "number") {
-        const g = this.gizmoByIndex.get(idx);
-        if (g) return { target: "gizmo", gizmo: g };
+      const g = findUserData(hit.object, "gizmo");
+      if (g && typeof g === "object" && "kind" in (g as object)) {
+        return { target: "gizmo", gizmo: g as Gizmo3 };
       }
     }
     const geoms = this.raycaster.intersectObject(this.content, true);
@@ -392,7 +388,7 @@ function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
     const loops = unitCircles(g.origin, Math.abs(g.d), color);
     group.add(...loops);
   }
-  group.userData.gizmoIndex = g.index;
+  group.userData.gizmo = g;
   return group;
 }
 

@@ -19,7 +19,7 @@ export type EditorTool =
   | { id: "point" }
   | {
       id: "distance";
-      origin?: { x: number; y: number; widgetIndex?: number };
+      origin?: { x: number; y: number; at?: { line: number; column: number } };
     };
 
 const EDITOR = "#e8876a";

@@ -12,11 +12,9 @@ import {
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commitWidget,
-  countEditCalls,
   peekFile,
   quantize,
   renderSnippet,
-  widgetCountError,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
 
@@ -58,17 +56,13 @@ export const euclid3Host: ViewHost = {
     let selectedId: string | null = null;
     let hoverGizmo: Gizmo3 | null = null;
     let selectedGeom: Geom3 | null = null;
-    let drag: { index: number; start: number[] } | null = null;
+    let drag: { site: string; start: number[]; gizmo: Gizmo3 } | null = null;
 
     function evaluate(): void {
       try {
         frame = runScene3(sceneMod);
         lastGood = frame;
         error = null;
-        const source = peekCache.get(`apps/paper/src/scenes/${ctx.sceneFile}`);
-        if (source) {
-          error = widgetCountError(frame.gizmos.length, countEditCalls(source));
-        }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
         frame = lastGood;
@@ -84,7 +78,7 @@ export const euclid3Host: ViewHost = {
 
     async function updateInspect(): Promise<void> {
       if (hoverGizmo) {
-        els.crumbEl.textContent = `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`;
+        els.crumbEl.textContent = `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${ctx.sceneFile}`;
         els.metaEl.textContent =
           "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
         els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
@@ -116,7 +110,7 @@ export const euclid3Host: ViewHost = {
         frame?.gizmos ?? [],
         hoverId,
         selectedId,
-        drag?.index ?? hoverGizmo?.index ?? null,
+        drag?.site ?? hoverGizmo?.site ?? null,
       );
       if (quiet && !error) return;
       els.statusEl.textContent = error
@@ -134,7 +128,7 @@ export const euclid3Host: ViewHost = {
       const h = space.hitTest(e.clientX, e.clientY);
       if (h?.target === "gizmo") {
         space.controls.enabled = false;
-        drag = { index: h.gizmo.index, start: gizmoValues3(h.gizmo) };
+        drag = { site: h.gizmo.site, start: gizmoValues3(h.gizmo), gizmo: h.gizmo };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
@@ -155,12 +149,11 @@ export const euclid3Host: ViewHost = {
 
     function onPointerMove(e: PointerEvent): void {
       if (drag && frame) {
-        const g = frame.gizmos.find((x) => x.index === drag?.index);
-        if (g) {
-          if (g.kind === "point3") {
+        const g = drag.gizmo;
+        if (g.kind === "point3") {
             const p = space.dragPoint(g, e.clientX, e.clientY);
             if (p) {
-              setWidgetOverride3(g.index, [
+              setWidgetOverride3(g.site, [
                 quantize(p.x),
                 quantize(p.y),
                 quantize(p.z),
@@ -168,21 +161,20 @@ export const euclid3Host: ViewHost = {
             }
           } else if (g.kind === "distance3") {
             const d = space.dragDistance(g.origin, e.clientX, e.clientY);
-            if (d != null) setWidgetOverride3(g.index, [quantize(d)]);
+            if (d != null) setWidgetOverride3(g.site, [quantize(d)]);
           } else {
             const t = space.dragGlider(g.a, g.b, e.clientX, e.clientY);
-            if (t != null) setWidgetOverride3(g.index, [quantize(t)]);
+            if (t != null) setWidgetOverride3(g.site, [quantize(t)]);
           }
           evaluate();
           ctx.onLiveChange();
           sync();
-        }
         return;
       }
       const h = space.hitTest(e.clientX, e.clientY);
       const nextId = h?.target === "geom" ? h.geom.id : null;
       const nextG = h?.target === "gizmo" ? h.gizmo : null;
-      if (nextId !== hoverId || nextG?.index !== hoverGizmo?.index) {
+      if (nextId !== hoverId || nextG?.site !== hoverGizmo?.site) {
         hoverId = nextId;
         hoverGizmo = nextG;
         canvas.style.cursor = nextG ? "grab" : nextId ? "pointer" : "crosshair";
@@ -197,7 +189,7 @@ export const euclid3Host: ViewHost = {
         return;
       }
       const dragging = drag;
-      const g = frame.gizmos.find((x) => x.index === dragging.index);
+      const g = frame.gizmos.find((x) => x.site === dragging.site);
       drag = null;
       if (!g) {
         sync();
@@ -206,7 +198,7 @@ export const euclid3Host: ViewHost = {
       const now = gizmoValues3(g);
       const changed = now.some((v, i) => v !== dragging.start[i]);
       if (changed) {
-        const err = await commitWidget(ctx.sceneFile, g.index, now);
+        const err = await commitWidget(ctx.sceneFile, g.at, now);
         if (err) error = err;
         else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
       }

@@ -22,4 +22,4 @@ Scene catalog and controls: [docs/scenes.md](./docs/scenes.md).
 - Click a tick: inspector shows **path**, **id**, and the **creation site**.
 - Wheel zooms; drag empty paper (or Alt-drag) to pan.
 
-Each handle needs its own unrolled `edit*` in the scene file. Writes use evaluation-order index (must match AST order).
+Each `edit*` CallExpression is one write target. A loop of five `editDistanceToPoint` is five gizmos and one literal.

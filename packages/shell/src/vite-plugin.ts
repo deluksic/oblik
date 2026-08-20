@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import * as ts from "typescript";
 import type { Plugin, ViteDevServer } from "vite";
 import { parseSceneSource } from "./catalog.ts";
 import { isSceneId } from "./layout-grid.ts";
@@ -12,21 +11,12 @@ import {
   widgetInSceneFunction,
   type EditorInsert,
 } from "./insert-editor.ts";
+import { injectSceneSites } from "./inject-sites.ts";
+import { patchWidgetAt } from "./patch-widget.ts";
 import { newSceneSource, titleFromId } from "./new-scene.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";
-
-const EDIT_NAMES = new Set([
-  "editPoint",
-  "editPoint3",
-  "editDistanceToPoint",
-  "editDistance3",
-  "editPointOnLine",
-  "editPointOnLine3",
-  "editNumber",
-  "editAngle",
-]);
 
 export type SceneDevOptions = {
   /** Repo root — peek may read any file under here. */
@@ -57,148 +47,6 @@ function resolveUnder(root: string, rel: string): string {
     throw new Error("path escapes sandbox");
   }
   return abs;
-}
-
-function formatNum(n: number): string {
-  const q = Math.round(n * 100) / 100;
-  if (Object.is(q, -0)) return "0";
-  return String(q);
-}
-
-function numericSpan(
-  sourceFile: ts.SourceFile,
-  expr: ts.Expression,
-): { start: number; end: number } | null {
-  if (ts.isNumericLiteral(expr)) {
-    return { start: expr.getStart(sourceFile), end: expr.getEnd() };
-  }
-  if (
-    ts.isPrefixUnaryExpression(expr) &&
-    expr.operator === ts.SyntaxKind.MinusToken &&
-    ts.isNumericLiteral(expr.operand)
-  ) {
-    return { start: expr.getStart(sourceFile), end: expr.getEnd() };
-  }
-  return null;
-}
-
-function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
-  const calls: ts.CallExpression[] = [];
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      EDIT_NAMES.has(node.expression.text)
-    ) {
-      calls.push(node);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return calls;
-}
-
-function resolveWidgetIndex(
-  sourceFile: ts.SourceFile,
-  calls: ts.CallExpression[],
-  raw: Record<string, unknown>,
-): number | null {
-  if (typeof raw.widgetIndex === "number") return raw.widgetIndex;
-  if (typeof raw.index === "number") return raw.index;
-
-  const site = raw.site;
-  if (!site || typeof site !== "object") return null;
-  const line = (site as { line?: unknown }).line;
-  const column = (site as { column?: unknown }).column;
-  const instance = (site as { instance?: unknown }).instance;
-  if (typeof line !== "number") return null;
-
-  const onLine = calls
-    .map((call, idx) => {
-      const pos = sourceFile.getLineAndCharacterOfPosition(
-        call.getStart(sourceFile),
-      );
-      return { idx, line: pos.line + 1, column: pos.character + 1 };
-    })
-    .filter((x) => x.line === line);
-
-  if (onLine.length === 0) return null;
-  if (typeof column === "number") {
-    const exact = onLine.find((x) => x.column === column);
-    if (exact) return exact.idx;
-  }
-  const n = typeof instance === "number" ? instance : 0;
-  return onLine[n]?.idx ?? onLine[0]?.idx ?? null;
-}
-
-function patchWidget(
-  source: string,
-  widgetIndex: number,
-  values: number[],
-): string {
-  const sourceFile = ts.createSourceFile(
-    "scene.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-  const calls = collectEditCalls(sourceFile);
-  const call = calls[widgetIndex];
-  if (!call) {
-    throw new Error(
-      `widget ${widgetIndex} not found (${calls.length} edit* calls in file)`,
-    );
-  }
-
-  const name = (call.expression as ts.Identifier).text;
-  const spans: { start: number; end: number; text: string }[] = [];
-
-  if (name === "editNumber") {
-    const arg = call.arguments[0];
-    if (!arg) throw new Error("editNumber expects a numeric value");
-    if (values[0] === undefined) throw new Error("editNumber write needs a value");
-    const span = numericSpan(sourceFile, arg);
-    if (!span) throw new Error("editNumber value is not a numeric literal");
-    spans.push({ ...span, text: formatNum(values[0]) });
-  } else if (name === "editAngle") {
-    const arg = call.arguments[1];
-    if (!arg) throw new Error("editAngle expects an angle in degrees");
-    if (values[0] === undefined) throw new Error("editAngle write needs a value");
-    const span = numericSpan(sourceFile, arg);
-    if (!span) throw new Error("editAngle angle is not a numeric literal");
-    spans.push({ ...span, text: formatNum(values[0]) });
-  } else if (name === "editPoint" || name === "editPoint3") {
-    const needed = name === "editPoint3" ? 3 : 2;
-    if (call.arguments.length < needed) {
-      throw new Error(`${name} expects ${needed} arguments`);
-    }
-    if (values.length < needed) {
-      throw new Error(`${name} write needs ${needed} values`);
-    }
-    for (let i = 0; i < needed; i++) {
-      const arg = call.arguments[i];
-      const v = values[i];
-      if (!arg || v === undefined) throw new Error(`${name} missing argument ${i}`);
-      const span = numericSpan(sourceFile, arg);
-      if (!span) throw new Error(`${name} args are not numeric literals`);
-      spans.push({ ...span, text: formatNum(v) });
-    }
-  } else {
-    const last = call.arguments[call.arguments.length - 1];
-    if (!last) throw new Error(`${name} missing argument`);
-    const span = numericSpan(sourceFile, last);
-    if (!span) throw new Error(`${name} last arg is not a numeric literal`);
-    if (values[0] === undefined) throw new Error(`${name} write needs a value`);
-    spans.push({ ...span, text: formatNum(values[0]) });
-  }
-
-  spans.sort((a, b) => b.start - a.start);
-  let next = source;
-  for (const s of spans) {
-    next = next.slice(0, s.start) + s.text + next.slice(s.end);
-  }
-  return next;
 }
 
 function sendText(res: ServerResponse, text: string) {
@@ -319,6 +167,8 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
 
   return {
     name: "scene-dev",
+    // Before Vite/oxc TS: `at` must be disk line/column, not post-transpile.
+    enforce: "pre",
     resolveId(id) {
       if (id === VIRTUAL_CATALOG) return VIRTUAL_CATALOG_RESOLVED;
       return undefined;
@@ -349,40 +199,26 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             >;
             const file = raw.file;
             const values = raw.values;
+            const line = raw.line;
+            const column = raw.column;
 
             if (
               typeof file !== "string" ||
+              typeof line !== "number" ||
+              typeof column !== "number" ||
               !Array.isArray(values) ||
               !values.every((v) => typeof v === "number")
             ) {
               json(res, 400, {
                 ok: false,
-                error: `invalid body: expected { file, widgetIndex, values }; got keys [${Object.keys(raw).join(", ")}]`,
+                error: `invalid body: expected { file, line, column, values }; got keys [${Object.keys(raw).join(", ")}]`,
               });
               return;
             }
 
             const abs = resolveUnder(sceneDir, path.basename(file));
             const source = fs.readFileSync(abs, "utf8");
-            const sourceFile = ts.createSourceFile(
-              "scene.ts",
-              source,
-              ts.ScriptTarget.Latest,
-              true,
-              ts.ScriptKind.TS,
-            );
-            const calls = collectEditCalls(sourceFile);
-            const widgetIndex = resolveWidgetIndex(sourceFile, calls, raw);
-
-            if (widgetIndex === null) {
-              json(res, 400, {
-                ok: false,
-                error: `invalid body: need widgetIndex; got keys [${Object.keys(raw).join(", ")}]`,
-              });
-              return;
-            }
-
-            const next = patchWidget(source, widgetIndex, values);
+            const next = patchWidgetAt(source, line, column, values);
             rememberWidgetWrite(widgetWrites, abs, next);
             fs.writeFileSync(abs, next);
             json(res, 200, { ok: true });
@@ -431,8 +267,18 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 }
                 let originName =
                   typeof e.originName === "string" ? e.originName : undefined;
-                if (typeof e.originWidget === "number") {
-                  if (!widgetInSceneFunction(source, e.originWidget)) {
+                const originAt = e.originAt;
+                if (
+                  originAt &&
+                  typeof originAt === "object" &&
+                  typeof (originAt as { line?: unknown }).line === "number" &&
+                  typeof (originAt as { column?: unknown }).column === "number"
+                ) {
+                  const at = {
+                    line: (originAt as { line: number }).line,
+                    column: (originAt as { column: number }).column,
+                  };
+                  if (!widgetInSceneFunction(source, at)) {
                     json(res, 400, {
                       ok: false,
                       error:
@@ -440,7 +286,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                     });
                     return;
                   }
-                  const name = widgetBindingName(source, e.originWidget);
+                  const name = widgetBindingName(source, at);
                   if (!name) {
                     json(res, 400, {
                       ok: false,
@@ -522,6 +368,10 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       });
     },
     transform(code, id) {
+      const file = id.split("?")[0] ?? "";
+      if (isSceneTs(sceneDir, file)) {
+        return { code: injectSceneSites(code), map: null };
+      }
       if (!isSceneLoadersModule(id)) return undefined;
       if (code.includes("/* __scene_hmr_accept */")) return undefined;
       const keys = sceneGlobKeys(sceneDir);

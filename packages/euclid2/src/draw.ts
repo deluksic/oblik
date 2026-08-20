@@ -37,7 +37,7 @@ export function drawFrame(
   gizmos: readonly Gizmo[],
   hoverId: string | null,
   selectedId: string | null,
-  activeGizmo: number | null,
+  activeGizmo: string | null,
 ): void {
   ctx.clearRect(0, 0, cssW, cssH);
   ctx.fillStyle = COL.bg;
@@ -54,7 +54,7 @@ export function drawFrame(
 
   for (const g of gizmos) {
     if (g.kind === "number") continue;
-    const active = g.index === activeGizmo;
+    const active = g.site === activeGizmo;
     drawGizmo(ctx, cam, cssW, cssH, g, active);
   }
   drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
@@ -67,11 +67,11 @@ export function drawGizmoOverlay(
   cssH: number,
   cam: Camera,
   gizmos: readonly Gizmo[],
-  activeGizmo: number | null,
+  activeGizmo: string | null,
 ): void {
   for (const g of gizmos) {
     if (g.kind === "number") continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, g.index === activeGizmo);
+    drawGizmo(ctx, cam, cssW, cssH, g, g.site === activeGizmo);
   }
   drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
@@ -237,6 +237,17 @@ function drawGizmo(
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
     ctx.stroke();
+  } else if (g.kind === "vector") {
+    const tip = { x: g.origin.x + g.dx, y: g.origin.y + g.dy };
+    pathSeg(ctx, cam, w, h, g.origin, tip);
+    ctx.stroke();
+    const s = worldToScreen(cam, tip, w, h);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, active ? 7 : 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COL.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 
@@ -245,10 +256,10 @@ function drawNumberSliders(
   cssW: number,
   cssH: number,
   gizmos: readonly Gizmo[],
-  activeGizmo: number | null,
+  activeGizmo: string | null,
 ): void {
   for (const L of layoutNumberSliders(gizmos, cssW, cssH)) {
-    const active = L.gizmo.index === activeGizmo;
+    const active = L.gizmo.site === activeGizmo;
     const { x, y, w, h } = L.panel;
     ctx.save();
     ctx.fillStyle = active ? "#1c222c" : "#151922";

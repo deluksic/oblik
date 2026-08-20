@@ -31,13 +31,13 @@ export function ringLayout(): RingLayout {
     x: center.x + innerR + 2.8,
     y: center.y - innerR,
   };
-  const shank = editDistanceToPoint(origin, 4.8);
+  const shank = editDistanceToPoint(origin, 3.95);
   const mid: Vec2 = {
     x: origin.x + Math.PI * innerR,
     y: origin.y,
   };
   const signet = editDistanceToPoint(mid, 7.6);
-  const gauge = editNumber(1.5, {
+  const gauge = editNumber(0.7, {
     label: "Gauge",
     min: 0.4,
     max: 3.2,

@@ -14,6 +14,6 @@ export function scene() {
   const master = withoutWidgets(() => plateLayout(), "plate");
   const cols = editNumber(3, { label: "Columns", min: 1, max: 4, step: 1 });
   const rows = editNumber(2, { label: "Rows", min: 1, max: 3, step: 1 });
-  const gap = editNumber(0.8, { label: "Gap", min: 0.25, max: 2.5, step: 0.05 });
+  const gap = editNumber(1.75, { label: "Gap", min: 0.25, max: 2.5, step: 0.05 });
   return drawPlateNest(master, { cols, rows, gap, countStep: 1 });
 }

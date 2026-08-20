@@ -66,7 +66,7 @@ export function numberValueFromPointer(
   gizmos: readonly Gizmo[],
 ): number {
   const L = layoutNumberSliders(gizmos, cssW, cssH).find(
-    (s) => s.gizmo.index === gizmo.index,
+    (s) => s.gizmo.site === gizmo.site,
   );
   if (!L) return gizmo.n;
   const t = (screenX - L.track.x) / L.track.w;

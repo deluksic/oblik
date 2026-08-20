@@ -21,11 +21,9 @@ import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commitEditors,
   commitWidget,
-  countEditCalls,
   peekFile,
   quantize,
   renderSnippet,
-  widgetCountError,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
 import {
@@ -68,7 +66,7 @@ export const euclid2Host: ViewHost = {
     let selectedId: string | null = null;
     let hoverGizmo: Gizmo | null = null;
     let selectedGeom: Geom | null = null;
-    let drag: { index: number; start: number[] } | null = null;
+    let drag: { site: string; start: number[]; gizmo: Gizmo } | null = null;
     let pan: { x: number; y: number; camX: number; camY: number } | null = null;
     let tool: EditorTool | null = null;
     let ghost: { x: number; y: number } | null = null;
@@ -91,10 +89,6 @@ export const euclid2Host: ViewHost = {
         frame = runScene(sceneMod, sceneId);
         lastGood = frame;
         error = null;
-        const source = peekCache.get(`apps/paper/src/scenes/${ctx.sceneFile}`);
-        if (source) {
-          error = widgetCountError(frame.gizmos.length, countEditCalls(source));
-        }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
         frame = lastGood;
@@ -110,8 +104,8 @@ export const euclid2Host: ViewHost = {
       if (propagate) ctx.onLiveChange();
     }
 
-    function activeGizmo(): number | null {
-      return drag?.index ?? hoverGizmo?.index ?? null;
+    function activeGizmo(): string | null {
+      return drag?.site ?? hoverGizmo?.site ?? null;
     }
 
     function currentTarget(): {
@@ -123,7 +117,7 @@ export const euclid2Host: ViewHost = {
     } | null {
       if (hoverGizmo) {
         return {
-          title: `widget ${hoverGizmo.kind} #${hoverGizmo.index} · writes ${ctx.sceneFile}`,
+          title: `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${ctx.sceneFile}`,
         };
       }
       const g =
@@ -222,28 +216,34 @@ export const euclid2Host: ViewHost = {
     ): void {
       if (g.kind === "point") {
         setWidgetOverride(
-          g.index,
+          g.site,
           [quantize(world.x), quantize(world.y)],
           sceneId,
         );
       } else if (g.kind === "distance") {
         setWidgetOverride(
-          g.index,
+          g.site,
           [quantize(Math.max(0.05, dist(world, g.origin)))],
           sceneId,
         );
       } else if (g.kind === "glider") {
         const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
-        setWidgetOverride(g.index, [quantize(t)], sceneId);
+        setWidgetOverride(g.site, [quantize(t)], sceneId);
       } else if (g.kind === "angle") {
         let deg =
           (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) /
           Math.PI;
         if (deg < 0) deg += 360;
-        setWidgetOverride(g.index, [Math.round(deg) % 360], sceneId);
+        setWidgetOverride(g.site, [Math.round(deg) % 360], sceneId);
+      } else if (g.kind === "vector") {
+        setWidgetOverride(
+          g.site,
+          [quantize(world.x - g.origin.x), quantize(world.y - g.origin.y)],
+          sceneId,
+        );
       } else {
         setWidgetOverride(
-          g.index,
+          g.site,
           [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)],
           sceneId,
         );
@@ -263,13 +263,13 @@ export const euclid2Host: ViewHost = {
     }
 
     async function finishDistance(
-      origin: { x: number; y: number; widgetIndex?: number },
+      origin: { x: number; y: number; at?: { line: number; column: number } },
       world: { x: number; y: number },
     ): Promise<void> {
       const d = quantize(radiusBetween(origin, world));
       const edits =
-        origin.widgetIndex != null
-          ? [{ kind: "distance" as const, originWidget: origin.widgetIndex, d }]
+        origin.at != null
+          ? [{ kind: "distance" as const, originAt: origin.at, d }]
           : [
               {
                 kind: "point" as const,
@@ -314,7 +314,7 @@ export const euclid2Host: ViewHost = {
               origin: {
                 x: h.gizmo.x,
                 y: h.gizmo.y,
-                widgetIndex: h.gizmo.index,
+                at: h.gizmo.at,
               },
             };
             render();
@@ -328,7 +328,7 @@ export const euclid2Host: ViewHost = {
         return;
       }
       if (h?.target === "gizmo") {
-        drag = { index: h.gizmo.index, start: gizmoValues(h.gizmo) };
+        drag = { site: h.gizmo.site, start: gizmoValues(h.gizmo), gizmo: h.gizmo };
         canvas.style.cursor = h.gizmo.kind === "number" ? "ew-resize" : "grab";
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
@@ -367,19 +367,23 @@ export const euclid2Host: ViewHost = {
         return;
       }
       if (drag && frame) {
-        const g = frame.gizmos.find((x) => x.index === drag?.index);
-        if (g) {
-          applyDrag(g, screenToWorld(cam, p, w, height), p, w, height, frame.gizmos);
-          evaluate();
-          render();
-        }
+        applyDrag(
+          drag.gizmo,
+          screenToWorld(cam, p, w, height),
+          p,
+          w,
+          height,
+          frame.gizmos,
+        );
+        evaluate();
+        render();
         return;
       }
       const hitResult = hit(e);
       const nextId =
         hitResult?.target === "geom" ? hitResult.drawable.geom.id : null;
       const nextG = hitResult?.target === "gizmo" ? hitResult.gizmo : null;
-      if (nextId !== hoverId || nextG?.index !== hoverGizmo?.index) {
+      if (nextId !== hoverId || nextG?.site !== hoverGizmo?.site) {
         hoverId = nextId;
         hoverGizmo = nextG;
         canvas.style.cursor =
@@ -401,7 +405,7 @@ export const euclid2Host: ViewHost = {
       }
       if (!drag || !frame) return;
       const dragging = drag;
-      const g = frame.gizmos.find((x) => x.index === dragging.index);
+      const g = frame.gizmos.find((x) => x.site === dragging.site);
       drag = null;
       if (!g) {
         render();
@@ -410,7 +414,7 @@ export const euclid2Host: ViewHost = {
       const now = gizmoValues(g);
       const changed = now.some((v, i) => v !== dragging.start[i]);
       if (changed) {
-        const err = await commitWidget(ctx.sceneFile, g.index, now);
+        const err = await commitWidget(ctx.sceneFile, g.at, now);
         if (err) error = err;
         else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
       }

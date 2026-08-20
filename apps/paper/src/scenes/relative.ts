@@ -1,17 +1,16 @@
-import { circle, group, line } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { circle, group, line, point } from "@design-scenes/geom";
+import { editPoint, editVector } from "@design-scenes/euclid2";
 
 export const title = "Relative";
 export const sceneFile = "relative.ts";
+export const hint = "Left is position. Coral arrow is the offset. b is derived.";
 
 /**
- * Stress: a handle whose arguments are expressions, not literals.
- *
- * `a` writes fine. `b` is declared as a.x+…, a.y+… — dragging it previews,
- * then pointer-up cannot patch the scene file (args are not numeric tokens).
+ * `a` writes position. `d` writes the offset (dx, dy). `b` is derived, not an editor.
  */
 export function scene() {
-  const a = editPoint(-2.2, 0.15);
-  const b = editPoint(a.x + 2.4, a.y + 1.05);
+  const a = editPoint(-0.1, 0.81);
+  const d = editVector(a, 1.12, 1.02);
+  const b = point(a.x + d.x, a.y + d.y);
   return group(() => [circle(a, 0.5), circle(b, 0.5), line(a, b)]);
 }

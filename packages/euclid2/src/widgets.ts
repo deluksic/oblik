@@ -2,31 +2,36 @@ import { point, type Line, type Point } from "@design-scenes/geom";
 import type { Vec2 } from "@design-scenes/geom";
 import { lerp } from "@design-scenes/geom";
 
-export type PointGizmo = {
+export type SiteOpts = {
+  id?: string;
+  at?: [number, number];
+};
+
+export type GizmoAt = { line: number; column: number };
+
+type Located = { site: string; at: GizmoAt };
+
+export type PointGizmo = Located & {
   kind: "point";
-  index: number;
   x: number;
   y: number;
 };
 
-export type DistanceGizmo = {
+export type DistanceGizmo = Located & {
   kind: "distance";
-  index: number;
   origin: Vec2;
   d: number;
 };
 
-export type GliderGizmo = {
+export type GliderGizmo = Located & {
   kind: "glider";
-  index: number;
   a: Vec2;
   b: Vec2;
   t: number;
 };
 
-export type NumberGizmo = {
+export type NumberGizmo = Located & {
   kind: "number";
-  index: number;
   n: number;
   label: string;
   min: number;
@@ -34,29 +39,39 @@ export type NumberGizmo = {
   step: number;
 };
 
-export type AngleGizmo = {
+export type AngleGizmo = Located & {
   kind: "angle";
-  index: number;
   origin: Vec2;
   /** Degrees, 0–360, CCW from +X. */
   deg: number;
   radius: number;
 };
 
-export type Gizmo = PointGizmo | DistanceGizmo | GliderGizmo | NumberGizmo | AngleGizmo;
+export type VectorGizmo = Located & {
+  kind: "vector";
+  origin: Vec2;
+  dx: number;
+  dy: number;
+};
+
+export type Gizmo =
+  | PointGizmo
+  | DistanceGizmo
+  | GliderGizmo
+  | NumberGizmo
+  | AngleGizmo
+  | VectorGizmo;
 
 const gizmos: Gizmo[] = [];
 /** Live write-back values, keyed by the 2D scene that owns them. */
-const overridesBySource = new Map<string, Map<number, number[]>>();
+const overridesBySource = new Map<string, Map<string, number[]>>();
 /** Last published frame per source — for withoutWidgets in another scene. */
-const importedBySource = new Map<string, Map<number, number[]>>();
-let nextIndex = 0;
+const importedBySource = new Map<string, Map<string, number[]>>();
 let silent = 0;
-let silentIndex = 0;
 let activeSource = "";
 let silentSource = "";
 
-function overridesOf(source: string): Map<number, number[]> {
+function overridesOf(source: string): Map<string, number[]> {
   let bag = overridesBySource.get(source);
   if (!bag) {
     bag = new Map();
@@ -65,45 +80,49 @@ function overridesOf(source: string): Map<number, number[]> {
   return bag;
 }
 
+function siteFrom(opts?: SiteOpts): Located | null {
+  if (!opts?.id || !opts.at || opts.at.length < 2) return null;
+  const line = opts.at[0];
+  const column = opts.at[1];
+  if (typeof line !== "number" || typeof column !== "number") return null;
+  return { site: opts.id, at: { line, column } };
+}
+
+function readOverride(id: string | undefined): number[] | undefined {
+  if (!id) return undefined;
+  if (silent) return importedBySource.get(silentSource)?.get(id);
+  return overridesBySource.get(activeSource)?.get(id);
+}
+
 export function beginWidgetFrame(source = ""): void {
   activeSource = source;
-  nextIndex = 0;
   gizmos.length = 0;
 }
 
 /**
- * Run edit* without gizmos or write-back indices.
- * Reads `publishWidgetOverrides(source)` from that 2D scene (e.g. plate → mill,
- * cylinder → rose, profile → rose), not the live map of the scene evaluating
- * now. Channels must match: two 2D editors otherwise collide on index 0.
+ * Run edit* without gizmos. Reads `publishWidgetOverrides(source)` from that
+ * 2D scene (e.g. plate → mill, cylinder → rose, profile → rose), not the live
+ * map of the scene evaluating now. Overlay is keyed by the compile-time UUID
+ * on each CallExpression.
  */
 export function withoutWidgets<T>(fn: () => T, source = ""): T {
   silent += 1;
-  const prevIndex = silentIndex;
   const prevSource = silentSource;
-  silentIndex = 0;
   silentSource = source;
   try {
     return fn();
   } finally {
-    silentIndex = prevIndex;
     silentSource = prevSource;
     silent -= 1;
   }
 }
 
-function takeSilentIndex(): number {
-  const i = silentIndex;
-  silentIndex += 1;
-  return i;
-}
-
 export function setWidgetOverride(
-  index: number,
+  site: string,
   values: number[],
   source?: string,
 ): void {
-  overridesOf(source ?? activeSource).set(index, values);
+  overridesOf(source ?? activeSource).set(site, values);
 }
 
 export function clearWidgetOverrides(source?: string): void {
@@ -113,7 +132,7 @@ export function clearWidgetOverrides(source?: string): void {
 /** Snapshot this source’s live widgets for silent readers (split mill, rose). */
 export function publishWidgetOverrides(source?: string): void {
   const src = source ?? activeSource;
-  const snap = new Map<number, number[]>();
+  const snap = new Map<string, number[]>();
   for (const [k, v] of overridesOf(src)) snap.set(k, [...v]);
   importedBySource.set(src, snap);
 }
@@ -123,75 +142,87 @@ export function clearImportedOverrides(source?: string): void {
   else importedBySource.delete(source);
 }
 
-function silentOverride(index: number): number[] | undefined {
-  return importedBySource.get(silentSource)?.get(index);
-}
-
-function liveOverride(index: number): number[] | undefined {
-  return overridesBySource.get(activeSource)?.get(index);
-}
-
 /** Copy of this frame’s gizmos. Callers must not keep the live array — a
  * second 2D editor’s beginWidgetFrame() clears it in place. */
 export function getGizmos(): readonly Gizmo[] {
   return gizmos.slice();
 }
 
-function takeIndex(): number {
-  const i = nextIndex;
-  nextIndex += 1;
-  return i;
-}
-
-export function editPoint(x: number, y: number): Point {
-  if (silent) {
-    const o = silentOverride(takeSilentIndex());
-    return point(o?.[0] ?? x, o?.[1] ?? y);
-  }
-  const index = takeIndex();
-  const o = liveOverride(index);
+export function editPoint(x: number, y: number, site?: SiteOpts): Point {
+  const o = readOverride(site?.id);
   const px = o?.[0] ?? x;
   const py = o?.[1] ?? y;
-  gizmos.push({ kind: "point", index, x: px, y: py });
+  const located = siteFrom(site);
+  if (!silent && located) {
+    gizmos.push({ kind: "point", ...located, x: px, y: py });
+  }
   return point(px, py);
 }
 
-export function editDistanceToPoint(origin: Vec2, d: number): number {
-  if (silent) {
-    const o = silentOverride(takeSilentIndex());
-    return o?.[0] ?? d;
-  }
-  const index = takeIndex();
-  const o = liveOverride(index);
+export function editDistanceToPoint(
+  origin: Vec2,
+  d: number,
+  site?: SiteOpts,
+): number {
+  const o = readOverride(site?.id);
   const dist = o?.[0] ?? d;
-  gizmos.push({
-    kind: "distance",
-    index,
-    origin: { x: origin.x, y: origin.y },
-    d: dist,
-  });
+  const located = siteFrom(site);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "distance",
+      ...located,
+      origin: { x: origin.x, y: origin.y },
+      d: dist,
+    });
+  }
   return dist;
 }
 
-export function editPointOnLine(lineSeg: Line, t: number): Point {
-  if (silent) {
-    const o = silentOverride(takeSilentIndex());
-    const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
-    const p = lerp(lineSeg.a, lineSeg.b, tt);
-    return point(p.x, p.y);
-  }
-  const index = takeIndex();
-  const o = liveOverride(index);
+export function editPointOnLine(
+  lineSeg: Line,
+  t: number,
+  site?: SiteOpts,
+): Point {
+  const o = readOverride(site?.id);
   const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
-  gizmos.push({
-    kind: "glider",
-    index,
-    a: lineSeg.a,
-    b: lineSeg.b,
-    t: tt,
-  });
+  const located = siteFrom(site);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "glider",
+      ...located,
+      a: lineSeg.a,
+      b: lineSeg.b,
+      t: tt,
+    });
+  }
   const p = lerp(lineSeg.a, lineSeg.b, tt);
   return point(p.x, p.y);
+}
+
+/**
+ * Offset from `origin`. Gizmo is the coral handle at origin+(dx,dy).
+ * Drag writes dx, dy; origin is geometry, not a write target.
+ */
+export function editVector(
+  origin: Vec2,
+  dx: number,
+  dy: number,
+  site?: SiteOpts,
+): Vec2 {
+  const o = readOverride(site?.id);
+  const vx = o?.[0] ?? dx;
+  const vy = o?.[1] ?? dy;
+  const located = siteFrom(site);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "vector",
+      ...located,
+      origin: { x: origin.x, y: origin.y },
+      dx: vx,
+      dy: vy,
+    });
+  }
+  return { x: vx, y: vy };
 }
 
 export function snapEditNumber(
@@ -211,35 +242,33 @@ export type NumberEditOpts = {
   min?: number;
   max?: number;
   step?: number;
-};
+} & SiteOpts;
 
 /** Screen-space titled slider. For counts and other non-spatial parameters. */
 export function editNumber(n: number, opts: NumberEditOpts): number {
   const min = opts.min ?? 0;
   const max = opts.max ?? Math.max(min + 1, n);
   const step = opts.step && opts.step > 0 ? opts.step : 1;
-  if (silent) {
-    const o = silentOverride(takeSilentIndex());
-    return snapEditNumber(o?.[0] ?? n, min, max, step);
+  const v = snapEditNumber(readOverride(opts.id)?.[0] ?? n, min, max, step);
+  const located = siteFrom(opts);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "number",
+      ...located,
+      n: v,
+      label: opts.label,
+      min,
+      max,
+      step,
+    });
   }
-  const index = takeIndex();
-  const v = snapEditNumber(liveOverride(index)?.[0] ?? n, min, max, step);
-  gizmos.push({
-    kind: "number",
-    index,
-    n: v,
-    label: opts.label,
-    min,
-    max,
-    step,
-  });
   return v;
 }
 
 export type AngleEditOpts = {
   /** Gizmo arm length. Default 1.5. */
   radius?: number;
-};
+} & SiteOpts;
 
 function wrapDeg(deg: number): number {
   let d = deg % 360;
@@ -257,20 +286,17 @@ export function editAngle(
   opts?: AngleEditOpts,
 ): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
-  if (silent) {
-    const o = silentOverride(takeSilentIndex());
-    const deg = wrapDeg(o?.[0] ?? degrees);
-    return (deg * Math.PI) / 180;
+  const deg = wrapDeg(readOverride(opts?.id)?.[0] ?? degrees);
+  const located = siteFrom(opts);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "angle",
+      ...located,
+      origin: { x: origin.x, y: origin.y },
+      deg,
+      radius,
+    });
   }
-  const index = takeIndex();
-  const deg = wrapDeg(liveOverride(index)?.[0] ?? degrees);
-  gizmos.push({
-    kind: "angle",
-    index,
-    origin: { x: origin.x, y: origin.y },
-    deg,
-    radius,
-  });
   return (deg * Math.PI) / 180;
 }
 
@@ -286,5 +312,7 @@ export function gizmoValues(g: Gizmo): number[] {
       return [g.n];
     case "angle":
       return [g.deg];
+    case "vector":
+      return [g.dx, g.dy];
   }
 }

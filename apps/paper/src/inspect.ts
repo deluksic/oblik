@@ -2,27 +2,6 @@ export function quantize(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function countEditCalls(source: string): number {
-  return source
-    .split("\n")
-    .filter((ln) =>
-      /\bedit(?:Point3|PointOnLine3|Distance3|Number|Angle|Point|DistanceToPoint|PointOnLine)\s*\(/.test(
-        ln,
-      ),
-    ).length;
-}
-
-export function widgetCountError(
-  gizmoCount: number,
-  editCount: number,
-): string | null {
-  if (editCount <= 0 || gizmoCount === editCount) return null;
-  if (gizmoCount > editCount) {
-    return `${gizmoCount} widgets at runtime but ${editCount} edit* calls in scene — unroll helpers`;
-  }
-  return `scene file has ${editCount} edit* calls but runtime still has ${gizmoCount} widgets`;
-}
-
 export function escapeHtml(s: string): string {
   return s
     .replaceAll("&", "&amp;")
@@ -63,13 +42,18 @@ export async function peekFile(
 
 export async function commitWidget(
   sceneFile: string,
-  widgetIndex: number,
+  at: { line: number; column: number },
   values: number[],
 ): Promise<string | null> {
   const res = await fetch("/__write-widget", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file: sceneFile, widgetIndex, values }),
+    body: JSON.stringify({
+      file: sceneFile,
+      line: at.line,
+      column: at.column,
+      values,
+    }),
   });
   const body = (await res.json()) as { ok?: boolean; error?: string };
   if (!res.ok || !body.ok) {
@@ -80,7 +64,12 @@ export async function commitWidget(
 
 export type InsertEdit =
   | { kind: "point"; x: number; y: number }
-  | { kind: "distance"; d: number; originName?: string; originWidget?: number };
+  | {
+      kind: "distance";
+      d: number;
+      originName?: string;
+      originAt?: { line: number; column: number };
+    };
 
 export async function commitEditors(
   sceneFile: string,

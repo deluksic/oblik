@@ -1,17 +1,9 @@
 import * as ts from "typescript";
+import { findEditCallAt } from "./patch-widget.ts";
 
 const SCENE_DRAWN = "__scene";
 
-const EDIT_NAMES = new Set([
-  "editPoint",
-  "editPoint3",
-  "editDistanceToPoint",
-  "editDistance3",
-  "editPointOnLine",
-  "editPointOnLine3",
-  "editNumber",
-  "editAngle",
-]);
+export type SourceAt = { line: number; column: number };
 
 export type EditorInsert =
   | { kind: "point"; x: number; y: number }
@@ -31,22 +23,6 @@ function parse(source: string): ts.SourceFile {
     true,
     ts.ScriptKind.TS,
   );
-}
-
-function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
-  const calls: ts.CallExpression[] = [];
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      EDIT_NAMES.has(node.expression.text)
-    ) {
-      calls.push(node);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return calls;
 }
 
 function isInNode(node: ts.Node, ancestor: ts.Node): boolean {
@@ -77,10 +53,10 @@ export function findSceneFunction(
 /** Const name if this edit* is `const foo = editPoint(...)`. */
 export function widgetBindingName(
   source: string,
-  widgetIndex: number,
+  at: SourceAt,
 ): string | null {
   const sf = parse(source);
-  const call = collectEditCalls(sf)[widgetIndex];
+  const call = findEditCallAt(sf, at.line, at.column);
   if (!call) return null;
   let n: ts.Node = call.parent;
   while (
@@ -97,11 +73,11 @@ export function widgetBindingName(
 /** True when that widget’s call sits inside exported `scene()`. */
 export function widgetInSceneFunction(
   source: string,
-  widgetIndex: number,
+  at: SourceAt,
 ): boolean {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
-  const call = collectEditCalls(sf)[widgetIndex];
+  const call = findEditCallAt(sf, at.line, at.column);
   if (!fn || !call) return false;
   return isInNode(call, fn);
 }

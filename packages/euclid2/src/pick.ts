@@ -51,6 +51,12 @@ export function hitTest(
       if (Math.abs(d - radiusPx) <= GIZMO_PX) {
         return { target: "gizmo", gizmo: g };
       }
+    } else if (g.kind === "vector") {
+      const tip = { x: g.origin.x + g.dx, y: g.origin.y + g.dy };
+      const s = worldToScreen(cam, tip, width, height);
+      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
+        return { target: "gizmo", gizmo: g };
+      }
     } else if (g.kind === "angle") {
       const rad = (g.deg * Math.PI) / 180;
       const p = {

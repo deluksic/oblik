@@ -6,9 +6,29 @@ import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader.ts";
 import type { Sdf } from "./tree.ts";
 
 type Gizmo3 =
-  | { kind: "point3"; index: number; x: number; y: number; z: number }
-  | { kind: "distance3"; index: number; origin: Vec3; d: number }
-  | { kind: "glider3"; index: number; a: Vec3; b: Vec3; t: number };
+  | {
+      kind: "point3";
+      site: string;
+      at: { line: number; column: number };
+      x: number;
+      y: number;
+      z: number;
+    }
+  | {
+      kind: "distance3";
+      site: string;
+      at: { line: number; column: number };
+      origin: Vec3;
+      d: number;
+    }
+  | {
+      kind: "glider3";
+      site: string;
+      at: { line: number; column: number };
+      a: Vec3;
+      b: Vec3;
+      t: number;
+    };
 
 const COL = {
   bg: 0x12141c,
@@ -16,7 +36,7 @@ const COL = {
 };
 
 /** Raymarch at this fraction of CSS pixels. Gizmos stay 1×. */
-const FIELD_SCALE = 0.25;
+const FIELD_SCALE = 1;
 
 export type HitSdf = { target: "gizmo"; gizmo: Gizmo3 };
 
@@ -36,7 +56,6 @@ export class SdfView {
   private blitQuad: THREE.Mesh;
   private world = new THREE.Scene();
   private gizmos = new THREE.Group();
-  private gizmoByIndex = new Map<number, Gizmo3>();
   private invVP = new THREE.Matrix4();
   private lastSig = "";
   private compiled: CompiledSdf | null = null;
@@ -153,13 +172,11 @@ export class SdfView {
     this.applyUniforms();
   }
 
-  syncGizmos(gizmos: readonly Gizmo3[], activeGizmo: number | null): void {
+  syncGizmos(gizmos: readonly Gizmo3[], activeGizmo: string | null): void {
     this.clearGroup(this.gizmos);
-    this.gizmoByIndex.clear();
     for (const g of gizmos) {
-      this.gizmoByIndex.set(g.index, g);
-      const obj = meshGizmo(g, g.index === activeGizmo);
-      obj.userData.gizmoIndex = g.index;
+      const obj = meshGizmo(g, g.site === activeGizmo);
+      obj.userData.gizmo = g;
       this.gizmos.add(obj);
     }
   }
@@ -169,10 +186,9 @@ export class SdfView {
     this.raycaster.setFromCamera(ndc, this.camera);
     const giz = this.raycaster.intersectObject(this.gizmos, true);
     for (const hit of giz) {
-      const idx = findUserData(hit.object, "gizmoIndex");
-      if (typeof idx === "number") {
-        const g = this.gizmoByIndex.get(idx);
-        if (g) return { target: "gizmo", gizmo: g };
+      const g = findUserData(hit.object, "gizmo");
+      if (g && typeof g === "object" && "kind" in (g as object)) {
+        return { target: "gizmo", gizmo: g as Gizmo3 };
       }
     }
     return null;
@@ -359,7 +375,7 @@ function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
   } else {
     group.add(...unitCircles(g.origin, Math.abs(g.d), color));
   }
-  group.userData.gizmoIndex = g.index;
+  group.userData.gizmo = g;
   return group;
 }
 
