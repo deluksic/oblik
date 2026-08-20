@@ -7,11 +7,15 @@ export type CallSite = {
 const INFRA = [
   "/packages/geom/",
   "/packages/euclid2/",
+  "/packages/euclid3/",
   "/packages/shell/",
   "/@design-scenes/geom/",
   "/@design-scenes/euclid2/",
+  "/@design-scenes/euclid3/",
   "/@design-scenes/shell/",
   "/node_modules/",
+  "/paper2d.ts",
+  "/paper3d.ts",
 ];
 
 function isInfra(file: string): boolean {

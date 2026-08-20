@@ -1,0 +1,16 @@
+{
+  "name": "@design-scenes/euclid3",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@design-scenes/geom": "workspace:*",
+    "three": "^0.172.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.172.0"
+  }
+}

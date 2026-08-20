@@ -1,72 +1,22 @@
 import type { Vec2 } from "./vec.ts";
-import { captureCallSite } from "./provenance.ts";
-
-export type Provenance = {
-  file: string;
-  line: number;
-  column: number;
-  createdBy: string;
-};
-
-type Base = {
-  /** Opaque pick identity — unique per geometric value this frame. */
-  id: string;
-  /** Human breadcrumb (group[0]/line[2]); groups namespace this, not id. */
-  path: string;
-  parentId: string | null;
-  provenance: Provenance;
-};
+import { makeBase, type Base, type Group } from "./identity.ts";
+import type { Geom3 } from "./geom3.ts";
 
 export type Point = Base & { kind: "point"; x: number; y: number };
 export type Line = Base & { kind: "line"; a: Point; b: Point };
 export type Circle = Base & { kind: "circle"; center: Point; radius: number };
 export type Polyline = Base & { kind: "polyline"; points: Point[] };
-export type Group = Base & { kind: "group"; children: Geom[] };
-export type Geom = Point | Line | Circle | Polyline | Group;
 
-const pathCounts = new Map<string, number>();
-let currentParentPath: string | null = null;
-let currentParentId: string | null = null;
-
-export function beginGeomFrame(): void {
-  pathCounts.clear();
-  currentParentPath = null;
-  currentParentId = null;
-}
-
-function nextPathLocal(kind: string): string {
-  const key = `${currentParentPath ?? ""}::${kind}`;
-  const n = pathCounts.get(key) ?? 0;
-  pathCounts.set(key, n + 1);
-  return `${kind}[${n}]`;
-}
-
-function makePath(local: string): string {
-  return currentParentPath ? `${currentParentPath}/${local}` : local;
-}
-
-function captureProvenance(createdBy: string): Provenance {
-  const site = captureCallSite();
-  return { ...site, createdBy };
-}
-
-function base(kind: string, createdBy: string): Base {
-  const local = nextPathLocal(kind);
-  return {
-    id: crypto.randomUUID(),
-    path: makePath(local),
-    parentId: currentParentId,
-    provenance: captureProvenance(createdBy),
-  };
-}
+export type Geom2 = Point | Line | Circle | Polyline;
+export type Geom = Geom2 | Geom3 | Group;
 
 export function point(x: number, y: number): Point {
-  return { ...base("point", "point"), kind: "point", x, y };
+  return { ...makeBase("point", "point"), kind: "point", x, y };
 }
 
 export function line(a: Vec2, b: Vec2): Line {
   return {
-    ...base("line", "line"),
+    ...makeBase("line", "line"),
     kind: "line",
     a: point(a.x, a.y),
     b: point(b.x, b.y),
@@ -75,7 +25,7 @@ export function line(a: Vec2, b: Vec2): Line {
 
 export function circle(center: Vec2, radius: number): Circle {
   return {
-    ...base("circle", "circle"),
+    ...makeBase("circle", "circle"),
     kind: "circle",
     center: point(center.x, center.y),
     radius,
@@ -84,33 +34,10 @@ export function circle(center: Vec2, radius: number): Circle {
 
 export function polyline(points: Vec2[]): Polyline {
   return {
-    ...base("polyline", "polyline"),
+    ...makeBase("polyline", "polyline"),
     kind: "polyline",
     points: points.map((p) => point(p.x, p.y)),
   };
-}
-
-/** Optional path namespace. Does not affect pick identity. */
-export function group(fn: () => Geom[]): Group {
-  const local = nextPathLocal("group");
-  const path = makePath(local);
-  const id = crypto.randomUUID();
-  const node: Group = {
-    id,
-    path,
-    parentId: currentParentId,
-    provenance: captureProvenance("group"),
-    kind: "group",
-    children: [],
-  };
-  const prevPath = currentParentPath;
-  const prevId = currentParentId;
-  currentParentPath = path;
-  currentParentId = id;
-  node.children = fn();
-  currentParentPath = prevPath;
-  currentParentId = prevId;
-  return node;
 }
 
 export type Drawable =
@@ -119,35 +46,67 @@ export type Drawable =
   | { geom: Circle }
   | { geom: Polyline };
 
+export type Drawable3 = { geom: Geom3 };
+
+function walk(g: Geom, visit2: (s: Geom2) => void, visit3: (s: Geom3) => void) {
+  if (g.kind === "group") {
+    for (const c of g.children) walk(c as Geom, visit2, visit3);
+    return;
+  }
+  if (
+    g.kind === "point3" ||
+    g.kind === "line3" ||
+    g.kind === "circle3" ||
+    g.kind === "box3" ||
+    g.kind === "cylinder3"
+  ) {
+    visit3(g);
+    return;
+  }
+  visit2(g);
+}
+
 export function flatten(geom: Geom | Geom[]): Drawable[] {
   const out: Drawable[] = [];
-  const walk = (g: Geom) => {
-    switch (g.kind) {
-      case "group":
-        for (const c of g.children) walk(c);
-        break;
-      case "point":
-        out.push({ geom: g });
-        break;
-      case "line":
-        out.push({ geom: g });
-        break;
-      case "circle":
-        out.push({ geom: g });
-        break;
-      case "polyline":
-        out.push({ geom: g });
-        break;
-    }
-  };
+  const visit = (g: Geom) =>
+    walk(
+      g,
+      (s) => {
+        switch (s.kind) {
+          case "point":
+            out.push({ geom: s });
+            break;
+          case "line":
+            out.push({ geom: s });
+            break;
+          case "circle":
+            out.push({ geom: s });
+            break;
+          case "polyline":
+            out.push({ geom: s });
+            break;
+        }
+      },
+      () => {},
+    );
   if (Array.isArray(geom)) {
-    for (const g of geom) walk(g);
+    for (const g of geom) visit(g);
   } else {
-    walk(geom);
+    visit(geom);
   }
   return out;
 }
 
-export function breadcrumb(path: string): string {
-  return path.replaceAll("/", " › ");
+export function flatten3(geom: Geom | Geom[]): Drawable3[] {
+  const out: Drawable3[] = [];
+  const visit = (g: Geom) =>
+    walk(g, () => {}, (s) => {
+      out.push({ geom: s });
+    });
+  if (Array.isArray(geom)) {
+    for (const g of geom) visit(g);
+  } else {
+    visit(geom);
+  }
+  return out;
 }

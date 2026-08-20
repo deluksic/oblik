@@ -29,19 +29,19 @@ export function scene() {
   const max = editPoint(5.8, 3.5);
   const edges = stockEdges(min, max);
 
-  const h0 = editPoint(-4.2, -2.1);
-  const h1 = editPoint(4.5, -2.0);
+  const h0 = editPoint(-4.29, -1.86);
+  const h1 = editPoint(4.46, -2.13);
   const h2 = editPoint(4.4, 2.3);
   const h3 = editPoint(-4.3, 2.2);
-  const drillR = editDistanceToPoint(h0, 0.38);
+  const drillR = editDistanceToPoint(h0, 1.82);
 
-  const pocketMin = editPoint(-1.8, -0.9);
-  const pocketMax = editPoint(1.9, 1.1);
-  const filletR = editDistanceToPoint(pocketMin, 0.42);
+  const pocketMin = editPoint(-1.99, -1.43);
+  const pocketMax = editPoint(2.02, 1.03);
+  const filletR = editDistanceToPoint(pocketMin, 0.32);
 
   const slotCenter = editPointOnLine(edges.top, 0.52);
-  const slotLen = editDistanceToPoint(slotCenter, 2.1);
-  const slotW = editDistanceToPoint(slotCenter, 0.35);
+  const slotLen = editDistanceToPoint(slotCenter, 3.02);
+  const slotW = editDistanceToPoint(slotCenter, 0.5);
 
   return drawPlate({
     stock: { min, max },

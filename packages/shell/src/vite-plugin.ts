@@ -6,8 +6,11 @@ import type { Plugin } from "vite";
 
 const EDIT_NAMES = new Set([
   "editPoint",
+  "editPoint3",
   "editDistanceToPoint",
+  "editDistance3",
   "editPointOnLine",
+  "editPointOnLine3",
 ]);
 
 export type SceneDevOptions = {
@@ -136,20 +139,22 @@ function patchWidget(
   const name = (call.expression as ts.Identifier).text;
   const spans: { start: number; end: number; text: string }[] = [];
 
-  if (name === "editPoint") {
-    const x = call.arguments[0];
-    const y = call.arguments[1];
-    if (!x || !y) throw new Error("editPoint expects two arguments");
-    const sx = numericSpan(sourceFile, x);
-    const sy = numericSpan(sourceFile, y);
-    if (!sx || !sy) {
-      throw new Error("editPoint args are not numeric literals");
+  if (name === "editPoint" || name === "editPoint3") {
+    const needed = name === "editPoint3" ? 3 : 2;
+    if (call.arguments.length < needed) {
+      throw new Error(`${name} expects ${needed} arguments`);
     }
-    if (values[0] === undefined || values[1] === undefined) {
-      throw new Error("editPoint write needs two values");
+    if (values.length < needed) {
+      throw new Error(`${name} write needs ${needed} values`);
     }
-    spans.push({ ...sx, text: formatNum(values[0]) });
-    spans.push({ ...sy, text: formatNum(values[1]) });
+    for (let i = 0; i < needed; i++) {
+      const arg = call.arguments[i];
+      const v = values[i];
+      if (!arg || v === undefined) throw new Error(`${name} missing argument ${i}`);
+      const span = numericSpan(sourceFile, arg);
+      if (!span) throw new Error(`${name} args are not numeric literals`);
+      spans.push({ ...span, text: formatNum(v) });
+    }
   } else {
     const last = call.arguments[call.arguments.length - 1];
     if (!last) throw new Error(`${name} missing argument`);

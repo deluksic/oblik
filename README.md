@@ -20,6 +20,7 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 - [?scene=flat](http://127.0.0.1:43117/?scene=flat) — two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.
 - [?scene=shared](http://127.0.0.1:43117/?scene=shared) — **one** `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release.
 - [?scene=plate](http://127.0.0.1:43117/?scene=plate) — milled plate: stock corners, four bolt holes (shared drill Ø), pocket + fillet, slot on top edge. Demo **loops** hole geometry; inspector jumps to the loop line for every hole.
+- [?scene=mill](http://127.0.0.1:43117/?scene=mill) — **3D** mill block (Three.js, Z-up). Same identity/widgets/write-back. Orbit with LMB; drag coral handles; one drill Ø drives four through-holes.
 
 ## Try
 

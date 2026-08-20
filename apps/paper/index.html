@@ -20,13 +20,18 @@
             <a href="?scene=shared" data-scene="shared">Shared radius</a>
             <span aria-hidden="true">·</span>
             <a href="?scene=plate" data-scene="plate">Milled plate</a>
+            <span aria-hidden="true">·</span>
+            <a href="?scene=mill" data-scene="mill">Mill 3D</a>
           </nav>
         </div>
         <p id="status">Loading scene…</p>
       </header>
       <p id="error" hidden></p>
       <div id="workspace">
-        <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
+        <div id="viewport">
+          <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
+          <canvas id="space" hidden tabindex="0" aria-label="3D mill block"></canvas>
+        </div>
         <aside id="inspect">
           <p class="kicker">Identity</p>
           <h2 id="crumb">Nothing selected</h2>

@@ -54,12 +54,13 @@ export const shape = ringProfile({ inner: r, seam: t, origin: A });
 ```
 lib/          pure domain code (rings, fields, images, …)
 scenes/       programs that import libs and widgets
-euclid2/      a scene type: renderer, pick, widget library
+euclid2/      2D scene type: renderer, pick, widget library
+euclid3/      3D scene type: Three.js view + editPoint3 / editDistance3
 <other type>  another package with its own widgets + view
 shell/        run a scene module, show one preview, apply text edits
 ```
 
-The long-term analog of LSP is a small **artifact / pick protocol**: what this module exported, which edit sites it declared, what `pick(x,y)` hit. Scene types subscribe. Until that protocol is forced by a second view, keep it implicit in one 2D implementation.
+The long-term analog of LSP is a small **artifact / pick protocol**: what this module exported, which edit sites it declared, what `pick(x,y)` hit. Scene types subscribe. euclid2 and euclid3 are two views of that idea; a later TypeGPU field view would be a third.
 
 Repo layout: [LAYOUT.md](./LAYOUT.md).
 

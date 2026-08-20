@@ -15,6 +15,7 @@ export type Frame = {
 export type SceneModule = {
   scene: () => Geom | Geom[];
   sceneFile: string;
+  view?: "euclid2";
 };
 
 export function runScene(mod: SceneModule): Frame {
