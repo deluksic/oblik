@@ -16,15 +16,21 @@ import {
 
 export type Ring = { post: Vec2; radius: number };
 
-function buildBeamParts(opts: { span: Line; rings: Ring[] }): Geom[] {
+function buildBeamParts(opts: {
+  span: Line;
+  rings: Ring[];
+  /** Roof height. Defaults to the middle ring’s radius. */
+  hubRadius?: number;
+}): Geom[] {
   const a = opts.span.a;
   const b = opts.span.b;
   const dir = sub(b, a);
   const normal = norm(perp(dir));
   const hub = opts.rings[Math.floor(opts.rings.length / 2)] ?? opts.rings[0];
+  const hubR = opts.hubRadius ?? hub?.radius ?? 1;
   const peak = hub
-    ? add(hub.post, mul(normal, hub.radius))
-    : add(a, mul(normal, 1));
+    ? add(hub.post, mul(normal, hubR))
+    : add(a, mul(normal, hubR));
 
   const parts: Geom[] = [opts.span, polyline([a, peak, b])];
 
@@ -44,11 +50,19 @@ function buildBeamParts(opts: { span: Line; rings: Ring[] }): Geom[] {
 }
 
 /** Same shapes as assembleBeam, without a group path prefix. */
-export function assembleBeamFlat(opts: { span: Line; rings: Ring[] }): Geom[] {
+export function assembleBeamFlat(opts: {
+  span: Line;
+  rings: Ring[];
+  hubRadius?: number;
+}): Geom[] {
   return buildBeamParts(opts);
 }
 
 /** Span, roof, circles, ticks — paths namespaced under group[0]. */
-export function assembleBeam(opts: { span: Line; rings: Ring[] }): Geom {
+export function assembleBeam(opts: {
+  span: Line;
+  rings: Ring[];
+  hubRadius?: number;
+}): Geom {
   return group(() => buildBeamParts(opts));
 }

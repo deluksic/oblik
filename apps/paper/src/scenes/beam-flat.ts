@@ -11,14 +11,14 @@ export const sceneFile = "beam-flat.ts";
 /** Two trusses, no group — each handle is its own unrolled edit*. */
 export function scene() {
   const aTop = editPoint(-4.72, 0.37);
-  const bTop = editPoint(6.04, -1.86);
+  const bTop = editPoint(5.89, 1.09);
   const spanTop = line(aTop, bTop);
   const p0Top = editPointOnLine(spanTop, 0.25);
-  const r0Top = editDistanceToPoint(p0Top, 3.91);
+  const r0Top = editDistanceToPoint(p0Top, 1.18);
   const p1Top = editPointOnLine(spanTop, 0.5);
-  const r1Top = editDistanceToPoint(p1Top, 0.34);
+  const r1Top = editDistanceToPoint(p1Top, 2.59);
   const p2Top = editPointOnLine(spanTop, 0.75);
-  const r2Top = editDistanceToPoint(p2Top, 1.19);
+  const r2Top = editDistanceToPoint(p2Top, 1.33);
   const top = assembleBeamFlat({
     span: spanTop,
     rings: [
@@ -29,14 +29,14 @@ export function scene() {
   });
 
   const aBot = editPoint(9.56, 4.22);
-  const bBot = editPoint(-5.7, 5.92);
+  const bBot = editPoint(-1.26, 6.95);
   const spanBot = line(aBot, bBot);
   const p0Bot = editPointOnLine(spanBot, 0.3);
-  const r0Bot = editDistanceToPoint(p0Bot, 1.1);
+  const r0Bot = editDistanceToPoint(p0Bot, 1.24);
   const p1Bot = editPointOnLine(spanBot, 0.55);
-  const r1Bot = editDistanceToPoint(p1Bot, 1.5);
+  const r1Bot = editDistanceToPoint(p1Bot, 1.62);
   const p2Bot = editPointOnLine(spanBot, 0.8);
-  const r2Bot = editDistanceToPoint(p2Bot, 1.04);
+  const r2Bot = editDistanceToPoint(p2Bot, 1);
   const bottom = assembleBeamFlat({
     span: spanBot,
     rings: [

@@ -6,27 +6,26 @@ import {
   editPointOnLine,
 } from "@design-scenes/euclid2";
 
-export const sceneFile = "beam.ts";
+export const sceneFile = "beam-shared.ts";
 
+/** One radius literal feeds every ring and the roof hub. */
 export function scene() {
   const a = editPoint(-6.32, -1.23);
   const b = editPoint(4.73, 2.5);
   const span = line(a, b);
 
   const p0 = editPointOnLine(span, 0.25);
-  const r0 = editDistanceToPoint(p0, 1.29);
   const p1 = editPointOnLine(span, 0.5);
-  const r1 = editDistanceToPoint(p1, 1.54);
   const p2 = editPointOnLine(span, 0.75);
-  const r2 = editDistanceToPoint(p2, 1.17);
+  const r = editDistanceToPoint(p1, 1.54);
 
   return assembleBeam({
     span,
-    hubRadius: r1,
+    hubRadius: r,
     rings: [
-      { post: p0, radius: r0 },
-      { post: p1, radius: r1 },
-      { post: p2, radius: r2 },
+      { post: p0, radius: r },
+      { post: p1, radius: r },
+      { post: p2, radius: r },
     ],
   });
 }

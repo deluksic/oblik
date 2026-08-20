@@ -16,8 +16,9 @@ pnpm dev
 
 Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 
-- [?scene=beam](http://127.0.0.1:43117/?scene=beam) — one truss; `group()` namespaces **paths** (`group[0] › line[2]`).
+- [?scene=beam](http://127.0.0.1:43117/?scene=beam) — one truss; `group()` namespaces **paths** (`group[0] › line[2]`). The roof uses the middle ring’s `r1`.
 - [?scene=flat](http://127.0.0.1:43117/?scene=flat) — two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.
+- [?scene=shared](http://127.0.0.1:43117/?scene=shared) — **one** `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release.
 
 ## Try
 

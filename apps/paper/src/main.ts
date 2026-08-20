@@ -18,10 +18,12 @@ import {
 } from "@design-scenes/euclid2";
 import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
+import * as beamShared from "./scenes/beam-shared.ts";
 
 const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   beam: { mod: beam, title: "Beam truss (grouped paths)" },
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
+  shared: { mod: beamShared, title: "Shared radius (one literal)" },
 };
 
 const sceneKey = new URLSearchParams(location.search).get("scene") ?? "beam";
@@ -124,7 +126,9 @@ function render(): void {
     ? "Last good frame · scene threw"
     : sceneKey === "flat"
       ? "Flat paths: ticks share mark/beam.ts — each geom has a unique id"
-      : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
+      : sceneKey === "shared"
+        ? "One dashed radius — all three rings and the roof follow it while you drag"
+        : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
   void updateInspect();
@@ -162,7 +166,9 @@ async function updateInspect(): Promise<void> {
     metaEl.textContent =
       sceneKey === "flat"
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
-        : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
+        : sceneKey === "shared"
+          ? "One coral radius around the middle post. Library circles on the other posts are not handles."
+          : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
   }
@@ -380,6 +386,10 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/beam-flat.ts", (mod) => {
     if (!mod || !("scene" in mod) || sceneKey !== "flat") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/beam-shared.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "shared") return;
     reloadScene(mod as unknown as SceneModule);
   });
 }
