@@ -5,6 +5,7 @@ TypeScript libraries stay pure. **Scenes** attach 2D widgets (`editPoint`, `edit
 - Intent: [PLAN.md](./PLAN.md)
 - Prototype 1 charter: [PROTOTYPE_1.md](./PROTOTYPE_1.md)
 - What P1 proved: [PROTOTYPE_1_CONCLUSIONS.md](./PROTOTYPE_1_CONCLUSIONS.md)
+- Next: [PROTOTYPE_2.md](./PROTOTYPE_2.md) — scene catalog and shell layouts
 - Repo layout: [LAYOUT.md](./LAYOUT.md)
 
 ## Run
