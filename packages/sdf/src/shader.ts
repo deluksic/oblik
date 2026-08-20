@@ -36,6 +36,11 @@ float sdBox(vec3 p, vec3 b) {
   return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
+float sdCappedCylinder(vec3 p, float h, float r) {
+  vec2 d = abs(vec2(length(p.xy), p.z)) - vec2(r, h);
+  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
   vec3 pa = p - a, ba = b - a;
   float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);

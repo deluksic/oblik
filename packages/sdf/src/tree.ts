@@ -4,6 +4,7 @@ import type { Vec3 } from "@design-scenes/geom";
 export type Sdf =
   | { k: "sphere"; c: Vec3; r: number }
   | { k: "box"; c: Vec3; half: Vec3 }
+  | { k: "cylinder"; c: Vec3; r: number; halfH: number }
   | { k: "capsule"; a: Vec3; b: Vec3; r: number }
   | { k: "torus"; c: Vec3; R: number; r: number }
   | { k: "union"; a: Sdf; b: Sdf }
@@ -17,6 +18,11 @@ export function sphere(c: Vec3, r: number): Sdf {
 
 export function box(c: Vec3, half: Vec3): Sdf {
   return { k: "box", c, half };
+}
+
+/** Z-up capped cylinder. `halfH` is half the height along Z. */
+export function cylinder(c: Vec3, r: number, halfH: number): Sdf {
+  return { k: "cylinder", c, r: Math.abs(r), halfH: Math.abs(halfH) };
 }
 
 /** Capped round cylinder (capsule) from `a` to `b`. */

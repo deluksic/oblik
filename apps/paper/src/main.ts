@@ -126,8 +126,8 @@ if (sceneKey === "split") {
   document.body.classList.add("view-3d");
   paper.hidden = true;
   space.hidden = false;
-  titleEl.textContent = "Rose window (SDF)";
-  document.title = "sdf — Rose window";
+  titleEl.textContent = "Cylinder (SDF)";
+  document.title = "sdf — Cylinder";
   statusEl.textContent = "Loading field view…";
   void import("./papersdf.ts")
     .then((m) => {

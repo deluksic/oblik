@@ -41,6 +41,12 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
         const h = u("v3", [s.half.x, s.half.y, s.half.z]);
         return `sdBox(p - ${c}, ${h})`;
       }
+      case "cylinder": {
+        const c = u("v3", [s.c.x, s.c.y, s.c.z]);
+        const r = u("f", s.r);
+        const h = u("f", s.halfH);
+        return `sdCappedCylinder(p - ${c}, ${h}, ${r})`;
+      }
       case "capsule": {
         const a = u("v3", [s.a.x, s.a.y, s.a.z]);
         const b = u("v3", [s.b.x, s.b.y, s.b.z]);

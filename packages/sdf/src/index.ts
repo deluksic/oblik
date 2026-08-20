@@ -2,6 +2,7 @@ export type { Sdf } from "./tree.ts";
 export {
   sphere,
   box,
+  cylinder,
   capsule,
   torus,
   union,

@@ -1,78 +1,45 @@
 import type { Vec3 } from "@design-scenes/geom";
 import {
-  capsule,
+  cylinder,
   difference,
-  smoothUnionAll,
-  torus,
-  union,
+  sphere,
+  unionAll,
   type Sdf,
 } from "@design-scenes/sdf";
 
-export type RoseSdfOpts = {
+export type DimpledCylinderOpts = {
   center: Vec3;
-  roseR: number;
-  holeR: number;
-  thickness: number;
-  /** Lobe count. */
+  radius: number;
+  height: number;
+  ballR: number;
+  /** Balls around the waist. */
   count: number;
-  moldR: number;
 };
 
-function punch(c: Vec3, r: number, z0: number, z1: number): Sdf {
-  return capsule({ x: c.x, y: c.y, z: z0 }, { x: c.x, y: c.y, z: z1 }, r);
-}
-
-/** Four overlapping bores — a quatrefoil as CSG, not a polyline. */
-export function quatrefoil(
-  c: Vec3,
-  r: number,
-  z0: number,
-  z1: number,
-): Sdf {
-  const o = r * 0.52;
-  const k = r * 0.22;
-  return smoothUnionAll(
-    [
-      punch({ x: c.x + o, y: c.y, z: c.z }, r, z0, z1),
-      punch({ x: c.x - o, y: c.y, z: c.z }, r, z0, z1),
-      punch({ x: c.x, y: c.y + o, z: c.z }, r, z0, z1),
-      punch({ x: c.x, y: c.y - o, z: c.z }, r, z0, z1),
-    ],
-    k,
-  );
-}
-
 /**
- * Disk of stone, six quatrefoil lights, torus molding.
+ * Solid Z-up cylinder minus `count` spheres whose centres sit on the barrel.
  * `count` is a loop in this library — change it in the scene literal.
  */
-export function roseStone(opts: RoseSdfOpts): Sdf {
+export function dimpledCylinder(opts: DimpledCylinderOpts): Sdf {
   const c = opts.center;
-  const R = Math.max(0.6, opts.roseR);
-  const h = Math.max(0.25, opts.thickness);
-  const z0 = c.z - h / 2;
-  const z1 = c.z + h / 2;
-  const wall = punch(c, R, z0, z1);
-  const n = Math.max(3, Math.round(opts.count));
-  const cellR = Math.max(0.15, opts.holeR);
-  const ring = R * 0.52;
-  const over = h * 0.35;
-  let holes: Sdf | null = null;
+  const R = Math.max(0.4, opts.radius);
+  const halfH = Math.max(0.25, opts.height) / 2;
+  const ballR = Math.max(0.08, opts.ballR);
+  const n = Math.max(1, Math.round(opts.count));
+  const body = cylinder(c, R, halfH);
+  const balls: Sdf[] = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-    const cell = quatrefoil(
-      {
-        x: c.x + Math.cos(a) * ring,
-        y: c.y + Math.sin(a) * ring,
-        z: c.z,
-      },
-      cellR,
-      z0 - over,
-      z1 + over,
+    balls.push(
+      sphere(
+        {
+          x: c.x + Math.cos(a) * R,
+          y: c.y + Math.sin(a) * R,
+          z: c.z,
+        },
+        ballR,
+      ),
     );
-    holes = holes ? union(holes, cell) : cell;
   }
-  const stone = holes ? difference(wall, holes) : wall;
-  const mold = torus(c, R, Math.max(0.06, opts.moldR));
-  return union(stone, mold);
+  return difference(body, unionAll(balls));
 }

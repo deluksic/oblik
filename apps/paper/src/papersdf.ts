@@ -73,7 +73,7 @@ export function startPaperSdf(els: InspectEls): PaperSdfHandle {
     if (quiet && !error) return;
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
-      : "SDF CSG — no pick on the field. Coral handles: centre, rose Ø, hole Ø, thickness. LMB orbit";
+      : "SDF CSG — cylinder minus 7 balls on the barrel. Coral handles: centre, radius, ball Ø, height. LMB orbit";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     if (hoverGizmo) {
@@ -84,7 +84,7 @@ export function startPaperSdf(els: InspectEls): PaperSdfHandle {
     } else {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent =
-        "Union / difference live in demo/rose-sdf.ts. Click a coral handle — the stone itself is not pickable.";
+        "Cylinder minus a polar loop of spheres, in demo/rose-sdf.ts. Click a coral handle — the field itself is not pickable.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
   }

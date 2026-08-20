@@ -16,7 +16,7 @@ const COL = {
 };
 
 /** Raymarch at this fraction of CSS pixels. Gizmos stay 1×. */
-const FIELD_SCALE = 0.5;
+const FIELD_SCALE = 0.25;
 
 export type HitSdf = { target: "gizmo"; gizmo: Gizmo3 };
 
@@ -52,9 +52,9 @@ export class SdfView {
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
     this.camera.up.set(0, 0, 1);
-    this.camera.position.set(10, -14, 8);
+    this.camera.position.set(9, -14, 7);
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, 0, 1.4);
+    this.controls.target.set(0, 0, 1.7);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.mouseButtons = {
