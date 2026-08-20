@@ -40,7 +40,7 @@ export function plateLayout() {
   const bc = editPoint(0.12, -0.08);
   const pcd = editDistanceToPoint(bc, 0.77);
   const tapR = editDistanceToPoint(bc, 0.2);
-  const ringN = editNumber(5, {
+  const ringN = editNumber(7, {
     label: "Hole count",
     min: 3,
     max: 12,
@@ -66,7 +66,7 @@ export function plateLayout() {
     ],
     pocket: { min: pocketMin, max: pocketMax, filletR },
     slot: { center: slotCenter, length: slotLen, width: slotW },
-    boltCircle: { center: bc, radius: pcd, count: ringN },
+    boltCircle: { center: bc, radius: pcd, count: ringN, holeR: tapR },
   };
 }
 

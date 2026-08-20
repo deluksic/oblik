@@ -20,6 +20,7 @@ import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
 import * as beamShared from "./scenes/beam-shared.ts";
 import * as plate from "./scenes/plate.ts";
+import * as nest from "./scenes/nest.ts";
 import * as relative from "./scenes/relative.ts";
 
 export type StartPaper2dOpts = {
@@ -34,6 +35,7 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
   shared: { mod: beamShared, title: "Shared radius (one literal)" },
   plate: { mod: plate, title: "Milled plate" },
+  nest: { mod: nest, title: "Print nest (grid of plates)" },
   relative: { mod: relative, title: "Relative handle (write-back stress)" },
 };
 
@@ -64,7 +66,8 @@ let sceneMod: SceneModule = active.mod;
 let frame: Frame | null = null;
 let lastGood: Frame | null = null;
 let error: string | null = null;
-let cam: Camera = defaultCamera();
+let cam: Camera =
+  sceneKey === "nest" ? { x: 0, y: 0, scale: 18 } : defaultCamera();
 let hoverId: string | null = null;
 let selectedId: string | null = null;
 let hoverGizmo: Gizmo | null = null;
@@ -154,6 +157,8 @@ function render(): void {
         ? "One dashed radius — all three rings and the roof follow it while you drag"
         : sceneKey === "plate"
           ? "Plate: corner bolts, polar array, titled hole-count slider, pocket, slot · wheel zooms"
+          : sceneKey === "nest"
+            ? "Same plate, instanced. Columns step hole count. Sliders: columns, rows, gap"
           : sceneKey === "relative"
             ? "Drag the left point: it writes. Drag the right: preview works, write-back cannot patch expressions"
           : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
@@ -200,7 +205,9 @@ async function updateInspect(): Promise<void> {
           ? "One coral radius around the middle post. Library circles on the other posts are not handles."
           : sceneKey === "plate"
             ? "Drag corner bolts, the polar array, the Hole count slider, pocket, or slot."
-            : sceneKey === "relative"
+            : sceneKey === "nest"
+              ? "Each cell is drawPlate(plateLayout()). Hole count increases left → right. Pick any copy — ids differ, provenance is the same library line."
+              : sceneKey === "relative"
               ? "Right handle is editPoint(a.x + …, a.y + …). Source is the truth only when args are numeric literals."
               : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
@@ -448,7 +455,18 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/plate.ts", (mod) => {
     if (!mod || !("scene" in mod)) return;
-    if (sceneKey !== "plate" && !opts.split) return;
+    if (sceneKey === "plate" || opts.split) {
+      reloadScene(mod as unknown as SceneModule);
+      return;
+    }
+    if (sceneKey === "nest") {
+      peekCache.clear();
+      evaluate();
+      render();
+    }
+  });
+  import.meta.hot.accept("./scenes/nest.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "nest") return;
     reloadScene(mod as unknown as SceneModule);
   });
   import.meta.hot.accept("./scenes/relative.ts", (mod) => {

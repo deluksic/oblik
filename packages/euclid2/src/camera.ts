@@ -42,7 +42,7 @@ export function zoomAt(
   factor: number,
 ): Camera {
   const before = screenToWorld(cam, screen, width, height);
-  const scale = Math.min(280, Math.max(16, cam.scale * factor));
+  const scale = Math.min(280, Math.max(8, cam.scale * factor));
   const next = { ...cam, scale };
   const after = screenToWorld(next, screen, width, height);
   return {
