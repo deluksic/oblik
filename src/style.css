@@ -1,0 +1,162 @@
+:root {
+  color-scheme: dark;
+  --bg: #0e1016;
+  --panel: #171a22;
+  --stroke: #2a3040;
+  --text: #ece8de;
+  --muted: #9a9488;
+  --accent: #e8876a;
+  --warn: #f0c14a;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+  padding: 0.9rem 1.1rem 0.7rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 1.15rem;
+}
+
+h2 {
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.kicker {
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--accent);
+}
+
+#status {
+  margin: 0;
+  max-width: 22rem;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+#error {
+  margin: 0;
+  padding: 0.45rem 1.1rem;
+  background: #3a2418;
+  color: #ffd0b8;
+  font-size: 0.85rem;
+}
+
+#workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr minmax(16rem, 22rem);
+}
+
+#paper {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+#inspect {
+  border-left: 1px solid var(--stroke);
+  background: var(--panel);
+  padding: 1rem 1rem 1.2rem;
+  overflow: auto;
+}
+
+#meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.35rem 0 1rem;
+}
+
+#source {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  background: #10131a;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  overflow: auto;
+}
+
+#source .empty {
+  display: block;
+  padding: 0.8rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+#source .ln {
+  display: inline-block;
+  width: 2.6rem;
+  color: #5c6370;
+  user-select: none;
+}
+
+#source .hl {
+  background: #2a2418;
+  color: var(--warn);
+}
+
+#source div {
+  padding: 0 0.6rem;
+  white-space: pre;
+}
+
+@media (max-width: 800px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #status {
+    text-align: left;
+  }
+
+  #workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 42%;
+  }
+
+  #inspect {
+    border-left: none;
+    border-top: 1px solid var(--stroke);
+  }
+}

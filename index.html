@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>euclid2 — beam scene</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div>
+          <p class="kicker">Prototype 1</p>
+          <h1>Beam truss</h1>
+        </div>
+        <p id="status">Loading scene…</p>
+      </header>
+      <p id="error" hidden></p>
+      <div id="workspace">
+        <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
+        <aside id="inspect">
+          <p class="kicker">Identity</p>
+          <h2 id="crumb">Nothing selected</h2>
+          <p id="meta"></p>
+          <p class="kicker">Creation site</p>
+          <div id="source"></div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
