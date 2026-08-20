@@ -26,9 +26,18 @@ export type InspectEls = {
   errorEl: HTMLElement;
 };
 
+export type CommandSpec = {
+  id: string;
+  title: string;
+  hint: string;
+};
+
 export type PaneHandle = {
   refresh: (opts?: { quiet?: boolean }) => void;
   dispose: () => void;
+  commands?: () => CommandSpec[];
+  runCommand?: (id: string) => void;
+  cancelCommand?: () => void;
 };
 
 export type PaneContext = {

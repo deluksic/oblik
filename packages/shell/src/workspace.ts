@@ -2,6 +2,7 @@ import {
   paneIdsFromAreas,
   stackedAreas,
 } from "./layout-grid.ts";
+import { mountCommandPalette } from "./palette.ts";
 import type { SceneEntry, SceneLayout } from "./types.ts";
 import type {
   InspectEls,
@@ -334,4 +335,53 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       mounted.push({ id, handle: null });
     }
   }
+
+  const palette = mountCommandPalette({
+    root: viewportRoot,
+    getCommands: () => {
+      const h = mounted.find((p) => p.id === focused)?.handle;
+      return h?.commands?.() ?? [];
+    },
+    onPick: (id) => {
+      const pane = mounted.find((p) => p.id === focused);
+      pane?.handle?.runCommand?.(id);
+      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
+        `.view-pane[data-scene="${focused}"] canvas`,
+      );
+      canvas?.focus();
+    },
+    onClose: () => {
+      const canvas = viewportRoot.querySelector<HTMLCanvasElement>(
+        `.view-pane[data-scene="${focused}"] canvas`,
+      );
+      canvas?.focus();
+    },
+  });
+
+  const onKey = (e: KeyboardEvent) => {
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+    if (e.key === "Escape") {
+      if (palette.isOpen()) return;
+      mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
+      return;
+    }
+    if (e.key !== " " || e.repeat || palette.isOpen()) return;
+    e.preventDefault();
+    const h = mounted.find((p) => p.id === focused)?.handle;
+    const cmds = h?.commands?.() ?? [];
+    if (cmds.length === 0) {
+      inspect.statusEl.textContent =
+        "Space adds coral editors on 2D paper. This view has none yet.";
+      return;
+    }
+    palette.open();
+  };
+  window.addEventListener("keydown", onKey);
 }

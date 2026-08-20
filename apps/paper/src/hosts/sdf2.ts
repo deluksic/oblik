@@ -17,12 +17,20 @@ import {
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
+  commitEditors,
   commitWidget,
   countEditCalls,
   peekFile,
   quantize,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
+import {
+  drawEditorGhost,
+  EDITOR_COMMANDS,
+  editorStatus,
+  radiusBetween,
+  type EditorTool,
+} from "./editors.ts";
 
 type SceneMod = {
   view: "sdf2";
@@ -85,6 +93,8 @@ export const sdf2Host: ViewHost = {
     let hoverGizmo: Gizmo | null = null;
     let drag: { index: number; start: number[] } | null = null;
     let pan: { x: number; y: number; camX: number; camY: number } | null = null;
+    let tool: EditorTool | null = null;
+    let ghost: Vec2 | null = null;
     const peekCache = new Map<string, string>();
 
     function cssSize(): { w: number; h: number } {
@@ -134,11 +144,15 @@ export const sdf2Host: ViewHost = {
         gizmos,
         drag?.index ?? hoverGizmo?.index ?? null,
       );
+      if (tool) drawEditorGhost(ctx2d, cam, w, h, tool, ghost);
       if (quiet && !error) return;
       els.statusEl.textContent = error
         ? "Last good frame · scene threw"
-        : (sceneMod.hint ??
-          "X radial, Y is Z. Drag a centre or dashed radius.");
+        : editorStatus(
+            tool,
+            sceneMod.hint ??
+              "Space adds a coral editor · X radial, Y is Z",
+          );
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
       if (hoverGizmo) {
@@ -170,6 +184,43 @@ export const sdf2Host: ViewHost = {
       }
     }
 
+    async function finishPoint(world: Vec2): Promise<void> {
+      const err = await commitEditors(ctx.sceneFile, [
+        { kind: "point", x: quantize(world.x), y: quantize(world.y) },
+      ]);
+      tool = null;
+      ghost = null;
+      if (err) error = err;
+      else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
+      evaluate();
+      render();
+    }
+
+    async function finishDistance(
+      origin: { x: number; y: number; widgetIndex?: number },
+      world: Vec2,
+    ): Promise<void> {
+      const d = quantize(radiusBetween(origin, world));
+      const edits =
+        origin.widgetIndex != null
+          ? [{ kind: "distance" as const, originWidget: origin.widgetIndex, d }]
+          : [
+              {
+                kind: "point" as const,
+                x: quantize(origin.x),
+                y: quantize(origin.y),
+              },
+              { kind: "distance" as const, d },
+            ];
+      const err = await commitEditors(ctx.sceneFile, edits);
+      tool = null;
+      ghost = null;
+      if (err) error = err;
+      else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
+      evaluate();
+      render();
+    }
+
     function onPointerDown(e: PointerEvent): void {
       ctx.onFocus();
       canvas.focus();
@@ -183,6 +234,33 @@ export const sdf2Host: ViewHost = {
         return;
       }
       if (e.button !== 0) return;
+      if (tool) {
+        const world = screenToWorld(cam, p, w, h);
+        e.preventDefault();
+        if (tool.id === "point") {
+          void finishPoint(world);
+          return;
+        }
+        if (!tool.origin) {
+          if (hit?.target === "gizmo" && hit.gizmo.kind === "point") {
+            tool = {
+              id: "distance",
+              origin: {
+                x: hit.gizmo.x,
+                y: hit.gizmo.y,
+                widgetIndex: hit.gizmo.index,
+              },
+            };
+            render();
+            return;
+          }
+          tool = { id: "distance", origin: { x: world.x, y: world.y } };
+          render();
+          return;
+        }
+        void finishDistance(tool.origin, world);
+        return;
+      }
       if (hit?.target === "gizmo") {
         drag = { index: hit.gizmo.index, start: gizmoValues(hit.gizmo) };
         canvas.setPointerCapture(e.pointerId);
@@ -204,6 +282,11 @@ export const sdf2Host: ViewHost = {
           x: pan.camX - (p.x - pan.x) / cam.scale,
           y: pan.camY + (p.y - pan.y) / cam.scale,
         };
+        render(true);
+        return;
+      }
+      if (tool) {
+        ghost = screenToWorld(cam, p, w, h);
         render(true);
         return;
       }
@@ -309,6 +392,20 @@ export const sdf2Host: ViewHost = {
       refresh(opts) {
         evaluate(false);
         render(opts?.quiet ?? false);
+      },
+      commands: () => EDITOR_COMMANDS,
+      runCommand(id) {
+        if (id === "point") tool = { id: "point" };
+        else if (id === "distance") tool = { id: "distance" };
+        else return;
+        ghost = null;
+        render();
+      },
+      cancelCommand() {
+        if (!tool) return;
+        tool = null;
+        ghost = null;
+        render();
       },
       dispose() {
         unsub();

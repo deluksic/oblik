@@ -6,6 +6,12 @@ import type { Plugin, ViteDevServer } from "vite";
 import { parseSceneSource } from "./catalog.ts";
 import { isSceneId } from "./layout-grid.ts";
 import type { SceneEntry } from "./types.ts";
+import {
+  insertEditors,
+  widgetBindingName,
+  widgetInSceneFunction,
+  type EditorInsert,
+} from "./insert-editor.ts";
 import { newSceneSource, titleFromId } from "./new-scene.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
@@ -360,6 +366,82 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             const next = patchWidget(source, widgetIndex, values);
             rememberWidgetWrite(widgetWrites, abs, next);
             fs.writeFileSync(abs, next);
+            json(res, 200, { ok: true });
+            return;
+          }
+
+          if (url === "/__insert-editor" && req.method === "POST") {
+            const raw = JSON.parse(await readBody(req)) as Record<
+              string,
+              unknown
+            >;
+            const file = raw.file;
+            const rawEdits = raw.edits;
+            if (typeof file !== "string" || !Array.isArray(rawEdits)) {
+              json(res, 400, {
+                ok: false,
+                error: "expected { file, edits }",
+              });
+              return;
+            }
+            const abs = resolveUnder(sceneDir, path.basename(file));
+            const source = fs.readFileSync(abs, "utf8");
+            const edits: EditorInsert[] = [];
+            for (const item of rawEdits) {
+              if (!item || typeof item !== "object") {
+                json(res, 400, { ok: false, error: "invalid edit" });
+                return;
+              }
+              const e = item as Record<string, unknown>;
+              if (e.kind === "point") {
+                if (typeof e.x !== "number" || typeof e.y !== "number") {
+                  json(res, 400, {
+                    ok: false,
+                    error: "point needs x, y",
+                  });
+                  return;
+                }
+                edits.push({ kind: "point", x: e.x, y: e.y });
+              } else if (e.kind === "distance") {
+                if (typeof e.d !== "number") {
+                  json(res, 400, {
+                    ok: false,
+                    error: "distance needs d",
+                  });
+                  return;
+                }
+                let originName =
+                  typeof e.originName === "string" ? e.originName : undefined;
+                if (typeof e.originWidget === "number") {
+                  if (!widgetInSceneFunction(source, e.originWidget)) {
+                    json(res, 400, {
+                      ok: false,
+                      error:
+                        "That handle is not declared in scene() — place a new point, or pick a coral point that scene() owns.",
+                    });
+                    return;
+                  }
+                  const name = widgetBindingName(source, e.originWidget);
+                  if (!name) {
+                    json(res, 400, {
+                      ok: false,
+                      error:
+                        "That point is inline, not a named const. Place a new point instead.",
+                    });
+                    return;
+                  }
+                  originName = name;
+                }
+                edits.push({ kind: "distance", originName, d: e.d });
+              } else {
+                json(res, 400, {
+                  ok: false,
+                  error: `unknown kind ${String(e.kind)}`,
+                });
+                return;
+              }
+            }
+            fs.writeFileSync(abs, insertEditors(source, edits));
             json(res, 200, { ok: true });
             return;
           }

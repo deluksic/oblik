@@ -19,6 +19,7 @@ import {
 } from "@design-scenes/euclid2";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
+  commitEditors,
   commitWidget,
   countEditCalls,
   peekFile,
@@ -26,6 +27,13 @@ import {
   renderSnippet,
 } from "../inspect.ts";
 import { subscribeSceneHot } from "../scene-loaders.ts";
+import {
+  drawEditorGhost,
+  EDITOR_COMMANDS,
+  editorStatus,
+  radiusBetween,
+  type EditorTool,
+} from "./editors.ts";
 
 function asCamera(mod: Record<string, unknown>): Camera {
   const c = mod.camera;
@@ -61,6 +69,8 @@ export const euclid2Host: ViewHost = {
     let selectedGeom: Geom | null = null;
     let drag: { index: number; start: number[] } | null = null;
     let pan: { x: number; y: number; camX: number; camY: number } | null = null;
+    let tool: EditorTool | null = null;
+    let ghost: { x: number; y: number } | null = null;
     const peekCache = new Map<string, string>();
     const sceneId = ctx.sceneId;
     const els = ctx.inspect;
@@ -176,12 +186,16 @@ export const euclid2Host: ViewHost = {
         selectedId,
         activeGizmo(),
       );
+      if (tool) drawEditorGhost(ctx2d, cam, w, h, tool, ghost);
       if (quiet && !error) return;
       els.statusEl.textContent = error
         ? "Last good frame · scene threw"
-        : hintOf(
-            sceneMod as unknown as Record<string, unknown>,
-            "Drag coral handles · wheel zooms · empty paper pans",
+        : editorStatus(
+            tool,
+            hintOf(
+              sceneMod as unknown as Record<string, unknown>,
+              "Space adds a coral editor · drag handles · wheel zooms",
+            ),
           );
       els.errorEl.hidden = !error;
       els.errorEl.textContent = error ?? "";
@@ -238,6 +252,43 @@ export const euclid2Host: ViewHost = {
       }
     }
 
+    async function finishPoint(world: { x: number; y: number }): Promise<void> {
+      const err = await commitEditors(ctx.sceneFile, [
+        { kind: "point", x: quantize(world.x), y: quantize(world.y) },
+      ]);
+      tool = null;
+      ghost = null;
+      if (err) error = err;
+      else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
+      evaluate();
+      render();
+    }
+
+    async function finishDistance(
+      origin: { x: number; y: number; widgetIndex?: number },
+      world: { x: number; y: number },
+    ): Promise<void> {
+      const d = quantize(radiusBetween(origin, world));
+      const edits =
+        origin.widgetIndex != null
+          ? [{ kind: "distance" as const, originWidget: origin.widgetIndex, d }]
+          : [
+              {
+                kind: "point" as const,
+                x: quantize(origin.x),
+                y: quantize(origin.y),
+              },
+              { kind: "distance" as const, d },
+            ];
+      const err = await commitEditors(ctx.sceneFile, edits);
+      tool = null;
+      ghost = null;
+      if (err) error = err;
+      else peekCache.delete(`apps/paper/src/scenes/${ctx.sceneFile}`);
+      evaluate();
+      render();
+    }
+
     function onPointerDown(e: PointerEvent): void {
       ctx.onFocus();
       canvas.focus();
@@ -250,6 +301,34 @@ export const euclid2Host: ViewHost = {
         return;
       }
       if (e.button !== 0) return;
+      if (tool) {
+        const { w, h: height } = cssSize();
+        const world = screenToWorld(cam, p, w, height);
+        e.preventDefault();
+        if (tool.id === "point") {
+          void finishPoint(world);
+          return;
+        }
+        if (!tool.origin) {
+          if (h?.target === "gizmo" && h.gizmo.kind === "point") {
+            tool = {
+              id: "distance",
+              origin: {
+                x: h.gizmo.x,
+                y: h.gizmo.y,
+                widgetIndex: h.gizmo.index,
+              },
+            };
+            render();
+            return;
+          }
+          tool = { id: "distance", origin: { x: world.x, y: world.y } };
+          render();
+          return;
+        }
+        void finishDistance(tool.origin, world);
+        return;
+      }
       if (h?.target === "gizmo") {
         drag = { index: h.gizmo.index, start: gizmoValues(h.gizmo) };
         canvas.style.cursor = h.gizmo.kind === "number" ? "ew-resize" : "grab";
@@ -281,6 +360,11 @@ export const euclid2Host: ViewHost = {
           x: pan.camX - (p.x - pan.x) / cam.scale,
           y: pan.camY + (p.y - pan.y) / cam.scale,
         };
+        render(true);
+        return;
+      }
+      if (tool) {
+        ghost = screenToWorld(cam, p, w, height);
         render(true);
         return;
       }
@@ -393,6 +477,20 @@ export const euclid2Host: ViewHost = {
       refresh(opts) {
         evaluate(false);
         render(opts?.quiet ?? false);
+      },
+      commands: () => EDITOR_COMMANDS,
+      runCommand(id) {
+        if (id === "point") tool = { id: "point" };
+        else if (id === "distance") tool = { id: "distance" };
+        else return;
+        ghost = null;
+        render();
+      },
+      cancelCommand() {
+        if (!tool) return;
+        tool = null;
+        ghost = null;
+        render();
       },
       dispose() {
         unsub();

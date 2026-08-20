@@ -67,6 +67,26 @@ export async function commitWidget(
   return null;
 }
 
+export type InsertEdit =
+  | { kind: "point"; x: number; y: number }
+  | { kind: "distance"; d: number; originName?: string; originWidget?: number };
+
+export async function commitEditors(
+  sceneFile: string,
+  edits: InsertEdit[],
+): Promise<string | null> {
+  const res = await fetch("/__insert-editor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file: sceneFile, edits }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok || !body.ok) {
+    return body.error ?? `insert failed (${res.status})`;
+  }
+  return null;
+}
+
 export type InspectEls = {
   crumbEl: HTMLElement;
   metaEl: HTMLElement;

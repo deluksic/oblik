@@ -5,6 +5,7 @@ export type {
   InspectEls,
   PaneContext,
   PaneHandle,
+  CommandSpec,
   SceneLoaderMap,
   ViewHost,
 } from "./types.ts";

@@ -7,6 +7,9 @@
     ".": "./src/index.ts",
     "./workspace.css": "./src/workspace.css"
   },
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/insert-editor.test.ts"
+  },
   "dependencies": {
     "typescript": "~6.0.2"
   },

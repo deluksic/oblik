@@ -8,7 +8,7 @@ packages/
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   sdf       @design-scenes/sdf       field CSG (no identity), 2D profile + 3D compile, raymarch view
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnLine3
-  shell     @design-scenes/shell     Vite plugin (peek, patch, catalog, create-scene) + pane workspace
+  shell     @design-scenes/shell     Vite plugin (peek, patch, insert-editor, catalog, create-scene) + pane workspace
 apps/
   paper     @design-scenes/paper     hosts + scenes + demos
     src/scenes/   the only scene registry (programs and layout files)

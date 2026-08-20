@@ -5,7 +5,8 @@ TypeScript libraries stay pure. **Scenes** attach 2D widgets (`editPoint`, `edit
 - Intent: [PLAN.md](./PLAN.md)
 - Prototype 1 charter: [PROTOTYPE_1.md](./PROTOTYPE_1.md)
 - What P1 proved: [PROTOTYPE_1_CONCLUSIONS.md](./PROTOTYPE_1_CONCLUSIONS.md)
-- Next: [PROTOTYPE_2.md](./PROTOTYPE_2.md) — scene catalog and shell layouts
+- Next: [PROTOTYPE_3.md](./PROTOTYPE_3.md) — Space inserts coral editors
+- What P2 proved: [PROTOTYPE_2_CONCLUSIONS.md](./PROTOTYPE_2_CONCLUSIONS.md)
 - Repo layout: [LAYOUT.md](./LAYOUT.md)
 
 ## Run
@@ -35,6 +36,7 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117) on the welcome screen. **
 
 ## Try
 
+- **Space** — command palette. **Point** places a coral `editPoint`. **Distance** places a dashed ring (`editDistanceToPoint`). These are editors, not cream geometry.
 - Drag coral **points**, the **glider** on the span, or a **dashed radius**.
 - Click a tick: inspector shows **path**, **id**, and the **creation site**.
 - Wheel zooms; drag empty paper (or Alt-drag) to pan.
