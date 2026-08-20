@@ -15,7 +15,7 @@ CAD, jewelry, and slicer apps each do one job well and talk to each other poorly
 ```ts
 // scene — may use euclid2 widgets
 const A = editPoint(3, 4);
-const t = editPointOnLine(seg, 0.3);
+const t = editPointOnSegment(seg, 0.3);
 const r = editDistanceToPoint(A, 2);
 
 // library — math only
@@ -24,7 +24,7 @@ export const shape = ringProfile({ inner: r, seam: t, origin: A });
 
 **Identity, hover, and select are core.** The canvas must say what you pointed at (`profile/seg[2]`, created at `lib.ts:40`) so a scene can bind widgets to it. Jump to source. Do not synthesize new math. Do not chase arbitrary expressions to infer handles.
 
-**Declared editors only.** `editPoint`, `editDistanceToPoint`, `editPointOnLine`, and later cousins. Degrees of freedom sit in the combinator. A plain `3` in a library is not a handle.
+**Declared editors only.** `editPoint`, `editDistanceToPoint`, `editPointOnSegment`, `editPointOnLine`, and later cousins. Degrees of freedom sit in the combinator. A plain `3` in a library is not a handle.
 
 **Domain tools are views.** Supports, hollowing, layout, maps, resin slicing are optional scene packages if someone implements them. The shell owes them a boring artifact (geometry, image, field, units) and pick IDs.
 

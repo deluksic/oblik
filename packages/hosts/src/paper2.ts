@@ -121,6 +121,13 @@ function applyDrag(
   } else if (g.kind === "glider") {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.site, [quantize(t)], sceneId);
+  } else if (g.kind === "lineGlider") {
+    let s =
+      (world.x - g.origin.x) * g.direction.x +
+      (world.y - g.origin.y) * g.direction.y;
+    if (g.min != null) s = Math.max(g.min, s);
+    if (g.max != null) s = Math.min(g.max, s);
+    setWidgetOverride(g.site, [quantize(s)], sceneId);
   } else if (g.kind === "angle") {
     let deg =
       (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
@@ -220,7 +227,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       } | null {
         if (hoverGizmo) {
           return {
-            title: `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${ctx.sceneFile}`,
+            title: `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${hoverGizmo.at.file}`,
           };
         }
         if (mode !== "geom") return null;
@@ -244,7 +251,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
               els,
               hoverGizmo.kind,
               hoverGizmo.site,
-              ctx.sceneFile,
+              hoverGizmo.at.file,
               "Handles are scene widgets. The filled blob is the 2D SDF.",
             );
             return;
@@ -269,9 +276,20 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         els.crumbEl.textContent = t.title;
         if (t.file == null || t.line == null) {
+          if (hoverGizmo) {
+            els.metaEl.textContent =
+              "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
+            try {
+              const text = await peekFile(peekCache, hoverGizmo.at.file);
+              els.sourceEl.innerHTML = renderSnippet(text, hoverGizmo.at.line);
+            } catch (err) {
+              els.sourceEl.innerHTML = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+            }
+            return;
+          }
           els.metaEl.textContent =
             "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
-          els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${ctx.sceneFile}.</code>`;
+          els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in the source file.</code>`;
           return;
         }
         els.metaEl.textContent = t.id
@@ -503,9 +521,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         drag = null;
         const now = g ? gizmoValues(g) : dragging.start;
         const err = await commitGizmoIfChanged(
-          ctx.sceneFile,
           peekCache,
-          peekPath,
           dragging.start,
           g,
           now,

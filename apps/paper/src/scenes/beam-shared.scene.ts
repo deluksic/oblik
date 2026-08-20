@@ -3,12 +3,12 @@ import { assembleBeam } from "../demo/beam.ts";
 import {
   editDistanceToPoint,
   editPoint,
-  editPointOnLine,
+  editPointOnSegment,
 } from "@design-scenes/euclid2";
 
 export const id = "shared";
 export const title = "Shared radius";
-export const sceneFile = "beam-shared.ts";
+export const sceneFile = "beam-shared.scene.ts";
 
 /** One radius literal feeds every ring and the roof hub. */
 export function scene() {
@@ -16,9 +16,9 @@ export function scene() {
   const b = editPoint(5.71, 3.24);
   const span = line(a, b);
 
-  const p0 = editPointOnLine(span, 0.25);
-  const p1 = editPointOnLine(span, 0.5);
-  const p2 = editPointOnLine(span, 0.75);
+  const p0 = editPointOnSegment(span, 0.25);
+  const p1 = editPointOnSegment(span, 0.5);
+  const p2 = editPointOnSegment(span, 0.75);
   const r = editDistanceToPoint(p1, 1.33);
 
   return assembleBeam({

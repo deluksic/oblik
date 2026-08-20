@@ -1,8 +1,8 @@
 # Scenes
 
-A file in `apps/paper/src/scenes/*.ts` is the registry. The shell Vite plugin parses it (does not execute it) into `virtual:scene-catalog`. Nav and `?scene=` come from the catalog. **New scene** on the welcome screen POSTs `/__create-scene` and writes a starter file.
+A file in `apps/paper/src/scenes/*.scene.ts` is the catalog. Plain `*.ts` in the same folder (e.g. `plate-layout.ts`) can hold shared `edit*` helpers and is not in nav. The shell Vite plugin parses catalog files (does not execute them) into `virtual:scene-catalog`. Nav and `?scene=` come from the catalog. **New scene** on the welcome screen POSTs `/__create-scene` and writes a starter `<id>.scene.ts`.
 
-Id defaults to the filename stem (`beam.ts` → `beam`). Override with `export const id`.
+Id defaults to the filename stem (`beam.scene.ts` → `beam`). Override with `export const id`.
 
 ```ts
 export const title = "Beam truss";
@@ -10,7 +10,7 @@ export const view = "euclid2";
 export const hint = "Drag the posts…";
 export const camera = { x: 0, y: 0, scale: 16 };
 export const camera3 = { position: [18, -24, 13], target: [0.3, 0, 1.15] };
-export const sceneFile = "beam.ts";
+export const sceneFile = "beam.scene.ts";
 export function scene() { /* … */ }
 ```
 
@@ -70,7 +70,7 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | [?scene=flat](http://127.0.0.1:43117/?scene=flat) | Two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line. |
 | [?scene=shared](http://127.0.0.1:43117/?scene=shared) | One `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release. |
 | [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `editPoint`. A `for` calls `editDistanceToPoint(p, 0.4)` and `circle(p, r)`. Five dashed rings, one `0.4`. Drag any ring: all five follow; pointer-up rewrites that single literal. |
-| [?scene=plate](http://127.0.0.1:43117/?scene=plate) | Milled plate: stock, four corner bolts (shared drill Ø), polar array (center, PCD, tap Ø), titled **Hole count** slider, pocket + fillet, slot. |
+| [?scene=plate](http://127.0.0.1:43117/?scene=plate) | Milled plate: stock, four corner bolts (one **editVector** inset mirrored to all corners; shared **drill Ø** helpers), polar array, pocket fillets on **editPointOnLine** bisectors, slot (**editPointOnSegment** on top edge). |
 | [?scene=nest](http://127.0.0.1:43117/?scene=nest) | Print grid. `withoutWidgets(plateLayout)` instanced in a nest; columns / rows / gap are titled sliders. Polar-array **count steps by column**. |
 | [?scene=relative](http://127.0.0.1:43117/?scene=relative) | Offset handle. Left `editPoint` writes position; `editVector` writes `dx`/`dy`; the second centre is derived. |
 | [?scene=gear](http://127.0.0.1:43117/?scene=gear) | Involute spur pair. Drag the pinion centre, pitch radius, and **mesh angle**. Tooth counts, pressure, and helix are titled sliders. The wheel is derived. |
@@ -80,5 +80,5 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | [?scene=profile](http://127.0.0.1:43117/?scene=profile) | 2D SDF profile used by the cylinder sweep. Three circles, each with a point and a radius. |
 | [?scene=helix](http://127.0.0.1:43117/?scene=helix) | Helical gears (3D). Closed tooth loops run through `extrude(..., { twist })`. Face width is the 3D glider. |
 | [?scene=gearsplit](http://127.0.0.1:43117/?scene=gearsplit) | 2D gear and 3D helix side by side. 2D drags update the helix live. |
-| [?scene=mill](http://127.0.0.1:43117/?scene=mill) | 3D extrusion of the plate. XY is read from `plate.ts` with gizmos off. Thickness is the 3D glider; write-back patches `mill.ts`. |
+| [?scene=mill](http://127.0.0.1:43117/?scene=mill) | 3D extrusion of the plate. XY is read from `plate-layout.ts` with gizmos off. Thickness is the 3D glider; write-back patches `mill.scene.ts`. |
 | [?scene=split](http://127.0.0.1:43117/?scene=split) | Plate 2D and mill 3D. Drag 2D handles and the mill follows **while you drag**; thickness stays a 3D-only widget. |

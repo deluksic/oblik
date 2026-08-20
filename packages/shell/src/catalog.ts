@@ -89,7 +89,9 @@ function isSceneFunction(node: ts.FunctionDeclaration): boolean {
 }
 
 export function parseSceneSource(file: string, source: string): SceneEntry {
-  const stem = path.basename(file, ".ts");
+  const stem = file.endsWith(".scene.ts")
+    ? path.basename(file, ".scene.ts")
+    : path.basename(file, ".ts");
   const sf = ts.createSourceFile(
     file,
     source,

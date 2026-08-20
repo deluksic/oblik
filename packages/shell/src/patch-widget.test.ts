@@ -100,3 +100,19 @@ const d = editVector(a, 2.4, 1.05);
   expect(next).toMatch(/editVector\(a, 3\.1, -0\.5\)/);
   expect(next).toMatch(/editPoint\(-2\.2, 0\.15\)/);
 });
+
+test("editPointOnLine patches s (third arg)", () => {
+  const src = `const p = editPointOnLine({ x: 0, y: 0 }, { x: 1, y: 1 }, 0.54, { min: 0 });
+`;
+  const loc = at(src, 0);
+  const next = patchWidgetAt(src, loc.line, loc.column, [0.72]);
+  expect(next).toMatch(/editPointOnLine\(\{ x: 0, y: 0 \}, \{ x: 1, y: 1 \}, 0\.72, \{ min: 0 \}\)/);
+});
+
+test("editPointOnSegment patches t", () => {
+  const src = `const p = editPointOnSegment(span, 0.52);
+`;
+  const loc = at(src, 0);
+  const next = patchWidgetAt(src, loc.line, loc.column, [0.61]);
+  expect(next).toMatch(/editPointOnSegment\(span, 0\.61\)/);
+});

@@ -1,9 +1,9 @@
 import { withoutWidgets, editNumber } from "@design-scenes/euclid2";
 import { drawPlateNest } from "../demo/plate.ts";
-import { plateLayout } from "./plate.ts";
+import { plateLayout } from "./plate-layout.ts";
 
 export const title = "Print grid";
-export const sceneFile = "nest.ts";
+export const sceneFile = "nest.scene.ts";
 export const camera = { x: 0, y: 0, scale: 18 };
 
 /**

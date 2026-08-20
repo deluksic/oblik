@@ -6,7 +6,7 @@ import {
 } from "../demo/cylinder.ts";
 
 export const title = "Cylinder plan";
-export const sceneFile = "cylinder.ts";
+export const sceneFile = "cylinder.scene.ts";
 export const camera = { x: 0, y: 0, scale: 16 };
 
 const origin = { x: 0, y: 0 };

@@ -1,6 +1,6 @@
 import { line3 } from "@design-scenes/geom";
 import { withoutWidgets } from "@design-scenes/euclid2";
-import { editPointOnLine3 } from "@design-scenes/euclid3";
+import { editPointOnSegment3 } from "@design-scenes/euclid3";
 import { difference, sweep2, union, unionAll } from "@design-scenes/sdf";
 import {
   packedCylinderCores,
@@ -8,12 +8,12 @@ import {
 } from "../demo/rose-sdf.ts";
 import { pack7 } from "../demo/cylinder.ts";
 import { profileSdf } from "../demo/profile.ts";
-import { cylinderLayout } from "./cylinder.ts";
-import { profileLayout } from "./profile.ts";
+import { cylinderLayout } from "./cylinder.scene.ts";
+import { profileLayout } from "./profile.scene.ts";
 
 export const title = "Cylinder SDF";
 export const view = "sdf" as const;
-export const sceneFile = "rose-sdf.ts";
+export const sceneFile = "rose-sdf.scene.ts";
 export const hint =
   "Joined rings + filled disks, then quatrefoil cut · glider is height";
 
@@ -21,12 +21,12 @@ let readLayout = cylinderLayout;
 let readProfile = profileLayout;
 
 if (import.meta.hot) {
-  import.meta.hot.accept("./cylinder.ts", (mod) => {
+  import.meta.hot.accept("./cylinder.scene.ts", (mod) => {
     if (mod && "cylinderLayout" in mod) {
       readLayout = mod.cylinderLayout as typeof cylinderLayout;
     }
   });
-  import.meta.hot.accept("./profile.ts", (mod) => {
+  import.meta.hot.accept("./profile.scene.ts", (mod) => {
     if (mod && "profileLayout" in mod) {
       readProfile = mod.profileLayout as typeof profileLayout;
     }
@@ -44,7 +44,7 @@ export function scene() {
   const layout = withoutWidgets(() => readLayout(), "cylinder");
   const profile = withoutWidgets(() => readProfile(), "profile");
   const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnLine3(mast, 0.07).z;
+  const height = editPointOnSegment3(mast, 0.07).z;
   const field = profileSdf(profile);
   const cells = pack7(layout.radius);
   const rings = unionAll(

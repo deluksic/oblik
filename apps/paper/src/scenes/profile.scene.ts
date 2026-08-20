@@ -7,7 +7,7 @@ import {
 
 export const title = "Sweep profile";
 export const view = "sdf2" as const;
-export const sceneFile = "profile.ts";
+export const sceneFile = "profile.scene.ts";
 export const camera = { x: 0.2, y: 0.32, scale: 110 };
 export const hint = "X = radial from each rim · Y is world Z";
 

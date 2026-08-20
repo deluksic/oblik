@@ -4,7 +4,7 @@ import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export const title = ${JSON.stringify(title)};
 export const view = "euclid2" as const;
-export const sceneFile = ${JSON.stringify(`${id}.ts`)};
+export const sceneFile = ${JSON.stringify(`${id}.scene.ts`)};
 
 export function scene() {
   const c = editPoint(0, 0);

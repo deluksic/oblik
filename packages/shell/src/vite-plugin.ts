@@ -59,7 +59,7 @@ function listSceneFiles(sceneDir: string): string[] {
   if (!fs.existsSync(sceneDir)) return [];
   return fs
     .readdirSync(sceneDir)
-    .filter((n) => n.endsWith(".ts") && !n.endsWith(".d.ts"))
+    .filter((n) => n.endsWith(".scene.ts"))
     .map((n) => path.join(sceneDir, n))
     .sort();
 }
@@ -89,14 +89,23 @@ function catalogFingerprint(sceneDir: string): string {
   return JSON.stringify(scanSceneCatalog(sceneDir));
 }
 
-function isSceneTs(sceneDir: string, file: string): boolean {
+function isCatalogScene(sceneDir: string, file: string): boolean {
   const abs = path.resolve(file).replace(/\\/g, "/");
   const dir = path.resolve(sceneDir).replace(/\\/g, "/");
-  return (
-    abs.startsWith(dir + "/") &&
-    abs.endsWith(".ts") &&
-    !abs.endsWith(".d.ts")
-  );
+  return abs.startsWith(dir + "/") && abs.endsWith(".scene.ts");
+}
+
+function workspaceRelPath(absFile: string, root: string): string {
+  return path.relative(root, absFile).replace(/\\/g, "/");
+}
+
+function isInjectableTs(workspaceRoot: string, file: string): boolean {
+  const abs = path.resolve(file).replace(/\\/g, "/");
+  const root = path.resolve(workspaceRoot).replace(/\\/g, "/");
+  if (!abs.startsWith(root + "/")) return false;
+  if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) return false;
+  if (abs.includes("/node_modules/")) return false;
+  return true;
 }
 
 function isSceneLoadersModule(id: string): boolean {
@@ -184,7 +193,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       vite = server;
       server.watcher.add(sceneDir);
       const onSceneTree = (file: string) => {
-        if (!isSceneTs(sceneDir, file)) return;
+        if (!isCatalogScene(sceneDir, file)) return;
         if (catalogChanged()) invalidateCatalog(server);
       };
       server.watcher.on("add", onSceneTree);
@@ -217,7 +226,11 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               return;
             }
 
-            const abs = resolveUnder(sceneDir, path.basename(file));
+            const abs = resolveUnder(workspaceRoot, file);
+            if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) {
+              json(res, 400, { ok: false, error: "expected a .ts file path" });
+              return;
+            }
             const source = fs.readFileSync(abs, "utf8");
             const next = patchWidgetAt(source, line, column, values);
             rememberWidgetWrite(widgetWrites, abs, next);
@@ -241,6 +254,13 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               return;
             }
             const abs = resolveUnder(sceneDir, path.basename(file));
+            if (!abs.endsWith(".scene.ts")) {
+              json(res, 400, {
+                ok: false,
+                error: "insert-editor only writes catalog .scene.ts files",
+              });
+              return;
+            }
             const source = fs.readFileSync(abs, "utf8");
             const edits: EditorInsert[] = [];
             for (const item of rawEdits) {
@@ -328,11 +348,11 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               });
               return;
             }
-            const abs = resolveUnder(sceneDir, `${id}.ts`);
+            const abs = resolveUnder(sceneDir, `${id}.scene.ts`);
             if (fs.existsSync(abs)) {
               json(res, 409, {
                 ok: false,
-                error: `${id}.ts already exists`,
+                error: `${id}.scene.ts already exists`,
               });
               return;
             }
@@ -343,7 +363,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             fs.writeFileSync(abs, newSceneSource(id, title));
             lastCatalog = "";
             if (vite) invalidateCatalog(vite);
-            json(res, 200, { ok: true, id, file: `${id}.ts` });
+            json(res, 200, { ok: true, id, file: `${id}.scene.ts` });
             return;
           }
 
@@ -370,8 +390,9 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
     },
     transform(code, id) {
       const file = id.split("?")[0] ?? "";
-      if (isSceneTs(sceneDir, file)) {
-        return { code: injectSceneSites(code), map: null };
+      if (isInjectableTs(workspaceRoot, file)) {
+        const rel = workspaceRelPath(path.resolve(file), workspaceRoot);
+        return { code: injectSceneSites(code, rel), map: null };
       }
       if (!isSceneLoadersModule(id)) return undefined;
       if (code.includes("/* __scene_hmr_accept */")) return undefined;
@@ -386,7 +407,6 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       order: "pre",
       handler(ctx) {
         if (ctx.type !== "update") return;
-        if (!isSceneTs(sceneDir, ctx.file)) return;
         const written = rememberedWrite(widgetWrites, ctx.file);
         if (written != null) {
           try {
@@ -395,6 +415,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             return [];
           }
         }
+        if (!isCatalogScene(sceneDir, ctx.file)) return;
         if (!catalogChanged()) return;
         const catalog = this.environment.moduleGraph.getModuleById(
           VIRTUAL_CATALOG_RESOLVED,

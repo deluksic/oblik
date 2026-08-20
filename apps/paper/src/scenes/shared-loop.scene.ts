@@ -2,7 +2,7 @@ import { circle, group, type Circle } from "@design-scenes/geom";
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export const title = "Shared loop";
-export const sceneFile = "shared-loop.ts";
+export const sceneFile = "shared-loop.scene.ts";
 export const hint = "Five rings, one 0.4. Drag any dashed circle — all follow.";
 export const camera = { x: 0, y: 0, scale: 48 };
 

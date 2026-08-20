@@ -1,8 +1,6 @@
 import * as ts from "typescript";
 import { EDIT_NAMES } from "./edit-names.ts";
 
-export type SiteMint = () => string;
-
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile(
     "scene.ts",
@@ -30,31 +28,29 @@ function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
 }
 
 /**
- * Inject `{ id, at }` onto each edit* in compiled output. Source on disk is
- * unchanged. `at` is 1-based line/column of the CallExpression start.
+ * Inject `{ file, at }` onto each edit* in compiled output. Source on disk is
+ * unchanged. `file` is workspace-relative; `at` is 1-based line/column of the
+ * CallExpression start.
  */
-export function injectSceneSites(
-  source: string,
-  mint: SiteMint = () => crypto.randomUUID(),
-): string {
+export function injectSceneSites(source: string, file: string): string {
   const sf = parse(source);
   const calls = collectEditCalls(sf);
+  if (calls.length === 0) return source;
   const splices: { start: number; text: string }[] = [];
   for (const call of calls) {
     const pos = sf.getLineAndCharacterOfPosition(call.getStart(sf));
     const line = pos.line + 1;
     const column = pos.character + 1;
-    const id = mint();
     const last = call.arguments[call.arguments.length - 1];
     if (last && ts.isObjectLiteralExpression(last)) {
       splices.push({
         start: last.getStart(sf) + 1,
-        text: ` id: ${JSON.stringify(id)}, at: [${line}, ${column}],`,
+        text: ` file: ${JSON.stringify(file)}, at: [${line}, ${column}],`,
       });
     } else {
       splices.push({
         start: call.getEnd() - 1,
-        text: `, { id: ${JSON.stringify(id)}, at: [${line}, ${column}] }`,
+        text: `, { file: ${JSON.stringify(file)}, at: [${line}, ${column}] }`,
       });
     }
   }

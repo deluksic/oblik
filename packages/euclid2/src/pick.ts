@@ -44,6 +44,15 @@ export function hitTest(
       if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
         return { target: "gizmo", gizmo: g };
       }
+    } else if (g.kind === "lineGlider") {
+      const p = {
+        x: g.origin.x + g.direction.x * g.s,
+        y: g.origin.y + g.direction.y * g.s,
+      };
+      const s = worldToScreen(cam, p, width, height);
+      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
+        return { target: "gizmo", gizmo: g };
+      }
     } else if (g.kind === "distance") {
       const radiusPx = Math.abs(g.d) * cam.scale;
       const c = worldToScreen(cam, g.origin, width, height);

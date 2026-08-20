@@ -7,7 +7,7 @@ import {
 import { drawRingPlan, drawUnrolled } from "../demo/ring.ts";
 
 export const title = "Ring";
-export const sceneFile = "ring.ts";
+export const sceneFile = "ring.scene.ts";
 export const camera = { x: 18, y: 3.2, scale: 14 };
 
 export type RingLayout = {

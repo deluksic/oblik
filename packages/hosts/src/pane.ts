@@ -44,12 +44,12 @@ export function showWidgetInspect(
   els: InspectEls,
   kind: string,
   site: string,
-  sceneFile: string,
+  writeFile: string,
   meta: string,
 ): void {
-  els.crumbEl.textContent = `widget ${kind} ${site} · writes ${sceneFile}`;
+  els.crumbEl.textContent = `widget ${kind} ${site} · writes ${writeFile}`;
   els.metaEl.textContent = meta;
-  els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${sceneFile}.</code>`;
+  els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${writeFile}.</code>`;
 }
 
 export function showEmptyInspect(
@@ -74,18 +74,16 @@ export function setPaneStatus(
 }
 
 export async function commitGizmoIfChanged(
-  sceneFile: string,
   peekCache: Map<string, string>,
-  peekPath: string,
   start: number[],
-  g: { at: { line: number; column: number } } | undefined,
+  g: { at: { file: string; line: number; column: number } } | undefined,
   now: number[],
 ): Promise<string | null> {
   if (!g) return null;
   const changed = now.some((v, i) => v !== start[i]);
   if (!changed) return null;
-  const err = await commitWidget(sceneFile, g.at, now);
-  if (!err) peekCache.delete(peekPath);
+  const err = await commitWidget(g.at, now);
+  if (!err) peekCache.delete(g.at.file);
   return err;
 }
 

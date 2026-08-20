@@ -146,7 +146,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             els,
             hoverGizmo.kind,
             hoverGizmo.site,
-            ctx.sceneFile,
+            hoverGizmo.at.file,
             meta,
           );
           return;
@@ -277,9 +277,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         drag = null;
         const now = g ? gizmoValues3(g) : dragging.start;
         const err = await commitGizmoIfChanged(
-          ctx.sceneFile,
           peekCache,
-          peekPath,
           dragging.start,
           g,
           now,

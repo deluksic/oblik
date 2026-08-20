@@ -1,6 +1,6 @@
 # Design programs, viewed in scenes
 
-TypeScript libraries stay pure. **Scenes** attach widgets (`editPoint`, `editDistanceToPoint`, `editPointOnLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
+TypeScript libraries stay pure. **Scenes** attach widgets (`editPoint`, `editDistanceToPoint`, `editPointOnSegment`, `editPointOnLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
 Docs: [docs/README.md](./docs/README.md).
 
@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `apps/paper/src/scenes/<id>.ts`. Nav is generated from that folder. Layout files are CSS `grid-template-areas` whose cell names are scene ids.
+Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `apps/paper/src/scenes/<id>.scene.ts`. Nav is generated from catalog files in that folder. Layout files are CSS `grid-template-areas` whose cell names are scene ids.
 
 Scene catalog and controls: [docs/scenes.md](./docs/scenes.md).
 

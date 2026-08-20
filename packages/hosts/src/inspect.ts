@@ -41,15 +41,14 @@ export async function peekFile(
 }
 
 export async function commitWidget(
-  sceneFile: string,
-  at: { line: number; column: number },
+  at: { file: string; line: number; column: number },
   values: number[],
 ): Promise<string | null> {
   const res = await fetch("/__write-widget", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      file: sceneFile,
+      file: at.file,
       line: at.line,
       column: at.column,
       values,

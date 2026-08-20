@@ -113,7 +113,7 @@ export function drawMill(opts: MillOpts): Geom {
       const p = opts.pocket;
       const parts: Geom[] = [box3(p.min, p.max)];
       const r = p.filletR;
-      if (r && r > 0.05) {
+      if (r > 0) {
         const z = Math.max(p.min.z, p.max.z);
         const n = { x: 0, y: 0, z: 1 };
         parts.push(circle3({ x: p.min.x + r, y: p.min.y + r, z }, r, n));

@@ -127,7 +127,7 @@ function showWelcome(
         <button type="submit">New scene</button>
         <p class="form-error" hidden></p>
       </form>
-      <p class="hint">Id becomes the filename and the CSS grid area: <code>hello.ts</code> → <code>grid-area: hello</code>.</p>
+      <p class="hint">Id becomes the filename and the CSS grid area: <code>hello.scene.ts</code> → <code>grid-area: hello</code>.</p>
     </div>
   `;
 

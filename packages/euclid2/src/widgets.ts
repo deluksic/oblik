@@ -3,11 +3,11 @@ import type { Vec2 } from "@design-scenes/geom";
 import { lerp } from "@design-scenes/geom";
 
 export type SiteOpts = {
-  id?: string;
+  file?: string;
   at?: [number, number];
 };
 
-export type GizmoAt = { line: number; column: number };
+export type GizmoAt = { file: string; line: number; column: number };
 
 type Located = { site: string; at: GizmoAt };
 
@@ -28,6 +28,17 @@ export type GliderGizmo = Located & {
   a: Vec2;
   b: Vec2;
   t: number;
+};
+
+export type LineGliderGizmo = Located & {
+  kind: "lineGlider";
+  origin: Vec2;
+  /** Unit direction. */
+  direction: Vec2;
+  /** Signed distance along direction, world units. */
+  s: number;
+  min?: number;
+  max?: number;
 };
 
 export type NumberGizmo = Located & {
@@ -58,6 +69,7 @@ export type Gizmo =
   | PointGizmo
   | DistanceGizmo
   | GliderGizmo
+  | LineGliderGizmo
   | NumberGizmo
   | AngleGizmo
   | VectorGizmo;
@@ -81,17 +93,20 @@ function overridesOf(source: string): Map<string, number[]> {
 }
 
 function siteFrom(opts?: SiteOpts): Located | null {
-  if (!opts?.id || !opts.at || opts.at.length < 2) return null;
+  if (!opts?.file || !opts.at || opts.at.length < 2) return null;
   const line = opts.at[0];
   const column = opts.at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
-  return { site: opts.id, at: { line, column } };
+  return {
+    site: `${opts.file}:${line}:${column}`,
+    at: { file: opts.file, line, column },
+  };
 }
 
-function readOverride(id: string | undefined): number[] | undefined {
-  if (!id) return undefined;
-  if (silent) return importedBySource.get(silentSource)?.get(id);
-  return overridesBySource.get(activeSource)?.get(id);
+function readOverride(site: string | undefined): number[] | undefined {
+  if (!site) return undefined;
+  if (silent) return importedBySource.get(silentSource)?.get(site);
+  return overridesBySource.get(activeSource)?.get(site);
 }
 
 export function beginWidgetFrame(source = ""): void {
@@ -102,8 +117,7 @@ export function beginWidgetFrame(source = ""): void {
 /**
  * Run edit* without gizmos. Reads `publishWidgetOverrides(source)` from that
  * 2D scene (e.g. plate → mill, cylinder → rose, profile → rose), not the live
- * map of the scene evaluating now. Overlay is keyed by the compile-time UUID
- * on each CallExpression.
+ * map of the scene evaluating now. Snapshot keys are file:line:column.
  */
 export function withoutWidgets<T>(fn: () => T, source = ""): T {
   silent += 1;
@@ -149,10 +163,10 @@ export function getGizmos(): readonly Gizmo[] {
 }
 
 export function editPoint(x: number, y: number, site?: SiteOpts): Point {
-  const o = readOverride(site?.id);
+  const located = siteFrom(site);
+  const o = readOverride(located?.site);
   const px = o?.[0] ?? x;
   const py = o?.[1] ?? y;
-  const located = siteFrom(site);
   if (!silent && located) {
     gizmos.push({ kind: "point", ...located, x: px, y: py });
   }
@@ -164,9 +178,9 @@ export function editDistanceToPoint(
   d: number,
   site?: SiteOpts,
 ): number {
-  const o = readOverride(site?.id);
-  const dist = o?.[0] ?? d;
   const located = siteFrom(site);
+  const o = readOverride(located?.site);
+  const dist = o?.[0] ?? d;
   if (!silent && located) {
     gizmos.push({
       kind: "distance",
@@ -178,14 +192,15 @@ export function editDistanceToPoint(
   return dist;
 }
 
-export function editPointOnLine(
+/** Glider on a finite segment. `t` is in `[0, 1]`. */
+export function editPointOnSegment(
   lineSeg: Line,
   t: number,
   site?: SiteOpts,
 ): Point {
-  const o = readOverride(site?.id);
-  const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
   const located = siteFrom(site);
+  const o = readOverride(located?.site);
+  const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
   if (!silent && located) {
     gizmos.push({
       kind: "glider",
@@ -199,6 +214,44 @@ export function editPointOnLine(
   return point(p.x, p.y);
 }
 
+export type LineEditOpts = SiteOpts & { min?: number; max?: number };
+
+function unitDir(direction: Vec2): Vec2 {
+  const len = Math.hypot(direction.x, direction.y);
+  if (len < 1e-12) return { x: 1, y: 0 };
+  return { x: direction.x / len, y: direction.y / len };
+}
+
+/**
+ * Glider on an infinite line through `origin` along `direction`.
+ * `s` is signed distance in world units (not 0–1). Returns the absolute point.
+ */
+export function editPointOnLine(
+  origin: Vec2,
+  direction: Vec2,
+  s: number,
+  opts?: LineEditOpts,
+): Point {
+  const located = siteFrom(opts);
+  const o = readOverride(located?.site);
+  let ss = o?.[0] ?? s;
+  if (opts?.min != null) ss = Math.max(opts.min, ss);
+  if (opts?.max != null) ss = Math.min(opts.max, ss);
+  const dir = unitDir(direction);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "lineGlider",
+      ...located,
+      origin: { x: origin.x, y: origin.y },
+      direction: dir,
+      s: ss,
+      min: opts?.min,
+      max: opts?.max,
+    });
+  }
+  return point(origin.x + dir.x * ss, origin.y + dir.y * ss);
+}
+
 /**
  * Offset from `origin`. Gizmo is the coral handle at origin+(dx,dy).
  * Drag writes dx, dy; origin is geometry, not a write target.
@@ -209,10 +262,10 @@ export function editVector(
   dy: number,
   site?: SiteOpts,
 ): Vec2 {
-  const o = readOverride(site?.id);
+  const located = siteFrom(site);
+  const o = readOverride(located?.site);
   const vx = o?.[0] ?? dx;
   const vy = o?.[1] ?? dy;
-  const located = siteFrom(site);
   if (!silent && located) {
     gizmos.push({
       kind: "vector",
@@ -249,8 +302,8 @@ export function editNumber(n: number, opts: NumberEditOpts): number {
   const min = opts.min ?? 0;
   const max = opts.max ?? Math.max(min + 1, n);
   const step = opts.step && opts.step > 0 ? opts.step : 1;
-  const v = snapEditNumber(readOverride(opts.id)?.[0] ?? n, min, max, step);
   const located = siteFrom(opts);
+  const v = snapEditNumber(readOverride(located?.site)?.[0] ?? n, min, max, step);
   if (!silent && located) {
     gizmos.push({
       kind: "number",
@@ -286,8 +339,8 @@ export function editAngle(
   opts?: AngleEditOpts,
 ): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
-  const deg = wrapDeg(readOverride(opts?.id)?.[0] ?? degrees);
   const located = siteFrom(opts);
+  const deg = wrapDeg(readOverride(located?.site)?.[0] ?? degrees);
   if (!silent && located) {
     gizmos.push({
       kind: "angle",
@@ -308,6 +361,8 @@ export function gizmoValues(g: Gizmo): number[] {
       return [g.d];
     case "glider":
       return [g.t];
+    case "lineGlider":
+      return [g.s];
     case "number":
       return [g.n];
     case "angle":

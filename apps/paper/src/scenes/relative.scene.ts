@@ -2,7 +2,7 @@ import { circle, group, line, point } from "@design-scenes/geom";
 import { editPoint, editVector } from "@design-scenes/euclid2";
 
 export const title = "Relative";
-export const sceneFile = "relative.ts";
+export const sceneFile = "relative.scene.ts";
 export const hint = "Left is position. Coral arrow is the offset. b is derived.";
 
 /**

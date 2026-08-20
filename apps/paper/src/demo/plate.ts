@@ -144,7 +144,7 @@ function pocketWithFillets(
   max: Vec2,
   filletR: number,
 ): Geom[] {
-  const r = Math.max(0.05, Math.min(filletR, (max.x - min.x) / 4, (max.y - min.y) / 4));
+  const r = filletR;
   const parts: Geom[] = [
     polyline([
       { x: min.x + r, y: min.y },
