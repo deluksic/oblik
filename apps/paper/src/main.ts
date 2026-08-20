@@ -19,11 +19,13 @@ import {
 import * as beam from "./scenes/beam.ts";
 import * as beamFlat from "./scenes/beam-flat.ts";
 import * as beamShared from "./scenes/beam-shared.ts";
+import * as plate from "./scenes/plate.ts";
 
 const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   beam: { mod: beam, title: "Beam truss (grouped paths)" },
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
   shared: { mod: beamShared, title: "Shared radius (one literal)" },
+  plate: { mod: plate, title: "Milled plate" },
 };
 
 const sceneKey = new URLSearchParams(location.search).get("scene") ?? "beam";
@@ -128,7 +130,9 @@ function render(): void {
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
       : sceneKey === "shared"
         ? "One dashed radius — all three rings and the roof follow it while you drag"
-        : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
+        : sceneKey === "plate"
+          ? "Plate: shared drill Ø, looped holes in demo, slot on top edge · wheel zooms"
+          : "Grouped paths: group[0] › line[2] · drag handles · wheel zooms";
   errorEl.hidden = !error;
   errorEl.textContent = error ?? "";
   void updateInspect();
@@ -168,7 +172,9 @@ async function updateInspect(): Promise<void> {
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
         : sceneKey === "shared"
           ? "One coral radius around the middle post. Library circles on the other posts are not handles."
-          : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
+          : sceneKey === "plate"
+            ? "Drag stock corners, any bolt center, drill Ø, pocket, fillet, or the slot on the top edge."
+            : "Hover a tick, the roof, or the span. Handles (coral) are scene widgets.";
     sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
     return;
   }
@@ -390,6 +396,10 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/beam-shared.ts", (mod) => {
     if (!mod || !("scene" in mod) || sceneKey !== "shared") return;
+    reloadScene(mod as unknown as SceneModule);
+  });
+  import.meta.hot.accept("./scenes/plate.ts", (mod) => {
+    if (!mod || !("scene" in mod) || sceneKey !== "plate") return;
     reloadScene(mod as unknown as SceneModule);
   });
 }
