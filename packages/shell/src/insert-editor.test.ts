@@ -18,9 +18,9 @@ export function scene() {
 
 test("inserts editPoint after existing scene widgets", () => {
   const next = insertEditors(hello, [{ kind: "point", x: 1.25, y: -0.4 }]);
-  assert.match(next, /const __scene = circle\(c, r\);/);
-  assert.match(next, /const p = editPoint\(1\.25, -0\.4\);/);
-  assert.match(next, /return __scene;/);
+  assert.match(next, /^  const __scene = circle\(c, r\);$/m);
+  assert.match(next, /^  const p = editPoint\(1\.25, -0\.4\);$/m);
+  assert.match(next, /^  return __scene;$/m);
   assert.equal(widgetBindingName(hello, 0), "c");
   assert.equal(widgetInSceneFunction(hello, 0), true);
 });

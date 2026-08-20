@@ -186,18 +186,20 @@ function insertBeforeReturn(
   if (!last || !ts.isReturnStatement(last) || !last.expression) {
     throw new Error("scene() must end with a return of some geometry");
   }
-  const indent = indentAt(source, last.getStart());
+  const sf = fn.getSourceFile();
+  const start = last.getStart(sf);
+  const indent = indentAt(source, start);
   const expr = last.expression;
   if (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) {
     const chunk = lines.map((ln) => `${indent}${ln}\n`).join("");
-    return source.slice(0, last.getStart()) + chunk + source.slice(last.getStart());
+    return source.slice(0, start) + chunk + source.slice(start);
   }
-  const exprText = source.slice(expr.getStart(), expr.getEnd());
+  const exprText = source.slice(expr.getStart(sf), expr.getEnd());
   const chunk =
     `${indent}const ${SCENE_DRAWN} = ${exprText};\n` +
     lines.map((ln) => `${indent}${ln}\n`).join("") +
     `${indent}return ${SCENE_DRAWN};`;
-  return source.slice(0, last.getStart()) + chunk + source.slice(last.getEnd());
+  return source.slice(0, start) + chunk + source.slice(last.getEnd());
 }
 
 export function insertEditors(source: string, edits: EditorInsert[]): string {
