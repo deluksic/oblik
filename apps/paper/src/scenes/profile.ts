@@ -13,12 +13,12 @@ export const sceneFile = "profile.ts";
  * (0 = on the circle), Y is world Z. Three unrolled circles.
  */
 export function profileLayout(): ProfileLayout {
-  const c0 = editPoint(0.12, 0.36);
-  const r0 = editDistanceToPoint(c0, 0.3);
-  const c1 = editPoint(0.48, 0.52);
-  const r1 = editDistanceToPoint(c1, 0.22);
-  const c2 = editPoint(-0.08, 0.14);
-  const r2 = editDistanceToPoint(c2, 0.2);
+  const c0 = editPoint(-0.06, 0.25);
+  const r0 = editDistanceToPoint(c0, 0.26);
+  const c1 = editPoint(-0.06, 0.58);
+  const r1 = editDistanceToPoint(c1, 0.1);
+  const c2 = editPoint(0.23, 0.11);
+  const r2 = editDistanceToPoint(c2, 0.17);
   return {
     circles: [
       { c: c0, r: r0 },

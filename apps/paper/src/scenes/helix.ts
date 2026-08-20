@@ -23,7 +23,7 @@ if (import.meta.hot) {
  * the mate uses the opposite hand.
  */
 export function scene() {
-  const g = withoutWidgets(() => readGears());
+  const g = withoutWidgets(() => readGears(), "gear");
   const mast = line3(
     { x: g.pinion.x, y: g.pinion.y, z: 0 },
     { x: g.pinion.x, y: g.pinion.y, z: 6 },

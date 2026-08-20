@@ -30,6 +30,7 @@ export type PaperSdf2Handle = {
 
 export type PaperSdf2Opts = {
   split?: boolean;
+  canvas?: HTMLCanvasElement;
   onLiveChange?: () => void;
 };
 
@@ -43,11 +44,11 @@ export function startPaperSdf2(
   els: InspectEls,
   opts: PaperSdf2Opts = {},
 ): PaperSdf2Handle {
-  const canvas = document.querySelector<HTMLCanvasElement>("#paper")!;
+  const canvas = opts.canvas ?? document.querySelector<HTMLCanvasElement>("#paper")!;
   canvas.hidden = false;
 
-  const paperLabel = document.querySelector("#pane-paper .view-label");
-  if (paperLabel) paperLabel.textContent = "SDF 2D · profile.ts";
+  const paneLabel = canvas.parentElement?.querySelector(".view-label");
+  if (paneLabel) paneLabel.textContent = "SDF 2D · profile.ts";
 
   if (!opts.split) {
     const titleEl = document.querySelector<HTMLElement>("#scene-title")!;
@@ -77,7 +78,7 @@ export function startPaperSdf2(
 
   function evaluate(): void {
     try {
-      beginWidgetFrame();
+      beginWidgetFrame("profile");
       sdf = sceneMod.scene();
       gizmos = getGizmos();
       error = null;
@@ -91,7 +92,7 @@ export function startPaperSdf2(
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
-    publishWidgetOverrides();
+    publishWidgetOverrides("profile");
     opts.onLiveChange?.();
   }
 
@@ -113,7 +114,7 @@ export function startPaperSdf2(
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
       : opts.split
-        ? "X = radial from each rim · Y = height. Three smooth-unioned circles · 3D sweeps this around the seven"
+        ? "X = radial from each rim · Y = height. Left is the packed plan; this pane is the sweep section"
         : "Sweep profile: three circles, point + radius each, smooth-unioned. X radial, Y is Z";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
@@ -125,7 +126,7 @@ export function startPaperSdf2(
     } else {
       els.crumbEl.textContent = "Nothing selected";
       els.metaEl.textContent = opts.split
-        ? "2D writes profile.ts. The field is swept around each of the seven circles; height writes rose-sdf.ts."
+        ? "2D writes profile.ts. Plan (left) writes cylinder.ts. Height writes rose-sdf.ts."
         : "Drag a centre or dashed radius. The three circles blend into one field.";
       els.sourceEl.innerHTML = `<code class="empty">No surface identity in this view.</code>`;
     }
@@ -138,11 +139,13 @@ export function startPaperSdf2(
 
   function applyDrag(g: Gizmo, world: Vec2): void {
     if (g.kind === "point") {
-      setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)]);
+      setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)], "profile");
     } else if (g.kind === "distance") {
-      setWidgetOverride(g.index, [
-        quantize(Math.max(0.02, dist(world, g.origin))),
-      ]);
+      setWidgetOverride(
+        g.index,
+        [quantize(Math.max(0.02, dist(world, g.origin)))],
+        "profile",
+      );
     }
   }
 
@@ -259,7 +262,7 @@ export function startPaperSdf2(
     import.meta.hot.accept("./scenes/profile.ts", (mod) => {
       if (!mod || !("scene" in mod)) return;
       sceneMod = mod as unknown as SceneMod;
-      clearWidgetOverrides();
+      clearWidgetOverrides("profile");
       peekCache.clear();
       void peekFile(peekCache, `apps/paper/src/scenes/${sceneMod.sceneFile}`).then(
         () => refresh(),

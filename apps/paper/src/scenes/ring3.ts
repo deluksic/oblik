@@ -20,7 +20,7 @@ if (import.meta.hot) {
  * of ring.ts (PLAN: two scene types looking at the same library).
  */
 export function scene() {
-  const r = withoutWidgets(() => readRing());
+  const r = withoutWidgets(() => readRing(), "ring");
   return drawRing3({
     origin: r.origin,
     innerR: r.innerR,

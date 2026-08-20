@@ -51,6 +51,8 @@ const sceneKey = opts.sceneKey ?? urlScene;
 const active = SCENES[sceneKey] ?? SCENES.beam!;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#paper")!;
+const paperLabel = document.querySelector("#pane-paper .view-label");
+if (paperLabel) paperLabel.textContent = `2D · ${active.mod.sceneFile}`;
 const crumbEl = document.querySelector<HTMLElement>("#crumb")!;
 const metaEl = document.querySelector<HTMLElement>("#meta")!;
 const sourceEl = document.querySelector<HTMLElement>("#source")!;
@@ -117,7 +119,7 @@ function countEditCalls(source: string): number {
 
 function evaluate(): void {
   try {
-    frame = runScene(sceneMod);
+    frame = runScene(sceneMod, sceneKey);
     lastGood = frame;
     error = null;
     const source = peekCache.get(`apps/paper/src/scenes/${sceneMod.sceneFile}`);
@@ -139,15 +141,7 @@ function evaluate(): void {
     selectedId = null;
     selectedGeom = null;
   }
-  if (
-    sceneKey === "plate" ||
-    sceneKey === "gear" ||
-    sceneKey === "ring" ||
-    sceneKey === "cylinder" ||
-    opts.split
-  ) {
-    publishWidgetOverrides();
-  }
+  publishWidgetOverrides(sceneKey);
   opts.onLiveChange?.();
 }
 
@@ -179,7 +173,7 @@ function render(): void {
         : sceneKey === "ring"
           ? "Drag the bore, shank, and signet on the unrolled strip — the wrap has no 3D widgets"
           : sceneKey === "cylinder"
-            ? "Drag the centre-cell quatrefoil — all seven follow · coral glider on the right is height"
+            ? "Drag the centre-cell quatrefoil — all seven follow · middle pane is the sweep profile · coral glider on the right is height"
           : "Drag 2D handles — mill follows live · Hole count is the titled slider · coral glider on the right is thickness"
       : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
@@ -329,22 +323,26 @@ function applyDrag(
   gizmos: readonly Gizmo[],
 ): void {
   if (g.kind === "point") {
-    setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)]);
+    setWidgetOverride(g.index, [quantize(world.x), quantize(world.y)], sceneKey);
   } else if (g.kind === "distance") {
-    setWidgetOverride(g.index, [
-      quantize(Math.max(0.05, dist(world, g.origin))),
-    ]);
+    setWidgetOverride(
+      g.index,
+      [quantize(Math.max(0.05, dist(world, g.origin)))],
+      sceneKey,
+    );
   } else if (g.kind === "glider") {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
-    setWidgetOverride(g.index, [quantize(t)]);
+    setWidgetOverride(g.index, [quantize(t)], sceneKey);
   } else if (g.kind === "angle") {
     let deg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
     if (deg < 0) deg += 360;
-    setWidgetOverride(g.index, [Math.round(deg) % 360]);
+    setWidgetOverride(g.index, [Math.round(deg) % 360], sceneKey);
   } else {
-    setWidgetOverride(g.index, [
-      numberValueFromPointer(g, screen.x, cssW, cssH, gizmos),
-    ]);
+    setWidgetOverride(
+      g.index,
+      [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)],
+      sceneKey,
+    );
   }
 }
 
@@ -484,7 +482,7 @@ window.addEventListener("resize", () => render());
 
 function reloadScene(mod: SceneModule): void {
   sceneMod = mod;
-  clearWidgetOverrides();
+  clearWidgetOverrides(sceneKey);
   peekCache.clear();
   void peekFile(`apps/paper/src/scenes/${sceneMod.sceneFile}`).then(() => {
     evaluate();
@@ -507,7 +505,7 @@ if (import.meta.hot) {
   });
   import.meta.hot.accept("./scenes/plate.ts", (mod) => {
     if (!mod || !("scene" in mod)) return;
-    if (sceneKey === "plate" || opts.split) {
+    if (sceneKey === "plate") {
       reloadScene(mod as unknown as SceneModule);
       return;
     }

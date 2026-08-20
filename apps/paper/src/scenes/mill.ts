@@ -25,9 +25,10 @@ if (import.meta.hot) {
  * gizmos (and increment euclid2 indices) while evaluating this scene.
  * Silent evaluation reads a published plate snapshot (split view), not
  * the live widgets of mill/nest — those would collide on index 0.
+ * Pass the channel that paper2d published (`"plate"`).
  */
 export function scene() {
-  const plate = withoutWidgets(() => readPlate());
+  const plate = withoutWidgets(() => readPlate(), "plate");
   const { x, y } = plate.stock.min;
   const mast = line3({ x, y, z: 0 }, { x, y, z: 8 });
   const thickness = Math.max(0.5, editPointOnLine3(mast, 0.18).z);

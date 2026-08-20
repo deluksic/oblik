@@ -30,12 +30,14 @@ if (import.meta.hot) {
 /**
  * Packed cylinders from cylinder.ts (gizmos off) plus the 2D profile
  * swept around each rim. Height is the only widget in this file.
+ * Layout and profile are separate widget channels so a profile drag
+ * cannot overwrite the quatrefoil radii.
  */
 export function scene() {
-  const layout = withoutWidgets(() => readLayout());
-  const profile = withoutWidgets(() => readProfile());
+  const layout = withoutWidgets(() => readLayout(), "cylinder");
+  const profile = withoutWidgets(() => readProfile(), "profile");
   const mast = line3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnLine3(mast, 0.07).z;
+  const height = editPointOnLine3(mast, 0.09).z;
   const pack = dimpledCylinderPack({
     radius: layout.radius,
     height,

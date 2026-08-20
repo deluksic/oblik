@@ -18,9 +18,9 @@ export type SceneModule = {
   view?: "euclid2";
 };
 
-export function runScene(mod: SceneModule): Frame {
+export function runScene(mod: SceneModule, source = ""): Frame {
   beginGeomFrame();
-  beginWidgetFrame();
+  beginWidgetFrame(source);
   const geom = mod.scene();
   return {
     geom,

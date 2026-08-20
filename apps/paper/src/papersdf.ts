@@ -46,8 +46,6 @@ export function startPaperSdf(
 
   const spaceLabel = document.querySelector("#pane-space .view-label");
   if (spaceLabel) spaceLabel.textContent = "SDF · rose-sdf.ts";
-  const paperLabel = document.querySelector("#pane-paper .view-label");
-  if (paperLabel && opts.split) paperLabel.textContent = "SDF 2D · profile.ts";
 
   let sceneMod: SceneMod = rose;
   const view = new SdfView(canvas);
