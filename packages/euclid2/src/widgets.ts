@@ -30,20 +30,33 @@ const gizmos: Gizmo[] = [];
 const overrides = new Map<number, number[]>();
 let nextIndex = 0;
 let silent = 0;
+let silentIndex = 0;
 
 export function beginWidgetFrame(): void {
   nextIndex = 0;
   gizmos.length = 0;
 }
 
-/** Run edit* as plain literals — no gizmos, no write-back indices. */
+/**
+ * Run edit* without gizmos or write-back indices.
+ * Live 2D overrides still apply, so a 3D view can follow a drag in real time.
+ */
 export function withoutWidgets<T>(fn: () => T): T {
   silent += 1;
+  const prev = silentIndex;
+  silentIndex = 0;
   try {
     return fn();
   } finally {
+    silentIndex = prev;
     silent -= 1;
   }
+}
+
+function takeSilentIndex(): number {
+  const i = silentIndex;
+  silentIndex += 1;
+  return i;
 }
 
 export function setWidgetOverride(index: number, values: number[]): void {
@@ -65,7 +78,10 @@ function takeIndex(): number {
 }
 
 export function editPoint(x: number, y: number): Point {
-  if (silent) return point(x, y);
+  if (silent) {
+    const o = overrides.get(takeSilentIndex());
+    return point(o?.[0] ?? x, o?.[1] ?? y);
+  }
   const index = takeIndex();
   const o = overrides.get(index);
   const px = o?.[0] ?? x;
@@ -75,7 +91,10 @@ export function editPoint(x: number, y: number): Point {
 }
 
 export function editDistanceToPoint(origin: Vec2, d: number): number {
-  if (silent) return d;
+  if (silent) {
+    const o = overrides.get(takeSilentIndex());
+    return o?.[0] ?? d;
+  }
   const index = takeIndex();
   const o = overrides.get(index);
   const dist = o?.[0] ?? d;
@@ -90,7 +109,9 @@ export function editDistanceToPoint(origin: Vec2, d: number): number {
 
 export function editPointOnLine(lineSeg: Line, t: number): Point {
   if (silent) {
-    const p = lerp(lineSeg.a, lineSeg.b, Math.min(1, Math.max(0, t)));
+    const o = overrides.get(takeSilentIndex());
+    const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
+    const p = lerp(lineSeg.a, lineSeg.b, tt);
     return point(p.x, p.y);
   }
   const index = takeIndex();

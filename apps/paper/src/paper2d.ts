@@ -20,7 +20,13 @@ import * as beamFlat from "./scenes/beam-flat.ts";
 import * as beamShared from "./scenes/beam-shared.ts";
 import * as plate from "./scenes/plate.ts";
 
-export function startPaper2d(): void {
+export type StartPaper2dOpts = {
+  sceneKey?: string;
+  split?: boolean;
+  onLiveChange?: () => void;
+};
+
+export function startPaper2d(opts: StartPaper2dOpts = {}): void {
 const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   beam: { mod: beam, title: "Beam truss (grouped paths)" },
   flat: { mod: beamFlat, title: "Twin trusses (flat paths)" },
@@ -28,7 +34,8 @@ const SCENES: Record<string, { mod: SceneModule; title: string }> = {
   plate: { mod: plate, title: "Milled plate" },
 };
 
-const sceneKey = new URLSearchParams(location.search).get("scene") ?? "beam";
+const urlScene = new URLSearchParams(location.search).get("scene") ?? "beam";
+const sceneKey = opts.sceneKey ?? urlScene;
 const active = SCENES[sceneKey] ?? SCENES.beam!;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#paper")!;
@@ -39,13 +46,15 @@ const statusEl = document.querySelector<HTMLElement>("#status")!;
 const errorEl = document.querySelector<HTMLElement>("#error")!;
 const titleEl = document.querySelector<HTMLElement>("#scene-title")!;
 
-titleEl.textContent = active.title;
-document.title = `euclid2 — ${active.title}`;
+if (!opts.split) {
+  titleEl.textContent = active.title;
+  document.title = `euclid2 — ${active.title}`;
 
-for (const link of document.querySelectorAll<HTMLAnchorElement>(
-  "#scene-nav a[data-scene]",
-)) {
-  link.classList.toggle("active", link.dataset.scene === sceneKey);
+  for (const link of document.querySelectorAll<HTMLAnchorElement>(
+    "#scene-nav a[data-scene]",
+  )) {
+    link.classList.toggle("active", link.dataset.scene === sceneKey);
+  }
 }
 
 let sceneMod: SceneModule = active.mod;
@@ -102,6 +111,7 @@ function evaluate(): void {
     error = err instanceof Error ? err.message : String(err);
     frame = lastGood;
   }
+  opts.onLiveChange?.();
 }
 
 function activeGizmo(): number | null {
@@ -126,7 +136,9 @@ function render(): void {
   );
   statusEl.textContent = error
     ? "Last good frame · scene threw"
-    : sceneKey === "flat"
+    : opts.split
+      ? "Drag 2D handles — mill follows live · coral glider on the right is thickness"
+      : sceneKey === "flat"
       ? "Flat paths: ticks share demo/beam.ts — each geom has a unique id"
       : sceneKey === "shared"
         ? "One dashed radius — all three rings and the roof follow it while you drag"
@@ -168,7 +180,9 @@ async function updateInspect(): Promise<void> {
   if (!t) {
     crumbEl.textContent = "Nothing selected";
     metaEl.textContent =
-      sceneKey === "flat"
+      opts.split
+        ? "2D writes plate.ts; 3D thickness writes mill.ts. Mill XY follows these handles while you drag."
+        : sceneKey === "flat"
         ? "Click ticks on each truss — paths differ; creation site is the library loop."
         : sceneKey === "shared"
           ? "One coral radius around the middle post. Library circles on the other posts are not handles."
@@ -399,7 +413,8 @@ if (import.meta.hot) {
     reloadScene(mod as unknown as SceneModule);
   });
   import.meta.hot.accept("./scenes/plate.ts", (mod) => {
-    if (!mod || !("scene" in mod) || sceneKey !== "plate") return;
+    if (!mod || !("scene" in mod)) return;
+    if (sceneKey !== "plate" && !opts.split) return;
     reloadScene(mod as unknown as SceneModule);
   });
 }

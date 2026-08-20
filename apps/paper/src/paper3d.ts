@@ -20,11 +20,24 @@ import {
   type InspectEls,
 } from "./inspect.ts";
 
-export function startPaper3d(els: InspectEls): void {
+export type Paper3dOpts = {
+  split?: boolean;
+};
+
+export type Paper3dHandle = {
+  refresh: (opts?: { quiet?: boolean }) => void;
+};
+
+export function startPaper3d(
+  els: InspectEls,
+  opts: Paper3dOpts = {},
+): Paper3dHandle {
   const canvas = document.querySelector<HTMLCanvasElement>("#space")!;
   const paper = document.querySelector<HTMLCanvasElement>("#paper")!;
-  paper.hidden = true;
-  canvas.hidden = false;
+  if (!opts.split) {
+    paper.hidden = true;
+    canvas.hidden = false;
+  }
 
   let sceneMod: SceneModule3 = mill;
   const space = new SpaceView(canvas);
@@ -58,7 +71,7 @@ export function startPaper3d(els: InspectEls): void {
     }
   }
 
-  function sync(): void {
+  function sync(quiet = false): void {
     space.resize();
     space.sync(
       frame?.drawables ?? [],
@@ -67,12 +80,20 @@ export function startPaper3d(els: InspectEls): void {
       selectedId,
       drag?.index ?? hoverGizmo?.index ?? null,
     );
+    if (quiet && !error) return;
     els.statusEl.textContent = error
       ? "Last good frame · scene threw"
-      : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
+      : opts.split
+        ? "Drag 2D handles — mill follows live · coral glider is thickness · LMB orbit"
+        : "XY from plate.ts (no gizmos) · coral glider = thickness · LMB orbit · RMB pan · wheel zoom";
     els.errorEl.hidden = !error;
     els.errorEl.textContent = error ?? "";
     void updateInspect();
+  }
+
+  function refresh(refreshOpts?: { quiet?: boolean }): void {
+    evaluate();
+    sync(refreshOpts?.quiet ?? false);
   }
 
   async function updateInspect(): Promise<void> {
@@ -88,8 +109,9 @@ export function startPaper3d(els: InspectEls): void {
         ?.geom ?? selectedGeom;
     if (!g) {
       els.crumbEl.textContent = "Nothing selected";
-      els.metaEl.textContent =
-        "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
+      els.metaEl.textContent = opts.split
+        ? "Stock XY, holes, pocket, and slot come from the 2D plate. Only thickness is a widget here."
+        : "Stock XY, holes, pocket, and slot come from plate.ts. Only thickness is a widget here.";
       els.sourceEl.innerHTML = `<code class="empty">Select geometry to see the creation site.</code>`;
       return;
     }
@@ -190,6 +212,10 @@ export function startPaper3d(els: InspectEls): void {
   window.addEventListener("resize", () => {
     space.resize();
   });
+  const pane = canvas.parentElement;
+  if (pane && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => space.resize()).observe(pane);
+  }
 
   if (import.meta.hot) {
     import.meta.hot.accept("./scenes/mill.ts", (mod) => {
@@ -207,14 +233,16 @@ export function startPaper3d(els: InspectEls): void {
     // plate.ts drives XY; keep the in-memory thickness override if mill.ts did not change.
     import.meta.hot.accept("./scenes/plate.ts", () => {
       evaluate();
-      sync();
+      sync(true);
     });
   }
 
   void peekFile(peekCache, `apps/paper/src/scenes/${sceneMod.sceneFile}`).then(
     () => {
       evaluate();
-      sync();
+      sync(opts.split);
     },
   );
+
+  return { refresh };
 }

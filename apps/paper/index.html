@@ -22,6 +22,8 @@
             <a href="?scene=plate" data-scene="plate">Milled plate</a>
             <span aria-hidden="true">·</span>
             <a href="?scene=mill" data-scene="mill">Mill 3D</a>
+            <span aria-hidden="true">·</span>
+            <a href="?scene=split" data-scene="split">Plate + mill</a>
           </nav>
         </div>
         <p id="status">Loading scene…</p>
@@ -29,8 +31,14 @@
       <p id="error" hidden></p>
       <div id="workspace">
         <div id="viewport">
-          <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
-          <canvas id="space" hidden tabindex="0" aria-label="3D mill block"></canvas>
+          <section id="pane-paper" class="view-pane">
+            <p class="view-label">2D · plate.ts</p>
+            <canvas id="paper" tabindex="0" aria-label="2D graph paper"></canvas>
+          </section>
+          <section id="pane-space" class="view-pane">
+            <p class="view-label">3D · mill.ts</p>
+            <canvas id="space" hidden tabindex="0" aria-label="3D mill block"></canvas>
+          </section>
         </div>
         <aside id="inspect">
           <p class="kicker">Identity</p>

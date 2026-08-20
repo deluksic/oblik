@@ -21,6 +21,7 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117).
 - [?scene=shared](http://127.0.0.1:43117/?scene=shared) — **one** `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release.
 - [?scene=plate](http://127.0.0.1:43117/?scene=plate) — milled plate: stock corners, four bolt holes (shared drill Ø), pocket + fillet, slot on top edge. Demo **loops** hole geometry; inspector jumps to the loop line for every hole.
 - [?scene=mill](http://127.0.0.1:43117/?scene=mill) — **3D** extrusion of the plate scene. XY (stock, holes, pocket, slot) is read from `plate.ts` with gizmos off. The only 3D widget is thickness (vertical glider); write-back patches `mill.ts`.
+- [?scene=split](http://127.0.0.1:43117/?scene=split) — plate 2D and mill 3D side by side. Drag 2D handles and the mill follows **while you drag**; thickness stays a 3D-only widget.
 
 ## Try
 
