@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Vec3 } from "@design-scenes/geom";
 import { compileSdf, sdfMapSignature, type CompiledSdf } from "./compile.ts";
-import { SDF_VERT, sdfFragSource } from "./shader.ts";
+import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader.ts";
 import type { Sdf } from "./tree.ts";
 
 type Gizmo3 =
@@ -14,6 +14,9 @@ const COL = {
   bg: 0x12141c,
   gizmo: 0xe8876a,
 };
+
+/** Raymarch at this fraction of CSS pixels. Gizmos stay 1×. */
+const FIELD_SCALE = 0.5;
 
 export type HitSdf = { target: "gizmo"; gizmo: Gizmo3 };
 
@@ -27,6 +30,10 @@ export class SdfView {
   private rayScene = new THREE.Scene();
   private rayCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private quad: THREE.Mesh;
+  private fieldTarget: THREE.WebGLRenderTarget;
+  private blitScene = new THREE.Scene();
+  private blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  private blitQuad: THREE.Mesh;
   private world = new THREE.Scene();
   private gizmos = new THREE.Group();
   private gizmoByIndex = new Map<number, Gizmo3>();
@@ -38,9 +45,9 @@ export class SdfView {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     this.renderer.setClearColor(COL.bg, 1);
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(1);
     this.renderer.autoClear = true;
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
@@ -63,6 +70,26 @@ export class SdfView {
     this.quad.frustumCulled = false;
     this.rayScene.add(this.quad);
 
+    this.fieldTarget = new THREE.WebGLRenderTarget(1, 1, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+    });
+    this.blitQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        vertexShader: BLIT_VERT,
+        fragmentShader: BLIT_FRAG,
+        uniforms: { uField: { value: this.fieldTarget.texture } },
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    this.blitQuad.frustumCulled = false;
+    this.blitScene.add(this.blitQuad);
+
     const axes = new THREE.AxesHelper(1.6);
     this.world.add(axes);
     this.world.add(this.gizmos);
@@ -79,6 +106,9 @@ export class SdfView {
     this.disposed = true;
     cancelAnimationFrame(this.anim);
     this.controls.dispose();
+    this.fieldTarget.dispose();
+    (this.blitQuad.material as THREE.Material).dispose();
+    this.blitQuad.geometry.dispose();
     this.renderer.dispose();
   }
 
@@ -89,6 +119,10 @@ export class SdfView {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
+    this.fieldTarget.setSize(
+      Math.max(1, Math.floor(w * FIELD_SCALE)),
+      Math.max(1, Math.floor(h * FIELD_SCALE)),
+    );
   }
 
   private loop = (): void => {
@@ -97,7 +131,10 @@ export class SdfView {
     this.controls.update();
     this.pushCamera();
     this.renderer.autoClear = true;
+    this.renderer.setRenderTarget(this.fieldTarget);
     this.renderer.render(this.rayScene, this.rayCam);
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.blitScene, this.blitCam);
     this.renderer.autoClear = false;
     this.renderer.clearDepth();
     this.renderer.render(this.world, this.camera);
@@ -188,11 +225,7 @@ export class SdfView {
     this.invVP.invert();
     mat.uniforms.uCamPos.value.copy(this.camera.position);
     mat.uniforms.uInvVP.value.copy(this.invVP);
-    const r = this.canvas.getBoundingClientRect();
-    mat.uniforms.uRes.value.set(
-      Math.max(1, r.width) * Math.min(2, window.devicePixelRatio || 1),
-      Math.max(1, r.height) * Math.min(2, window.devicePixelRatio || 1),
-    );
+    mat.uniforms.uRes.value.set(this.fieldTarget.width, this.fieldTarget.height);
   }
 
   private intersectPlane(
@@ -256,6 +289,7 @@ function makeSdfMaterial(compiled: CompiledSdf): THREE.ShaderMaterial {
     uniforms,
     depthTest: false,
     depthWrite: false,
+    toneMapped: false,
   });
 }
 
