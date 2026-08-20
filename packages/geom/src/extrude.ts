@@ -23,6 +23,16 @@ function stripClose(points: readonly Vec2[]): Vec2[] {
   return points.slice();
 }
 
+/** Append a copy of `n` xyz triples starting at vertex `from`. Returns the new base index. */
+function copyRing(positions: number[], from: number, n: number): number {
+  const base = positions.length / 3;
+  const start = from * 3;
+  for (let i = 0; i < n * 3; i++) {
+    positions.push(positions[start + i]!);
+  }
+  return base;
+}
+
 /**
  * Sweep a 2D polyline along +Z. Optional twist rotates each slice about
  * `center` (helical extrude). Closed rings get top and bottom caps.
@@ -70,6 +80,8 @@ export function extrude(
     }
   }
 
+  // Caps use a duplicated ring so computeVertexNormals does not average
+  // wall normals into the planar faces (that reads as a shaded rim).
   if (closed && n >= 3) {
     let bx = 0;
     let by = 0;
@@ -81,16 +93,20 @@ export function extrude(
     by /= n;
     const bot = rotateAround({ x: bx, y: by }, center, 0);
     const top = rotateAround({ x: bx, y: by }, center, twist);
+    const last = slices * n;
+    const botRing = copyRing(positions, 0, n);
     const botI = positions.length / 3;
     positions.push(bot.x, bot.y, 0);
+    const topRing = copyRing(positions, last, n);
     const topI = positions.length / 3;
     positions.push(top.x, top.y, h);
-    const last = slices * n;
     for (let i = 0; i < n; i++) {
-      const i0 = i;
-      const i1 = (i + 1) % n;
+      const i0 = botRing + i;
+      const i1 = botRing + ((i + 1) % n);
       indices.push(botI, i1, i0);
-      indices.push(topI, last + i0, last + i1);
+      const j0 = topRing + i;
+      const j1 = topRing + ((i + 1) % n);
+      indices.push(topI, j0, j1);
     }
   }
 
