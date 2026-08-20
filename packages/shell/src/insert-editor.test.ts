@@ -25,16 +25,19 @@ test("inserts editPoint after existing scene widgets", () => {
   assert.equal(widgetInSceneFunction(hello, 0), true);
 });
 
-test("second insert stacks before return __scene", () => {
+test("stacked inserts keep two-space indent on every line", () => {
   const once = insertEditors(hello, [{ kind: "point", x: 1, y: 2 }]);
   const twice = insertEditors(once, [
     { kind: "distance", originName: "p", d: 0.5 },
   ]);
-  assert.equal(
-    (twice.match(/const __scene = /g) ?? []).length,
-    1,
-  );
+  assert.equal((twice.match(/const __scene = /g) ?? []).length, 1);
   assert.match(twice, /const d = editDistanceToPoint\(p, 0\.5\);/);
+  const inner = twice.split("export function scene() {\n")[1]?.split("\n}")[0] ?? "";
+  for (const line of inner.split("\n")) {
+    if (!line.trim()) continue;
+    assert.equal(line.slice(0, 2), "  ", `bad indent: ${JSON.stringify(line)}`);
+    assert.notEqual(line.slice(0, 4), "    ", `over-indented: ${JSON.stringify(line)}`);
+  }
 });
 
 test("rewrites return drawPlate so layout widgets still run first", () => {

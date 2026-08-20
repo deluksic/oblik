@@ -174,6 +174,10 @@ export function ensureNamedImport(
   );
 }
 
+function lineStartAt(source: string, pos: number): number {
+  return source.lastIndexOf("\n", pos - 1) + 1;
+}
+
 function insertBeforeReturn(
   source: string,
   fn: ts.FunctionDeclaration,
@@ -188,18 +192,19 @@ function insertBeforeReturn(
   }
   const sf = fn.getSourceFile();
   const start = last.getStart(sf);
+  const lineStart = lineStartAt(source, start);
   const indent = indentAt(source, start);
   const expr = last.expression;
   if (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) {
     const chunk = lines.map((ln) => `${indent}${ln}\n`).join("");
-    return source.slice(0, start) + chunk + source.slice(start);
+    return source.slice(0, lineStart) + chunk + source.slice(lineStart);
   }
   const exprText = source.slice(expr.getStart(sf), expr.getEnd());
   const chunk =
     `${indent}const ${SCENE_DRAWN} = ${exprText};\n` +
     lines.map((ln) => `${indent}${ln}\n`).join("") +
     `${indent}return ${SCENE_DRAWN};`;
-  return source.slice(0, start) + chunk + source.slice(last.getEnd());
+  return source.slice(0, lineStart) + chunk + source.slice(last.getEnd());
 }
 
 export function insertEditors(source: string, edits: EditorInsert[]): string {
