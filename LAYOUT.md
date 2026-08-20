@@ -6,6 +6,7 @@ pnpm workspace. Libraries are packages; the paper preview is an app. Domain demo
 packages/
   geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude, wrapBand), UUID id, path, provenance
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
+  sdf       @design-scenes/sdf       field CSG (no identity), GLSL compile, raymarch view
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnLine3
   shell     @design-scenes/shell     Vite plugin: peek source, patch edit* literals
 apps/
@@ -20,10 +21,11 @@ apps/
 | --- | --- | --- |
 | `geom` | nothing in this repo | widgets, canvas, Vite |
 | `euclid2` | `geom` | apps, filesystem writes |
+| `sdf` | `geom`, Three.js | widgets, provenance, apps |
 | `euclid3` | `geom`, Three.js | apps, filesystem writes |
 | `shell` | Node, TypeScript, Vite | geom/scene types (it only patches text) |
-| `paper` scenes | `geom`, `euclid2` or `euclid3`, `../demo/*` | putting reusable “domain” in `packages/` until it is real |
-| `paper` demo | `geom` only | `euclid2`, `shell` |
+| `paper` scenes | `geom`, `euclid2` / `euclid3` / `sdf`, `../demo/*` | putting reusable “domain” in `packages/` until it is real |
+| `paper` demo | `geom` or `sdf` | `euclid2`, `shell` |
 
 ## Identity
 

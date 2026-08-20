@@ -27,6 +27,10 @@ export default defineConfig({
         workspaceRoot,
         "packages/euclid3/src/index.ts",
       ),
+      "@design-scenes/sdf": path.resolve(
+        workspaceRoot,
+        "packages/sdf/src/index.ts",
+      ),
     },
   },
   server: {
@@ -40,6 +44,7 @@ export default defineConfig({
       "@design-scenes/geom",
       "@design-scenes/euclid2",
       "@design-scenes/euclid3",
+      "@design-scenes/sdf",
     ],
     include: ["three", "three/addons/controls/OrbitControls.js"],
   },

@@ -122,6 +122,18 @@ if (sceneKey === "split") {
       m.startPaper3d(inspect, { sceneKey: "ring3" });
     })
     .catch(fail3d);
+} else if (sceneKey === "rose") {
+  document.body.classList.add("view-3d");
+  paper.hidden = true;
+  space.hidden = false;
+  titleEl.textContent = "Rose window (SDF)";
+  document.title = "sdf — Rose window";
+  statusEl.textContent = "Loading field view…";
+  void import("./papersdf.ts")
+    .then((m) => {
+      m.startPaperSdf(inspect);
+    })
+    .catch(fail3d);
 } else {
   document.body.classList.add("view-2d");
   paper.hidden = false;
