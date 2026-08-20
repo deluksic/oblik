@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { sceneDevPlugin } from "@design-scenes/shell";
+import { sceneDevPlugin } from "../../packages/shell/src/vite-plugin.ts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../..");
