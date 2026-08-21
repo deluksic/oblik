@@ -3,9 +3,31 @@ import type { PaneMount } from "@/ui/Pane";
 
 import { loaderKey } from "./model";
 
-export type PaneSlot =
-  | { kind: "live"; mount: PaneMount }
-  | { kind: "error"; id: string; label: string; message: string };
+export class PaneResolveError extends Error {
+  readonly id: string;
+  readonly label: string;
+
+  constructor(id: string, label: string, message: string) {
+    super(message);
+    this.name = "PaneResolveError";
+    this.id = id;
+    this.label = label;
+  }
+}
+
+export function paneResolveFallback(
+  err: unknown,
+  id: string,
+): { id: string; label: string; message: string } {
+  if (err instanceof PaneResolveError) {
+    return { id: err.id, label: err.label, message: err.message };
+  }
+  return {
+    id,
+    label: id,
+    message: err instanceof Error ? err.message : String(err),
+  };
+}
 
 export function resolvePaneSlot(
   id: string,
@@ -13,27 +35,17 @@ export function resolvePaneSlot(
   mount: PaneMount | undefined,
   hosts: Partial<Record<ViewKind, ViewHost>>,
   loaders: SceneLoaderMap,
-): PaneSlot {
+): PaneMount {
   if (!paneEntry) {
-    return {
-      kind: "error",
-      id,
-      label: id,
-      message: `Unknown scene id "${id}" in layout.`,
-    };
+    throw new PaneResolveError(id, id, `Unknown scene id "${id}" in layout.`);
   }
   if (paneEntry.error) {
-    return { kind: "error", id, label: id, message: paneEntry.error };
+    throw new PaneResolveError(id, id, paneEntry.error);
   }
   if (!paneEntry.hasScene) {
-    return {
-      kind: "error",
-      id,
-      label: id,
-      message: `${paneEntry.file} is a layout, not a view.`,
-    };
+    throw new PaneResolveError(id, id, `${paneEntry.file} is a layout, not a view.`);
   }
-  if (mount) return { kind: "live", mount };
+  if (mount) return mount;
   const host = hosts[paneEntry.view];
   const loader = loaders[loaderKey(paneEntry.file)];
   const message = !host
@@ -41,7 +53,7 @@ export function resolvePaneSlot(
     : !loader
       ? `No loader for ${paneEntry.file}.`
       : "Failed to mount pane.";
-  return { kind: "error", id, label: id, message };
+  throw new PaneResolveError(id, id, message);
 }
 
 export function sceneViewportError(sceneId: string, entry: SceneEntry | undefined): string {

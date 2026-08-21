@@ -4,11 +4,10 @@
     "lib": ["ES2023", "DOM"],
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
-    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["../../packages/shell/src/*"]
+      "@/*": ["../shell/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../shell/src/css-modules.d.ts"]
 }

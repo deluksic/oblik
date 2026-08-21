@@ -74,9 +74,68 @@ onSettled(() => {
 ## Reactivity
 
 - `createSignal`, `createMemo`, `createEffect`, `Show`, `For` from `solid-js`
-- Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks and lazy getters (`getCommands`).
-- Internal imports use `@/` → `packages/shell/src/` (e.g. `@/types.ts`, `@/ui/App.tsx`). Colocated `.module.css` stays relative.
-- `createEffect(compute, apply)` — two-arg form when tracking deps explicitly
+- Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks and stable local readers (`commands` in `Pane`).
+- **Do not read `props` or signals in imperative code** (`For` map bodies, `if` branches before `return`, helper calls). Use JSX expressions, `createMemo`, or a child component whose template reads props.
+- **Do not write signals in `createEffect` apply** — derive with `createMemo`; scene-driven reset uses **function-form** `createSignal(() => …)` (writable memo).
+- **Async data** — `createMemo(() => loader())`; read it under `<Loading>`. Rejected loads → `<Errored>`.
+- **`onSettled` cannot read pending async** (throws `PENDING_ASYNC_FORBIDDEN_SCOPE`). If the owner tree has an async memo (pane loaders), window listeners and host `mount()` go in **`createEffect`**, whose compute is async-aware. `onSettled` is only for purely sync DOM after layout.
+- **Host callbacks that write shell state** (`onCommandBar`, `onInspect`, `onLiveChange`) must not run the setter inside effect apply. If `getOwner()` is set, `queueMicrotask` the call. Pointer/DOM handlers have no owner and stay synchronous.
+- **Imperative cross-pane refs** (e.g. `handles` `Map` for `refreshOthers`) — plain mutation, no signal bump; palette commands stay **pane-local** via an `ownedWrite` handle signal.
+- Internal imports use `@/` → `packages/shell/src/` (e.g. `@/types`, `@/ui/App`). Colocated `.module.css` stays relative.
+
+```tsx
+// ❌ imperative props read inside <For> callback
+<For each={props.paneIds}>
+  {(id) => {
+    const slot = resolvePaneSlot(id, props.catalog.get(id), …);
+    return <Pane mount={slot.mount} />;
+  }}
+</For>
+
+// ✅ child component + <Errored>, resolve in JSX (throws → PaneError fallback)
+<For each={props.paneIds}>
+  {(id) => (
+    <Errored fallback={(err) => <PaneError {...paneResolveFallback(err(), id)} />}>
+      <Pane mount={resolvePaneSlot(id, props.catalog.get(id), …)} />
+    </Errored>
+  )}
+</For>
+```
+
+### `createEffect` (Solid 2)
+
+**Not 1.x.** Single-callback `createEffect(() => { … })` is invalid. Use the **compute / effect** split:
+
+```tsx
+createEffect(
+  () => {
+    const id = sceneId();
+    return id == null ? null : { id, title: catalog().get(id)?.title ?? id };
+  },
+  (row) => {
+    if (!row) return;
+    document.title = `euclid — ${row.title}`; // DOM side effect — not a signal write
+  },
+);
+```
+
+Scene-driven **signal** resets: function-form `createSignal(() => inspectForScene(sceneId(), …))` — not an effect that writes, not a call in the component body.
+
+- **`compute`** — all reactive reads (`props`, signals, memos) happen here; returns a **stable** value (string/number/tuple of primitives).
+- **`effect`** — receives `(value, prevValue)` from compute only. **Do not read `props`, signals, or memos here.** Do not write Solid signals here. DOM / `document.title` / measured layout only.
+- **`onCleanup` only works inside `compute`**, not in the effect function.
+- **The effect function must `return` its cleanup** (do not call `onCleanup` in the effect).
+
+```tsx
+// ✅ window listener: onSettled, not createEffect
+onSettled(() => {
+  window.addEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
+});
+
+// ❌ dummy effect for the same job
+createEffect(() => void 0, () => { window.addEventListener(…); });
+```
 
 ## Styling
 
@@ -109,7 +168,7 @@ Modes as signals: `"closed" | "picker" | "prompt"`. `filterCommands` stays pure 
 ## Checklist
 
 - [ ] `class` arrays/objects, not `classList` or template strings
-- [ ] Host mount/dispose in `onSettled`, not before canvas exists
+- [ ] `createEffect` — reactive reads in `compute` only; effect uses captured args / snapshots
 - [ ] `min-height: 0` on flex/grid children that should fill height
 - [ ] Pane uses `display: flex; flex-direction: column` so canvas `flex: 1` works
 - [ ] No React, no SolidStart unless explicitly requested

@@ -15,65 +15,29 @@ function parseDraft(raw: string): number | null {
 export type PaletteProps = {
   mode: PaletteMode;
   commandBar: CommandBarState | null;
-  getCommands: () => CommandSpec[];
+  commands: () => CommandSpec[];
   onPick: (id: string) => void;
   onClosePicker: () => void;
   onNumberDraft: (raw: string) => void;
 };
 
-export function Palette(props: PaletteProps) {
+type InlineNumberLayout = {
+  previewHtml: string;
+  mode: PaletteMode;
+  numberValue: string;
+  acceptNumber: boolean;
+};
+
+function PickerPanel(props: {
+  commands: () => CommandSpec[];
+  onPick: (id: string) => void;
+  onClosePicker: () => void;
+}) {
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
-  const previewRef = { current: null as HTMLElement | null };
-  const numberRef = { current: null as HTMLInputElement | null };
-
-  const items = createMemo(() => filterCommands(props.getCommands(), query()));
-
-  createEffect(
-    () => props.mode,
-    () => {
-      if (props.mode === "picker") {
-        setQuery("");
-        setActive(0);
-      }
-    },
-  );
-
-  createEffect(
-    () => [props.commandBar?.previewHtml, props.mode, props.commandBar?.numberValue] as const,
-    () => {
-      layoutInlineNumber();
-    },
-  );
-
-  function layoutInlineNumber(): void {
-    const bar = props.commandBar;
-    if (!bar?.acceptNumber || !previewRef.current || !numberRef.current) return;
-    const slot = previewRef.current.querySelector<HTMLElement>(".slot.is-number");
-    if (!slot) return;
-    const typed = numberRef.current.value;
-    slot.textContent = typed || "<radius>";
-    slot.dataset.placeholder = typed ? typed : "<radius>";
-    const row = previewRef.current.parentElement;
-    if (!row) return;
-    const slotRect = slot.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    numberRef.current.style.left = `${slotRect.left - rowRect.left}px`;
-    numberRef.current.style.top = `${slotRect.top - rowRect.top}px`;
-    numberRef.current.style.width = `${Math.max(slotRect.width, 1)}px`;
-    numberRef.current.style.height = `${slotRect.height}px`;
-  }
-
-  function tryCommitNumber(): void {
-    const bar = props.commandBar;
-    if (!bar?.onNumber || !numberRef.current) return;
-    const n = parseDraft(numberRef.current.value);
-    if (n == null) return;
-    bar.onNumber(n);
-  }
+  const items = createMemo(() => filterCommands(props.commands(), query()));
 
   function onPickerKey(e: KeyboardEvent): void {
-    if (props.mode !== "picker") return;
     if (e.key === "Escape") {
       e.preventDefault();
       props.onClosePicker();
@@ -97,12 +61,94 @@ export function Palette(props: PaletteProps) {
   }
 
   createEffect(
-    () => props.mode,
-    (mode) => {
-      if (mode === "picker") {
-        window.addEventListener("keydown", onPickerKey);
-        return () => window.removeEventListener("keydown", onPickerKey);
-      }
+    () => true,
+    () => {
+      window.addEventListener("keydown", onPickerKey);
+      return () => window.removeEventListener("keydown", onPickerKey);
+    },
+  );
+
+  return (
+    <div class={styles.panel} role="dialog" aria-label="Add editor">
+      <input
+        type="search"
+        class={styles.input}
+        placeholder="Point, distance…"
+        autocomplete="off"
+        spellcheck={false}
+        value={query()}
+        onInput={(e) => {
+          setQuery(e.currentTarget.value);
+          setActive(0);
+        }}
+      />
+      <ul class={styles.list} role="listbox">
+        <For each={items()} keyed={false}>
+          {(cmd, i) => (
+            <li
+              class={[styles.listItem, { [styles.listItemActive]: i === active() }]}
+              role="option"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                props.onPick(cmd().id);
+              }}
+            >
+              <span class={styles.cmd}>{cmd().title}</span>
+              <span class={styles.cmdHint}>{cmd().hint}</span>
+            </li>
+          )}
+        </For>
+      </ul>
+      <Show when={items().length === 0}>
+        <p class={styles.empty}>No editors to add in this view.</p>
+      </Show>
+    </div>
+  );
+}
+
+export function Palette(props: PaletteProps) {
+  const previewRef = { current: null as HTMLElement | null };
+  const numberRef = { current: null as HTMLInputElement | null };
+
+  function layoutInlineNumber(layout: InlineNumberLayout): void {
+    if (!layout.acceptNumber || !previewRef.current || !numberRef.current) return;
+    const slot = previewRef.current.querySelector<HTMLElement>(".slot.is-number");
+    if (!slot) return;
+    const typed = numberRef.current.value;
+    slot.textContent = typed || "<radius>";
+    slot.dataset.placeholder = typed ? typed : "<radius>";
+    const row = previewRef.current.parentElement;
+    if (!row) return;
+    const slotRect = slot.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    numberRef.current.style.left = `${slotRect.left - rowRect.left}px`;
+    numberRef.current.style.top = `${slotRect.top - rowRect.top}px`;
+    numberRef.current.style.width = `${Math.max(slotRect.width, 1)}px`;
+    numberRef.current.style.height = `${slotRect.height}px`;
+  }
+
+  function tryCommitNumber(commandBar: CommandBarState | null): void {
+    if (!commandBar?.onNumber || !numberRef.current) return;
+    const n = parseDraft(numberRef.current.value);
+    if (n == null) return;
+    commandBar.onNumber(n);
+  }
+
+  createEffect(
+    () =>
+      [
+        props.commandBar?.previewHtml ?? "",
+        props.mode,
+        props.commandBar?.numberValue ?? "",
+        props.commandBar?.acceptNumber === true,
+      ] as const,
+    (layout) => {
+      layoutInlineNumber({
+        previewHtml: layout[0],
+        mode: layout[1],
+        numberValue: layout[2],
+        acceptNumber: layout[3],
+      });
     },
   );
 
@@ -123,40 +169,11 @@ export function Palette(props: PaletteProps) {
         }}
       >
         <Show when={props.mode === "picker"}>
-          <div class={styles.panel} role="dialog" aria-label="Add editor">
-            <input
-              type="search"
-              class={styles.input}
-              placeholder="Point, distance…"
-              autocomplete="off"
-              spellcheck={false}
-              value={query()}
-              onInput={(e) => {
-                setQuery(e.currentTarget.value);
-                setActive(0);
-              }}
-            />
-            <ul class={styles.list} role="listbox">
-              <For each={items()} keyed={false}>
-                {(cmd, i) => (
-                  <li
-                    class={[styles.listItem, { [styles.listItemActive]: i() === active() }]}
-                    role="option"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      props.onPick(cmd().id);
-                    }}
-                  >
-                    <span class={styles.cmd}>{cmd().title}</span>
-                    <span class={styles.cmdHint}>{cmd().hint}</span>
-                  </li>
-                )}
-              </For>
-            </ul>
-            <Show when={items().length === 0}>
-              <p class={styles.empty}>No editors to add in this view.</p>
-            </Show>
-          </div>
+          <PickerPanel
+            commands={props.commands}
+            onPick={props.onPick}
+            onClosePicker={props.onClosePicker}
+          />
         </Show>
         <Show when={props.mode === "prompt"}>
           <div class={styles.prompt} role="status" aria-live="polite">
@@ -181,12 +198,19 @@ export function Palette(props: PaletteProps) {
                   value={props.commandBar?.numberValue ?? ""}
                   onInput={(e) => {
                     props.onNumberDraft(e.currentTarget.value);
-                    requestAnimationFrame(layoutInlineNumber);
+                    requestAnimationFrame(() =>
+                      layoutInlineNumber({
+                        previewHtml: props.commandBar?.previewHtml ?? "",
+                        mode: props.mode,
+                        numberValue: e.currentTarget.value,
+                        acceptNumber: props.commandBar?.acceptNumber === true,
+                      }),
+                    );
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      tryCommitNumber();
+                      tryCommitNumber(props.commandBar);
                     }
                   }}
                 />

@@ -16,8 +16,8 @@ function stockEdges(min: Vec2, max: Vec2) {
   };
 }
 
-const cornerR = (p: Vec2) => editDistanceToPoint(p, 0.59);
-const ringR = (p: Vec2) => editDistanceToPoint(p, 0.22);
+const cornerR = (p: Vec2) => editDistanceToPoint(p, 0.62);
+const ringR = (p: Vec2) => editDistanceToPoint(p, 0.37);
 const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
 
 /**
@@ -29,11 +29,11 @@ const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
  * gizmos. Pocket fillets: one editPointOnLine on each corner bisector.
  */
 export function plateLayout() {
-  const min = editPoint(-5.5, -3.2);
-  const max = editPoint(5.75, 3.22);
+  const min = editPoint(-4.49, -3.07);
+  const max = editPoint(6.17, 2.81);
   const edges = stockEdges(min, max);
 
-  const inset = editVector(min, 1.34, 1.11);
+  const inset = editVector(min, 1.3, 1.01);
   const ix = inset.x;
   const iy = inset.y;
   const corners: Vec2[] = [
@@ -48,7 +48,7 @@ export function plateLayout() {
     radius: cornerR(center),
   }));
 
-  const bc = editPoint(3.73, -0.03);
+  const bc = editPoint(3.68, 0.06);
   const pcd = editDistanceToPoint(bc, 1.19);
   const ringN = editNumber(5, {
     label: "Hole count",
@@ -76,7 +76,7 @@ export function plateLayout() {
   };
   const filletMax = Math.sqrt(2) * Math.min(pocketSpan.x / 2, pocketSpan.y / 2);
   const onBisector = (origin: Vec2, dir: Vec2) =>
-    editPointOnLine(origin, dir, 0.5, { min: 0, max: filletMax });
+    editPointOnLine(origin, dir, 0.85, { min: 0, max: filletMax });
   const bl = onBisector(pocketMin, { x: 1, y: 1 });
   onBisector({ x: pocketMax.x, y: pocketMin.y }, { x: -1, y: 1 });
   onBisector(pocketMax, { x: -1, y: -1 });
@@ -84,7 +84,7 @@ export function plateLayout() {
   const filletR = bl.x - pocketMin.x;
 
   const slotCenter = editPointOnSegment(edges.top, 0.49);
-  const slotLen = editDistanceToPoint(slotCenter, 3.91);
+  const slotLen = editDistanceToPoint(slotCenter, 3.6);
   const halfL = slotLen / 2;
   const slotCapR = slotCapAt({
     x: slotCenter.x - halfL,

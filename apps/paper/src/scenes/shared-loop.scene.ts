@@ -19,7 +19,7 @@ export function scene() {
       x: o.x + Math.cos(ang) * 2.2,
       y: o.y + Math.sin(ang) * 2.2,
     };
-    const r = editDistanceToPoint(p, 0.64);
+    const r = editDistanceToPoint(p, 1);
     rings.push(circle(p, r));
   }
   return group(() => rings);

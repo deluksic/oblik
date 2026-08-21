@@ -408,7 +408,7 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
   const used = usedIdentifiers(sf);
   const lines: string[] = [];
   let lastPoint: string | undefined;
-  for (const e of edits) {
+  for (const e of editors) {
     if (e.kind === "point") {
       const name = freshName("p", used);
       lastPoint = name;

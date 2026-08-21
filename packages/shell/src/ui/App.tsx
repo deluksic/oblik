@@ -1,7 +1,14 @@
-import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 
 import { paneIdsFromAreas, stackedAreas } from "@/layout/grid";
-import type { CommandBarState, InspectPatch, PaneHandle, WorkspaceProps } from "@/types";
+import type {
+  CommandBarState,
+  InspectPatch,
+  InspectState,
+  PaneHandle,
+  SceneEntry,
+  WorkspaceProps,
+} from "@/types";
 
 import { Inspect } from "./Inspect";
 import { Nav } from "./Nav";
@@ -12,25 +19,92 @@ import { singleSceneLayout, WELCOME_INSPECT } from "./workspace/constants";
 import { catalogById, currentSceneId, loaderKey, openScene } from "./workspace/model";
 import { commandBarSnapshotKey, inspectSnapshotKey } from "./workspace/push-guards";
 
+function inspectForScene(id: string | null, catalog: Map<string, SceneEntry>): InspectState {
+  if (id == null) return WELCOME_INSPECT;
+  const e = catalog.get(id);
+  if (!e) {
+    return {
+      ...WELCOME_INSPECT,
+      status: "Unknown scene",
+      error: `No catalog entry for "${id}".`,
+    };
+  }
+  if (e.error) {
+    return {
+      ...WELCOME_INSPECT,
+      status: "Scene catalog error",
+      error: e.error,
+    };
+  }
+  return { ...WELCOME_INSPECT, status: "Loading…", error: null };
+}
+
+function defaultFocusedId(id: string | null, catalog: Map<string, SceneEntry>): string | null {
+  if (!id) return null;
+  const e = catalog.get(id);
+  if (!e || e.error) return null;
+  return e.layout ? (paneIdsFromAreas(e.layout.areas)[0] ?? e.id) : e.id;
+}
+
 export function App(props: WorkspaceProps) {
   const [sceneId, setSceneId] = createSignal<string | null>(currentSceneId());
-  const [title, setTitle] = createSignal("Welcome");
-  const [inspect, setInspect] = createSignal(WELCOME_INSPECT);
-  const [focusedId, setFocusedId] = createSignal<string | null>(null);
-  const [paletteMode, setPaletteMode] = createSignal<PaletteMode>("closed");
-  const [commandBar, setCommandBar] = createSignal<CommandBarState | null>(null);
-  const handles = new Map<string, PaneHandle | null>();
-  let lastBarKey = "";
-  let lastInspectKey = "";
-  let fanOut = false;
+  const catalog = createMemo(() => catalogById(props.scenes));
 
-  onSettled(() => {
-    const onPop = () => setSceneId(currentSceneId());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+  const [focusedId, setFocusedId] = createSignal(() =>
+    defaultFocusedId(
+      sceneId(),
+      untrack(() => catalog()),
+    ),
+  );
+  const [pickerOpen, setPickerOpen] = createSignal(() => {
+    sceneId();
+    return false;
+  });
+  const [inspectByPane, setInspectByPane] = createSignal((): Record<string, InspectPatch> => {
+    sceneId();
+    return {};
+  });
+  const [commandBarByPane, setCommandBarByPane] = createSignal(
+    (): Record<string, CommandBarState | null> => {
+      sceneId();
+      return {};
+    },
+  );
+  const handles = new Map<string, PaneHandle | null>();
+
+  const inspect = createMemo(() => {
+    const base = inspectForScene(sceneId(), catalog());
+    const id = focusedId();
+    if (!id) return base;
+    const patch = inspectByPane()[id];
+    return patch ? { ...base, ...patch } : base;
   });
 
-  const catalog = createMemo(() => catalogById(props.scenes));
+  const commandBar = createMemo(() => {
+    const id = focusedId();
+    return id ? (commandBarByPane()[id] ?? null) : null;
+  });
+
+  const paletteMode = createMemo((): PaletteMode => {
+    if (commandBar()) return "prompt";
+    if (pickerOpen()) return "picker";
+    return "closed";
+  });
+
+  const title = createMemo(() => {
+    const id = sceneId();
+    if (!id) return "Welcome";
+    const e = catalog().get(id);
+    if (!e) return id;
+    return e.title;
+  });
+
+  createEffect(
+    () => title(),
+    (nextTitle) => {
+      document.title = `euclid — ${nextTitle}`;
+    },
+  );
 
   const entry = createMemo(() => {
     const id = sceneId();
@@ -50,48 +124,11 @@ export function App(props: WorkspaceProps) {
   });
 
   createEffect(
-    () => sceneId(),
+    () => true,
     () => {
-      setPaletteMode("closed");
-      setCommandBar(null);
-      lastBarKey = "";
-      lastInspectKey = "";
-      handles.clear();
-      const id = sceneId();
-      if (id == null) {
-        setTitle("Welcome");
-        document.title = "euclid — Welcome";
-        setInspect(WELCOME_INSPECT);
-        setFocusedId(null);
-        return;
-      }
-      const e = catalog().get(id);
-      if (!e) {
-        setTitle(id);
-        document.title = `euclid — ${id}`;
-        setFocusedId(null);
-        setInspect({
-          ...WELCOME_INSPECT,
-          status: "Unknown scene",
-          error: `No catalog entry for "${id}".`,
-        });
-        return;
-      }
-      if (e.error) {
-        setTitle(e.title);
-        document.title = `euclid — ${e.title}`;
-        setFocusedId(null);
-        setInspect({
-          ...WELCOME_INSPECT,
-          status: "Scene catalog error",
-          error: e.error,
-        });
-        return;
-      }
-      setTitle(e.title);
-      document.title = `euclid — ${e.title}`;
-      setFocusedId(e.layout ? (paneIdsFromAreas(e.layout.areas)[0] ?? e.id) : e.id);
-      setInspect((prev) => ({ ...prev, status: "Loading…", error: null }));
+      const onPop = () => setSceneId(currentSceneId());
+      window.addEventListener("popstate", onPop);
+      return () => window.removeEventListener("popstate", onPop);
     },
   );
 
@@ -129,57 +166,40 @@ export function App(props: WorkspaceProps) {
     setSceneId(id);
   }
 
+  function registerHandle(id: string, handle: PaneHandle | null): void {
+    if (handle) handles.set(id, handle);
+    else handles.delete(id);
+  }
+
   function focusPane(id: string): void {
-    if (focusedId() !== id) {
-      handles.get(focusedId() ?? "")?.cancelCommand?.();
-      setPaletteMode("closed");
-      setCommandBar(null);
-      lastBarKey = "";
+    const prev = focusedId();
+    if (prev !== id) {
+      handles.get(prev ?? "")?.cancelCommand?.();
+      setPickerOpen(false);
     }
     setFocusedId(id);
   }
 
   function refreshOthers(originId: string): void {
-    if (fanOut) return;
-    fanOut = true;
-    try {
-      for (const [id, handle] of handles) {
-        if (id !== originId) handle?.refresh({ quiet: true });
-      }
-    } finally {
-      fanOut = false;
+    for (const [id, handle] of handles) {
+      if (id !== originId) handle?.refresh({ quiet: true });
     }
   }
 
   function receiveCommandBar(id: string, state: CommandBarState | null): void {
-    if (id !== focusedId()) return;
-    if (!state) {
-      if (lastBarKey !== "") {
-        lastBarKey = "";
-        setCommandBar(null);
-        setPaletteMode((mode) => (mode === "prompt" ? "closed" : mode));
-      }
-      return;
-    }
-    const key = commandBarSnapshotKey(state);
-    if (key === lastBarKey) return;
-    lastBarKey = key;
-    setCommandBar(state);
-    setPaletteMode("prompt");
+    setCommandBarByPane((prev) => {
+      if (commandBarSnapshotKey(state) === commandBarSnapshotKey(prev[id] ?? null)) return prev;
+      return { ...prev, [id]: state };
+    });
   }
 
   function receiveInspect(id: string, patch: InspectPatch): void {
-    if (id !== focusedId()) return;
-    const key = inspectSnapshotKey(patch);
-    if (key === lastInspectKey) return;
-    lastInspectKey = key;
-    setInspect((prev) => ({ ...prev, ...patch }));
-  }
-
-  function getCommands(): import("../types.ts").CommandSpec[] {
-    const id = focusedId();
-    if (!id) return [];
-    return handles.get(id)?.commands?.() ?? [];
+    setInspectByPane((prev) => {
+      const cur = prev[id];
+      const next = { ...cur, ...patch };
+      if (cur && inspectSnapshotKey(next) === inspectSnapshotKey(cur)) return prev;
+      return { ...prev, [id]: next };
+    });
   }
 
   function pickCommand(cmdId: string): void {
@@ -189,44 +209,46 @@ export function App(props: WorkspaceProps) {
     document.querySelector<HTMLCanvasElement>(`[data-scene="${id}"] canvas`)?.focus();
   }
 
-  onSettled(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target;
-      if (
-        t instanceof HTMLInputElement ||
-        t instanceof HTMLTextAreaElement ||
-        t instanceof HTMLSelectElement
-      ) {
+  function onWorkspaceKeydown(e: KeyboardEvent): void {
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+    if (e.key === "Escape") {
+      if (paletteMode() === "picker") {
+        setPickerOpen(false);
         return;
       }
-      if (e.key === "Escape") {
-        if (paletteMode() === "picker") {
-          setPaletteMode("closed");
-          return;
-        }
-        if (paletteMode() === "prompt") {
-          handles.get(focusedId() ?? "")?.cancelCommand?.();
-          return;
-        }
-        handles.get(focusedId() ?? "")?.cancelCommand?.();
-        return;
-      }
-      if (e.key !== " " || e.repeat || paletteMode() !== "closed") return;
-      const id = focusedId();
-      if (!id) return;
-      if (getCommands().length === 0) {
-        setInspect((prev) => ({
-          ...prev,
-          status: "Space adds editors on 2D paper. This view has none yet.",
-        }));
-        return;
-      }
-      e.preventDefault();
-      setPaletteMode("picker");
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+      handles.get(focusedId() ?? "")?.cancelCommand?.();
+      return;
+    }
+    const isSpace = e.code === "Space" || e.key === " ";
+    if (!isSpace || e.repeat || paletteMode() !== "closed") return;
+    const id = focusedId();
+    if (!id) return;
+    const cmds = handles.get(id)?.commands?.() ?? [];
+    if (cmds.length === 0) {
+      setInspectByPane((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], status: "Space adds editors on 2D paper. This view has none yet." },
+      }));
+      return;
+    }
+    e.preventDefault();
+    setPickerOpen(true);
+  }
+
+  createEffect(
+    () => true,
+    () => {
+      window.addEventListener("keydown", onWorkspaceKeydown);
+      return () => window.removeEventListener("keydown", onWorkspaceKeydown);
+    },
+  );
 
   return (
     <>
@@ -253,17 +275,14 @@ export function App(props: WorkspaceProps) {
           paletteMode={paletteMode()}
           commandBar={commandBar()}
           onWelcomeCreated={selectScene}
-          getCommands={getCommands}
           onFocusPane={focusPane}
           onPickCommand={pickCommand}
-          onClosePicker={() => setPaletteMode("closed")}
+          onClosePicker={() => setPickerOpen(false)}
           onNumberDraft={(raw) => commandBar()?.onNumberDraft?.(raw)}
           onCommandBar={receiveCommandBar}
           onInspect={receiveInspect}
           onLiveChange={refreshOthers}
-          onHandle={(id, handle) => {
-            handles.set(id, handle);
-          }}
+          onHandle={registerHandle}
         />
         <Inspect state={inspect()} />
       </div>

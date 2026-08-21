@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { SceneEntry } from "@/types";
 
-import { resolvePaneSlot, sceneViewportError } from "./resolve-pane-slot";
+import {
+  PaneResolveError,
+  paneResolveFallback,
+  resolvePaneSlot,
+  sceneViewportError,
+} from "./resolve-pane-slot";
 
 const entry = (overrides: Partial<SceneEntry> & Pick<SceneEntry, "id">): SceneEntry => ({
   file: `${overrides.id}.scene.ts`,
@@ -13,30 +18,25 @@ const entry = (overrides: Partial<SceneEntry> & Pick<SceneEntry, "id">): SceneEn
 });
 
 describe("resolvePaneSlot", () => {
-  it("errors for unknown layout id", () => {
-    const slot = resolvePaneSlot("missing", undefined, undefined, {}, {});
-    expect(slot).toEqual({
-      kind: "error",
-      id: "missing",
-      label: "missing",
-      message: 'Unknown scene id "missing" in layout.',
-    });
+  it("throws for unknown layout id", () => {
+    expect(() => resolvePaneSlot("missing", undefined, undefined, {}, {})).toThrow(
+      PaneResolveError,
+    );
+    expect(() => resolvePaneSlot("missing", undefined, undefined, {}, {})).toThrow(
+      'Unknown scene id "missing" in layout.',
+    );
   });
 
-  it("errors when entry has catalog error", () => {
-    const slot = resolvePaneSlot(
-      "bad",
-      entry({ id: "bad", error: "parse failed", hasScene: false }),
-      undefined,
-      {},
-      {},
-    );
-    expect(slot).toEqual({
-      kind: "error",
-      id: "bad",
-      label: "bad",
-      message: "parse failed",
-    });
+  it("throws when entry has catalog error", () => {
+    expect(() =>
+      resolvePaneSlot(
+        "bad",
+        entry({ id: "bad", error: "parse failed", hasScene: false }),
+        undefined,
+        {},
+        {},
+      ),
+    ).toThrow("parse failed");
   });
 
   it("returns live mount when provided", () => {
@@ -46,8 +46,18 @@ describe("resolvePaneSlot", () => {
       host: { mount: () => ({ refresh: () => {}, dispose: () => {} }) },
       loader: async () => ({}),
     };
-    const slot = resolvePaneSlot("beam", entry({ id: "beam" }), mount, {}, {});
-    expect(slot).toEqual({ kind: "live", mount });
+    expect(resolvePaneSlot("beam", entry({ id: "beam" }), mount, {}, {})).toBe(mount);
+  });
+});
+
+describe("paneResolveFallback", () => {
+  it("reads PaneResolveError fields", () => {
+    const err = new PaneResolveError("beam", "beam", "nope");
+    expect(paneResolveFallback(err, "beam")).toEqual({
+      id: "beam",
+      label: "beam",
+      message: "nope",
+    });
   });
 });
 

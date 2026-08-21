@@ -1,4 +1,4 @@
-import type { InspectState } from "@/types";
+import type { InspectState, SceneLayout } from "@/types";
 
 export const WELCOME_INSPECT: InspectState = {
   crumb: "No scene open",
@@ -8,6 +8,6 @@ export const WELCOME_INSPECT: InspectState = {
   error: null,
 };
 
-export function singleSceneLayout(id: string) {
+export function singleSceneLayout(id: string): SceneLayout {
   return { areas: `"${id}"`, columns: "minmax(0, 1fr)" };
 }

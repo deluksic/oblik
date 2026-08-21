@@ -56,6 +56,7 @@ function hintOf(mod: Record<string, unknown>, fallback: string): string {
 type DragView = {
   controls: { enabled: boolean };
   resize(): void;
+  dispose(): void;
   hitTest(
     x: number,
     y: number,

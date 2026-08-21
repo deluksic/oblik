@@ -16,12 +16,18 @@ import {
   setWidgetOverride,
   zoomAt,
   type Camera,
-  type Drawable,
   type Frame,
   type Gizmo,
   type SceneModule,
 } from "@design-scenes/euclid2";
-import { breadcrumb, dist, projectT, type Geom, type Vec2 } from "@design-scenes/geom";
+import {
+  breadcrumb,
+  dist,
+  projectT,
+  type Drawable,
+  type Geom,
+  type Vec2,
+} from "@design-scenes/geom";
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
@@ -699,17 +705,18 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           }
           if (!tool.origin) {
             if (h?.target === "gizmo" && h.gizmo.kind === "point") {
+              const originGizmo = h.gizmo;
               void (async () => {
-                const text = await peekFile(peekCache, h.gizmo.at.file);
-                const name = widgetInSceneFunction(text, h.gizmo.at)
-                  ? (widgetBindingName(text, h.gizmo.at) ?? undefined)
+                const text = await peekFile(peekCache, originGizmo.at.file);
+                const name = widgetInSceneFunction(text, originGizmo.at)
+                  ? (widgetBindingName(text, originGizmo.at) ?? undefined)
                   : undefined;
                 tool = {
                   id: "distance",
                   origin: {
-                    x: h.gizmo.x,
-                    y: h.gizmo.y,
-                    at: h.gizmo.at,
+                    x: originGizmo.x,
+                    y: originGizmo.y,
+                    at: originGizmo.at,
                     name,
                   },
                 };

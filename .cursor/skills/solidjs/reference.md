@@ -101,3 +101,54 @@ Plugin import: `packages/shell/src/plugin/vite-plugin.ts`.
 "@solidjs/web": "2.0.0-rc.0",
 "@solidjs/vite-plugin": "^3.0.0-next.28"
 ```
+
+## `createEffect` cleanup rules (Solid 2)
+
+| Where                          | Cleanup mechanism                               |
+| ------------------------------ | ----------------------------------------------- |
+| `createEffect` **compute**     | `onCleanup(fn)`                                 |
+| `createEffect` **effect**      | `return fn` from the effect function            |
+| `onSettled` callback           | `return fn` from the callback (not `onCleanup`) |
+| `createTrackedEffect` callback | `return fn` from the callback (not `onCleanup`) |
+
+The effect function is the apply phase — `onCleanup` registered there is ignored. Return a function instead.
+
+**Never read `props`, signals, or memos in the effect callback.** Read them in `compute` and pass captured values (or a snapshot filled during compute) into the effect. Global keyboard handlers can live in a named function that reads signals at event time.
+
+```tsx
+function onWorkspaceKeydown(e: KeyboardEvent) {
+  if (paletteMode() === "picker") {
+    /* … */
+  }
+}
+
+createEffect(
+  () => void 0,
+  () => {
+    window.addEventListener("keydown", onWorkspaceKeydown);
+    return () => window.removeEventListener("keydown", onWorkspaceKeydown);
+  },
+);
+```
+
+```tsx
+// Pane host mount: snapshot during compute, stable string key
+const mountSnap = { current: null as MountSnap | null };
+
+createEffect(
+  () => {
+    const el = canvas();
+    if (!el) {
+      mountSnap.current = null;
+      return null;
+    }
+    mountSnap.current = { el, mount: props.mount };
+    return `${props.mount.id}\0${props.mount.entry.file}`;
+  },
+  (key) => {
+    if (!key || !mountSnap.current) return;
+    const { el, mount } = mountSnap.current;
+    // … mount host, return dispose
+  },
+);
+```
