@@ -1,10 +1,6 @@
+import { editAngle, editDistanceToPoint, editNumber, editPoint } from "@design-scenes/euclid2";
 import { line, type Vec2 } from "@design-scenes/geom";
-import {
-  editAngle,
-  editDistanceToPoint,
-  editNumber,
-  editPoint,
-} from "@design-scenes/euclid2";
+
 import {
   centerDistance,
   drawSpurGear,

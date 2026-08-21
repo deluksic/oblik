@@ -1,5 +1,6 @@
 import type { Vec2 } from "@design-scenes/geom";
 import { cylinder, sphere, unionAll, type Sdf } from "@design-scenes/sdf";
+
 import { pack7, ringBalls } from "./cylinder.ts";
 
 export type QuatrefoilOpts = {
@@ -30,27 +31,18 @@ export function quatrefoilBalls(opts: QuatrefoilOpts): Sdf {
 }
 
 /** Disk fill for each packed rim: Z-up cylinder from z=0 to z=height. */
-export function packedCylinderCores(opts: {
-  radius: number;
-  height: number;
-}): Sdf {
+export function packedCylinderCores(opts: { radius: number; height: number }): Sdf {
   const R = Math.abs(opts.radius);
   const halfH = Math.abs(opts.height) / 2;
   return unionAll(
     pack7(opts.radius).map((cell) =>
-      cylinder(
-        { x: cell.origin.x, y: cell.origin.y, z: halfH },
-        R,
-        halfH,
-      ),
+      cylinder({ x: cell.origin.x, y: cell.origin.y, z: halfH }, R, halfH),
     ),
   );
 }
 
 /** One quatrefoil in the middle, six around — foils follow the pack angle. */
-export function quatrefoilBallsPack(
-  opts: QuatrefoilOpts & { radius: number },
-): Sdf {
+export function quatrefoilBallsPack(opts: QuatrefoilOpts & { radius: number }): Sdf {
   return unionAll(
     pack7(opts.radius).map((cell) =>
       quatrefoilBalls({

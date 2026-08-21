@@ -1,4 +1,5 @@
 import * as ts from "typescript";
+
 import { EDIT_NAMES } from "./edit-names.ts";
 
 export function formatNum(n: number): string {
@@ -8,13 +9,7 @@ export function formatNum(n: number): string {
 }
 
 function parse(source: string): ts.SourceFile {
-  return ts.createSourceFile(
-    "scene.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
 
 export function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
@@ -39,9 +34,7 @@ export function findEditCallAt(
   column: number,
 ): ts.CallExpression | null {
   const located = collectEditCalls(sourceFile).map((call) => {
-    const pos = sourceFile.getLineAndCharacterOfPosition(
-      call.getStart(sourceFile),
-    );
+    const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
     return { call, line: pos.line + 1, column: pos.character + 1 };
   });
   const exact = located.find((x) => x.line === line && x.column === column);
@@ -129,12 +122,13 @@ export function patchWidgetAt(
     if (values[0] === undefined) throw new Error(`${name} write needs a value`);
     spans = [{ ...span, text: formatNum(values[0]) }];
   } else {
-    const lastNumeric = name === "editDistanceToPoint" ||
+    const lastNumeric =
+      name === "editDistanceToPoint" ||
       name === "editDistance3" ||
       name === "editPointOnSegment" ||
       name === "editPointOnSegment3"
-      ? args[1]
-      : args[args.length - 1];
+        ? args[1]
+        : args[args.length - 1];
     if (!lastNumeric) throw new Error(`${name} missing argument`);
     const span = numericSpan(sourceFile, lastNumeric);
     if (!span) throw new Error(`${name} last arg is not a numeric literal`);

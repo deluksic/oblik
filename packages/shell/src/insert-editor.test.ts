@@ -1,5 +1,6 @@
-import { expect, test } from "vitest";
 import * as ts from "typescript";
+import { expect, test } from "vitest";
+
 import {
   distanceOriginName,
   evalDerivedScenePoints,
@@ -45,18 +46,14 @@ test("inserts editPoint after existing scene widgets", () => {
 
 test("stacked inserts keep two-space indent on every line", () => {
   const once = insertEditors(hello, [{ kind: "point", x: 1, y: 2 }]);
-  const twice = insertEditors(once, [
-    { kind: "distance", originName: "p", d: 0.5 },
-  ]);
+  const twice = insertEditors(once, [{ kind: "distance", originName: "p", d: 0.5 }]);
   expect(twice.match(/const __scene = /g)?.length).toBe(1);
   expect(twice).toMatch(/const d = editDistanceToPoint\(p, 0\.5\);/);
   const inner = twice.split("export function scene() {\n")[1]?.split("\n}")[0] ?? "";
   for (const line of inner.split("\n")) {
     if (!line.trim()) continue;
     expect(line.slice(0, 2), `bad indent: ${JSON.stringify(line)}`).toBe("  ");
-    expect(line.slice(0, 4), `over-indented: ${JSON.stringify(line)}`).not.toBe(
-      "    ",
-    );
+    expect(line.slice(0, 4), `over-indented: ${JSON.stringify(line)}`).not.toBe("    ");
   }
 });
 
@@ -97,19 +94,13 @@ export function scene() {
 }
 `;
   const next = insertEditors(src, [{ kind: "point", x: 0, y: 0 }]);
-  expect(next).toMatch(
-    /import \{ editPoint \} from "@design-scenes\/euclid2";/,
-  );
+  expect(next).toMatch(/import \{ editPoint \} from "@design-scenes\/euclid2";/);
 });
 
 test("circle wraps a plain return in group", () => {
-  const next = insertEditors(hello, [
-    { kind: "circle", center: "c", radius: "r" },
-  ]);
+  const next = insertEditors(hello, [{ kind: "circle", center: "c", radius: "r" }]);
   expect(next).toMatch(/^  const __scene = circle\(c, r\);$/m);
-  expect(next).toMatch(
-    /^  return group\(\(\) => \[__scene, circle\(c, r\)\]\);$/m,
-  );
+  expect(next).toMatch(/^  return group\(\(\) => \[__scene, circle\(c, r\)\]\);$/m);
   expect(next).toMatch(/^import \{ circle, group \} from "@design-scenes\/geom";$/m);
 });
 
@@ -124,13 +115,9 @@ export function scene() {
   return group(() => [__scene, circle(c, r)]);
 }
 `;
-  const next = insertEditors(grouped, [
-    { kind: "circle", center: "c", radius: "r" },
-  ]);
+  const next = insertEditors(grouped, [{ kind: "circle", center: "c", radius: "r" }]);
   expect(next.match(/const __scene = /g)?.length).toBe(1);
-  expect(next).toMatch(
-    /return group\(\(\) => \[__scene, circle\(c, r\), circle\(c, r\)\]\);/,
-  );
+  expect(next).toMatch(/return group\(\(\) => \[__scene, circle\(c, r\), circle\(c, r\)\]\);/);
 });
 
 test("line appends when __scene is already the return", () => {
@@ -145,9 +132,7 @@ export function scene() {
 }
 `;
   const next = insertEditors(src, [{ kind: "line", a: "a", b: "b" }]);
-  expect(next).toMatch(
-    /^  return group\(\(\) => \[__scene, line\(a, b\)\]\);$/m,
-  );
+  expect(next).toMatch(/^  return group\(\(\) => \[__scene, line\(a, b\)\]\);$/m);
   expect(next).toMatch(/^import \{ circle, line, group \} from "@design-scenes\/geom";$/m);
 });
 
@@ -168,9 +153,7 @@ export function scene() {
   const next = insertEditors(src, [{ kind: "point", x: -1, y: 2 }]);
   expect(next.match(/const __scene = /g)?.length).toBe(1);
   expect(next).toMatch(/^  const p = editPoint\(-1, 2\);$/m);
-  expect(next).toMatch(
-    /^  return group\(\(\) => \[__scene, circle\(a, 1\)\]\);$/m,
-  );
+  expect(next).toMatch(/^  return group\(\(\) => \[__scene, circle\(a, 1\)\]\);$/m);
 });
 
 test("namedScenePointNear matches a derived point()", () => {
@@ -190,7 +173,5 @@ export function scene() {
   ];
   const derived = evalDerivedScenePoints(src, known);
   expect(derived).toEqual([{ name: "b", x: 2, y: 3 }]);
-  expect(
-    namedScenePointNear(src, 2.02, 2.97, [...known, ...derived], 0.25)?.name,
-  ).toBe("b");
+  expect(namedScenePointNear(src, 2.02, 2.97, [...known, ...derived], 0.25)?.name).toBe("b");
 });

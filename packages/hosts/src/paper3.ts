@@ -1,4 +1,3 @@
-import { breadcrumb, type Geom3 } from "@design-scenes/geom";
 import { clearImportedOverrides } from "@design-scenes/euclid2";
 import {
   beginWidgetFrame3,
@@ -12,9 +11,11 @@ import {
   type Gizmo3,
   type SceneModule3,
 } from "@design-scenes/euclid3";
+import { breadcrumb, type Geom3 } from "@design-scenes/geom";
 import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeSceneHot, subscribeHelperHot } from "@design-scenes/shell";
+
 import { peekFile, quantize, renderSnippet } from "./inspect.ts";
 import {
   commitGizmoIfChanged,
@@ -43,11 +44,7 @@ function applyCamera3(space: SpaceView, mod: Record<string, unknown>): void {
     space.camera.position.set(Number(pos[0]), Number(pos[1]), Number(pos[2]));
   }
   if (Array.isArray(target) && target.length >= 3) {
-    space.controls.target.set(
-      Number(target[0]),
-      Number(target[1]),
-      Number(target[2]),
-    );
+    space.controls.target.set(Number(target[0]), Number(target[1]), Number(target[2]));
   }
 }
 
@@ -58,10 +55,18 @@ function hintOf(mod: Record<string, unknown>, fallback: string): string {
 type DragView = {
   controls: { enabled: boolean };
   resize(): void;
-  hitTest(x: number, y: number): { target: "gizmo"; gizmo: Gizmo3 } | { target: "geom"; geom: Geom3 } | null;
+  hitTest(
+    x: number,
+    y: number,
+  ): { target: "gizmo"; gizmo: Gizmo3 } | { target: "geom"; geom: Geom3 } | null;
   dragPoint(g: Gizmo3, x: number, y: number): { x: number; y: number; z: number } | null;
   dragDistance(origin: { x: number; y: number; z: number }, x: number, y: number): number | null;
-  dragGlider(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, x: number, y: number): number | null;
+  dragGlider(
+    a: { x: number; y: number; z: number },
+    b: { x: number; y: number; z: number },
+    x: number,
+    y: number,
+  ): number | null;
 };
 
 function applyGizmoDrag(view: DragView, g: Gizmo3, clientX: number, clientY: number): void {
@@ -128,10 +133,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           if (mode === "space") frame = lastGood;
         }
         if (mode === "space") {
-          if (
-            selectedId &&
-            !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)
-          ) {
+          if (selectedId && !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)) {
             selectedId = null;
             selectedGeom = null;
           }
@@ -144,13 +146,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             mode === "space"
               ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
               : "The field has no provenance. Widget values live in this scene file.";
-          showWidgetInspect(
-            els,
-            hoverGizmo.kind,
-            hoverGizmo.site,
-            hoverGizmo.at.file,
-            meta,
-          );
+          showWidgetInspect(els, hoverGizmo.kind, hoverGizmo.site, hoverGizmo.at.file, meta);
           return;
         }
         if (mode === "field") {
@@ -163,8 +159,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           return;
         }
         const g =
-          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))
-            ?.geom ?? selectedGeom;
+          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))?.geom ?? selectedGeom;
         if (!g) {
           showEmptyInspect(
             els,
@@ -196,24 +191,14 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           );
         } else {
           if (sdf) fieldView!.setSdf(sdf);
-          fieldView!.syncGizmos(
-            fieldGizmos,
-            drag?.site ?? hoverGizmo?.site ?? null,
-          );
+          fieldView!.syncGizmos(fieldGizmos, drag?.site ?? hoverGizmo?.site ?? null);
         }
         if (quiet && !error) return;
         const fallback =
           mode === "space"
             ? hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · glider writes this file")
-            : hintOf(
-                sceneMod,
-                "Field view — not pickable · glider writes this file · LMB orbit",
-              );
-        setPaneStatus(
-          els,
-          error ? "Last good frame · scene threw" : fallback,
-          error,
-        );
+            : hintOf(sceneMod, "Field view — not pickable · glider writes this file · LMB orbit");
+        setPaneStatus(els, error ? "Last good frame · scene threw" : fallback, error);
         void updateInspect();
       }
 
@@ -278,12 +263,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         const g = gizmos().find((x) => x.site === dragging.site);
         drag = null;
         const now = g ? gizmoValues3(g) : dragging.start;
-        const err = await commitGizmoIfChanged(
-          peekCache,
-          dragging.start,
-          g,
-          now,
-        );
+        const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;
         sync();
       }
@@ -315,11 +295,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         });
       }
 
-      const unsub = subscribeHotReload(
-        ctx.sceneFile,
-        subscribeSceneHot,
-        onHotReload,
-      );
+      const unsub = subscribeHotReload(ctx.sceneFile, subscribeSceneHot, onHotReload);
       const unsubHelper = subscribeHelperHot(() => {
         if (closed) return;
         peekCache.clear();

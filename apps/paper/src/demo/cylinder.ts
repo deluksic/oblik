@@ -28,11 +28,7 @@ export type CylinderLayout = {
   ringBallR: number;
 };
 
-export function polarRing(
-  count: number,
-  ringR: number,
-  rotation = 0,
-): Vec2[] {
+export function polarRing(count: number, ringR: number, rotation = 0): Vec2[] {
   const n = Math.max(1, Math.round(count));
   const r = Math.max(0, ringR);
   const out: Vec2[] = [];
@@ -48,11 +44,7 @@ export function ringBalls(ringR: number, rotation = 0): Vec2[] {
   return polarRing(4, ringR, rotation);
 }
 
-function dimples(
-  origin: Vec2,
-  layout: CylinderLayout,
-  rotation: number,
-): Geom[] {
+function dimples(origin: Vec2, layout: CylinderLayout, rotation: number): Geom[] {
   return [
     circle(origin, layout.centerR),
     ...ringBalls(layout.ringR, rotation).map((b) =>

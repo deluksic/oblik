@@ -29,7 +29,7 @@ export function smoothUnionAll2(nodes: Sdf2[], ksoft: number): Sdf2 {
 
 function smin(a: number, b: number, k: number): number {
   const kk = Math.max(k, 1e-6);
-  const h = Math.min(1, Math.max(0, 0.5 + 0.5 * (b - a) / kk));
+  const h = Math.min(1, Math.max(0, 0.5 + (0.5 * (b - a)) / kk));
   return b * (1 - h) + a * h - kk * h * (1 - h);
 }
 

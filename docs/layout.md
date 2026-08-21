@@ -20,18 +20,18 @@ apps/
 
 ## Rules
 
-| Layer | May import | Must not |
-| --- | --- | --- |
-| `geom` | nothing else in the workspace | widgets, canvas, Vite |
-| `euclid2` | `geom` | apps, filesystem writes |
-| `sdf` | `geom`, Three.js | widgets, provenance, apps |
-| `euclid3` | `geom`, Three.js | apps, filesystem writes |
-| `shell` | Node, TypeScript, Vite, DOM | geom, euclid2/3, sdf, hosts |
-| `hosts` | `geom`, `euclid2`, `euclid3`, `sdf`, `shell` | apps |
-| `paper` scenes | `geom`, `euclid2` / `euclid3` / `sdf`, `../demo/*` | putting reusable domain in `packages/` until it is real |
-| `paper` app | `hosts`, `shell`, `geom`, `euclid2` / `euclid3` / `sdf`, `demo` | implementing pane hosts |
-| layout files in `scenes/` | string ids / CSS areas only | other scene modules |
-| `paper` demo | `geom` or `sdf` | `euclid2`, `shell` |
+| Layer                     | May import                                                      | Must not                                                |
+| ------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| `geom`                    | nothing else in the workspace                                   | widgets, canvas, Vite                                   |
+| `euclid2`                 | `geom`                                                          | apps, filesystem writes                                 |
+| `sdf`                     | `geom`, Three.js                                                | widgets, provenance, apps                               |
+| `euclid3`                 | `geom`, Three.js                                                | apps, filesystem writes                                 |
+| `shell`                   | Node, TypeScript, Vite, DOM                                     | geom, euclid2/3, sdf, hosts                             |
+| `hosts`                   | `geom`, `euclid2`, `euclid3`, `sdf`, `shell`                    | apps                                                    |
+| `paper` scenes            | `geom`, `euclid2` / `euclid3` / `sdf`, `../demo/*`              | putting reusable domain in `packages/` until it is real |
+| `paper` app               | `hosts`, `shell`, `geom`, `euclid2` / `euclid3` / `sdf`, `demo` | implementing pane hosts                                 |
+| layout files in `scenes/` | string ids / CSS areas only                                     | other scene modules                                     |
+| `paper` demo              | `geom` or `sdf`                                                 | `euclid2`, `shell`                                      |
 
 ## Identity
 

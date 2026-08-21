@@ -1,6 +1,7 @@
+import type { Vec3 } from "@design-scenes/geom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { Vec3 } from "@design-scenes/geom";
+
 import { compileSdf, sdfMapSignature, type CompiledSdf } from "./compile.ts";
 import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader.ts";
 import type { Sdf } from "./tree.ts";
@@ -82,10 +83,7 @@ export class SdfView {
       RIGHT: THREE.MOUSE.PAN,
     };
 
-    this.quad = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
-      emptySdfMaterial(),
-    );
+    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), emptySdfMaterial());
     this.quad.frustumCulled = false;
     this.rayScene.add(this.quad);
 
@@ -208,10 +206,7 @@ export class SdfView {
   dragDistance(origin: Vec3, clientX: number, clientY: number): number | null {
     const hit = this.intersectPlane(cameraPlane(this.camera, origin), clientX, clientY);
     if (!hit) return null;
-    return Math.max(
-      0.05,
-      Math.hypot(hit.x - origin.x, hit.y - origin.y, hit.z - origin.z),
-    );
+    return Math.max(0.05, Math.hypot(hit.x - origin.x, hit.y - origin.y, hit.z - origin.z));
   }
 
   dragGlider(a: Vec3, b: Vec3, clientX: number, clientY: number): number | null {
@@ -225,8 +220,7 @@ export class SdfView {
     const ab = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
     const l2 = ab.x * ab.x + ab.y * ab.y + ab.z * ab.z;
     if (l2 < 1e-12) return 0;
-    const t =
-      ((hit.x - a.x) * ab.x + (hit.y - a.y) * ab.y + (hit.z - a.z) * ab.z) / l2;
+    const t = ((hit.x - a.x) * ab.x + (hit.y - a.y) * ab.y + (hit.z - a.z) * ab.z) / l2;
     return Math.min(1, Math.max(0, t));
   }
 
@@ -237,8 +231,7 @@ export class SdfView {
       const slot = mat.uniforms[u.name];
       if (!slot) continue;
       if (u.kind === "f") slot.value = u.value;
-      else if (u.kind === "v2")
-        (slot.value as THREE.Vector2).set(u.value[0], u.value[1]);
+      else if (u.kind === "v2") (slot.value as THREE.Vector2).set(u.value[0], u.value[1]);
       else (slot.value as THREE.Vector3).set(u.value[0], u.value[1], u.value[2]);
     }
   }
@@ -253,11 +246,7 @@ export class SdfView {
     mat.uniforms.uRes.value.set(this.fieldTarget.width, this.fieldTarget.height);
   }
 
-  private intersectPlane(
-    plane: THREE.Plane,
-    clientX: number,
-    clientY: number,
-  ): Vec3 | null {
+  private intersectPlane(plane: THREE.Plane, clientX: number, clientY: number): Vec3 | null {
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
     const p = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(plane, p)) return null;
@@ -347,10 +336,7 @@ function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
   const color = active ? 0xfff3e6 : COL.gizmo;
   const mat = new THREE.MeshLambertMaterial({ color });
   if (g.kind === "point3") {
-    const s = new THREE.Mesh(
-      new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12),
-      mat,
-    );
+    const s = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12), mat);
     s.position.set(g.x, g.y, g.z);
     group.add(s);
   } else if (g.kind === "glider3") {
@@ -359,10 +345,7 @@ function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
       y: g.a.y + (g.b.y - g.a.y) * g.t,
       z: g.a.z + (g.b.z - g.a.z) * g.t,
     };
-    const s = new THREE.Mesh(
-      new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12),
-      mat,
-    );
+    const s = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12), mat);
     s.position.set(p.x, p.y, p.z);
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),
@@ -418,10 +401,7 @@ function unitCircles(origin: Vec3, r: number, color: number): THREE.Object3D[] {
         ),
       );
     }
-    const line = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      mat,
-    );
+    const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
     line.computeLineDistances();
     return line;
   });

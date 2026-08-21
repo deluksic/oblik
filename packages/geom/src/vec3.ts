@@ -29,11 +29,7 @@ export function dist3(a: Vec3, b: Vec3): number {
 }
 
 export function lerp3(a: Vec3, b: Vec3, t: number): Vec3 {
-  return vec3(
-    a.x + (b.x - a.x) * t,
-    a.y + (b.y - a.y) * t,
-    a.z + (b.z - a.z) * t,
-  );
+  return vec3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
 }
 
 export function projectT3(a: Vec3, b: Vec3, p: Vec3): number {

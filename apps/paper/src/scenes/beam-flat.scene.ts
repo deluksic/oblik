@@ -1,10 +1,7 @@
+import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
 import { line } from "@design-scenes/geom";
+
 import { assembleBeamFlat } from "../demo/beam.ts";
-import {
-  editDistanceToPoint,
-  editPoint,
-  editPointOnSegment,
-} from "@design-scenes/euclid2";
 
 export const id = "flat";
 export const title = "Flat";

@@ -1,4 +1,5 @@
 import { dist, distToArc, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
+
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
 import { hitNumberSlider } from "./hud.ts";
@@ -7,9 +8,7 @@ import type { Gizmo } from "./widgets.ts";
 const GIZMO_PX = 12;
 const GEOM_PX = 8;
 
-export type Hit =
-  | { target: "gizmo"; gizmo: Gizmo }
-  | { target: "geom"; drawable: Drawable };
+export type Hit = { target: "gizmo"; gizmo: Gizmo } | { target: "geom"; drawable: Drawable };
 
 export function hitTest(
   screen: Vec2,

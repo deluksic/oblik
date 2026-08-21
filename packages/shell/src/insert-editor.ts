@@ -1,4 +1,5 @@
 import * as ts from "typescript";
+
 import { findEditCallAt } from "./patch-widget.ts";
 
 const SCENE_DRAWN = "__scene";
@@ -18,13 +19,7 @@ export function formatNum(n: number): string {
 }
 
 function parse(source: string): ts.SourceFile {
-  return ts.createSourceFile(
-    "scene.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
 
 function isInNode(node: ts.Node, ancestor: ts.Node): boolean {
@@ -36,9 +31,7 @@ function isInNode(node: ts.Node, ancestor: ts.Node): boolean {
   return false;
 }
 
-export function findSceneFunction(
-  sourceFile: ts.SourceFile,
-): ts.FunctionDeclaration | null {
+export function findSceneFunction(sourceFile: ts.SourceFile): ts.FunctionDeclaration | null {
   for (const stmt of sourceFile.statements) {
     if (
       ts.isFunctionDeclaration(stmt) &&
@@ -53,19 +46,12 @@ export function findSceneFunction(
 }
 
 /** Const name if this edit* is `const foo = editPoint(...)`. */
-export function widgetBindingName(
-  source: string,
-  at: SourceAt,
-): string | null {
+export function widgetBindingName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
   const call = findEditCallAt(sf, at.line, at.column);
   if (!call) return null;
   let n: ts.Node = call.parent;
-  while (
-    ts.isAsExpression(n) ||
-    ts.isParenthesizedExpression(n) ||
-    ts.isSatisfiesExpression(n)
-  ) {
+  while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) {
     n = n.parent;
   }
   if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) return n.name.text;
@@ -73,10 +59,7 @@ export function widgetBindingName(
 }
 
 /** True when that widget’s call sits inside exported `scene()`. */
-export function widgetInSceneFunction(
-  source: string,
-  at: SourceAt,
-): boolean {
+export function widgetInSceneFunction(source: string, at: SourceAt): boolean {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
   const call = findEditCallAt(sf, at.line, at.column);
@@ -101,8 +84,7 @@ export function namedScenePointNear(
   maxDist = 0.35,
 ): ScenePointBinding | null {
   const names = namedScenePointBindings(source);
-  let best: { name: string; kind: ScenePointBinding["kind"]; d: number } | null =
-    null;
+  let best: { name: string; kind: ScenePointBinding["kind"]; d: number } | null = null;
   for (const e of evals) {
     const kind = names.get(e.name);
     if (!kind) continue;
@@ -113,9 +95,7 @@ export function namedScenePointNear(
   return best ? { name: best.name, kind: best.kind } : null;
 }
 
-export function namedScenePointBindings(
-  source: string,
-): Map<string, ScenePointBinding["kind"]> {
+export function namedScenePointBindings(source: string): Map<string, ScenePointBinding["kind"]> {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
   const names = new Map<string, ScenePointBinding["kind"]>();
@@ -146,10 +126,7 @@ function numericLiteral(node: ts.Expression): number | null {
   return null;
 }
 
-function evalBinary(
-  node: ts.BinaryExpression,
-  env: Map<string, Vec2Like>,
-): number | null {
+function evalBinary(node: ts.BinaryExpression, env: Map<string, Vec2Like>): number | null {
   const l = evalNumber(node.left, env);
   const r = evalNumber(node.right, env);
   if (l == null || r == null) return null;
@@ -216,11 +193,7 @@ export function evalDerivedScenePoints(
 
 function unwrapCall(node: ts.Expression): ts.CallExpression | null {
   let n: ts.Expression = node;
-  while (
-    ts.isAsExpression(n) ||
-    ts.isParenthesizedExpression(n) ||
-    ts.isSatisfiesExpression(n)
-  ) {
+  while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) {
     n = n.expression;
   }
   return ts.isCallExpression(n) ? n : null;
@@ -278,27 +251,18 @@ export function ensureNamedImport(
   if (!named || !ts.isNamedImports(named)) {
     throw new Error(`existing import from ${moduleName} is not named`);
   }
-  const have = new Set(
-    named.elements.map((el) => (el.propertyName ?? el.name).text),
-  );
+  const have = new Set(named.elements.map((el) => (el.propertyName ?? el.name).text));
   const missing = names.filter((n) => !have.has(n));
   if (missing.length === 0) return source;
   const last = named.elements[named.elements.length - 1];
   if (!last) {
     throw new Error(`empty named import from ${moduleName}`);
   }
-  return (
-    source.slice(0, last.getEnd()) +
-    `, ${missing.join(", ")}` +
-    source.slice(last.getEnd())
-  );
+  return source.slice(0, last.getEnd()) + `, ${missing.join(", ")}` + source.slice(last.getEnd());
 }
 
 /** First argument identifier of editDistanceToPoint(...) at this site, if any. */
-export function distanceOriginName(
-  source: string,
-  at: SourceAt,
-): string | null {
+export function distanceOriginName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
   const call = findEditCallAt(sf, at.line, at.column);
   if (!call) return null;
@@ -339,20 +303,14 @@ function appendConstructorToReturn(
     retExpr.expression.text === "group"
   ) {
     const arrow = retExpr.arguments[0];
-    if (
-      !arrow ||
-      !ts.isArrowFunction(arrow) ||
-      !ts.isArrayLiteralExpression(arrow.body)
-    ) {
+    if (!arrow || !ts.isArrowFunction(arrow) || !ts.isArrayLiteralExpression(arrow.body)) {
       throw new Error("group return must be group(() => [...])");
     }
     const arr = arrow.body;
     const lastEl = arr.elements[arr.elements.length - 1];
     if (!lastEl) throw new Error("group array is empty");
     const insertPos = lastEl.getEnd();
-    return (
-      source.slice(0, insertPos) + `, ${ctorExpr}` + source.slice(insertPos)
-    );
+    return source.slice(0, insertPos) + `, ${ctorExpr}` + source.slice(insertPos);
   }
 
   if (ts.isIdentifier(retExpr) && retExpr.text === SCENE_DRAWN) {
@@ -370,9 +328,7 @@ function appendConstructorToReturn(
   return source.slice(0, lineStart) + chunk + source.slice(last.getEnd());
 }
 
-function sceneAlreadyBindsDrawn(
-  fn: ts.FunctionDeclaration,
-): boolean {
+function sceneAlreadyBindsDrawn(fn: ts.FunctionDeclaration): boolean {
   const body = fn.body;
   if (!body) return false;
   for (const stmt of body.statements) {
@@ -386,11 +342,7 @@ function sceneAlreadyBindsDrawn(
   return false;
 }
 
-function insertBeforeReturn(
-  source: string,
-  fn: ts.FunctionDeclaration,
-  lines: string[],
-): string {
+function insertBeforeReturn(source: string, fn: ts.FunctionDeclaration, lines: string[]): string {
   const body = fn.body;
   if (!body) throw new Error("scene() has no body");
   const stmts = body.statements;
@@ -404,8 +356,7 @@ function insertBeforeReturn(
   const indent = indentAt(source, start);
   const expr = last.expression;
   const keepReturn =
-    (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) ||
-    sceneAlreadyBindsDrawn(fn);
+    (ts.isIdentifier(expr) && expr.text === SCENE_DRAWN) || sceneAlreadyBindsDrawn(fn);
   if (keepReturn) {
     const chunk = lines.map((ln) => `${indent}${ln}\n`).join("");
     return source.slice(0, lineStart) + chunk + source.slice(lineStart);
@@ -421,12 +372,8 @@ function insertBeforeReturn(
 export function insertEditors(source: string, edits: EditorInsert[]): string {
   if (edits.length === 0) return source;
 
-  const constructors = edits.filter(
-    (e) => e.kind === "circle" || e.kind === "line",
-  );
-  const editors = edits.filter(
-    (e) => e.kind === "point" || e.kind === "distance",
-  );
+  const constructors = edits.filter((e) => e.kind === "circle" || e.kind === "line");
+  const editors = edits.filter((e) => e.kind === "point" || e.kind === "distance");
   if (constructors.length > 0 && editors.length > 0) {
     throw new Error("cannot mix editor and constructor inserts in one write");
   }
@@ -436,21 +383,12 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
   if (constructors.length === 1) {
     const c = constructors[0]!;
     const imports =
-      c.kind === "circle"
-        ? (["circle", "group"] as const)
-        : (["line", "group"] as const);
-    const withImports = ensureNamedImport(
-      source,
-      "@design-scenes/geom",
-      imports,
-    );
+      c.kind === "circle" ? (["circle", "group"] as const) : (["line", "group"] as const);
+    const withImports = ensureNamedImport(source, "@design-scenes/geom", imports);
     const sf = parse(withImports);
     const fn = findSceneFunction(sf);
     if (!fn) throw new Error("no exported scene() function to insert into");
-    const expr =
-      c.kind === "circle"
-        ? `circle(${c.center}, ${c.radius})`
-        : `line(${c.a}, ${c.b})`;
+    const expr = c.kind === "circle" ? `circle(${c.center}, ${c.radius})` : `line(${c.a}, ${c.b})`;
     return appendConstructorToReturn(withImports, fn, expr);
   }
 
@@ -463,11 +401,7 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
       imports.push("editDistanceToPoint");
     }
   }
-  const withImports = ensureNamedImport(
-    source,
-    "@design-scenes/euclid2",
-    imports,
-  );
+  const withImports = ensureNamedImport(source, "@design-scenes/euclid2", imports);
   const sf = parse(withImports);
   const fn = findSceneFunction(sf);
   if (!fn) throw new Error("no exported scene() function to insert into");
@@ -478,18 +412,14 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
     if (e.kind === "point") {
       const name = freshName("p", used);
       lastPoint = name;
-      lines.push(
-        `const ${name} = editPoint(${formatNum(e.x)}, ${formatNum(e.y)});`,
-      );
+      lines.push(`const ${name} = editPoint(${formatNum(e.x)}, ${formatNum(e.y)});`);
     } else {
       const origin = e.originName ?? lastPoint;
       if (!origin) {
         throw new Error("distance needs a point in scene() or a new point first");
       }
       const name = freshName("d", used);
-      lines.push(
-        `const ${name} = editDistanceToPoint(${origin}, ${formatNum(e.d)});`,
-      );
+      lines.push(`const ${name} = editDistanceToPoint(${origin}, ${formatNum(e.d)});`);
     }
   }
   return insertBeforeReturn(withImports, fn, lines);

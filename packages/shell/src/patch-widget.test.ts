@@ -1,5 +1,6 @@
-import { expect, test } from "vitest";
 import * as ts from "typescript";
+import { expect, test } from "vitest";
+
 import { insertEditors } from "./insert-editor.ts";
 import { collectEditCalls, patchWidgetAt } from "./patch-widget.ts";
 
@@ -36,13 +37,7 @@ test("loop of five distances is one write target", () => {
   expect(next).not.toMatch(/0\.4/);
   expect(
     collectEditCalls(
-      ts.createSourceFile(
-        "s.ts",
-        next,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-      ),
+      ts.createSourceFile("s.ts", next, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
     ).length,
   ).toBe(2);
 });
@@ -106,7 +101,9 @@ test("editPointOnLine patches s (third arg)", () => {
 `;
   const loc = at(src, 0);
   const next = patchWidgetAt(src, loc.line, loc.column, [0.72]);
-  expect(next).toMatch(/editPointOnLine\(\{ x: 0, y: 0 \}, \{ x: 1, y: 1 \}, 0\.72, \{ min: 0 \}\)/);
+  expect(next).toMatch(
+    /editPointOnLine\(\{ x: 0, y: 0 \}, \{ x: 1, y: 1 \}, 0\.72, \{ min: 0 \}\)/,
+  );
 });
 
 test("editPointOnSegment patches t", () => {

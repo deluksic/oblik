@@ -1,6 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vite";
+
 import { sceneDevPlugin } from "../../packages/shell/src/vite-plugin.ts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -15,30 +17,12 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@design-scenes/geom": path.resolve(
-        workspaceRoot,
-        "packages/geom/src/index.ts",
-      ),
-      "@design-scenes/euclid2": path.resolve(
-        workspaceRoot,
-        "packages/euclid2/src/index.ts",
-      ),
-      "@design-scenes/euclid3": path.resolve(
-        workspaceRoot,
-        "packages/euclid3/src/index.ts",
-      ),
-      "@design-scenes/sdf": path.resolve(
-        workspaceRoot,
-        "packages/sdf/src/index.ts",
-      ),
-      "@design-scenes/shell": path.resolve(
-        workspaceRoot,
-        "packages/shell/src/index.ts",
-      ),
-      "@design-scenes/hosts": path.resolve(
-        workspaceRoot,
-        "packages/hosts/src/index.ts",
-      ),
+      "@design-scenes/geom": path.resolve(workspaceRoot, "packages/geom/src/index.ts"),
+      "@design-scenes/euclid2": path.resolve(workspaceRoot, "packages/euclid2/src/index.ts"),
+      "@design-scenes/euclid3": path.resolve(workspaceRoot, "packages/euclid3/src/index.ts"),
+      "@design-scenes/sdf": path.resolve(workspaceRoot, "packages/sdf/src/index.ts"),
+      "@design-scenes/shell": path.resolve(workspaceRoot, "packages/shell/src/index.ts"),
+      "@design-scenes/hosts": path.resolve(workspaceRoot, "packages/hosts/src/index.ts"),
     },
   },
   server: {

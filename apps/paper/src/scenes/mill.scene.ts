@@ -1,6 +1,7 @@
-import { line3 } from "@design-scenes/geom";
 import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnSegment3 } from "@design-scenes/euclid3";
+import { line3 } from "@design-scenes/geom";
+
 import { drawMill, millFromPlate } from "../demo/mill.ts";
 import { plateLayout } from "./plate-layout.ts";
 

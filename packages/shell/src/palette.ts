@@ -11,10 +11,7 @@ export type PromptOpts = {
   onNumberDraft?: (raw: string) => void;
 };
 
-export function filterCommands(
-  commands: readonly CommandSpec[],
-  query: string,
-): CommandSpec[] {
+export function filterCommands(commands: readonly CommandSpec[], query: string): CommandSpec[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...commands];
   return commands.filter(
@@ -31,6 +28,11 @@ export type PaletteOpts = {
   onPick: (id: string) => void;
   onClose: () => void;
 };
+
+function parseDraft(raw: string): number | null {
+  const n = Number(raw.trim());
+  return raw.trim() !== "" && Number.isFinite(n) ? n : null;
+}
 
 export function mountCommandPalette(opts: PaletteOpts): {
   open: () => void;
@@ -211,11 +213,6 @@ export function mountCommandPalette(opts: PaletteOpts): {
     }
   }
 
-  function parseDraft(raw: string): number | null {
-    const n = Number(raw.trim());
-    return raw.trim() !== "" && Number.isFinite(n) ? n : null;
-  }
-
   function tryCommitNumber(): void {
     if (!onNumber || numberInput.hidden) return;
     const n = parseDraft(numberInput.value);
@@ -286,8 +283,5 @@ export function mountCommandPalette(opts: PaletteOpts): {
 }
 
 function escape(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

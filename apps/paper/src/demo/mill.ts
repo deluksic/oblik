@@ -1,12 +1,5 @@
-import {
-  box3,
-  circle3,
-  cylinder3,
-  group,
-  line3,
-  type Geom,
-  type Vec3,
-} from "@design-scenes/geom";
+import { box3, circle3, cylinder3, group, line3, type Geom, type Vec3 } from "@design-scenes/geom";
+
 import type { PlateOpts } from "./plate.ts";
 
 export type MillHole = { x: number; y: number; radius: number };
@@ -69,12 +62,8 @@ function holeSet(stock: MillOpts["stock"], holes: MillHole[]): Geom[] {
   const z1 = Math.max(stock.min.z, stock.max.z);
   const out: Geom[] = [];
   for (const h of holes) {
-    out.push(
-      cylinder3({ x: h.x, y: h.y, z: z0 }, { x: h.x, y: h.y, z: z1 }, h.radius),
-    );
-    out.push(
-      circle3({ x: h.x, y: h.y, z: z1 }, h.radius, { x: 0, y: 0, z: 1 }),
-    );
+    out.push(cylinder3({ x: h.x, y: h.y, z: z0 }, { x: h.x, y: h.y, z: z1 }, h.radius));
+    out.push(circle3({ x: h.x, y: h.y, z: z1 }, h.radius, { x: 0, y: 0, z: 1 }));
   }
   return out;
 }

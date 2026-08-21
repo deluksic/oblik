@@ -1,4 +1,3 @@
-import { line, type Vec2 } from "@design-scenes/geom";
 import {
   editDistanceToPoint,
   editNumber,
@@ -7,6 +6,7 @@ import {
   editPointOnSegment,
   editVector,
 } from "@design-scenes/euclid2";
+import { line, type Vec2 } from "@design-scenes/geom";
 
 function stockEdges(min: Vec2, max: Vec2) {
   return {
@@ -15,6 +15,10 @@ function stockEdges(min: Vec2, max: Vec2) {
     left: line(min, { x: min.x, y: max.y }),
   };
 }
+
+const cornerR = (p: Vec2) => editDistanceToPoint(p, 0.59);
+const ringR = (p: Vec2) => editDistanceToPoint(p, 0.22);
+const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
 
 /**
  * Shared plate parameters — edit* live here so plate, mill, and nest panes
@@ -39,7 +43,6 @@ export function plateLayout() {
     { x: min.x + ix, y: max.y - iy },
   ];
 
-  const cornerR = (p: Vec2) => editDistanceToPoint(p, 0.59);
   const cornerHoles = corners.map((center) => ({
     center,
     radius: cornerR(center),
@@ -54,7 +57,6 @@ export function plateLayout() {
     step: 1,
   });
 
-  const ringR = (p: Vec2) => editDistanceToPoint(p, 0.22);
   const ringCount = Math.max(3, Math.round(ringN));
   const ringHoles: { center: Vec2; radius: number }[] = [];
   for (let i = 0; i < ringCount; i++) {
@@ -84,7 +86,6 @@ export function plateLayout() {
   const slotCenter = editPointOnSegment(edges.top, 0.49);
   const slotLen = editDistanceToPoint(slotCenter, 3.91);
   const halfL = slotLen / 2;
-  const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
   const slotCapR = slotCapAt({
     x: slotCenter.x - halfL,
     y: slotCenter.y,

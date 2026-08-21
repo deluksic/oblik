@@ -1,6 +1,6 @@
-import type { Vec2 } from "./vec.ts";
-import { makeBase, type Base, type Group } from "./identity.ts";
 import type { Geom3 } from "./geom3.ts";
+import { makeBase, type Base, type Group } from "./identity.ts";
+import type { Vec2 } from "./vec.ts";
 
 export type Point = Base & { kind: "point"; x: number; y: number };
 export type Line = Base & { kind: "line"; a: Point; b: Point };
@@ -125,9 +125,13 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
 export function flatten3(geom: Geom | Geom[]): Drawable3[] {
   const out: Drawable3[] = [];
   const visit = (g: Geom) =>
-    walk(g, () => {}, (s) => {
-      out.push({ geom: s });
-    });
+    walk(
+      g,
+      () => {},
+      (s) => {
+        out.push({ geom: s });
+      },
+    );
   if (Array.isArray(geom)) {
     for (const g of geom) visit(g);
   } else {

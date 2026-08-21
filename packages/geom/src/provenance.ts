@@ -28,16 +28,13 @@ function isInfra(file: string): boolean {
 export function normalizeFile(file: string): string {
   const cleaned = file.replace(/^\/+/, "");
   const cut =
-    cleaned.match(/(packages\/[^/]+\/src\/\S+)$/) ??
-    cleaned.match(/(apps\/[^/]+\/src\/\S+)$/);
+    cleaned.match(/(packages\/[^/]+\/src\/\S+)$/) ?? cleaned.match(/(apps\/[^/]+\/src\/\S+)$/);
   return cut?.[1] ?? cleaned;
 }
 
 function parseFrame(raw: string): CallSite | null {
   const line = raw.replace(/\.(tsx?|jsx?|mjs)\?[^:]*:/, ".$1:");
-  const m = line.match(
-    /(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/,
-  );
+  const m = line.match(/(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/);
   if (!m?.[1] || !m[2] || !m[3]) return null;
   return {
     file: normalizeFile(m[1].replace(/^\//, "")),

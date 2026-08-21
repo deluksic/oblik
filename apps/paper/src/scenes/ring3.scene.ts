@@ -1,4 +1,5 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
+
 import { drawRing3 } from "../demo/ring.ts";
 import { ringLayout } from "./ring.scene.ts";
 

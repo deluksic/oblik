@@ -207,7 +207,9 @@
 }
 
 .shell-palette.has-inline-number.is-typing .shell-palette-preview .slot.is-number::after,
-.shell-palette.has-inline-number .shell-palette-preview .slot.is-number:not([data-placeholder="<radius>"])::after {
+.shell-palette.has-inline-number
+  .shell-palette-preview
+  .slot.is-number:not([data-placeholder="<radius>"])::after {
   content: none;
 }
 

@@ -1,14 +1,6 @@
-import {
-  beginGeomFrame,
-  flatten3,
-  type Drawable3,
-  type Geom,
-} from "@design-scenes/geom";
-import {
-  beginWidgetFrame3,
-  getGizmos3,
-  type Gizmo3,
-} from "./widgets.ts";
+import { beginGeomFrame, flatten3, type Drawable3, type Geom } from "@design-scenes/geom";
+
+import { beginWidgetFrame3, getGizmos3, type Gizmo3 } from "./widgets.ts";
 
 export type Frame3 = {
   geom: Geom | Geom[];

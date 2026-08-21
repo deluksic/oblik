@@ -1,5 +1,5 @@
-import { dist, type Vec2 } from "@design-scenes/geom";
 import { worldToScreen, type Camera, type Gizmo } from "@design-scenes/euclid2";
+import { dist, type Vec2 } from "@design-scenes/geom";
 import type { CommandSpec } from "@design-scenes/shell";
 
 export const EDITOR_COMMANDS: CommandSpec[] = [
@@ -61,18 +61,12 @@ const EDITOR = "#e8876a";
 const SNAP = "#f0c14a";
 
 function escapeHtml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function slot(label: string, extraClass = ""): string {
   const cls = extraClass ? `slot ${extraClass}` : "slot";
-  const attr =
-    extraClass.includes("is-number")
-      ? ` data-placeholder="${escapeHtml(label)}"`
-      : "";
+  const attr = extraClass.includes("is-number") ? ` data-placeholder="${escapeHtml(label)}"` : "";
   return `<span class="${cls}"${attr}>${escapeHtml(label)}</span>`;
 }
 
@@ -97,9 +91,7 @@ export function commandPreview(tool: EditorTool | null): CommandPreview | null {
         hint: "Click a named point in scene(), or empty paper for a new origin.",
       };
     }
-    const point = tool.origin.name
-      ? escapeHtml(tool.origin.name)
-      : slot("<point>");
+    const point = tool.origin.name ? escapeHtml(tool.origin.name) : slot("<point>");
     const radiusLabel = tool.typedRadius?.trim() ? tool.typedRadius : "<radius>";
     return {
       previewHtml: `editDistanceToPoint(${point}, ${slot(radiusLabel, "is-number")})`,
@@ -119,9 +111,7 @@ export function commandPreview(tool: EditorTool | null): CommandPreview | null {
   const a = tool.a ? escapeHtml(tool.a.name) : slot("<a>");
   return {
     previewHtml: `line(${a}, ${slot("<b>")})`,
-    hint: tool.a
-      ? "Click a second named point in scene()."
-      : "Click a named point in scene().",
+    hint: tool.a ? "Click a second named point in scene()." : "Click a named point in scene().",
   };
 }
 
@@ -150,8 +140,7 @@ export function drawEditorGhost(
   cursor: Vec2 | null,
   snap: GhostSnap | null = null,
 ): void {
-  const raw =
-    tool.id === "distance" && tool.origin ? tool.typedRadius?.trim() ?? "" : "";
+  const raw = tool.id === "distance" && tool.origin ? (tool.typedRadius?.trim() ?? "") : "";
   const typedNum = raw === "" ? NaN : Number(raw);
   const typed = Number.isFinite(typedNum) ? Math.max(0.05, typedNum) : null;
   if (!cursor && !(tool.id === "distance" && tool.origin && typed != null)) {
@@ -204,8 +193,7 @@ export function drawEditorGhost(
       const r =
         snap?.kind === "distance" && snap.d != null
           ? snap.d
-          : (tool.hoverRadius ??
-            (cursor ? radiusBetween(center, cursor) : 0.2));
+          : (tool.hoverRadius ?? (cursor ? radiusBetween(center, cursor) : 0.2));
       const c = worldToScreen(cam, center, w, h);
       ctx.globalAlpha = 0.55;
       ctx.lineWidth = 2;
@@ -254,10 +242,7 @@ export function drawEditorGhost(
   ctx.restore();
 }
 
-export function distanceHoverRadius(
-  tool: EditorTool,
-  gizmo: Gizmo | null,
-): number | undefined {
+export function distanceHoverRadius(tool: EditorTool, gizmo: Gizmo | null): number | undefined {
   if (tool.id !== "circle" || !tool.center || !gizmo || gizmo.kind !== "distance") {
     return undefined;
   }

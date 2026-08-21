@@ -1,16 +1,7 @@
-import {
-  paneIdsFromAreas,
-  stackedAreas,
-} from "./layout-grid.ts";
+import { paneIdsFromAreas, stackedAreas } from "./layout-grid.ts";
 import { mountCommandPalette } from "./palette.ts";
 import type { SceneEntry, SceneLayout } from "./types.ts";
-import type {
-  InspectEls,
-  PaneHandle,
-  SceneLoaderMap,
-  ViewHost,
-  ViewKind,
-} from "./types.ts";
+import type { InspectEls, PaneHandle, SceneLoaderMap, ViewHost, ViewKind } from "./types.ts";
 
 export type WorkspaceOpts = {
   scenes: SceneEntry[];
@@ -41,23 +32,17 @@ function loaderKey(file: string): string {
 }
 
 function navItems(scenes: SceneEntry[]): SceneEntry[] {
-  return [...scenes].sort((a, b) => a.title.localeCompare(b.title));
+  return [...scenes].toSorted((a, b) => a.title.localeCompare(b.title));
 }
 
-function renderNav(
-  nav: HTMLElement,
-  scenes: SceneEntry[],
-  activeId: string | null,
-): void {
+function renderNav(nav: HTMLElement, scenes: SceneEntry[], activeId: string | null): void {
   const welcomeOn = activeId == null ? ' class="active"' : "";
   const options = [
     `<option value="" disabled${activeId == null ? " selected" : ""}>Select Scene</option>`,
   ];
   for (const s of navItems(scenes)) {
     const sel = s.id === activeId ? " selected" : "";
-    options.push(
-      `<option value="${escapeHtml(s.id)}"${sel}>${escapeHtml(s.title)}</option>`,
-    );
+    options.push(`<option value="${escapeHtml(s.id)}"${sel}>${escapeHtml(s.title)}</option>`);
   }
   nav.innerHTML = `
     <a href="${sceneHref(null)}" data-scene=""${welcomeOn}>Welcome</a>
@@ -75,9 +60,7 @@ function sceneHref(id: string | null): string {
 }
 
 function openScene(opts: WorkspaceOpts, id: string | null): void {
-  const url = id
-    ? `${location.pathname}?scene=${encodeURIComponent(id)}`
-    : location.pathname;
+  const url = id ? `${location.pathname}?scene=${encodeURIComponent(id)}` : location.pathname;
   history.pushState(null, "", url);
   void startWorkspace(opts);
 }
@@ -134,13 +117,8 @@ function escapeHtml(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function applyGrid(
-  viewport: HTMLElement,
-  layout: SceneLayout,
-  ids: string[],
-): void {
-  const columns =
-    layout.columns ?? ids.map(() => "minmax(0, 1fr)").join(" ");
+function applyGrid(viewport: HTMLElement, layout: SceneLayout, ids: string[]): void {
+  const columns = layout.columns ?? ids.map(() => "minmax(0, 1fr)").join(" ");
   viewport.style.display = "grid";
   viewport.classList.add("shell-viewport");
   viewport.style.gridTemplateAreas = layout.areas;
@@ -167,8 +145,7 @@ function showWelcome(
   viewport.style.gridTemplateRows = "";
   titleEl.textContent = "Welcome";
   document.title = "euclid — Welcome";
-  inspect.statusEl.textContent =
-    "Open a scene from the nav, or create a new TypeScript file.";
+  inspect.statusEl.textContent = "Open a scene from the nav, or create a new TypeScript file.";
   inspect.errorEl.hidden = true;
   inspect.crumbEl.textContent = "No scene open";
   inspect.metaEl.textContent =
@@ -205,8 +182,7 @@ function showWelcome(
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
     const input = form.elements.namedItem("id");
-    const id =
-      input instanceof HTMLInputElement ? input.value.trim().toLowerCase() : "";
+    const id = input instanceof HTMLInputElement ? input.value.trim().toLowerCase() : "";
     void createScene(id, form.querySelector("button"), errEl, opts);
   });
 }
@@ -257,8 +233,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   activeWorkspaceCleanup = undefined;
   wireNav(opts);
 
-  const { scenes, loaders, hosts, navRoot, viewportRoot, inspect, titleEl } =
-    opts;
+  const { scenes, loaders, hosts, navRoot, viewportRoot, inspect, titleEl } = opts;
   const catalog = byId(scenes);
   const activeId = currentSceneId();
 
@@ -276,9 +251,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     inspect.statusEl.textContent = "Unknown scene";
     inspect.errorEl.hidden = false;
     inspect.errorEl.textContent = `No catalog entry for "${activeId}".`;
-    viewportRoot.replaceChildren(
-      errorPane(activeId, `No scene file for "${activeId}".`),
-    );
+    viewportRoot.replaceChildren(errorPane(activeId, `No scene file for "${activeId}".`));
     return;
   }
 
@@ -293,9 +266,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   }
 
   const layout = entry.layout ?? singleLayout(entry.id);
-  const paneIds = entry.layout
-    ? paneIdsFromAreas(entry.layout.areas)
-    : [entry.id];
+  const paneIds = entry.layout ? paneIdsFromAreas(entry.layout.areas) : [entry.id];
 
   titleEl.textContent = entry.title;
   document.title = `euclid — ${entry.title}`;
@@ -372,9 +343,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
   };
 
   function focusedPaneEl(): HTMLElement | null {
-    return viewportRoot.querySelector<HTMLElement>(
-      `.view-pane[data-scene="${focused}"]`,
-    );
+    return viewportRoot.querySelector<HTMLElement>(`.view-pane[data-scene="${focused}"]`);
   }
 
   function syncCommandBarAnchor(): void {
@@ -396,25 +365,19 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       continue;
     }
     if (!paneEntry.hasScene) {
-      viewportRoot.append(
-        errorPane(id, `${paneEntry.file} is a layout, not a view.`),
-      );
+      viewportRoot.append(errorPane(id, `${paneEntry.file} is a layout, not a view.`));
       mounted.push({ id, handle: null });
       continue;
     }
     const host = hosts[paneEntry.view];
     if (!host) {
-      viewportRoot.append(
-        errorPane(id, `No view host registered for "${paneEntry.view}".`),
-      );
+      viewportRoot.append(errorPane(id, `No view host registered for "${paneEntry.view}".`));
       mounted.push({ id, handle: null });
       continue;
     }
     const loader = loaders[loaderKey(paneEntry.file)];
     if (!loader) {
-      viewportRoot.append(
-        errorPane(id, `No loader for ${paneEntry.file}.`),
-      );
+      viewportRoot.append(errorPane(id, `No loader for ${paneEntry.file}.`));
       mounted.push({ id, handle: null });
       continue;
     }
@@ -438,10 +401,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       }
       focused = id;
       for (const el of viewportRoot.querySelectorAll(".view-pane")) {
-        el.classList.toggle(
-          "is-focused",
-          (el as HTMLElement).dataset.scene === id,
-        );
+        el.classList.toggle("is-focused", (el as HTMLElement).dataset.scene === id);
       }
       syncCommandBarAnchor();
     };
@@ -452,8 +412,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       if (gen !== workspaceGen) return;
       const handle = host.mount(canvas, loaded, {
         sceneId: id,
-        sceneFile:
-          typeof loaded.sceneFile === "string" ? loaded.sceneFile : paneEntry.file,
+        sceneFile: typeof loaded.sceneFile === "string" ? loaded.sceneFile : paneEntry.file,
         inspect,
         onLiveChange: () => refreshOthers(id),
         onFocus: focus,
@@ -503,12 +462,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
       mounted.find((p) => p.id === focused)?.handle?.cancelCommand?.();
       return;
     }
-    if (
-      e.key !== " " ||
-      e.repeat ||
-      paletteHandle.isOpen() ||
-      paletteHandle.isPromptOpen()
-    ) {
+    if (e.key !== " " || e.repeat || paletteHandle.isOpen() || paletteHandle.isPromptOpen()) {
       return;
     }
     e.preventDefault();
@@ -516,8 +470,7 @@ export async function startWorkspace(opts: WorkspaceOpts): Promise<void> {
     const h = mounted.find((p) => p.id === focused)?.handle;
     const cmds = h?.commands?.() ?? [];
     if (cmds.length === 0) {
-      inspect.statusEl.textContent =
-        "Space adds editors on 2D paper. This view has none yet.";
+      inspect.statusEl.textContent = "Space adds editors on 2D paper. This view has none yet.";
       return;
     }
     paletteHandle.open();

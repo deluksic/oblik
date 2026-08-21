@@ -1,12 +1,7 @@
-import {
-  dist3,
-  projectT3,
-  type Drawable3,
-  type Geom3,
-  type Vec3,
-} from "@design-scenes/geom";
+import { dist3, projectT3, type Drawable3, type Geom3, type Vec3 } from "@design-scenes/geom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
 import type { Gizmo3 } from "./widgets.ts";
 
 const COL = {
@@ -20,9 +15,7 @@ const COL = {
   pocket: 0x3a4254,
 };
 
-export type Hit3 =
-  | { target: "gizmo"; gizmo: Gizmo3 }
-  | { target: "geom"; geom: Geom3 };
+export type Hit3 = { target: "gizmo"; gizmo: Gizmo3 } | { target: "geom"; geom: Geom3 };
 
 export class SpaceView {
   readonly canvas: HTMLCanvasElement;
@@ -129,12 +122,7 @@ export class SpaceView {
     for (const d of drawables) {
       const g = d.geom;
       this.geomById.set(g.id, g);
-      const color =
-        g.id === selectedId
-          ? COL.selected
-          : g.id === hoverId
-            ? COL.hover
-            : COL.geom;
+      const color = g.id === selectedId ? COL.selected : g.id === hoverId ? COL.hover : COL.geom;
       const obj = meshFor(g, color, g.id === selectedId || g.id === hoverId);
       obj.userData.geomId = g.id;
       this.content.add(obj);
@@ -182,12 +170,7 @@ export class SpaceView {
     return Math.max(0.05, dist3(origin, hit));
   }
 
-  dragGlider(
-    a: Vec3,
-    b: Vec3,
-    clientX: number,
-    clientY: number,
-  ): number | null {
+  dragGlider(a: Vec3, b: Vec3, clientX: number, clientY: number): number | null {
     const mid = {
       x: (a.x + b.x) / 2,
       y: (a.y + b.y) / 2,
@@ -199,11 +182,7 @@ export class SpaceView {
     return Math.min(1, Math.max(0, projectT3(a, b, hit)));
   }
 
-  private intersectPlane(
-    plane: THREE.Plane,
-    clientX: number,
-    clientY: number,
-  ): Vec3 | null {
+  private intersectPlane(plane: THREE.Plane, clientX: number, clientY: number): Vec3 | null {
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
     const p = new THREE.Vector3();
     const ok = this.raycaster.ray.intersectPlane(plane, p);
@@ -298,10 +277,7 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
       side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(cyl, fill);
-    mesh.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      axis.clone().normalize(),
-    );
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.clone().normalize());
     mesh.position.set(
       (g.bottom.x + g.top.x) / 2,
       (g.bottom.y + g.top.y) / 2,
@@ -334,15 +310,10 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
         ),
       );
     }
-    group.add(
-      new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), edgeMat),
-    );
+    group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), edgeMat));
   } else if (g.kind === "mesh3") {
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(g.positions, 3),
-    );
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(g.positions, 3));
     geo.setIndex(g.indices);
     geo.computeVertexNormals();
     const fill = new THREE.MeshLambertMaterial({

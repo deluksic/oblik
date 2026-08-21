@@ -1,4 +1,3 @@
-import { breadcrumb, dist, projectT, type Geom, type Vec2 } from "@design-scenes/geom";
 import {
   beginWidgetFrame,
   clearImportedOverrides,
@@ -22,8 +21,9 @@ import {
   type Gizmo,
   type SceneModule,
 } from "@design-scenes/euclid2";
+import { breadcrumb, dist, projectT, type Geom, type Vec2 } from "@design-scenes/geom";
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
-import type { PaneContext, PaneHandle, ViewHost } from "@design-scenes/shell";
+import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   evalDerivedScenePoints,
   namedScenePointNear,
@@ -32,12 +32,7 @@ import {
   widgetBindingName,
   widgetInSceneFunction,
 } from "@design-scenes/shell";
-import {
-  commitEditors,
-  peekFile,
-  quantize,
-  renderSnippet,
-} from "./inspect.ts";
+
 import {
   commandPreview,
   distanceHoverRadius,
@@ -51,6 +46,7 @@ import {
   type GhostSnap,
   type NamedGizmoPick,
 } from "./editors.ts";
+import { commitEditors, peekFile, quantize, renderSnippet } from "./inspect.ts";
 import {
   commitGizmoIfChanged,
   cssSize,
@@ -93,12 +89,7 @@ function hintOf(mod: Record<string, unknown>, fallback: string): string {
   return typeof mod.hint === "string" ? mod.hint : fallback;
 }
 
-function drawAxes(
-  ctx2d: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  cam: Camera,
-): void {
+function drawAxes(ctx2d: CanvasRenderingContext2D, w: number, h: number, cam: Camera): void {
   const ox = w / 2 + (0 - cam.x) * cam.scale;
   const oy = h / 2 - (0 - cam.y) * cam.scale;
   ctx2d.strokeStyle = "#3a4156";
@@ -127,24 +118,17 @@ function applyDrag(
   if (g.kind === "point") {
     setWidgetOverride(g.site, [quantize(world.x), quantize(world.y)], sceneId);
   } else if (g.kind === "distance") {
-    setWidgetOverride(
-      g.site,
-      [quantize(Math.max(0.05, dist(world, g.origin)))],
-      sceneId,
-    );
+    setWidgetOverride(g.site, [quantize(Math.max(0.05, dist(world, g.origin)))], sceneId);
   } else if (g.kind === "glider") {
     const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.site, [quantize(t)], sceneId);
   } else if (g.kind === "lineGlider") {
-    let s =
-      (world.x - g.origin.x) * g.direction.x +
-      (world.y - g.origin.y) * g.direction.y;
+    let s = (world.x - g.origin.x) * g.direction.x + (world.y - g.origin.y) * g.direction.y;
     if (g.min != null) s = Math.max(g.min, s);
     if (g.max != null) s = Math.min(g.max, s);
     setWidgetOverride(g.site, [quantize(s)], sceneId);
   } else if (g.kind === "angle") {
-    let deg =
-      (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
+    let deg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
     if (deg < 0) deg += 360;
     setWidgetOverride(g.site, [Math.round(deg) % 360], sceneId);
   } else if (g.kind === "vector") {
@@ -154,11 +138,7 @@ function applyDrag(
       sceneId,
     );
   } else {
-    setWidgetOverride(
-      g.site,
-      [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)],
-      sceneId,
-    );
+    setWidgetOverride(g.site, [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)], sceneId);
   }
 }
 
@@ -169,8 +149,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       const els = ctx.inspect;
       const peekPath = scenePeekPath(ctx.sceneFile);
       const peekCache = new Map<string, string>();
-      const defaultCam =
-        mode === "geom" ? defaultCamera() : { x: 0.2, y: 0.32, scale: 110 };
+      const defaultCam = mode === "geom" ? defaultCamera() : { x: 0.2, y: 0.32, scale: 110 };
 
       let sceneMod = mod as Record<string, unknown>;
       let cam = asCamera(mod, defaultCam);
@@ -219,10 +198,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           if (mode === "geom") frame = lastGood;
         }
         if (mode === "geom") {
-          if (
-            selectedId &&
-            !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)
-          ) {
+          if (selectedId && !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)) {
             selectedId = null;
             selectedGeom = null;
           }
@@ -249,8 +225,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         if (mode !== "geom") return null;
         const g =
-          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))
-            ?.geom ?? selectedGeom;
+          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))?.geom ?? selectedGeom;
         if (!g) return null;
         return {
           title: breadcrumb(g.path),
@@ -324,10 +299,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         if (mode === "sdf2") {
           return hintOf(sceneMod, "Space adds an editor · X radial, Y is Z");
         }
-        return hintOf(
-          sceneMod,
-          "Space adds an editor · drag handles · wheel zooms",
-        );
+        return hintOf(sceneMod, "Space adds an editor · drag handles · wheel zooms");
       }
 
       function clearTool(): void {
@@ -351,8 +323,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         ctx.onCommandBar({
           ...preview,
-          numberValue:
-            tool.id === "distance" ? (tool.typedRadius ?? "") : "",
+          numberValue: tool.id === "distance" ? (tool.typedRadius ?? "") : "",
           onNumber:
             tool.id === "distance" && tool.origin
               ? (n) => {
@@ -477,29 +448,17 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         return out;
       }
 
-      function namedPointNearWorld(
-        world: Vec2,
-        maxDist = 0.35,
-      ): NamedGizmoPick | null {
+      function namedPointNearWorld(world: Vec2, maxDist = 0.35): NamedGizmoPick | null {
         const src = peekText(peekPath);
         if (!src) return null;
-        const hitName = namedScenePointNear(
-          src,
-          world.x,
-          world.y,
-          scenePointEvals(),
-          maxDist,
-        );
+        const hitName = namedScenePointNear(src, world.x, world.y, scenePointEvals(), maxDist);
         if (!hitName) return null;
         const pos = scenePointEvals().find((e) => e.name === hitName.name);
         if (!pos) return null;
         return { name: hitName.name, x: pos.x, y: pos.y };
       }
 
-      function namedPointFromHit(
-        h: ReturnType<typeof hit>,
-        world: Vec2,
-      ): NamedGizmoPick | null {
+      function namedPointFromHit(h: ReturnType<typeof hit>, world: Vec2): NamedGizmoPick | null {
         if (h?.target === "gizmo") {
           const p = gizmoWorldPoint(h.gizmo);
           if (p) {
@@ -612,9 +571,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       async function finishCircle(center: string, radius: string): Promise<void> {
-        const err = await commitEditors(ctx.sceneFile, [
-          { kind: "circle", center, radius },
-        ]);
+        const err = await commitEditors(ctx.sceneFile, [{ kind: "circle", center, radius }]);
         clearTool();
         if (err) error = err;
         else peekCache.delete(peekPath);
@@ -623,9 +580,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       async function finishLine(a: string, b: string): Promise<void> {
-        const err = await commitEditors(ctx.sceneFile, [
-          { kind: "line", a, b },
-        ]);
+        const err = await commitEditors(ctx.sceneFile, [{ kind: "line", a, b }]);
         clearTool();
         if (err) error = err;
         else peekCache.delete(peekPath);
@@ -659,10 +614,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         await finishCircle(tool.center.name, picked.name);
       }
 
-      async function pickLinePoint(
-        h: ReturnType<typeof hit>,
-        world: Vec2,
-      ): Promise<void> {
+      async function pickLinePoint(h: ReturnType<typeof hit>, world: Vec2): Promise<void> {
         const picked = await resolveLinePoint(h, world);
         if (typeof picked === "string") {
           error = picked;
@@ -724,7 +676,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
               void (async () => {
                 const text = await peekFile(peekCache, h.gizmo.at.file);
                 const name = widgetInSceneFunction(text, h.gizmo.at)
-                  ? widgetBindingName(text, h.gizmo.at) ?? undefined
+                  ? (widgetBindingName(text, h.gizmo.at) ?? undefined)
                   : undefined;
                 tool = {
                   id: "distance",
@@ -752,8 +704,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             start: gizmoValues(h.gizmo),
             gizmo: h.gizmo,
           };
-          canvas.style.cursor =
-            h.gizmo.kind === "number" ? "ew-resize" : "grab";
+          canvas.style.cursor = h.gizmo.kind === "number" ? "ew-resize" : "grab";
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
           render();
@@ -794,24 +745,14 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         if (drag) {
-          applyDrag(
-            drag.gizmo,
-            screenToWorld(cam, p, w, height),
-            p,
-            w,
-            height,
-            gizmos(),
-            sceneId,
-          );
+          applyDrag(drag.gizmo, screenToWorld(cam, p, w, height), p, w, height, gizmos(), sceneId);
           evaluate();
           render();
           return;
         }
         const hitResult = hit(e);
         const nextId =
-          mode === "geom" && hitResult?.target === "geom"
-            ? hitResult.drawable.geom.id
-            : null;
+          mode === "geom" && hitResult?.target === "geom" ? hitResult.drawable.geom.id : null;
         const nextG = hitResult?.target === "gizmo" ? hitResult.gizmo : null;
         if (nextId !== hoverId || nextG?.site !== hoverGizmo?.site) {
           hoverId = nextId;
@@ -838,12 +779,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const g = gizmos().find((x) => x.site === dragging.site);
         drag = null;
         const now = g ? gizmoValues(g) : dragging.start;
-        const err = await commitGizmoIfChanged(
-          peekCache,
-          dragging.start,
-          g,
-          now,
-        );
+        const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;
         render();
       }
@@ -857,13 +793,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function onWheel(e: WheelEvent): void {
         e.preventDefault();
         const { w, h } = cssSize(canvas);
-        cam = zoomAt(
-          cam,
-          { x: e.offsetX, y: e.offsetY },
-          w,
-          h,
-          e.deltaY < 0 ? 1.08 : 1 / 1.08,
-        );
+        cam = zoomAt(cam, { x: e.offsetX, y: e.offsetY }, w, h, e.deltaY < 0 ? 1.08 : 1 / 1.08);
         render(true);
       }
 
@@ -889,11 +819,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         });
       }
 
-      const unsub = subscribeHotReload(
-        ctx.sceneFile,
-        subscribeSceneHot,
-        onHotReload,
-      );
+      const unsub = subscribeHotReload(ctx.sceneFile, subscribeSceneHot, onHotReload);
       const unsubHelper = subscribeHelperHot(() => {
         if (closed) return;
         peekCache.clear();
@@ -914,9 +840,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           render(opts?.quiet ?? false);
         },
         commands: () =>
-          mode === "geom"
-            ? [...EDITOR_COMMANDS, ...GEOM_CONSTRUCTOR_COMMANDS]
-            : EDITOR_COMMANDS,
+          mode === "geom" ? [...EDITOR_COMMANDS, ...GEOM_CONSTRUCTOR_COMMANDS] : EDITOR_COMMANDS,
         runCommand(id) {
           if (id === "point") tool = { id: "point" };
           else if (id === "distance") tool = { id: "distance" };

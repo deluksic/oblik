@@ -21,11 +21,7 @@ void main() {
 }
 `;
 
-export function sdfFragSource(
-  uniformDecls: string,
-  expr: string,
-  map2: string,
-): string {
+export function sdfFragSource(uniformDecls: string, expr: string, map2: string): string {
   return /* glsl */ `
 precision highp float;
 uniform vec3 uCamPos;

@@ -1,21 +1,18 @@
-import { line3 } from "@design-scenes/geom";
 import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnSegment3 } from "@design-scenes/euclid3";
+import { line3 } from "@design-scenes/geom";
 import { difference, sweep2, union, unionAll } from "@design-scenes/sdf";
-import {
-  packedCylinderCores,
-  quatrefoilBallsPack,
-} from "../demo/rose-sdf.ts";
+
 import { pack7 } from "../demo/cylinder.ts";
 import { profileSdf } from "../demo/profile.ts";
+import { packedCylinderCores, quatrefoilBallsPack } from "../demo/rose-sdf.ts";
 import { cylinderLayout } from "./cylinder.scene.ts";
 import { profileLayout } from "./profile.scene.ts";
 
 export const title = "Cylinder SDF";
 export const view = "sdf" as const;
 export const sceneFile = "rose-sdf.scene.ts";
-export const hint =
-  "Joined rings + filled disks, then quatrefoil cut · glider is height";
+export const hint = "Joined rings + filled disks, then quatrefoil cut · glider is height";
 
 let readLayout = cylinderLayout;
 let readProfile = profileLayout;
@@ -47,9 +44,7 @@ export function scene() {
   const height = editPointOnSegment3(mast, 0.04).z;
   const field = profileSdf(profile);
   const cells = pack7(layout.radius);
-  const rings = unionAll(
-    cells.map((cell) => sweep2(cell.origin, layout.radius, field)),
-  );
+  const rings = unionAll(cells.map((cell) => sweep2(cell.origin, layout.radius, field)));
   const cores = packedCylinderCores({
     radius: layout.radius,
     height,

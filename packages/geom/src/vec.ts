@@ -85,13 +85,7 @@ export function sweepCCW(a0: number, a1: number): number {
   return wrapTau(a1 - a0);
 }
 
-export function distToArc(
-  p: Vec2,
-  center: Vec2,
-  radius: number,
-  a0: number,
-  a1: number,
-): number {
+export function distToArc(p: Vec2, center: Vec2, radius: number, a0: number, a1: number): number {
   const r = Math.abs(radius);
   const rel = sub(p, center);
   const d = len(rel);

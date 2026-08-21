@@ -3,10 +3,7 @@ export function quantize(n: number): number {
 }
 
 export function escapeHtml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 export function renderSnippet(text: string, line: number): string {
@@ -26,10 +23,7 @@ export function renderSnippet(text: string, line: number): string {
   return chunks.join("");
 }
 
-export async function peekFile(
-  cache: Map<string, string>,
-  file: string,
-): Promise<string> {
+export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {
   const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
   const cached = cache.get(key);
   if (cached != null) return cached;

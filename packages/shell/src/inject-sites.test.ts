@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { injectSceneSites } from "./inject-sites.ts";
 import { patchWidgetAt } from "./patch-widget.ts";
 
@@ -14,13 +15,9 @@ test("injects file and at per CallExpression, including a looped call", () => {
 `;
   const out = injectSceneSites(src, SCENE);
   expect(out).toMatch(
-    new RegExp(
-      `editPoint\\(0, 0, \\{ file: ${JSON.stringify(SCENE)}, at: \\[\\d+, \\d+\\] \\}\\)`,
-    ),
+    new RegExp(`editPoint\\(0, 0, \\{ file: ${JSON.stringify(SCENE)}, at: \\[\\d+, \\d+\\] \\}\\)`),
   );
-  expect(out).toMatch(
-    /editDistanceToPoint\(o, 0\.4, \{ file: .+, at: \[\d+, \d+\] \}\)/,
-  );
+  expect(out).toMatch(/editDistanceToPoint\(o, 0\.4, \{ file: .+, at: \[\d+, \d+\] \}\)/);
   expect(out.match(/file:/g)?.length).toBe(2);
 });
 
@@ -37,9 +34,7 @@ test("merges file/at into an existing last object literal", () => {
 test("injects editVector site as a last argument", () => {
   const src = `editVector(a, 2.4, 1.05);\n`;
   const out = injectSceneSites(src, SCENE);
-  expect(out).toMatch(
-    /editVector\(a, 2\.4, 1\.05, \{ file: .+, at: \[\d+, \d+\] \}\)/,
-  );
+  expect(out).toMatch(/editVector\(a, 2\.4, 1\.05, \{ file: .+, at: \[\d+, \d+\] \}\)/);
 });
 
 test("baked at matches the CallExpression on the original source", () => {

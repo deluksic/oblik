@@ -1,4 +1,5 @@
 import type { Vec2, Vec3 } from "@design-scenes/geom";
+
 import type { Sdf2 } from "./tree2.ts";
 
 /** Field CSG. No id / path / provenance — the surface is not pickable. */

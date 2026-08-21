@@ -25,12 +25,7 @@ export type PlateOpts = {
 };
 
 /** Polar hole pattern. Loop is the provenance stress: every hole shares one call site. */
-export function boltCircle(
-  center: Vec2,
-  radius: number,
-  count: number,
-  holeR: number,
-): Hole[] {
+export function boltCircle(center: Vec2, radius: number, count: number, holeR: number): Hole[] {
   const n = Math.max(3, Math.round(count));
   const out: Hole[] = [];
   for (let i = 0; i < n; i++) {
@@ -133,17 +128,10 @@ function rectOutline(min: Vec2, max: Vec2): Geom {
 function crossAt(center: Vec2, size: number): Geom[] {
   const h = mul({ x: 1, y: 0 }, size);
   const v = mul({ x: 0, y: 1 }, size);
-  return [
-    line(sub(center, h), add(center, h)),
-    line(sub(center, v), add(center, v)),
-  ];
+  return [line(sub(center, h), add(center, h)), line(sub(center, v), add(center, v))];
 }
 
-function pocketWithFillets(
-  min: Vec2,
-  max: Vec2,
-  filletR: number,
-): Geom[] {
+function pocketWithFillets(min: Vec2, max: Vec2, filletR: number): Geom[] {
   const r = filletR;
   const parts: Geom[] = [
     polyline([
@@ -222,9 +210,7 @@ export function drawPlate(opts: PlateOpts): Geom {
     const pocket = group(() =>
       pocketWithFillets(opts.pocket.min, opts.pocket.max, opts.pocket.filletR),
     );
-    const slot = group(() =>
-      slotCut(opts.slot.center, opts.slot.length, opts.slot.width),
-    );
+    const slot = group(() => slotCut(opts.slot.center, opts.slot.length, opts.slot.width));
     return [stock, holes, pocket, slot];
   });
 }

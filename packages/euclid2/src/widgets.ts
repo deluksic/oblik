@@ -131,11 +131,7 @@ export function withoutWidgets<T>(fn: () => T, source = ""): T {
   }
 }
 
-export function setWidgetOverride(
-  site: string,
-  values: number[],
-  source?: string,
-): void {
+export function setWidgetOverride(site: string, values: number[], source?: string): void {
   overridesOf(source ?? activeSource).set(site, values);
 }
 
@@ -173,11 +169,7 @@ export function editPoint(x: number, y: number, site?: SiteOpts): Point {
   return point(px, py);
 }
 
-export function editDistanceToPoint(
-  origin: Vec2,
-  d: number,
-  site?: SiteOpts,
-): number {
+export function editDistanceToPoint(origin: Vec2, d: number, site?: SiteOpts): number {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const dist = o?.[0] ?? d;
@@ -193,11 +185,7 @@ export function editDistanceToPoint(
 }
 
 /** Glider on a finite segment. `t` is in `[0, 1]`. */
-export function editPointOnSegment(
-  lineSeg: Line,
-  t: number,
-  site?: SiteOpts,
-): Point {
+export function editPointOnSegment(lineSeg: Line, t: number, site?: SiteOpts): Point {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
@@ -256,12 +244,7 @@ export function editPointOnLine(
  * Offset from `origin`. Gizmo is the coral handle at origin+(dx,dy).
  * Drag writes dx, dy; origin is geometry, not a write target.
  */
-export function editVector(
-  origin: Vec2,
-  dx: number,
-  dy: number,
-  site?: SiteOpts,
-): Vec2 {
+export function editVector(origin: Vec2, dx: number, dy: number, site?: SiteOpts): Vec2 {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const vx = o?.[0] ?? dx;
@@ -278,12 +261,7 @@ export function editVector(
   return { x: vx, y: vy };
 }
 
-export function snapEditNumber(
-  n: number,
-  min: number,
-  max: number,
-  step: number,
-): number {
+export function snapEditNumber(n: number, min: number, max: number, step: number): number {
   const clamped = Math.min(max, Math.max(min, n));
   const k = Math.round(clamped / step) * step;
   const q = Math.round(k * 1000) / 1000;
@@ -333,11 +311,7 @@ function wrapDeg(deg: number): number {
  * World-space polar angle around `origin`.
  * The scene literal is degrees (1° snaps, readable source). Returns radians.
  */
-export function editAngle(
-  origin: Vec2,
-  degrees: number,
-  opts?: AngleEditOpts,
-): number {
+export function editAngle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
   const located = siteFrom(opts);
   const deg = wrapDeg(readOverride(located?.site)?.[0] ?? degrees);

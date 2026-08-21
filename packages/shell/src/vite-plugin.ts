@@ -1,20 +1,22 @@
 import fs from "node:fs";
-import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import path from "node:path";
+
 import type { Plugin, ViteDevServer } from "vite";
+
 import { parseSceneSource } from "./catalog.ts";
-import { isSceneId } from "./layout-grid.ts";
-import type { SceneEntry } from "./types.ts";
+import { injectSceneSites } from "./inject-sites.ts";
 import {
   insertEditors,
   widgetBindingName,
   widgetInSceneFunction,
   type EditorInsert,
 } from "./insert-editor.ts";
-import { injectSceneSites } from "./inject-sites.ts";
-import { patchWidgetAt } from "./patch-widget.ts";
+import { isSceneId } from "./layout-grid.ts";
 import { newSceneSource, titleFromId } from "./new-scene.ts";
+import { patchWidgetAt } from "./patch-widget.ts";
 import { SCENE_HELPER_HMR_EVENT } from "./scene-hmr.ts";
+import type { SceneEntry } from "./types.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";
@@ -62,7 +64,7 @@ function listSceneFiles(sceneDir: string): string[] {
     .readdirSync(sceneDir)
     .filter((n) => n.endsWith(".scene.ts"))
     .map((n) => path.join(sceneDir, n))
-    .sort();
+    .toSorted();
 }
 
 export function scanSceneCatalog(sceneDir: string): SceneEntry[] {
@@ -135,7 +137,7 @@ function helperGlobKeys(sceneDir: string): string[] {
     .readdirSync(sceneDir)
     .filter((n) => n.endsWith(".ts") && !n.endsWith(".scene.ts"))
     .map((n) => `./scenes/${n}`)
-    .sort();
+    .toSorted();
 }
 
 /**
@@ -143,10 +145,7 @@ function helperGlobKeys(sceneDir: string): string[] {
  * HMR URLs; the copy passed to applyHotScenes stays as glob keys so hosts
  * can match `./scenes/<file>`. Indices stay aligned.
  */
-export function sceneLoadersAcceptTail(
-  keys: string[],
-  helpers: string[] = [],
-): string {
+export function sceneLoadersAcceptTail(keys: string[], helpers: string[] = []): string {
   const sceneLit = JSON.stringify(keys);
   const helperLit = JSON.stringify(helpers);
   let snip = `\n/* __scene_hmr_accept */\n`;
@@ -156,10 +155,8 @@ export function sceneLoadersAcceptTail(
   }
   snip += `if (import.meta.hot) import.meta.hot.accept(${sceneLit}, (mods) => { if (mods) applyHotScenes(${sceneLit}, mods); });\n`;
   if (helpers.length > 0) {
-    snip +=
-      `if (import.meta.hot) import.meta.hot.accept(${helperLit}, () => { notifyHelperHot(); });\n`;
-    snip +=
-      `if (import.meta.hot) import.meta.hot.on(${JSON.stringify(SCENE_HELPER_HMR_EVENT)}, () => { notifyHelperHot(); });\n`;
+    snip += `if (import.meta.hot) import.meta.hot.accept(${helperLit}, () => { notifyHelperHot(); });\n`;
+    snip += `if (import.meta.hot) import.meta.hot.on(${JSON.stringify(SCENE_HELPER_HMR_EVENT)}, () => { notifyHelperHot(); });\n`;
   }
   return snip;
 }
@@ -176,18 +173,11 @@ function fileAliases(file: string): string[] {
   return [...new Set([abs, posix, path.basename(abs)])];
 }
 
-function rememberWidgetWrite(
-  writes: Map<string, string>,
-  file: string,
-  content: string,
-): void {
+function rememberWidgetWrite(writes: Map<string, string>, file: string, content: string): void {
   for (const key of fileAliases(file)) writes.set(key, content);
 }
 
-function rememberedWrite(
-  writes: Map<string, string>,
-  file: string,
-): string | undefined {
+function rememberedWrite(writes: Map<string, string>, file: string): string | undefined {
   for (const key of fileAliases(file)) {
     const content = writes.get(key);
     if (content != null) return content;
@@ -233,218 +223,206 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       server.watcher.on("add", onSceneTree);
       server.watcher.on("unlink", onSceneTree);
 
-      server.middlewares.use(async (req, res, next) => {
-        const url = req.url?.split("?")[0] ?? "";
-        try {
-          if (url === "/__write-widget" && req.method === "POST") {
-            const raw = JSON.parse(await readBody(req)) as Record<
-              string,
-              unknown
-            >;
-            const file = raw.file;
-            const values = raw.values;
-            const line = raw.line;
-            const column = raw.column;
+      server.middlewares.use((req, res, next) => {
+        void (async () => {
+          const url = req.url?.split("?")[0] ?? "";
+          try {
+            if (url === "/__write-widget" && req.method === "POST") {
+              const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+              const file = raw.file;
+              const values = raw.values;
+              const line = raw.line;
+              const column = raw.column;
 
-            if (
-              typeof file !== "string" ||
-              typeof line !== "number" ||
-              typeof column !== "number" ||
-              !Array.isArray(values) ||
-              !values.every((v) => typeof v === "number")
-            ) {
-              json(res, 400, {
-                ok: false,
-                error: `invalid body: expected { file, line, column, values }; got keys [${Object.keys(raw).join(", ")}]`,
-              });
-              return;
-            }
-
-            const abs = resolveUnder(workspaceRoot, file);
-            if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) {
-              json(res, 400, { ok: false, error: "expected a .ts file path" });
-              return;
-            }
-            const source = fs.readFileSync(abs, "utf8");
-            const next = patchWidgetAt(source, line, column, values);
-            rememberWidgetWrite(widgetWrites, abs, next);
-            fs.writeFileSync(abs, next);
-            json(res, 200, { ok: true });
-            return;
-          }
-
-          if (url === "/__insert-editor" && req.method === "POST") {
-            const raw = JSON.parse(await readBody(req)) as Record<
-              string,
-              unknown
-            >;
-            const file = raw.file;
-            const rawEdits = raw.edits;
-            if (typeof file !== "string" || !Array.isArray(rawEdits)) {
-              json(res, 400, {
-                ok: false,
-                error: "expected { file, edits }",
-              });
-              return;
-            }
-            const abs = resolveUnder(sceneDir, path.basename(file));
-            if (!abs.endsWith(".scene.ts")) {
-              json(res, 400, {
-                ok: false,
-                error: "insert-editor only writes catalog .scene.ts files",
-              });
-              return;
-            }
-            const source = fs.readFileSync(abs, "utf8");
-            const edits: EditorInsert[] = [];
-            for (const item of rawEdits) {
-              if (!item || typeof item !== "object") {
-                json(res, 400, { ok: false, error: "invalid edit" });
-                return;
-              }
-              const e = item as Record<string, unknown>;
-              if (e.kind === "point") {
-                if (typeof e.x !== "number" || typeof e.y !== "number") {
-                  json(res, 400, {
-                    ok: false,
-                    error: "point needs x, y",
-                  });
-                  return;
-                }
-                edits.push({ kind: "point", x: e.x, y: e.y });
-              } else if (e.kind === "distance") {
-                if (typeof e.d !== "number") {
-                  json(res, 400, {
-                    ok: false,
-                    error: "distance needs d",
-                  });
-                  return;
-                }
-                let originName =
-                  typeof e.originName === "string" ? e.originName : undefined;
-                const originAt = e.originAt;
-                if (
-                  originAt &&
-                  typeof originAt === "object" &&
-                  typeof (originAt as { line?: unknown }).line === "number" &&
-                  typeof (originAt as { column?: unknown }).column === "number"
-                ) {
-                  const at = {
-                    line: (originAt as { line: number }).line,
-                    column: (originAt as { column: number }).column,
-                  };
-                  if (!widgetInSceneFunction(source, at)) {
-                    json(res, 400, {
-                      ok: false,
-                      error:
-                        "That handle is not declared in scene() — place a new point, or pick a point that scene() owns.",
-                    });
-                    return;
-                  }
-                  const name = widgetBindingName(source, at);
-                  if (!name) {
-                    json(res, 400, {
-                      ok: false,
-                      error:
-                        "That point is inline, not a named const. Place a new point instead.",
-                    });
-                    return;
-                  }
-                  originName = name;
-                }
-                edits.push({ kind: "distance", originName, d: e.d });
-              } else if (e.kind === "circle") {
-                if (
-                  typeof e.center !== "string" ||
-                  typeof e.radius !== "string"
-                ) {
-                  json(res, 400, {
-                    ok: false,
-                    error: "circle needs center, radius",
-                  });
-                  return;
-                }
-                edits.push({
-                  kind: "circle",
-                  center: e.center,
-                  radius: e.radius,
-                });
-              } else if (e.kind === "line") {
-                if (typeof e.a !== "string" || typeof e.b !== "string") {
-                  json(res, 400, {
-                    ok: false,
-                    error: "line needs a, b",
-                  });
-                  return;
-                }
-                edits.push({ kind: "line", a: e.a, b: e.b });
-              } else {
+              if (
+                typeof file !== "string" ||
+                typeof line !== "number" ||
+                typeof column !== "number" ||
+                !Array.isArray(values) ||
+                !values.every((v) => typeof v === "number")
+              ) {
                 json(res, 400, {
                   ok: false,
-                  error: `unknown kind ${String(e.kind)}`,
+                  error: `invalid body: expected { file, line, column, values }; got keys [${Object.keys(raw).join(", ")}]`,
                 });
                 return;
               }
-            }
-            fs.writeFileSync(abs, insertEditors(source, edits));
-            for (const key of fileAliases(abs)) widgetWrites.delete(key);
-            if (vite) hotReloadSceneFile(vite, abs);
-            json(res, 200, { ok: true });
-            return;
-          }
 
-          if (url === "/__create-scene" && req.method === "POST") {
-            const raw = JSON.parse(await readBody(req)) as Record<
-              string,
-              unknown
-            >;
-            const id = raw.id;
-            if (typeof id !== "string" || !isSceneId(id)) {
-              json(res, 400, {
-                ok: false,
-                error:
-                  'id must match [a-z][a-z0-9-]* so it can be a CSS grid area',
-              });
+              const abs = resolveUnder(workspaceRoot, file);
+              if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) {
+                json(res, 400, { ok: false, error: "expected a .ts file path" });
+                return;
+              }
+              const source = fs.readFileSync(abs, "utf8");
+              const patched = patchWidgetAt(source, line, column, values);
+              rememberWidgetWrite(widgetWrites, abs, patched);
+              fs.writeFileSync(abs, patched);
+              json(res, 200, { ok: true });
               return;
             }
-            const abs = resolveUnder(sceneDir, `${id}.scene.ts`);
-            if (fs.existsSync(abs)) {
-              json(res, 409, {
-                ok: false,
-                error: `${id}.scene.ts already exists`,
-              });
-              return;
-            }
-            const title =
-              typeof raw.title === "string" && raw.title.trim()
-                ? raw.title.trim()
-                : titleFromId(id);
-            fs.writeFileSync(abs, newSceneSource(id, title));
-            lastCatalog = "";
-            if (vite) invalidateCatalog(vite);
-            json(res, 200, { ok: true, id, file: `${id}.scene.ts` });
-            return;
-          }
 
-          if (url === "/__peek" && req.method === "GET") {
-            const u = new URL(req.url ?? "", "http://127.0.0.1");
-            const file = (u.searchParams.get("file") ?? "").replace(/^\/+/, "");
-            const abs = resolveUnder(workspaceRoot, file);
-            if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
-              json(res, 404, { ok: false, error: "not found" });
+            if (url === "/__insert-editor" && req.method === "POST") {
+              const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+              const file = raw.file;
+              const rawEdits = raw.edits;
+              if (typeof file !== "string" || !Array.isArray(rawEdits)) {
+                json(res, 400, {
+                  ok: false,
+                  error: "expected { file, edits }",
+                });
+                return;
+              }
+              const abs = resolveUnder(sceneDir, path.basename(file));
+              if (!abs.endsWith(".scene.ts")) {
+                json(res, 400, {
+                  ok: false,
+                  error: "insert-editor only writes catalog .scene.ts files",
+                });
+                return;
+              }
+              const source = fs.readFileSync(abs, "utf8");
+              const edits: EditorInsert[] = [];
+              for (const item of rawEdits) {
+                if (!item || typeof item !== "object") {
+                  json(res, 400, { ok: false, error: "invalid edit" });
+                  return;
+                }
+                const e = item as Record<string, unknown>;
+                if (e.kind === "point") {
+                  if (typeof e.x !== "number" || typeof e.y !== "number") {
+                    json(res, 400, {
+                      ok: false,
+                      error: "point needs x, y",
+                    });
+                    return;
+                  }
+                  edits.push({ kind: "point", x: e.x, y: e.y });
+                } else if (e.kind === "distance") {
+                  if (typeof e.d !== "number") {
+                    json(res, 400, {
+                      ok: false,
+                      error: "distance needs d",
+                    });
+                    return;
+                  }
+                  let originName = typeof e.originName === "string" ? e.originName : undefined;
+                  const originAt = e.originAt;
+                  if (
+                    originAt &&
+                    typeof originAt === "object" &&
+                    typeof (originAt as { line?: unknown }).line === "number" &&
+                    typeof (originAt as { column?: unknown }).column === "number"
+                  ) {
+                    const at = {
+                      line: (originAt as { line: number }).line,
+                      column: (originAt as { column: number }).column,
+                    };
+                    if (!widgetInSceneFunction(source, at)) {
+                      json(res, 400, {
+                        ok: false,
+                        error:
+                          "That handle is not declared in scene() — place a new point, or pick a point that scene() owns.",
+                      });
+                      return;
+                    }
+                    const name = widgetBindingName(source, at);
+                    if (!name) {
+                      json(res, 400, {
+                        ok: false,
+                        error:
+                          "That point is inline, not a named const. Place a new point instead.",
+                      });
+                      return;
+                    }
+                    originName = name;
+                  }
+                  edits.push({ kind: "distance", originName, d: e.d });
+                } else if (e.kind === "circle") {
+                  if (typeof e.center !== "string" || typeof e.radius !== "string") {
+                    json(res, 400, {
+                      ok: false,
+                      error: "circle needs center, radius",
+                    });
+                    return;
+                  }
+                  edits.push({
+                    kind: "circle",
+                    center: e.center,
+                    radius: e.radius,
+                  });
+                } else if (e.kind === "line") {
+                  if (typeof e.a !== "string" || typeof e.b !== "string") {
+                    json(res, 400, {
+                      ok: false,
+                      error: "line needs a, b",
+                    });
+                    return;
+                  }
+                  edits.push({ kind: "line", a: e.a, b: e.b });
+                } else {
+                  json(res, 400, {
+                    ok: false,
+                    error: `unknown kind ${String(e.kind)}`,
+                  });
+                  return;
+                }
+              }
+              fs.writeFileSync(abs, insertEditors(source, edits));
+              for (const key of fileAliases(abs)) widgetWrites.delete(key);
+              if (vite) hotReloadSceneFile(vite, abs);
+              json(res, 200, { ok: true });
               return;
             }
-            sendText(res, fs.readFileSync(abs, "utf8"));
+
+            if (url === "/__create-scene" && req.method === "POST") {
+              const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+              const id = raw.id;
+              if (typeof id !== "string" || !isSceneId(id)) {
+                json(res, 400, {
+                  ok: false,
+                  error: "id must match [a-z][a-z0-9-]* so it can be a CSS grid area",
+                });
+                return;
+              }
+              const abs = resolveUnder(sceneDir, `${id}.scene.ts`);
+              if (fs.existsSync(abs)) {
+                json(res, 409, {
+                  ok: false,
+                  error: `${id}.scene.ts already exists`,
+                });
+                return;
+              }
+              const title =
+                typeof raw.title === "string" && raw.title.trim()
+                  ? raw.title.trim()
+                  : titleFromId(id);
+              fs.writeFileSync(abs, newSceneSource(id, title));
+              lastCatalog = "";
+              if (vite) invalidateCatalog(vite);
+              json(res, 200, { ok: true, id, file: `${id}.scene.ts` });
+              return;
+            }
+
+            if (url === "/__peek" && req.method === "GET") {
+              const u = new URL(req.url ?? "", "http://127.0.0.1");
+              const file = (u.searchParams.get("file") ?? "").replace(/^\/+/, "");
+              const abs = resolveUnder(workspaceRoot, file);
+              if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+                json(res, 404, { ok: false, error: "not found" });
+                return;
+              }
+              sendText(res, fs.readFileSync(abs, "utf8"));
+              return;
+            }
+          } catch (err) {
+            json(res, 500, {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            });
             return;
           }
-        } catch (err) {
-          json(res, 500, {
-            ok: false,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return;
-        }
-        next();
+          next();
+        })().catch(next);
       });
     },
     transform(code, id) {
@@ -481,10 +459,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
           const extra = new Set(ctx.modules);
           for (const mod of ctx.modules) {
             for (const importer of mod.importers) {
-              const file = (importer.file ?? importer.id ?? "").replace(
-                /\\/g,
-                "/",
-              );
+              const file = (importer.file ?? importer.id ?? "").replace(/\\/g, "/");
               if (file.endsWith(".scene.ts")) extra.add(importer);
             }
           }
@@ -501,9 +476,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
         }
         if (!isCatalogScene(sceneDir, ctx.file)) return;
         if (!catalogChanged()) return;
-        const catalog = this.environment.moduleGraph.getModuleById(
-          VIRTUAL_CATALOG_RESOLVED,
-        );
+        const catalog = this.environment.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
         return catalog ? [...ctx.modules, catalog] : ctx.modules;
       },
     },

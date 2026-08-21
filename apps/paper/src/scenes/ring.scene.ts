@@ -1,9 +1,6 @@
+import { editDistanceToPoint, editNumber, editPoint } from "@design-scenes/euclid2";
 import { type Vec2 } from "@design-scenes/geom";
-import {
-  editDistanceToPoint,
-  editNumber,
-  editPoint,
-} from "@design-scenes/euclid2";
+
 import { drawRingPlan, drawUnrolled } from "../demo/ring.ts";
 
 export const title = "Ring";

@@ -1,9 +1,5 @@
 import type { Vec2 } from "@design-scenes/geom";
-import {
-  circle2,
-  smoothUnionAll2,
-  type Sdf2,
-} from "@design-scenes/sdf";
+import { circle2, smoothUnionAll2, type Sdf2 } from "@design-scenes/sdf";
 
 export const PROFILE_SMOOTH = 0.16;
 

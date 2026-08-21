@@ -1,6 +1,6 @@
+import { mesh3, type Mesh3 } from "./geom3.ts";
 import { dist, rotateAround, type Vec2 } from "./vec.ts";
 import { vec3, type Vec3 } from "./vec3.ts";
-import { mesh3, type Mesh3 } from "./geom3.ts";
 
 export type ExtrudeOpts = {
   /** Total rotation about +Z from bottom to top, radians. */
@@ -38,19 +38,14 @@ function copyRing(positions: number[], from: number, n: number): number {
  * Sweep a 2D polyline along +Z. Optional twist rotates each slice about
  * `center` (helical extrude). Closed rings get top and bottom caps.
  */
-export function extrude(
-  points: readonly Vec2[],
-  height: number,
-  opts: ExtrudeOpts = {},
-): Mesh3 {
+export function extrude(points: readonly Vec2[], height: number, opts: ExtrudeOpts = {}): Mesh3 {
   const ring = stripClose(points);
   const n = ring.length;
   const h = Math.max(1e-6, Math.abs(height));
   const twist = opts.twist ?? 0;
   const center = opts.center ?? { x: 0, y: 0 };
   const closed =
-    opts.closed ??
-    (points.length >= 3 && dist(points[0]!, points[points.length - 1]!) < 1e-6);
+    opts.closed ?? (points.length >= 3 && dist(points[0]!, points[points.length - 1]!) < 1e-6);
   const slices = Math.max(
     1,
     opts.slices ?? Math.max(8, Math.ceil(Math.abs(twist) / (Math.PI / 12))),
@@ -137,11 +132,7 @@ function pushV(positions: number[], p: Vec3): void {
  * `bottom` and `top` must share sample count; x is arc length at `radius`.
  * The last sample is welded to the first (a closed ring).
  */
-export function wrapBand(
-  bottom: readonly Vec2[],
-  top: readonly Vec2[],
-  opts: WrapBandOpts,
-): Mesh3 {
+export function wrapBand(bottom: readonly Vec2[], top: readonly Vec2[], opts: WrapBandOpts): Mesh3 {
   const n = Math.min(bottom.length, top.length);
   if (n < 3) return mesh3([], []);
   const rMap = Math.max(1e-3, Math.abs(opts.radius));

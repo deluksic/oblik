@@ -1,16 +1,9 @@
 import path from "node:path";
+
 import * as ts from "typescript";
-import {
-  isSceneId,
-  layoutFromIds,
-  normalizeAreas,
-} from "./layout-grid.ts";
-import {
-  VIEW_KINDS,
-  type SceneEntry,
-  type SceneLayout,
-  type ViewKind,
-} from "./types.ts";
+
+import { isSceneId, layoutFromIds, normalizeAreas } from "./layout-grid.ts";
+import { VIEW_KINDS, type SceneEntry, type SceneLayout, type ViewKind } from "./types.ts";
 
 function unwrap(expr: ts.Expression): ts.Expression {
   if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) {
@@ -83,22 +76,17 @@ function parseLayout(expr: ts.Expression): SceneLayout | string {
 }
 
 function isSceneFunction(node: ts.FunctionDeclaration): boolean {
-  return node.name?.text === "scene" && node.modifiers?.some(
-    (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-  ) === true;
+  return (
+    node.name?.text === "scene" &&
+    node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true
+  );
 }
 
 export function parseSceneSource(file: string, source: string): SceneEntry {
   const stem = file.endsWith(".scene.ts")
     ? path.basename(file, ".scene.ts")
     : path.basename(file, ".ts");
-  const sf = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
   let id = stem;
   let title: string | undefined;
@@ -110,9 +98,7 @@ export function parseSceneSource(file: string, source: string): SceneEntry {
   for (const stmt of sf.statements) {
     if (ts.isFunctionDeclaration(stmt) && isSceneFunction(stmt)) hasScene = true;
     if (!ts.isVariableStatement(stmt)) continue;
-    const exported = stmt.modifiers?.some(
-      (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-    );
+    const exported = stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
     if (!exported) continue;
     for (const decl of stmt.declarationList.declarations) {
       if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;

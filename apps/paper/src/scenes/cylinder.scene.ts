@@ -1,9 +1,6 @@
 import { editDistanceToPoint } from "@design-scenes/euclid2";
-import {
-  CYLINDER_RADIUS,
-  drawCylinderPlan,
-  type CylinderLayout,
-} from "../demo/cylinder.ts";
+
+import { CYLINDER_RADIUS, drawCylinderPlan, type CylinderLayout } from "../demo/cylinder.ts";
 
 export const title = "Cylinder plan";
 export const sceneFile = "cylinder.scene.ts";

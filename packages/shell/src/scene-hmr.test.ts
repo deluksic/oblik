@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { sceneLoadersAcceptTail } from "./vite-plugin.ts";
 
 test("accept snippet keeps glob keys as string literals for Vite's HMR lexer", () => {

@@ -1,4 +1,5 @@
 import type { ViewHost, ViewKind } from "@design-scenes/shell";
+
 import { euclid2Host, sdf2Host } from "./paper2.ts";
 import { euclid3Host, sdfHost } from "./paper3.ts";
 

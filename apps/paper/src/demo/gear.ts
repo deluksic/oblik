@@ -29,10 +29,7 @@ export type SpurGearOpts = {
 };
 
 function involuteAt(rb: number, t: number): Vec2 {
-  return vec(
-    rb * (Math.cos(t) + t * Math.sin(t)),
-    rb * (Math.sin(t) - t * Math.cos(t)),
-  );
+  return vec(rb * (Math.cos(t) + t * Math.sin(t)), rb * (Math.sin(t) - t * Math.cos(t)));
 }
 
 function tAtRadius(rb: number, r: number): number {
@@ -41,13 +38,7 @@ function tAtRadius(rb: number, r: number): number {
   return Math.sqrt(x * x - 1);
 }
 
-function flank(
-  rb: number,
-  t0: number,
-  t1: number,
-  samples: number,
-  spin: number,
-): Vec2[] {
+function flank(rb: number, t0: number, t1: number, samples: number, spin: number): Vec2[] {
   const pts: Vec2[] = [];
   for (let i = 0; i <= samples; i++) {
     const t = t0 + ((t1 - t0) * i) / samples;
@@ -91,7 +82,7 @@ function toothParts(
   const t0 = tAtRadius(baseR, Math.max(baseR * 1.001, rootR));
   const t1 = tAtRadius(baseR, addR);
   const right = flank(baseR, t0, t1, flankSamples, spin);
-  const left = right.map((p) => vec(p.x, -p.y)).reverse();
+  const left = right.map((p) => vec(p.x, -p.y)).toReversed();
   const tip = right[right.length - 1] ?? polar(addR, half);
   const rootPt = right[0] ?? polar(Math.max(rootR, baseR), half);
   const add1 = ang(tip);
@@ -142,9 +133,7 @@ export function drawSpurGear(opts: SpurGearOpts): Geom {
         parts.push(polyline(tooth.right.map((p) => at(p, c, a))));
         parts.push(polyline(tooth.left.map((p) => at(p, c, a))));
         parts.push(arc(c, tooth.addR, a + tooth.add0, a + tooth.add1));
-        parts.push(
-          arc(c, tooth.rootR, a + tooth.root1, a + step + tooth.root0),
-        );
+        parts.push(arc(c, tooth.rootR, a + tooth.root1, a + step + tooth.root0));
         if (tooth.needsRadial) {
           const inner = tooth.rootR;
           const outer = tooth.baseR;
@@ -235,8 +224,8 @@ export function gearOutline(opts: SpurGearOpts, flankSamples = 8): Vec2[] {
 
   for (let i = 0; i < z; i++) {
     const a = rot + i * step;
-    const leftOut = tooth.left.map((p) => at(p, c, a)).reverse();
-    const rightIn = tooth.right.map((p) => at(p, c, a)).reverse();
+    const leftOut = tooth.left.map((p) => at(p, c, a)).toReversed();
+    const rightIn = tooth.right.map((p) => at(p, c, a)).toReversed();
     if (tooth.needsRadial) {
       append([at(polar(tooth.rootR, tooth.root0), c, a)]);
     }
@@ -252,18 +241,12 @@ export function gearOutline(opts: SpurGearOpts, flankSamples = 8): Vec2[] {
 }
 
 /** Total twist (radians) so the pitch helix angle is `helixAngle`. */
-export function helixTwist(
-  faceWidth: number,
-  helixAngle: number,
-  pitchRadius: number,
-): number {
+export function helixTwist(faceWidth: number, helixAngle: number, pitchRadius: number): number {
   if (Math.abs(pitchRadius) < 1e-6) return 0;
   return (Math.abs(faceWidth) * Math.tan(helixAngle)) / pitchRadius;
 }
 
-export function drawHelicalGear(
-  opts: SpurGearOpts & { height: number; helixAngle: number },
-): Geom {
+export function drawHelicalGear(opts: SpurGearOpts & { height: number; helixAngle: number }): Geom {
   const outline = gearOutline(opts);
   const twist = helixTwist(opts.height, opts.helixAngle, opts.pitchRadius);
   return extrude(outline, opts.height, {

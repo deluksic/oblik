@@ -1,5 +1,5 @@
-import { circle, group, type Circle } from "@design-scenes/geom";
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
+import { circle, group, type Circle } from "@design-scenes/geom";
 
 export const title = "Shared loop";
 export const sceneFile = "shared-loop.scene.ts";

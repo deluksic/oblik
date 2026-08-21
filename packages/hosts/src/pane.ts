@@ -1,4 +1,5 @@
 import type { InspectEls } from "@design-scenes/shell";
+
 import { commitWidget, peekFile } from "./inspect.ts";
 
 export function scenePeekPath(sceneFile: string): string {
@@ -9,17 +10,12 @@ export function sceneHotKey(sceneFile: string): string {
   return `./scenes/${sceneFile}`;
 }
 
-export function observePaneResize(
-  canvas: HTMLCanvasElement,
-  onResize: () => void,
-): () => void {
+export function observePaneResize(canvas: HTMLCanvasElement, onResize: () => void): () => void {
   const onWinResize = () => onResize();
   window.addEventListener("resize", onWinResize);
   const pane = canvas.parentElement;
   const ro =
-    pane && typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => onResize())
-      : null;
+    pane && typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => onResize()) : null;
   if (pane && ro) ro.observe(pane);
   return () => {
     window.removeEventListener("resize", onWinResize);
@@ -32,10 +28,7 @@ export function cssSize(canvas: HTMLCanvasElement): { w: number; h: number } {
   return { w: r.width, h: r.height };
 }
 
-export function eventPos(
-  canvas: HTMLCanvasElement,
-  e: PointerEvent,
-): { x: number; y: number } {
+export function eventPos(canvas: HTMLCanvasElement, e: PointerEvent): { x: number; y: number } {
   const r = canvas.getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
@@ -63,11 +56,7 @@ export function showEmptyInspect(
   els.sourceEl.innerHTML = source;
 }
 
-export function setPaneStatus(
-  els: InspectEls,
-  status: string,
-  error: string | null,
-): void {
+export function setPaneStatus(els: InspectEls, status: string, error: string | null): void {
   els.statusEl.textContent = status;
   els.errorEl.hidden = !error;
   els.errorEl.textContent = error ?? "";
@@ -98,9 +87,7 @@ export async function warmPeek(
 
 export function subscribeHotReload(
   sceneFile: string,
-  subscribe: (
-    cb: (path: string, mod: Record<string, unknown>) => void,
-  ) => () => void,
+  subscribe: (cb: (path: string, mod: Record<string, unknown>) => void) => () => void,
   onReload: (mod: Record<string, unknown>) => void,
 ): () => void {
   const key = sceneHotKey(sceneFile);

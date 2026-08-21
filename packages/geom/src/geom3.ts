@@ -1,5 +1,5 @@
-import type { Vec3 } from "./vec3.ts";
 import { makeBase, type Base } from "./identity.ts";
+import type { Vec3 } from "./vec3.ts";
 
 export type Point3 = Base & { kind: "point3"; x: number; y: number; z: number };
 export type Line3 = Base & { kind: "line3"; a: Point3; b: Point3 };

@@ -1,4 +1,5 @@
 import type { Drawable, Vec2 } from "@design-scenes/geom";
+
 import type { Camera } from "./camera.ts";
 import { worldToScreen } from "./camera.ts";
 import { layoutNumberSliders } from "./hud.ts";
@@ -46,8 +47,7 @@ export function drawFrame(
 
   for (const d of drawables) {
     const id = d.geom.id;
-    const color =
-      id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
+    const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
     const width = id === selectedId || id === hoverId ? 2.4 : 1.5;
     strokeGeom(ctx, cam, cssW, cssH, d, color, width);
   }
@@ -76,12 +76,7 @@ export function drawGizmoOverlay(
   drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
 
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  cam: Camera,
-): void {
+function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera): void {
   const step = cam.scale;
   const origin = worldToScreen(cam, { x: 0, y: 0 }, w, h);
 
@@ -141,14 +136,7 @@ function strokeGeom(
   } else if (g.kind === "arc") {
     const c = worldToScreen(cam, g.center, w, h);
     ctx.beginPath();
-    ctx.arc(
-      c.x,
-      c.y,
-      Math.abs(g.radius) * cam.scale,
-      -g.a0,
-      -g.a1,
-      true,
-    );
+    ctx.arc(c.x, c.y, Math.abs(g.radius) * cam.scale, -g.a0, -g.a1, true);
     ctx.stroke();
   } else {
     if (g.points.length < 2) return;
@@ -305,8 +293,7 @@ function drawNumberSliders(
     ctx.fillStyle = COL.geom;
     ctx.textAlign = "right";
     ctx.font = "600 13px ui-monospace, monospace";
-    const shown =
-      L.gizmo.step >= 1 ? String(Math.round(L.gizmo.n)) : String(L.gizmo.n);
+    const shown = L.gizmo.step >= 1 ? String(Math.round(L.gizmo.n)) : String(L.gizmo.n);
     ctx.fillText(shown, x + w - 14, y + 18);
 
     ctx.fillStyle = "#2a3040";
