@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM"],
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
     "types": ["vite/client"]
   },
   "include": ["src"]

@@ -23,16 +23,16 @@ export const camera = { x: 0.4, y: 0.15, scale: 28 };
  */
 export function gearLayout(): GearLayout {
   const pinion = editPoint(-4.75, 0.05);
-  const z1 = editNumber(24, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
-  const z2 = editNumber(30, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
+  const z1 = editNumber(14, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
+  const z2 = editNumber(40, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
   const pitch1 = editDistanceToPoint(pinion, 1.8);
-  const pressureDeg = editNumber(21.5, {
+  const pressureDeg = editNumber(25, {
     label: "Pressure °",
     min: 14.5,
     max: 25,
     step: 0.5,
   });
-  const rot1 = editAngle(pinion, 32, { radius: pitch1 });
+  const rot1 = editAngle(pinion, 57, { radius: pitch1 });
   const helixDeg = editNumber(35, {
     label: "Helix °",
     min: 0,

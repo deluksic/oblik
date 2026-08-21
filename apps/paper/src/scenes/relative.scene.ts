@@ -16,7 +16,7 @@ export function scene() {
   const d2 = editDistanceToPoint(a, 1.32);
   const p = editPoint(-2.52, 2.56);
   const p2 = editPoint(-0.11, 4.57);
-  const p3 = editPoint(2.51, 3.39);
+  const p3 = editPoint(7.3, 6.01);
   editDistanceToPoint(p3, 2.22);
   editDistanceToPoint(p3, 4.73);
   editDistanceToPoint(p3, 7.78);

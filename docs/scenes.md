@@ -1,5 +1,7 @@
 # Scenes
 
+Shell chrome (nav, welcome, viewport panes, inspector, command palette) is Solid 2 (`@design-scenes/shell` under `packages/shell/src/ui/`). Canvas hosts stay vanilla TypeScript in `@design-scenes/hosts`.
+
 A file in `apps/paper/src/scenes/*.scene.ts` is the catalog. Plain `*.ts` in the same folder (e.g. `plate-layout.ts`) can hold shared `edit*` helpers and is not in nav. The shell Vite plugin parses catalog files (does not execute them) into `virtual:scene-catalog`. Nav and `?scene=` come from the catalog. **New scene** on the welcome screen POSTs `/__create-scene` and writes a starter `<id>.scene.ts`.
 
 Id defaults to the filename stem (`beam.scene.ts` → `beam`). Override with `export const id`.

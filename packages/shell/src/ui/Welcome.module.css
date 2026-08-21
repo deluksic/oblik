@@ -1,0 +1,65 @@
+.welcome {
+  min-height: 0;
+  overflow: auto;
+  padding: 2.2rem 1.6rem 2.4rem;
+  max-width: 36rem;
+}
+
+.welcome h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.lead {
+  margin: 0 0 1.4rem;
+  color: var(--muted, #9a9488);
+  line-height: 1.45;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  min-width: 10rem;
+  background: #10131a;
+  border: 1px solid var(--stroke, #2a3040);
+  color: var(--text, #ece8de);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+}
+
+.button {
+  background: var(--accent, #e8876a);
+  color: #1a120e;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.48rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.formError {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+  color: #ffd0b8;
+  font-size: 0.85rem;
+}
+
+.hint {
+  margin: 1.1rem 0 0;
+  color: var(--muted, #9a9488);
+  font-size: 0.85rem;
+}

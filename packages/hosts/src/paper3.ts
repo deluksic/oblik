@@ -14,7 +14,7 @@ import {
 import { breadcrumb, type Geom3 } from "@design-scenes/geom";
 import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
-import { subscribeSceneHot, subscribeHelperHot } from "@design-scenes/shell";
+import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
 import { peekFile, quantize, renderSnippet } from "./inspect.ts";
 import {
@@ -26,6 +26,7 @@ import {
   showWidgetInspect,
   subscribeHotReload,
   warmPeek,
+  type InspectPush,
 } from "./pane.ts";
 
 type FieldSceneMod = {
@@ -87,9 +88,17 @@ function applyGizmoDrag(view: DragView, g: Gizmo3, clientX: number, clientY: num
 function createPaper3Host(mode: "space" | "field"): ViewHost {
   return {
     mount(canvas, mod, ctx): PaneHandle {
-      const els = ctx.inspect;
       const peekPath = scenePeekPath(ctx.sceneFile);
       const peekCache = new Map<string, string>();
+      let lastInspectKey = "";
+
+      const pushInspect: InspectPush = (patch) => {
+        if (!ctx.onInspect) return;
+        const key = inspectSnapshotKey(patch);
+        if (key === lastInspectKey) return;
+        lastInspectKey = key;
+        ctx.onInspect(patch);
+      };
 
       let sceneMod = mod as Record<string, unknown>;
       let error: string | null = null;
@@ -146,12 +155,18 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             mode === "space"
               ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
               : "The field has no provenance. Widget values live in this scene file.";
-          showWidgetInspect(els, hoverGizmo.kind, hoverGizmo.site, hoverGizmo.at.file, meta);
+          showWidgetInspect(
+            pushInspect,
+            hoverGizmo.kind,
+            hoverGizmo.site,
+            hoverGizmo.at.file,
+            meta,
+          );
           return;
         }
         if (mode === "field") {
           showEmptyInspect(
-            els,
+            pushInspect,
             "Nothing selected",
             "The field itself is not pickable. Drag a handle, or edit a 2D pane.",
             `<code class="empty">No surface identity in this view.</code>`,
@@ -162,21 +177,25 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))?.geom ?? selectedGeom;
         if (!g) {
           showEmptyInspect(
-            els,
+            pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · glider writes this file"),
             `<code class="empty">Select geometry to see the creation site.</code>`,
           );
           return;
         }
-        els.crumbEl.textContent = breadcrumb(g.path);
-        els.metaEl.textContent = `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`;
-        try {
-          const text = await peekFile(peekCache, g.provenance.file);
-          els.sourceEl.innerHTML = renderSnippet(text, g.provenance.line);
-        } catch (err) {
-          els.sourceEl.innerHTML = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-        }
+        pushInspect({
+          crumb: breadcrumb(g.path),
+          meta: `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
+          sourceHtml: await (async () => {
+            try {
+              const text = await peekFile(peekCache, g.provenance.file);
+              return renderSnippet(text, g.provenance.line);
+            } catch (err) {
+              return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+            }
+          })(),
+        });
       }
 
       function sync(quiet = false): void {
@@ -198,7 +217,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           mode === "space"
             ? hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · glider writes this file")
             : hintOf(sceneMod, "Field view — not pickable · glider writes this file · LMB orbit");
-        setPaneStatus(els, error ? "Last good frame · scene threw" : fallback, error);
+        setPaneStatus(pushInspect, error ? "Last good frame · scene threw" : fallback, error);
         void updateInspect();
       }
 

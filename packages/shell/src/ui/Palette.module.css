@@ -1,0 +1,161 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+}
+
+.picker {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 18vh 1rem 1rem;
+  background: #0e1016aa;
+  display: flex;
+}
+
+.promptDock {
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  display: flex;
+}
+
+.panel {
+  width: min(28rem, 100%);
+  background: #171a22;
+  border: 1px solid var(--stroke, #2a3040);
+  border-radius: 10px;
+  box-shadow: 0 18px 40px #0008;
+  overflow: hidden;
+}
+
+.prompt {
+  width: 100%;
+  max-width: none;
+  background: #171a22;
+  border-top: 1px solid var(--stroke, #2a3040);
+  box-shadow: 0 -8px 24px #0006;
+  padding: 0.55rem 0.75rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.previewRow {
+  position: relative;
+  display: block;
+  min-height: 1.35em;
+}
+
+.preview {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text, #ece8de);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview :global(.slot) {
+  color: var(--accent, #e8876a);
+  font-weight: 600;
+}
+
+.hasInlineNumber .preview :global(.slot.is-number) {
+  color: transparent;
+  position: relative;
+}
+
+.hasInlineNumber .preview :global(.slot.is-number)::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent, #e8876a);
+  opacity: 0.38;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.hasInlineNumber.isTyping .preview :global(.slot.is-number)::after,
+.hasInlineNumber .preview :global(.slot.is-number:not([data-placeholder="<radius>"]))::after {
+  content: none;
+}
+
+.number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4.5ch;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--accent, #e8876a);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+  outline: none;
+  caret-color: var(--accent, #e8876a);
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted, #9a9488);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--stroke, #2a3040);
+  color: var(--text, #ece8de);
+  font: inherit;
+  padding: 0.75rem 0.9rem;
+  outline: none;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.listItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.listItemActive,
+.listItem:hover {
+  background: #221c1a;
+}
+
+.cmd {
+  color: var(--accent, #e8876a);
+  font-weight: 600;
+}
+
+.cmdHint {
+  color: var(--muted, #9a9488);
+  font-size: 0.82rem;
+}
+
+.empty {
+  margin: 0;
+  padding: 0.9rem;
+  color: var(--muted, #9a9488);
+}

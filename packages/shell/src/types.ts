@@ -18,13 +18,15 @@ export type SceneEntry = {
   error?: string;
 };
 
-export type InspectEls = {
-  crumbEl: HTMLElement;
-  metaEl: HTMLElement;
-  sourceEl: HTMLElement;
-  statusEl: HTMLElement;
-  errorEl: HTMLElement;
+export type InspectState = {
+  crumb: string;
+  meta: string;
+  sourceHtml: string;
+  status: string;
+  error: string | null;
 };
+
+export type InspectPatch = Partial<InspectState>;
 
 export type CommandSpec = {
   id: string;
@@ -52,10 +54,10 @@ export type CommandBarState = {
 export type PaneContext = {
   sceneId: string;
   sceneFile: string;
-  inspect: InspectEls;
   onLiveChange: () => void;
   onFocus: () => void;
   onCommandBar?: (state: CommandBarState | null) => void;
+  onInspect?: (patch: InspectPatch) => void;
 };
 
 export type ViewHost = {
@@ -63,3 +65,9 @@ export type ViewHost = {
 };
 
 export type SceneLoaderMap = Record<string, () => Promise<unknown>>;
+
+export type WorkspaceProps = {
+  scenes: SceneEntry[];
+  loaders: SceneLoaderMap;
+  hosts: Partial<Record<ViewKind, ViewHost>>;
+};

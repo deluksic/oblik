@@ -1,0 +1,70 @@
+.inspect {
+  border-left: 1px solid var(--stroke);
+  background: var(--panel);
+  padding: 1rem 1rem 1.2rem;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kicker {
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--accent);
+}
+
+.crumb {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.35rem 0 1rem;
+}
+
+.source {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  background: #10131a;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.source :global(.empty) {
+  display: block;
+  padding: 0.8rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.source :global(.ln) {
+  display: inline-block;
+  width: 2.6rem;
+  color: #5c6370;
+  user-select: none;
+}
+
+.source :global(.hl) {
+  background: #2a2418;
+  color: var(--warn);
+}
+
+.source :global(div) {
+  padding: 0 0.6rem;
+  white-space: pre;
+}
+
+@media (max-width: 800px) {
+  .inspect {
+    border-left: none;
+    border-top: 1px solid var(--stroke);
+  }
+}

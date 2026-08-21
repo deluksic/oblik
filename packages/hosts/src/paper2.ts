@@ -25,10 +25,12 @@ import { breadcrumb, dist, projectT, type Geom, type Vec2 } from "@design-scenes
 import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
+  commandBarSnapshotKey,
   evalDerivedScenePoints,
+  inspectSnapshotKey,
   namedScenePointNear,
-  subscribeSceneHot,
   subscribeHelperHot,
+  subscribeSceneHot,
   widgetBindingName,
   widgetInSceneFunction,
 } from "@design-scenes/shell";
@@ -58,6 +60,7 @@ import {
   showWidgetInspect,
   subscribeHotReload,
   warmPeek,
+  type InspectPush,
 } from "./pane.ts";
 
 type Sdf2SceneMod = {
@@ -146,10 +149,19 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
   return {
     mount(canvas, mod, ctx): PaneHandle {
       const sceneId = ctx.sceneId;
-      const els = ctx.inspect;
       const peekPath = scenePeekPath(ctx.sceneFile);
       const peekCache = new Map<string, string>();
       const defaultCam = mode === "geom" ? defaultCamera() : { x: 0.2, y: 0.32, scale: 110 };
+      let lastInspectKey = "";
+      let lastBarKey = "";
+
+      const pushInspect: InspectPush = (patch) => {
+        if (!ctx.onInspect) return;
+        const key = inspectSnapshotKey(patch);
+        if (key === lastInspectKey) return;
+        lastInspectKey = key;
+        ctx.onInspect(patch);
+      };
 
       let sceneMod = mod as Record<string, unknown>;
       let cam = asCamera(mod, defaultCam);
@@ -240,7 +252,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         if (mode === "sdf2") {
           if (hoverGizmo) {
             showWidgetInspect(
-              els,
+              pushInspect,
               hoverGizmo.kind,
               hoverGizmo.site,
               hoverGizmo.at.file,
@@ -249,7 +261,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             return;
           }
           showEmptyInspect(
-            els,
+            pushInspect,
             "Nothing selected",
             "Drag a centre or dashed radius. This field is swept in 3D around each rim.",
             `<code class="empty">No surface identity in this view.</code>`,
@@ -259,40 +271,44 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const t = currentTarget();
         if (!t) {
           showEmptyInspect(
-            els,
+            pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "Hover geometry or a handle. Numbers live in the scene file."),
             `<code class="empty">Select geometry to see the creation site.</code>`,
           );
           return;
         }
-        els.crumbEl.textContent = t.title;
-        if (t.file == null || t.line == null) {
-          if (hoverGizmo) {
-            els.metaEl.textContent =
-              "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
-            try {
-              const text = await peekFile(peekCache, hoverGizmo.at.file);
-              els.sourceEl.innerHTML = renderSnippet(text, hoverGizmo.at.line);
-            } catch (err) {
-              els.sourceEl.innerHTML = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+        pushInspect({
+          crumb: t.title,
+          meta:
+            t.file == null || t.line == null
+              ? hoverGizmo
+                ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
+                : "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
+              : t.id
+                ? `${t.id} · ${t.file}:${t.line}:${t.column ?? 0}`
+                : `${t.file}:${t.line}:${t.column ?? 0}`,
+          sourceHtml: await (async () => {
+            if (t.file == null || t.line == null) {
+              if (hoverGizmo) {
+                try {
+                  const text = await peekFile(peekCache, hoverGizmo.at.file);
+                  return renderSnippet(text, hoverGizmo.at.line);
+                } catch (err) {
+                  return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+                }
+              }
+              return `<code class="empty">Widget values are the numeric arguments of edit* in the source file.</code>`;
             }
-            return;
-          }
-          els.metaEl.textContent =
-            "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.";
-          els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in the source file.</code>`;
-          return;
-        }
-        els.metaEl.textContent = t.id
-          ? `${t.id} · ${t.file}:${t.line}:${t.column ?? 0}`
-          : `${t.file}:${t.line}:${t.column ?? 0}`;
-        try {
-          const text = await peekFile(peekCache, t.file);
-          els.sourceEl.innerHTML = renderSnippet(text, t.line);
-        } catch (err) {
-          els.sourceEl.innerHTML = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-        }
+            try {
+              const text = await peekFile(peekCache, t.file);
+              return renderSnippet(text, t.line);
+            } catch (err) {
+              return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+            }
+          })(),
+        });
+        return;
       }
 
       function statusHint(): string {
@@ -313,27 +329,33 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function syncCommandBar(): void {
         if (!ctx.onCommandBar) return;
         if (!tool) {
-          ctx.onCommandBar(null);
+          if (lastBarKey !== "") {
+            lastBarKey = "";
+            ctx.onCommandBar(null);
+          }
           return;
         }
         const preview = commandPreview(tool);
         if (!preview) {
-          ctx.onCommandBar(null);
+          if (lastBarKey !== "") {
+            lastBarKey = "";
+            ctx.onCommandBar(null);
+          }
           return;
         }
-        ctx.onCommandBar({
+        const state = {
           ...preview,
           numberValue: tool.id === "distance" ? (tool.typedRadius ?? "") : "",
           onNumber:
             tool.id === "distance" && tool.origin
-              ? (n) => {
+              ? (n: number) => {
                   if (!tool || tool.id !== "distance" || !tool.origin) return;
                   void finishDistance(tool.origin, null, n);
                 }
               : undefined,
           onNumberDraft:
             tool.id === "distance" && tool.origin
-              ? (raw) => {
+              ? (raw: string) => {
                   if (!tool || tool.id !== "distance") return;
                   const next = raw.trim() === "" ? undefined : raw;
                   if (tool.typedRadius === next) return;
@@ -341,7 +363,11 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
                   render(true);
                 }
               : undefined,
-        });
+        };
+        const key = commandBarSnapshotKey(state);
+        if (key === lastBarKey) return;
+        lastBarKey = key;
+        ctx.onCommandBar(state);
       }
 
       async function namedPointFromGizmo(
@@ -402,7 +428,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         setPaneStatus(
-          els,
+          pushInspect,
           error ? "Last good frame · scene threw" : editorStatus(tool, statusHint()),
           error,
         );

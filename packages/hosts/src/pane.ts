@@ -1,4 +1,4 @@
-import type { InspectEls } from "@design-scenes/shell";
+import type { InspectPatch } from "@design-scenes/shell";
 
 import { commitWidget, peekFile } from "./inspect.ts";
 
@@ -33,33 +33,33 @@ export function eventPos(canvas: HTMLCanvasElement, e: PointerEvent): { x: numbe
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
+export type InspectPush = (patch: InspectPatch) => void;
+
 export function showWidgetInspect(
-  els: InspectEls,
+  push: InspectPush,
   kind: string,
   site: string,
   writeFile: string,
   meta: string,
 ): void {
-  els.crumbEl.textContent = `widget ${kind} ${site} · writes ${writeFile}`;
-  els.metaEl.textContent = meta;
-  els.sourceEl.innerHTML = `<code class="empty">Widget values are the numeric arguments of edit* in ${writeFile}.</code>`;
+  push({
+    crumb: `widget ${kind} ${site} · writes ${writeFile}`,
+    meta,
+    sourceHtml: `<code class="empty">Widget values are the numeric arguments of edit* in ${writeFile}.</code>`,
+  });
 }
 
 export function showEmptyInspect(
-  els: InspectEls,
+  push: InspectPush,
   crumb: string,
   meta: string,
-  source: string,
+  sourceHtml: string,
 ): void {
-  els.crumbEl.textContent = crumb;
-  els.metaEl.textContent = meta;
-  els.sourceEl.innerHTML = source;
+  push({ crumb, meta, sourceHtml });
 }
 
-export function setPaneStatus(els: InspectEls, status: string, error: string | null): void {
-  els.statusEl.textContent = status;
-  els.errorEl.hidden = !error;
-  els.errorEl.textContent = error ?? "";
+export function setPaneStatus(push: InspectPush, status: string, error: string | null): void {
+  push({ status, error });
 }
 
 export async function commitGizmoIfChanged(
