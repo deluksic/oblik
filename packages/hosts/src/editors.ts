@@ -11,7 +11,7 @@ export const EDITOR_COMMANDS: CommandSpec[] = [
   {
     id: "distance",
     title: "Distance",
-    hint: "Dashed ring. A point in scene(), then a radius.",
+    hint: "Dashed ring. Pick a named point, then a radius.",
   },
 ];
 
@@ -24,7 +24,7 @@ export const GEOM_CONSTRUCTOR_COMMANDS: CommandSpec[] = [
   {
     id: "line",
     title: "Line",
-    hint: "Two named points in scene().",
+    hint: "Two named points.",
   },
 ];
 
@@ -64,10 +64,29 @@ function escapeHtml(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function slot(label: string, extraClass = ""): string {
+function slotHtml(label: string, extraClass = ""): string {
   const cls = extraClass ? `slot ${extraClass}` : "slot";
   const attr = extraClass.includes("is-number") ? ` data-placeholder="${escapeHtml(label)}"` : "";
   return `<span class="${cls}"${attr}>${escapeHtml(label)}</span>`;
+}
+
+function arg(content: string, state: "active" | "done" | "pending"): string {
+  return `<span class="arg arg-${state}">${content}</span>`;
+}
+
+function slot(label: string, extraClass = "", state: "active" | "pending" = "active"): string {
+  return arg(slotHtml(label, extraClass), state);
+}
+
+function filled(text: string): string {
+  return arg(escapeHtml(text), "done");
+}
+
+function fn(name: string, args: string[]): string {
+  const body = args
+    .map((argHtml, i) => (i === 0 ? argHtml : `<span class="cmd-punct">, </span>${argHtml}`))
+    .join("");
+  return `<span class="cmd-name">${escapeHtml(name)}</span><span class="cmd-punct">(</span>${body}<span class="cmd-punct">)</span>`;
 }
 
 export type CommandPreview = {
@@ -80,38 +99,43 @@ export function commandPreview(tool: EditorTool | null): CommandPreview | null {
   if (!tool) return null;
   if (tool.id === "point") {
     return {
-      previewHtml: `editPoint(${slot("<x>")}, ${slot("<y>")})`,
+      previewHtml: fn("editPoint", [slot("<x>"), slot("<y>")]),
       hint: "Click empty paper.",
     };
   }
   if (tool.id === "distance") {
     if (!tool.origin) {
       return {
-        previewHtml: `editDistanceToPoint(${slot("<point>")}, ${slot("<radius>")})`,
-        hint: "Click a named point in scene(), or empty paper for a new origin.",
+        previewHtml: fn("editDistanceToPoint", [
+          slot("<point>"),
+          slot("<radius>", "", "pending"),
+        ]),
+        hint: "Click a named point, or empty paper for a new origin.",
       };
     }
-    const point = tool.origin.name ? escapeHtml(tool.origin.name) : slot("<point>");
+    const point = tool.origin.name ? filled(tool.origin.name) : slot("<point>", "", "done");
     const radiusLabel = tool.typedRadius?.trim() ? tool.typedRadius : "<radius>";
     return {
-      previewHtml: `editDistanceToPoint(${point}, ${slot(radiusLabel, "is-number")})`,
+      previewHtml: fn("editDistanceToPoint", [point, slot(radiusLabel, "is-number")]),
       acceptNumber: true,
       hint: "Type a radius and Enter, or click the canvas.",
     };
   }
   if (tool.id === "circle") {
-    const center = tool.center ? escapeHtml(tool.center.name) : slot("<point>");
+    const center = tool.center ? filled(tool.center.name) : slot("<point>");
+    const distance = slot("<distance>", "", tool.center ? "active" : "pending");
     return {
-      previewHtml: `circle(${center}, ${slot("<distance>")})`,
+      previewHtml: fn("circle", [center, distance]),
       hint: tool.center
         ? "Click a named dashed ring (any origin)."
-        : "Click a named editPoint in scene().",
+        : "Click a named editPoint.",
     };
   }
-  const a = tool.a ? escapeHtml(tool.a.name) : slot("<a>");
+  const a = tool.a ? filled(tool.a.name) : slot("<a>");
+  const b = slot("<b>", "", tool.a ? "active" : "pending");
   return {
-    previewHtml: `line(${a}, ${slot("<b>")})`,
-    hint: tool.a ? "Click a second named point in scene()." : "Click a named point in scene().",
+    previewHtml: fn("line", [a, b]),
+    hint: tool.a ? "Click a second named point." : "Click a named point.",
   };
 }
 

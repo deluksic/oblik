@@ -33,9 +33,18 @@ function PickerPanel(props: {
   onPick: (id: string) => void;
   onClosePicker: () => void;
 }) {
+  const inputRef = { current: null as HTMLInputElement | null };
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
   const items = createMemo(() => filterCommands(props.commands(), query()));
+
+  function focusQueryInput(): void {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
+  }
 
   function onPickerKey(e: KeyboardEvent): void {
     if (e.key === "Escape") {
@@ -57,12 +66,43 @@ function PickerPanel(props: {
       e.preventDefault();
       const c = items()[active()];
       if (c) props.onPick(c.id);
+      return;
+    }
+    if (e.code === "Space" || e.key === " ") {
+      if (query().trim() === "") {
+        e.preventDefault();
+        props.onClosePicker();
+        return;
+      }
+      if (document.activeElement !== inputRef.current) {
+        e.preventDefault();
+        setQuery((q) => `${q} `);
+        setActive(0);
+        focusQueryInput();
+      }
+      return;
+    }
+    if (document.activeElement === inputRef.current) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      setQuery((q) => q.slice(0, -1));
+      setActive(0);
+      focusQueryInput();
+      return;
+    }
+    if (e.key.length === 1 && e.key !== " ") {
+      e.preventDefault();
+      setQuery((q) => q + e.key);
+      setActive(0);
+      focusQueryInput();
     }
   }
 
   createEffect(
     () => true,
     () => {
+      queueMicrotask(focusQueryInput);
       window.addEventListener("keydown", onPickerKey);
       return () => window.removeEventListener("keydown", onPickerKey);
     },
@@ -71,6 +111,9 @@ function PickerPanel(props: {
   return (
     <div class={styles.panel} role="dialog" aria-label="Add editor">
       <input
+        ref={(el) => {
+          inputRef.current = el;
+        }}
         type="search"
         class={styles.input}
         placeholder="Point, distance…"
@@ -133,6 +176,20 @@ export function Palette(props: PaletteProps) {
     if (n == null) return;
     commandBar.onNumber(n);
   }
+
+  createEffect(
+    () => props.mode === "prompt" && props.commandBar?.acceptNumber === true,
+    (focusNumber) => {
+      if (!focusNumber) return;
+      queueMicrotask(() => {
+        const el = numberRef.current;
+        if (!el) return;
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
+    },
+  );
 
   createEffect(
     () =>

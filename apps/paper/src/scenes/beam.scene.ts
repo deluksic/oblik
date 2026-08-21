@@ -7,14 +7,14 @@ export const title = "Grouped";
 export const sceneFile = "beam.scene.ts";
 
 export function scene() {
-  const a = editPoint(-3.63, 10.56);
-  const b = editPoint(4.37, 10.76);
+  const a = editPoint(-3.87, 0.16);
+  const b = editPoint(4.41, -0.23);
   const span = line(a, b);
 
   const p0 = editPointOnSegment(span, 0.25);
   const r0 = editDistanceToPoint(p0, 1.29);
-  const p1 = editPointOnSegment(span, 0.47);
-  const r1 = editDistanceToPoint(p1, 1.54);
+  const p1 = editPointOnSegment(span, 0.48);
+  const r1 = editDistanceToPoint(p1, 1.86);
   const p2 = editPointOnSegment(span, 0.75);
   const r2 = editDistanceToPoint(p2, 1.17);
 

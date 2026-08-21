@@ -64,7 +64,7 @@ export type ViewHost = {
   mount: (canvas: HTMLCanvasElement, mod: Record<string, unknown>, ctx: PaneContext) => PaneHandle;
 };
 
-export type SceneLoaderMap = Record<string, () => Promise<unknown>>;
+export type SceneLoaderMap = Record<string, () => Promise<Record<string, unknown>>>;
 
 export type WorkspaceProps = {
   scenes: SceneEntry[];

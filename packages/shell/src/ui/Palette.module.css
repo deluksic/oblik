@@ -16,7 +16,7 @@
 .promptDock {
   align-items: flex-end;
   justify-content: stretch;
-  padding: 0;
+  padding: 0.65rem 0.75rem 0.7rem;
   background: transparent;
   pointer-events: none;
   display: flex;
@@ -31,17 +31,36 @@
   overflow: hidden;
 }
 
+@keyframes promptEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-1.1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .prompt {
   width: 100%;
   max-width: none;
   background: #171a22;
-  border-top: 1px solid var(--stroke, #2a3040);
-  box-shadow: 0 -8px 24px #0006;
+  border: 1px solid var(--stroke, #2a3040);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px #0007;
   padding: 0.55rem 0.75rem 0.65rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   pointer-events: auto;
+  animation: promptEnter 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* .prompt {
+    animation: none;
+  } */
 }
 
 .previewRow {
@@ -58,6 +77,17 @@
   color: var(--text, #ece8de);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.preview :global(.cmd-name),
+.preview :global(.cmd-punct),
+.preview :global(.arg-done),
+.preview :global(.arg-pending) {
+  opacity: 0.38;
+}
+
+.preview :global(.arg-active) {
+  opacity: 1;
 }
 
 .preview :global(.slot) {
@@ -82,7 +112,9 @@
 }
 
 .hasInlineNumber.isTyping .preview :global(.slot.is-number)::after,
-.hasInlineNumber .preview :global(.slot.is-number:not([data-placeholder="<radius>"]))::after {
+.hasInlineNumber
+  .preview
+  :global(.slot.is-number:not([data-placeholder="<radius>"]))::after {
   content: none;
 }
 

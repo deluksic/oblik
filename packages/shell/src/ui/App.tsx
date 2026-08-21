@@ -203,6 +203,7 @@ export function App(props: WorkspaceProps) {
   }
 
   function pickCommand(cmdId: string): void {
+    setPickerOpen(false);
     const id = focusedId();
     if (!id) return;
     handles.get(id)?.runCommand?.(cmdId);
@@ -210,6 +211,47 @@ export function App(props: WorkspaceProps) {
   }
 
   function onWorkspaceKeydown(e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      if (paletteMode() === "picker") {
+        setPickerOpen(false);
+        return;
+      }
+      if (paletteMode() !== "closed") {
+        e.preventDefault();
+      }
+      handles.get(focusedId() ?? "")?.cancelCommand?.();
+      return;
+    }
+
+    const bar = commandBar();
+    if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
+      const draft = bar.numberValue ?? "";
+      if (e.key === "Enter") {
+        const trimmed = draft.trim();
+        const n = Number(trimmed);
+        if (trimmed !== "" && Number.isFinite(n)) {
+          e.preventDefault();
+          bar.onNumber?.(n);
+        }
+        return;
+      }
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        bar.onNumberDraft(draft === "" ? "" : draft.slice(0, -1));
+        return;
+      }
+      if (e.key === "Delete") {
+        e.preventDefault();
+        bar.onNumberDraft(draft === "" ? "" : "");
+        return;
+      }
+      if (e.key.length === 1 && /[0-9.\-]/.test(e.key)) {
+        e.preventDefault();
+        bar.onNumberDraft(draft + e.key);
+        return;
+      }
+    }
+
     const t = e.target;
     if (
       t instanceof HTMLInputElement ||
@@ -218,14 +260,7 @@ export function App(props: WorkspaceProps) {
     ) {
       return;
     }
-    if (e.key === "Escape") {
-      if (paletteMode() === "picker") {
-        setPickerOpen(false);
-        return;
-      }
-      handles.get(focusedId() ?? "")?.cancelCommand?.();
-      return;
-    }
+
     const isSpace = e.code === "Space" || e.key === " ";
     if (!isSpace || e.repeat || paletteMode() !== "closed") return;
     const id = focusedId();

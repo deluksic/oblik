@@ -32,7 +32,7 @@ export function gearLayout(): GearLayout {
     max: 25,
     step: 0.5,
   });
-  const rot1 = editAngle(pinion, 57, { radius: pitch1 });
+  const rot1 = editAngle(pinion, 49, { radius: pitch1 });
   const helixDeg = editNumber(35, {
     label: "Helix °",
     min: 0,

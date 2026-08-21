@@ -363,9 +363,20 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             tool.id === "distance" && tool.origin
               ? (raw: string) => {
                   if (!tool || tool.id !== "distance") return;
-                  const next = raw.trim() === "" ? undefined : raw;
-                  if (tool.typedRadius === next) return;
-                  tool = { ...tool, typedRadius: next };
+                  const trimmed = raw.trim();
+                  const current = tool.typedRadius?.trim() ?? "";
+                  if (trimmed === "") {
+                    if (current !== "") {
+                      tool = { ...tool, typedRadius: undefined };
+                      render(true);
+                      return;
+                    }
+                    tool = { id: "distance" };
+                    render();
+                    return;
+                  }
+                  if (tool.typedRadius === raw) return;
+                  tool = { ...tool, typedRadius: raw };
                   render(true);
                 }
               : undefined,

@@ -58,18 +58,22 @@ Static-only: `class={styles.nav}`.
 
 ## Lifecycle & DOM
 
-- **`onSettled`** — run after DOM is ready (replaces `onMount` for ref-dependent work). Return a cleanup.
-- **Canvas / host mount** — Solid creates `<canvas>` via `ref`; mount the view host in `onSettled`; `dispose` on cleanup.
-- **Refs** — prefer callback refs or `{ current: null as T | null }` if the linter flags unassigned `let` refs.
+- **`onSettled`** — run after DOM is ready (replaces `onMount` for ref-dependent work). Return a cleanup. **Cannot read pending async** (`PENDING_ASYNC_FORBIDDEN_SCOPE`). Window listeners under a tree with async memos use `createEffect`.
+- **Async resource in `createMemo`** — register `onCleanup` **before** the first `await`. If the memo re-runs while awaiting, cleanup still runs.
 
 ```tsx
-onSettled(() => {
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  const handle = host.mount(canvas, mod, ctx);
-  return () => handle.dispose();
+const handle = createMemo(async () => {
+  let current: PaneHandle | null = null;
+  onCleanup(() => current?.dispose());
+  const mod = await mount.loader();
+  current = mount.host.mount(canvas, mod, ctx);
+  return current;
 });
 ```
+
+Read under `<Loading>`; rejected loads → `<Errored>`. `host.mount()` → `render()` calls `onInspect` (and sometimes `onCommandBar`) while the async memo is still owned — wrap those two in `runWithOwner(null, …)`. `onFocus` / `onLiveChange` / `onHandle` do not write signals from that path.
+
+- **Refs** — prefer callback refs or `{ current: null as T | null }` if the linter flags unassigned `let` refs.
 
 ## Reactivity
 
@@ -77,10 +81,7 @@ onSettled(() => {
 - Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks and stable local readers (`commands` in `Pane`).
 - **Do not read `props` or signals in imperative code** (`For` map bodies, `if` branches before `return`, helper calls). Use JSX expressions, `createMemo`, or a child component whose template reads props.
 - **Do not write signals in `createEffect` apply** — derive with `createMemo`; scene-driven reset uses **function-form** `createSignal(() => …)` (writable memo).
-- **Async data** — `createMemo(() => loader())`; read it under `<Loading>`. Rejected loads → `<Errored>`.
-- **`onSettled` cannot read pending async** (throws `PENDING_ASYNC_FORBIDDEN_SCOPE`). If the owner tree has an async memo (pane loaders), window listeners and host `mount()` go in **`createEffect`**, whose compute is async-aware. `onSettled` is only for purely sync DOM after layout.
-- **Host callbacks that write shell state** (`onCommandBar`, `onInspect`, `onLiveChange`) must not run the setter inside effect apply. If `getOwner()` is set, `queueMicrotask` the call. Pointer/DOM handlers have no owner and stay synchronous.
-- **Imperative cross-pane refs** (e.g. `handles` `Map` for `refreshOthers`) — plain mutation, no signal bump; palette commands stay **pane-local** via an `ownedWrite` handle signal.
+- **Imperative cross-pane refs** (e.g. `handles` `Map` for `refreshOthers`) — plain mutation; palette commands come from the pane’s async handle memo.
 - Internal imports use `@/` → `packages/shell/src/` (e.g. `@/types`, `@/ui/App`). Colocated `.module.css` stays relative.
 
 ```tsx

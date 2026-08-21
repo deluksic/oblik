@@ -17,8 +17,8 @@ function stockEdges(min: Vec2, max: Vec2) {
 }
 
 const cornerR = (p: Vec2) => editDistanceToPoint(p, 0.62);
-const ringR = (p: Vec2) => editDistanceToPoint(p, 0.37);
-const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.9);
+const ringR = (p: Vec2) => editDistanceToPoint(p, 0.12);
+const slotCapAt = (p: Vec2) => editDistanceToPoint(p, 0.32);
 
 /**
  * Shared plate parameters — edit* live here so plate, mill, and nest panes
@@ -48,8 +48,8 @@ export function plateLayout() {
     radius: cornerR(center),
   }));
 
-  const bc = editPoint(3.68, 0.06);
-  const pcd = editDistanceToPoint(bc, 1.19);
+  const bc = editPoint(0.5, -0.08);
+  const pcd = editDistanceToPoint(bc, 0.46);
   const ringN = editNumber(5, {
     label: "Hole count",
     min: 3,
@@ -68,8 +68,8 @@ export function plateLayout() {
     ringHoles.push({ center, radius: ringR(center) });
   }
 
-  const pocketMin = editPoint(-2.11, -1.52);
-  const pocketSpan = editVector(pocketMin, 4.13, 2.6);
+  const pocketMin = editPoint(-1.95, -2.05);
+  const pocketSpan = editVector(pocketMin, 5.48, 3.89);
   const pocketMax = {
     x: pocketMin.x + pocketSpan.x,
     y: pocketMin.y + pocketSpan.y,
@@ -83,8 +83,8 @@ export function plateLayout() {
   onBisector({ x: pocketMin.x, y: pocketMax.y }, { x: 1, y: -1 });
   const filletR = bl.x - pocketMin.x;
 
-  const slotCenter = editPointOnSegment(edges.top, 0.49);
-  const slotLen = editDistanceToPoint(slotCenter, 3.6);
+  const slotCenter = editPointOnSegment(edges.top, 0.51);
+  const slotLen = editDistanceToPoint(slotCenter, 1.33);
   const halfL = slotLen / 2;
   const slotCapR = slotCapAt({
     x: slotCenter.x - halfL,
