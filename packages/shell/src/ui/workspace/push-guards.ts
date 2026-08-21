@@ -1,4 +1,4 @@
-import type { CommandBarState } from "../types.ts";
+import type { CommandBarState } from "@/types";
 
 export function commandBarSnapshotKey(state: CommandBarState | null): string {
   if (!state) return "";

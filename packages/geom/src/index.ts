@@ -1,8 +1,8 @@
-export * from "./vec.ts";
-export * from "./vec3.ts";
-export * from "./identity.ts";
-export * from "./geom3.ts";
-export * from "./extrude.ts";
+export * from "./vec";
+export * from "./vec3";
+export * from "./identity";
+export * from "./geom3";
+export * from "./extrude";
 export {
   point,
   line,
@@ -20,5 +20,5 @@ export {
   type Geom,
   type Drawable,
   type Drawable3,
-} from "./geom.ts";
-export * from "./provenance.ts";
+} from "./geom";
+export * from "./provenance";

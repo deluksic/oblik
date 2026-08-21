@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
-import { injectSceneSites } from "./inject-sites.ts";
-import { patchWidgetAt } from "./patch-widget.ts";
+import { injectSceneSites } from "./inject-sites";
+import { patchWidgetAt } from "./patch-widget";
 
 const SCENE = "apps/paper/src/scenes/shared-loop.scene.ts";
 

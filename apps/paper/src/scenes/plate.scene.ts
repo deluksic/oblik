@@ -1,5 +1,5 @@
-import { drawPlate } from "../demo/plate.ts";
-import { plateLayout } from "./plate-layout.ts";
+import { drawPlate } from "../demo/plate";
+import { plateLayout } from "./plate-layout";
 
 export const title = "Milled plate";
 export const sceneFile = "plate.scene.ts";

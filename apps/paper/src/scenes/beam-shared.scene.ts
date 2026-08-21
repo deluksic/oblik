@@ -1,7 +1,7 @@
 import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
 import { line } from "@design-scenes/geom";
 
-import { assembleBeam } from "../demo/beam.ts";
+import { assembleBeam } from "../demo/beam";
 
 export const id = "shared";
 export const title = "Shared radius";

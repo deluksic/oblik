@@ -1,6 +1,6 @@
 import type { InspectPatch } from "@design-scenes/shell";
 
-import { commitWidget, peekFile } from "./inspect.ts";
+import { commitWidget, peekFile } from "./inspect";
 
 export function scenePeekPath(sceneFile: string): string {
   return `apps/paper/src/scenes/${sceneFile}`;

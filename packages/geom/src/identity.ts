@@ -1,4 +1,4 @@
-import { captureCallSite } from "./provenance.ts";
+import { captureCallSite } from "./provenance";
 
 export type Provenance = {
   file: string;

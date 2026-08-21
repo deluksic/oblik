@@ -1,5 +1,5 @@
-import type { Gizmo, NumberGizmo } from "./widgets.ts";
-import { snapEditNumber } from "./widgets.ts";
+import type { Gizmo, NumberGizmo } from "./widgets";
+import { snapEditNumber } from "./widgets";
 
 const MARGIN = 12;
 const PANEL_W = 200;

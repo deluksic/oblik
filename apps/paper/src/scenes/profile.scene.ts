@@ -1,6 +1,6 @@
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
-import { PROFILE_SMOOTH, profileSdf, type ProfileLayout } from "../demo/profile.ts";
+import { PROFILE_SMOOTH, profileSdf, type ProfileLayout } from "../demo/profile";
 
 export const title = "Sweep profile";
 export const view = "sdf2" as const;

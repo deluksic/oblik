@@ -1,5 +1,5 @@
-export type { Sdf } from "./tree.ts";
-export type { Sdf2 } from "./tree2.ts";
+export type { Sdf } from "./tree";
+export type { Sdf2 } from "./tree2";
 export {
   sphere,
   box,
@@ -13,8 +13,8 @@ export {
   intersection,
   unionAll,
   smoothUnionAll,
-} from "./tree.ts";
-export { circle2, union2, smoothUnion2, smoothUnionAll2, evalSdf2 } from "./tree2.ts";
-export { compileSdf, type CompiledSdf } from "./compile.ts";
-export { fillSdf2 } from "./raster2.ts";
-export { SdfView } from "./view.ts";
+} from "./tree";
+export { circle2, union2, smoothUnion2, smoothUnionAll2, evalSdf2 } from "./tree2";
+export { compileSdf, type CompiledSdf } from "./compile";
+export { fillSdf2 } from "./raster2";
+export { SdfView } from "./view";

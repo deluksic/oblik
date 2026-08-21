@@ -1,6 +1,6 @@
 import { box3, circle3, cylinder3, group, line3, type Geom, type Vec3 } from "@design-scenes/geom";
 
-import type { PlateOpts } from "./plate.ts";
+import type { PlateOpts } from "./plate";
 
 export type MillHole = { x: number; y: number; radius: number };
 

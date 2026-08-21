@@ -1,7 +1,7 @@
 import { render } from "@solidjs/web";
 
-import type { WorkspaceProps } from "./types.ts";
-import { App } from "./ui/App.tsx";
+import type { WorkspaceProps } from "@/types";
+import { App } from "@/ui/App";
 
 export type { WorkspaceProps };
 

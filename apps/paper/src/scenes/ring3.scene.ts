@@ -1,7 +1,7 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
 
-import { drawRing3 } from "../demo/ring.ts";
-import { ringLayout } from "./ring.scene.ts";
+import { drawRing3 } from "../demo/ring";
+import { ringLayout } from "./ring.scene";
 
 export const title = "Signet wrap";
 export const view = "euclid3" as const;

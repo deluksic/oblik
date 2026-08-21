@@ -1,4 +1,4 @@
-import type { CommandSpec } from "./types.ts";
+import type { CommandSpec } from "@/types";
 
 export type { CommandSpec };
 

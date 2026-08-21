@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 
-import { createScene } from "../workspace-model.ts";
+import { createScene } from "./workspace/model";
 
 import styles from "./Welcome.module.css";
 

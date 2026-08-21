@@ -16,7 +16,7 @@ import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
-import { peekFile, quantize, renderSnippet } from "./inspect.ts";
+import { peekFile, quantize, renderSnippet } from "./inspect";
 import {
   commitGizmoIfChanged,
   observePaneResize,
@@ -27,7 +27,7 @@ import {
   subscribeHotReload,
   warmPeek,
   type InspectPush,
-} from "./pane.ts";
+} from "./pane";
 
 type FieldSceneMod = {
   view: "sdf";

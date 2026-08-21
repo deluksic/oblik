@@ -3,11 +3,11 @@ import { editPointOnSegment3 } from "@design-scenes/euclid3";
 import { line3 } from "@design-scenes/geom";
 import { difference, sweep2, union, unionAll } from "@design-scenes/sdf";
 
-import { pack7 } from "../demo/cylinder.ts";
-import { profileSdf } from "../demo/profile.ts";
-import { packedCylinderCores, quatrefoilBallsPack } from "../demo/rose-sdf.ts";
-import { cylinderLayout } from "./cylinder.scene.ts";
-import { profileLayout } from "./profile.scene.ts";
+import { pack7 } from "../demo/cylinder";
+import { profileSdf } from "../demo/profile";
+import { packedCylinderCores, quatrefoilBallsPack } from "../demo/rose-sdf";
+import { cylinderLayout } from "./cylinder.scene";
+import { profileLayout } from "./profile.scene";
 
 export const title = "Cylinder SDF";
 export const view = "sdf" as const;

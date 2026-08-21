@@ -1,3 +1,3 @@
-export * from "./widgets.ts";
-export * from "./run.ts";
-export * from "./view.ts";
+export * from "./widgets";
+export * from "./run";
+export * from "./view";

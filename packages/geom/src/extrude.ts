@@ -1,6 +1,6 @@
-import { mesh3, type Mesh3 } from "./geom3.ts";
-import { dist, rotateAround, type Vec2 } from "./vec.ts";
-import { vec3, type Vec3 } from "./vec3.ts";
+import { mesh3, type Mesh3 } from "./geom3";
+import { dist, rotateAround, type Vec2 } from "./vec";
+import { vec3, type Vec3 } from "./vec3";
 
 export type ExtrudeOpts = {
   /** Total rotation about +Z from bottom to top, radians. */

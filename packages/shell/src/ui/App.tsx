@@ -1,40 +1,21 @@
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 
-import { paneIdsFromAreas, stackedAreas } from "../layout-grid.ts";
-import { commandBarSnapshotKey, inspectSnapshotKey } from "../push-guards.ts";
-import type {
-  CommandBarState,
-  InspectPatch,
-  InspectState,
-  PaneHandle,
-  WorkspaceProps,
-} from "../types.ts";
-import { catalogById, currentSceneId, loaderKey, openScene } from "../workspace-model.ts";
-import { Inspect } from "./Inspect.tsx";
-import { Nav } from "./Nav.tsx";
-import type { PaletteMode } from "./Palette.tsx";
-import { Pane, type PaneMount } from "./Pane.tsx";
-import { Welcome } from "./Welcome.tsx";
+import { paneIdsFromAreas, stackedAreas } from "@/layout/grid";
+import type { CommandBarState, InspectPatch, PaneHandle, WorkspaceProps } from "@/types";
 
-import paneStyles from "./Pane.module.css";
-import styles from "./Viewport.module.css";
-
-const WELCOME_INSPECT: InspectState = {
-  crumb: "No scene open",
-  meta: "A scene is a file in apps/paper/src/scenes. Layouts are CSS grid areas named by scene id.",
-  sourceHtml: `<code class="empty">Nothing to inspect until a pane is focused.</code>`,
-  status: "Open a scene from the nav, or create a new TypeScript file.",
-  error: null,
-};
-
-function singleLayout(id: string) {
-  return { areas: `"${id}"`, columns: "minmax(0, 1fr)" };
-}
+import { Inspect } from "./Inspect";
+import { Nav } from "./Nav";
+import type { PaletteMode } from "./Palette";
+import type { PaneMount } from "./Pane";
+import { Viewport } from "./Viewport";
+import { singleSceneLayout, WELCOME_INSPECT } from "./workspace/constants";
+import { catalogById, currentSceneId, loaderKey, openScene } from "./workspace/model";
+import { commandBarSnapshotKey, inspectSnapshotKey } from "./workspace/push-guards";
 
 export function App(props: WorkspaceProps) {
   const [sceneId, setSceneId] = createSignal<string | null>(currentSceneId());
   const [title, setTitle] = createSignal("Welcome");
-  const [inspect, setInspect] = createSignal<InspectState>(WELCOME_INSPECT);
+  const [inspect, setInspect] = createSignal(WELCOME_INSPECT);
   const [focusedId, setFocusedId] = createSignal<string | null>(null);
   const [paletteMode, setPaletteMode] = createSignal<PaletteMode>("closed");
   const [commandBar, setCommandBar] = createSignal<CommandBarState | null>(null);
@@ -65,7 +46,7 @@ export function App(props: WorkspaceProps) {
   const layout = createMemo(() => {
     const e = entry();
     if (!e || e.error) return null;
-    return e.layout ?? singleLayout(e.id);
+    return e.layout ?? singleSceneLayout(e.id);
   });
 
   createEffect(
@@ -126,6 +107,21 @@ export function App(props: WorkspaceProps) {
       "grid-template-rows": l.rows ?? "minmax(0, 1fr)",
       "--stack-areas": stackedAreas(ids),
     } as Record<string, string>;
+  });
+
+  const paneMounts = createMemo((): PaneMount[] => {
+    const ids = paneIds();
+    const cat = catalog();
+    const mounts: PaneMount[] = [];
+    for (const id of ids) {
+      const paneEntry = cat.get(id);
+      if (!paneEntry?.hasScene) continue;
+      const host = props.hosts[paneEntry.view];
+      const loader = props.loaders[loaderKey(paneEntry.file)];
+      if (!host || !loader) continue;
+      mounts.push({ id, entry: paneEntry, host, loader });
+    }
+    return mounts;
   });
 
   function selectScene(id: string | null): void {
@@ -190,14 +186,7 @@ export function App(props: WorkspaceProps) {
     const id = focusedId();
     if (!id) return;
     handles.get(id)?.runCommand?.(cmdId);
-    const canvas = document.querySelector<HTMLCanvasElement>(
-      `.${paneStyles.pane}[data-scene="${id}"] canvas`,
-    );
-    canvas?.focus();
-  }
-
-  function onNumberDraft(raw: string): void {
-    commandBar()?.onNumberDraft?.(raw);
+    document.querySelector<HTMLCanvasElement>(`[data-scene="${id}"] canvas`)?.focus();
   }
 
   onSettled(() => {
@@ -225,8 +214,7 @@ export function App(props: WorkspaceProps) {
       if (e.key !== " " || e.repeat || paletteMode() !== "closed") return;
       const id = focusedId();
       if (!id) return;
-      const cmds = getCommands();
-      if (cmds.length === 0) {
+      if (getCommands().length === 0) {
         setInspect((prev) => ({
           ...prev,
           status: "Space adds editors on 2D paper. This view has none yet.",
@@ -240,115 +228,44 @@ export function App(props: WorkspaceProps) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const paneMounts = createMemo((): PaneMount[] => {
-    const ids = paneIds();
-    const cat = catalog();
-    const mounts: PaneMount[] = [];
-    for (const id of ids) {
-      const paneEntry = cat.get(id);
-      if (!paneEntry?.hasScene) continue;
-      const host = props.hosts[paneEntry.view];
-      const loader = props.loaders[loaderKey(paneEntry.file)];
-      if (!host || !loader) continue;
-      mounts.push({ id, entry: paneEntry, host, loader });
-    }
-    return mounts;
-  });
-
   return (
     <>
       <header>
         <p class="kicker">Prototype 3</p>
         <h1>{title()}</h1>
-        <Nav scenes={props.scenes} activeId={sceneId} onSelect={selectScene} />
+        <Nav scenes={props.scenes} activeId={sceneId()} onSelect={selectScene} />
         <p id="status">{inspect().status}</p>
       </header>
       <Show when={inspect().error}>
         <p id="error">{inspect().error}</p>
       </Show>
       <div id="workspace">
-        <div id="viewport" class={styles.viewport}>
-          <Show when={sceneId() == null}>
-            <Welcome onCreated={(id) => selectScene(id)} />
-          </Show>
-          <Show when={sceneId() != null && (!entry() || entry()?.error)}>
-            <section class={paneStyles.pane}>
-              <p class={paneStyles.label}>{sceneId()}</p>
-              <p class={paneStyles.error}>
-                {!entry() ? `No scene file for "${sceneId()}".` : (entry()?.error ?? "Scene error")}
-              </p>
-            </section>
-          </Show>
-          <Show when={sceneId() != null && entry() && !entry()!.error}>
-            <div class={styles.viewportGrid} style={gridStyle()}>
-              <For each={paneIds()}>
-                {(id) => {
-                  const paneEntry = catalog().get(id);
-                  const mount = paneMounts().find((m) => m.id === id);
-                  if (!paneEntry) {
-                    return (
-                      <section class={paneStyles.pane} style={{ "grid-area": id }} data-scene={id}>
-                        <p class={paneStyles.label}>{id}</p>
-                        <p class={paneStyles.error}>Unknown scene id "{id}" in layout.</p>
-                      </section>
-                    );
-                  }
-                  if (paneEntry.error) {
-                    return (
-                      <section class={paneStyles.pane} style={{ "grid-area": id }} data-scene={id}>
-                        <p class={paneStyles.label}>{id}</p>
-                        <p class={paneStyles.error}>{paneEntry.error}</p>
-                      </section>
-                    );
-                  }
-                  if (!paneEntry.hasScene) {
-                    return (
-                      <section class={paneStyles.pane} style={{ "grid-area": id }} data-scene={id}>
-                        <p class={paneStyles.label}>{id}</p>
-                        <p class={paneStyles.error}>{paneEntry.file} is a layout, not a view.</p>
-                      </section>
-                    );
-                  }
-                  if (!mount) {
-                    const host = props.hosts[paneEntry.view];
-                    const loader = props.loaders[loaderKey(paneEntry.file)];
-                    const message = !host
-                      ? `No view host registered for "${paneEntry.view}".`
-                      : !loader
-                        ? `No loader for ${paneEntry.file}.`
-                        : "Failed to mount pane.";
-                    return (
-                      <section class={paneStyles.pane} style={{ "grid-area": id }} data-scene={id}>
-                        <p class={paneStyles.label}>{id}</p>
-                        <p class={paneStyles.error}>{message}</p>
-                      </section>
-                    );
-                  }
-                  return (
-                    <Pane
-                      mount={mount}
-                      focused={() => focusedId() === id}
-                      paletteMode={() => (focusedId() === id ? paletteMode() : "closed")}
-                      commandBar={() => (focusedId() === id ? commandBar() : null)}
-                      getCommands={getCommands}
-                      onFocus={() => focusPane(id)}
-                      onPickCommand={pickCommand}
-                      onClosePicker={() => setPaletteMode("closed")}
-                      onNumberDraft={onNumberDraft}
-                      onCommandBar={(state) => receiveCommandBar(id, state)}
-                      onInspect={(patch) => receiveInspect(id, patch)}
-                      onLiveChange={() => refreshOthers(id)}
-                      onHandle={(handle) => {
-                        handles.set(id, handle);
-                      }}
-                    />
-                  );
-                }}
-              </For>
-            </div>
-          </Show>
-        </div>
-        <Inspect state={inspect} />
+        <Viewport
+          sceneId={sceneId()}
+          entry={entry()}
+          paneIds={paneIds()}
+          gridStyle={gridStyle()}
+          paneMounts={paneMounts()}
+          catalog={catalog()}
+          hosts={props.hosts}
+          loaders={props.loaders}
+          focusedId={focusedId()}
+          paletteMode={paletteMode()}
+          commandBar={commandBar()}
+          onWelcomeCreated={selectScene}
+          getCommands={getCommands}
+          onFocusPane={focusPane}
+          onPickCommand={pickCommand}
+          onClosePicker={() => setPaletteMode("closed")}
+          onNumberDraft={(raw) => commandBar()?.onNumberDraft?.(raw)}
+          onCommandBar={receiveCommandBar}
+          onInspect={receiveInspect}
+          onLiveChange={refreshOthers}
+          onHandle={(id, handle) => {
+            handles.set(id, handle);
+          }}
+        />
+        <Inspect state={inspect()} />
       </div>
     </>
   );

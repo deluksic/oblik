@@ -2,8 +2,8 @@ import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnSegment3 } from "@design-scenes/euclid3";
 import { line3 } from "@design-scenes/geom";
 
-import { drawHelicalPair } from "../demo/gear.ts";
-import { gearLayout } from "./gear.scene.ts";
+import { drawHelicalPair } from "../demo/gear";
+import { gearLayout } from "./gear.scene";
 
 export const title = "Helix 3D";
 export const view = "euclid3" as const;

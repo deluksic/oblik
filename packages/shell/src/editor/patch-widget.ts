@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names.ts";
+import { EDIT_NAMES } from "./edit-names";
 
 export function formatNum(n: number): string {
   const q = Math.round(n * 100) / 100;

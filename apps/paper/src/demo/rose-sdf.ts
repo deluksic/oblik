@@ -1,7 +1,7 @@
 import type { Vec2 } from "@design-scenes/geom";
 import { cylinder, sphere, unionAll, type Sdf } from "@design-scenes/sdf";
 
-import { pack7, ringBalls } from "./cylinder.ts";
+import { pack7, ringBalls } from "./cylinder";
 
 export type QuatrefoilOpts = {
   origin?: Vec2;

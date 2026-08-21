@@ -2,9 +2,9 @@ import type { Vec3 } from "@design-scenes/geom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { compileSdf, sdfMapSignature, type CompiledSdf } from "./compile.ts";
-import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader.ts";
-import type { Sdf } from "./tree.ts";
+import { compileSdf, sdfMapSignature, type CompiledSdf } from "./compile";
+import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader";
+import type { Sdf } from "./tree";
 
 type Gizmo3 =
   | {

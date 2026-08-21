@@ -18,10 +18,10 @@ description: >-
 
 ## Where Solid lives
 
-| Solid (UI) | Vanilla TS (keep as-is) |
-|---|---|
-| `packages/shell/src/ui/*` | `packages/hosts/src/paper2.ts`, `paper3.ts` |
-| `packages/shell/src/workspace.tsx` | geometry packages, `insert-editor.ts`, `vite-plugin.ts` |
+| Solid (UI)                         | Vanilla TS (keep as-is)                                |
+| ---------------------------------- | ------------------------------------------------------ |
+| `packages/shell/src/ui/*`          | `packages/hosts/src/paper2.ts`, `paper3.ts`            |
+| `packages/shell/src/workspace.tsx` | geometry packages, `editor/*`, `plugin/vite-plugin.ts` |
 
 Shell chrome: `App`, `Nav`, `Welcome`, `Viewport`, `Pane`, `Inspect`, `Palette`.
 Mount via `startWorkspace(mount, props)` → `render(() => <App {...props} />, mount)`.
@@ -74,14 +74,14 @@ onSettled(() => {
 ## Reactivity
 
 - `createSignal`, `createMemo`, `createEffect`, `Show`, `For` from `solid-js`
-- Pass reactive inputs as accessors: `activeId: () => string | null`, not bare values when children must re-run
+- Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks and lazy getters (`getCommands`).
+- Internal imports use `@/` → `packages/shell/src/` (e.g. `@/types.ts`, `@/ui/App.tsx`). Colocated `.module.css` stays relative.
 - `createEffect(compute, apply)` — two-arg form when tracking deps explicitly
 
 ## Styling
 
 - **CSS modules** per component: `Component.module.css` imported as `styles`
-- Global app chrome tokens stay in `apps/paper/src/style.css` (`:root`, `#app`, `#workspace`)
-- Do not move canvas/view-pane rules back into global CSS unless shared across apps
+- Global app chrome tokens stay in `apps/paper/src/style.css` (`:root`, `#app`, `#workspace`, `#viewport`)
 
 ## Host boundary (shell ↔ hosts)
 
@@ -93,11 +93,11 @@ onInspect?: (patch: InspectPatch) => void;
 onCommandBar?: (state: CommandBarState | null) => void;
 ```
 
-Gate pushes in hosts with `inspectSnapshotKey` / `commandBarSnapshotKey` (`push-guards.ts`) so rAF loops do not spam the UI.
+Gate pushes in hosts with `inspectSnapshotKey` / `commandBarSnapshotKey` (`ui/workspace/push-guards.ts`) so rAF loops do not spam the UI.
 
 ## Palette pattern
 
-Modes as signals: `"closed" | "picker" | "prompt"`. `filterCommands` stays pure TS in `palette.ts`.
+Modes as signals: `"closed" | "picker" | "prompt"`. `filterCommands` stays pure TS in `palette/filter.ts`.
 
 ## Adding a component
 

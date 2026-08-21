@@ -1,4 +1,4 @@
-import type { SceneEntry } from "./types.ts";
+import type { SceneEntry } from "@/types";
 
 export function currentSceneId(): string | null {
   const sceneParam = new URLSearchParams(location.search).get("scene");

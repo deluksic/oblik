@@ -2,7 +2,7 @@ import { dist3, projectT3, type Drawable3, type Geom3, type Vec3 } from "@design
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import type { Gizmo3 } from "./widgets.ts";
+import type { Gizmo3 } from "./widgets";
 
 const COL = {
   bg: 0x12141c,

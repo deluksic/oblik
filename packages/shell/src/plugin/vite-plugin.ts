@@ -4,19 +4,19 @@ import path from "node:path";
 
 import type { Plugin, ViteDevServer } from "vite";
 
-import { parseSceneSource } from "./catalog.ts";
-import { injectSceneSites } from "./inject-sites.ts";
+import { parseSceneSource } from "@/catalog/catalog";
+import { newSceneSource, titleFromId } from "@/catalog/new-scene";
+import { injectSceneSites } from "@/editor/inject-sites";
 import {
   insertEditors,
   widgetBindingName,
   widgetInSceneFunction,
   type EditorInsert,
-} from "./insert-editor.ts";
-import { isSceneId } from "./layout-grid.ts";
-import { newSceneSource, titleFromId } from "./new-scene.ts";
-import { patchWidgetAt } from "./patch-widget.ts";
-import { SCENE_HELPER_HMR_EVENT } from "./scene-hmr.ts";
-import type { SceneEntry } from "./types.ts";
+} from "@/editor/insert-editor";
+import { patchWidgetAt } from "@/editor/patch-widget";
+import { SCENE_HELPER_HMR_EVENT } from "@/hmr/scene-hmr";
+import { isSceneId } from "@/layout/grid";
+import type { SceneEntry } from "@/types";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";

@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 
-import { findEditCallAt } from "./patch-widget.ts";
+import { findEditCallAt } from "./patch-widget";
 
 const SCENE_DRAWN = "__scene";
 

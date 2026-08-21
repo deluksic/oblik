@@ -1,8 +1,8 @@
 import * as ts from "typescript";
 import { expect, test } from "vitest";
 
-import { insertEditors } from "./insert-editor.ts";
-import { collectEditCalls, patchWidgetAt } from "./patch-widget.ts";
+import { insertEditors } from "./insert-editor";
+import { collectEditCalls, patchWidgetAt } from "./patch-widget";
 
 function at(source: string, i = 0): { line: number; column: number } {
   const sf = ts.createSourceFile(

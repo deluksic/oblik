@@ -1,9 +1,9 @@
 import type { Drawable, Vec2 } from "@design-scenes/geom";
 
-import type { Camera } from "./camera.ts";
-import { worldToScreen } from "./camera.ts";
-import { layoutNumberSliders } from "./hud.ts";
-import type { Gizmo } from "./widgets.ts";
+import type { Camera } from "./camera";
+import { worldToScreen } from "./camera";
+import { layoutNumberSliders } from "./hud";
+import type { Gizmo } from "./widgets";
 
 const COL = {
   bg: "#12141c",

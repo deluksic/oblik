@@ -1,22 +1,42 @@
 # SolidJS reference (this repo)
 
-## File map
+## Package layout
 
 ```
 packages/shell/src/
-  workspace.tsx          # render(() => <App />, mount)
-  workspace-model.ts     # URL, catalog, createScene (pure TS)
-  push-guards.ts         # commandBarSnapshotKey, inspectSnapshotKey
-  palette.ts             # filterCommands only (no DOM)
-  types.ts               # InspectState, PaneContext, WorkspaceProps
-  ui/
-    App.tsx              # scene state, keyboard, grid layout
-    Nav.tsx
-    Welcome.tsx
-    Viewport.module.css
-    Pane.tsx             # onSettled host mount
-    Inspect.tsx
-    Palette.tsx
+  index.ts              # public exports
+  types.ts              # shared types
+  workspace.tsx         # render(() => <App />, mount)
+
+  ui/                   # Solid chrome
+    App.tsx, Nav.tsx, Pane.tsx, …
+    workspace/          # workspace UI logic (no components)
+      constants.ts
+      model.ts
+      push-guards.ts
+      resolve-pane-slot.ts
+
+  palette/              # command palette (pure filter)
+    filter.ts
+
+  editor/               # AST insert/patch (vite + hosts)
+    insert-editor.ts
+    patch-widget.ts
+    inject-sites.ts
+    edit-names.ts
+
+  catalog/              # scene catalog parsing + scaffolding
+    catalog.ts
+    new-scene.ts
+
+  layout/               # CSS grid area helpers
+    grid.ts
+
+  hmr/                  # scene hot-reload helpers
+    scene-hmr.ts
+
+  plugin/               # Vite dev plugin
+    vite-plugin.ts
 ```
 
 ## Height chain (viewport)
@@ -67,10 +87,12 @@ startWorkspace(app, { scenes, loaders, hosts });
 
 `apps/paper/index.html` — single `<div id="app"></div>`.
 
+Plugin import: `packages/shell/src/plugin/vite-plugin.ts`.
+
 ## Testing
 
-- Pure logic: vitest in `packages/shell/src/*.test.ts` (e.g. `palette.test.ts`)
-- UI components: prefer testing pure helpers; Solid component tests only when behavior warrants `solid-js` test utils
+- Pure logic: vitest next to source (`palette/filter.test.ts`, `ui/workspace/resolve-pane-slot.test.ts`, `editor/*.test.ts`)
+- UI components: prefer testing pure helpers; Solid component tests only when behavior warrants test utils
 
 ## Versions (pin together)
 

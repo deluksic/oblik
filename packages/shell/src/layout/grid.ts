@@ -1,6 +1,6 @@
-import type { SceneLayout } from "./types.ts";
+import type { SceneLayout } from "@/types";
 
-export { VIEW_KINDS, type ViewKind, type SceneEntry, type SceneLayout } from "./types.ts";
+export { VIEW_KINDS, type ViewKind, type SceneEntry, type SceneLayout } from "@/types";
 
 const ID_RE = /^[a-z][a-z0-9-]*$/;
 

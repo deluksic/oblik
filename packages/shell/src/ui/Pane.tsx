@@ -1,7 +1,8 @@
 import { createSignal, onSettled, Show } from "solid-js";
 
-import type { CommandBarState, PaneContext, PaneHandle, SceneEntry, ViewHost } from "../types.ts";
-import { Palette, type PaletteMode } from "./Palette.tsx";
+import type { CommandBarState, PaneContext, PaneHandle, SceneEntry, ViewHost } from "@/types";
+
+import { Palette, type PaletteMode } from "./Palette";
 
 import styles from "./Pane.module.css";
 
@@ -14,9 +15,9 @@ export type PaneMount = {
 
 export type PaneProps = {
   mount: PaneMount;
-  focused: () => boolean;
-  paletteMode: () => PaletteMode;
-  commandBar: () => CommandBarState | null;
+  focused: boolean;
+  paletteMode: PaletteMode;
+  commandBar: CommandBarState | null;
   getCommands: () => import("../types.ts").CommandSpec[];
   onFocus: () => void;
   onPickCommand: (id: string) => void;
@@ -50,7 +51,7 @@ export function Pane(props: PaneProps) {
           onInspect: props.onInspect,
         });
         props.onHandle(handle);
-        if (props.focused()) {
+        if (props.focused) {
           props.onFocus();
           handle.refresh();
         } else {
@@ -70,7 +71,7 @@ export function Pane(props: PaneProps) {
 
   return (
     <section
-      class={[styles.pane, { [styles.paneFocused]: props.focused() }]}
+      class={[styles.pane, { [styles.paneFocused]: props.focused }]}
       style={{ "grid-area": props.mount.id }}
       data-scene={props.mount.id}
       onPointerDown={() => props.onFocus()}

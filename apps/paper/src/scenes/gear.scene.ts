@@ -9,7 +9,7 @@ import {
   meshMateRotation,
   pitchRadiusFor,
   type GearLayout,
-} from "../demo/gear.ts";
+} from "../demo/gear";
 
 export const title = "Gears";
 export const sceneFile = "gear.scene.ts";

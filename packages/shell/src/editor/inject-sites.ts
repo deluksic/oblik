@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names.ts";
+import { EDIT_NAMES } from "./edit-names";
 
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);

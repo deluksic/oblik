@@ -1,5 +1,5 @@
-import type { Sdf2 } from "./tree2.ts";
-import { evalSdf2 } from "./tree2.ts";
+import type { Sdf2 } from "./tree2";
+import { evalSdf2 } from "./tree2";
 
 export type Cam2 = { x: number; y: number; scale: number };
 

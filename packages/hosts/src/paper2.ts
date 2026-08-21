@@ -47,8 +47,8 @@ import {
   type EditorTool,
   type GhostSnap,
   type NamedGizmoPick,
-} from "./editors.ts";
-import { commitEditors, peekFile, quantize, renderSnippet } from "./inspect.ts";
+} from "./editors";
+import { commitEditors, peekFile, quantize, renderSnippet } from "./inspect";
 import {
   commitGizmoIfChanged,
   cssSize,
@@ -61,7 +61,7 @@ import {
   subscribeHotReload,
   warmPeek,
   type InspectPush,
-} from "./pane.ts";
+} from "./pane";
 
 type Sdf2SceneMod = {
   view: "sdf2";

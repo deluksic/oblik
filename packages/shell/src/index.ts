@@ -11,18 +11,18 @@ export type {
   SceneLoaderMap,
   ViewHost,
   WorkspaceProps,
-} from "./types.ts";
-export { VIEW_KINDS } from "./types.ts";
-export { isSceneId, paneIdsFromAreas, stackedAreas } from "./layout-grid.ts";
-export { startWorkspace, type WorkspaceProps } from "./workspace.tsx";
-export { filterCommands } from "./palette.ts";
-export { commandBarSnapshotKey, inspectSnapshotKey } from "./push-guards.ts";
+} from "@/types";
+export { VIEW_KINDS } from "@/types";
+export { isSceneId, paneIdsFromAreas, stackedAreas } from "@/layout/grid";
+export { startWorkspace, type WorkspaceProps } from "@/workspace";
+export { filterCommands } from "@/palette/filter";
+export { commandBarSnapshotKey, inspectSnapshotKey } from "@/ui/workspace/push-guards";
 export {
   subscribeSceneHot,
   subscribeHelperHot,
   applyHotScenes,
   notifyHelperHot,
-} from "./scene-hmr.ts";
+} from "@/hmr/scene-hmr";
 export {
   widgetBindingName,
   widgetInSceneFunction,
@@ -30,4 +30,4 @@ export {
   namedScenePointNear,
   namedScenePointBindings,
   evalDerivedScenePoints,
-} from "./insert-editor.ts";
+} from "@/editor/insert-editor";

@@ -1,5 +1,5 @@
-import type { Sdf } from "./tree.ts";
-import type { Sdf2 } from "./tree2.ts";
+import type { Sdf } from "./tree";
+import type { Sdf2 } from "./tree2";
 
 export type SdfUniform =
   | { name: string; kind: "f"; value: number }

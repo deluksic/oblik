@@ -8,8 +8,8 @@ import {
   namedScenePointNear,
   widgetBindingName,
   widgetInSceneFunction,
-} from "./insert-editor.ts";
-import { collectEditCalls } from "./patch-widget.ts";
+} from "./insert-editor";
+import { collectEditCalls } from "./patch-widget";
 
 function at(source: string, i = 0): { line: number; column: number } {
   const sf = ts.createSourceFile(
@@ -58,7 +58,7 @@ test("stacked inserts keep two-space indent on every line", () => {
 });
 
 test("rewrites return drawPlate so layout widgets still run first", () => {
-  const plate = `import { drawPlate } from "../demo/plate.ts";
+  const plate = `import { drawPlate } from "../demo/plate";
 import { editPoint } from "@design-scenes/euclid2";
 
 export function plateLayout() {

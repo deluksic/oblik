@@ -11,7 +11,7 @@ import {
   publishWidgetOverrides,
   setWidgetOverride,
   withoutWidgets,
-} from "./widgets.ts";
+} from "./widgets";
 
 const F = "apps/paper/src/scenes/plate-layout.ts";
 const pt = { file: F, at: [1, 1] as [number, number] };

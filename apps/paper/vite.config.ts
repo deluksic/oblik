@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import solid from "@solidjs/vite-plugin";
 import { defineConfig } from "vite";
 
-import { sceneDevPlugin } from "../../packages/shell/src/vite-plugin.ts";
+import { sceneDevPlugin } from "../../packages/shell/src/plugin/vite-plugin";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../..");
@@ -19,6 +19,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      "@": path.resolve(workspaceRoot, "packages/shell/src"),
       "@design-scenes/geom": path.resolve(workspaceRoot, "packages/geom/src/index.ts"),
       "@design-scenes/euclid2": path.resolve(workspaceRoot, "packages/euclid2/src/index.ts"),
       "@design-scenes/euclid3": path.resolve(workspaceRoot, "packages/euclid3/src/index.ts"),

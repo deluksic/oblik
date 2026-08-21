@@ -1,7 +1,7 @@
 import { withoutWidgets, editNumber } from "@design-scenes/euclid2";
 
-import { drawPlateNest } from "../demo/plate.ts";
-import { plateLayout } from "./plate-layout.ts";
+import { drawPlateNest } from "../demo/plate";
+import { plateLayout } from "./plate-layout";
 
 export const title = "Print grid";
 export const sceneFile = "nest.scene.ts";

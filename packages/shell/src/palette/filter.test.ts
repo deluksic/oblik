@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterCommands } from "./palette.ts";
+import { filterCommands } from "./filter";
 
 describe("filterCommands", () => {
   const cmds = [
