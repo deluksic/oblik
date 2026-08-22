@@ -1,10 +1,22 @@
-# euclid2 calls
+# euclid2 physics
 
-A constructor returns **one object** with a **principal type**. Other uses are **projections** (fields, or subtype of the principal geom). Slots bind a type `T` by taking a `T` or by writing a projection (`k.radius`, not a hidden coerce). Gizmos are UI for that object / its DOF field — never a third kind of value.
+One constructor per object. `{ edit: true }` is a **source declaration**, not a runtime test. Evaluation is always the pure call. Gizmos are a host view of evaluated objects whose construction site is in the edit table.
 
-`edit*` = principal geom + writable literal field(s). Same principal type as the non-edit constructor; DOF is provenance, not a second type. `withoutDraw` hides the stroke; it does not change the type.
+```
+circle(c, 2.4, { edit: true })     // Circle; .radius is DOF; write the 2.4
+circle(c, dist(c, q))              // Circle; .radius derived; no handle
+circle(c, 2.4)                     // Circle; constant; no handle
+point(1.2, 0.4, { edit: true })    // Point; .x .y are DOF
+offsetLine(L, 1.2, { edit: true }) // OffsetLine <: Line; .d is DOF
+```
 
-Widget literals must be numeric. `site?` omitted. Types: `Point <: Vec2`, `LineLike = Line | Segment`, `Branch = +1 | -1`.
+`{ edit: true }` means: **numeric literals at this call are write sites**. Names and calls are never writable. Tool inserts the flag; compiler does not infer it from unmarked literals.
+
+```
+circle(c, dist(c, q), { edit: true })   // illegal — nothing to write
+```
+
+`{ draw: false }` hides the stroke; type unchanged.
 
 ```
 OffsetLine = Line & { d: number; base: LineLike }
@@ -13,32 +25,12 @@ OffsetLine = Line & { d: number; base: LineLike }
 ## Objects
 
 ```
-editPoint(x: number, y: number): Point
-  .x .y
-
-editCircle(center: Point, radius: number): Circle          // replaces circle+editDistanceToPoint
-  .center: Point
-  .radius: number                                          // DOF
-
-editOffsetLine(base: LineLike, d: number): OffsetLine      // replaces editOffsetFromLine+offsetLine
-  <: Line
-  .d: number                                               // DOF
-  .base: LineLike
-
-editPointOnSegment(seg: Segment, t: number): Point
-  . /* Point */  t is DOF, not a projection others need
-
-editPointOnLine(line: LineLike, s: number): Point
-
-circle(center: Point, radius: number): Circle              // no DOF; radius may be dist(...)
+point(x: number, y: number): Point
+circle(center: Point, radius: number): Circle
 line(a: Point, b: Point): Line
 segment(a: Point, b: Point): Segment
-offsetLine(base: LineLike, d: number): Line                // derived parallel, no .d unless we return OffsetLine
-```
+offsetLine(base: LineLike, d: number): OffsetLine
 
-## Derived (still objects / numbers)
-
-```
 dist(a: Point, b: Point): number
 distToLine(p: Point, line: LineLike): number
 lineIntersection(a: LineLike, b: LineLike): Point | null
@@ -46,54 +38,39 @@ circleLineIntersection(c: Circle, l: LineLike, k: Branch): Point | null
 circleCircleIntersection(a: Circle, b: Circle, k: Branch): Point | null
 ```
 
-## Projections a slot may write
+Projections: `.center` `.radius` `.d` `.x` `.y`. Slot of `T` takes a `T` or writes a projection.
 
-| slot `T` | pick | emit |
+## Compiler
+
+Scene modules only. Walk constructor calls.
+
+1. **Declare** — collect `{ edit: true }`. Record `{ site, callee, literalArgIndexes, fields }`.
+2. **Reject** — `edit: true` with no numeric literals in those slots.
+3. **Inject** — `{ file, at: [line, col] }` onto the call so the value carries identity (pick, gizmo join). Strip `edit` before eval if the runtime API has no such option.
+4. **Publish** — `EditTable`: site → which field(s) of the principal type are DOF.
+
+No gizmos in constructors. No `edit*` combinators.
+
+## Eval
+
+Pure functions. Result is the object (`Circle`, `Point`, …) with projections and `site`. Same type with or without the flag.
+
+## Host (gizmos)
+
+After eval: join drawables/values to `EditTable` by `site`. Spawn handles from **principal type + declared fields**, using evaluated numbers (`circle.radius`, `point.x/y`, `offset.d`).
+
+A visible ring **is** that `Circle`. Intersections see it.
+
+## Write-back
+
+Gizmo drag → `EditTable` site + arg index → rewrite the **literal** in source. Undo is the editor.
+
+## Tools write
+
+| tool | slots | source |
 | --- | --- | --- |
-| Point | empty | `editPoint(x, y)` |
-| Point | named Point | reuse |
-| Point | L∩L | `lineIntersection(l1, l2)` |
-| Point | C∩L | `circleLineIntersection(c, l, +1)` |
-| Point | Circle center | `k.center` |
-| LineLike | Line / Segment / OffsetLine | reuse (OffsetLine <: Line) |
-| number | type / click empty | literal on the `edit*` being built |
-| number | Circle radius handle | `k.radius` |
-| number | OffsetLine | `off.d` |
-| number | Point `q` (when a Point origin `c` is already bound) | `dist(c, q)` |
-
-No `editDistanceToPoint`: a free length at `c` **is** `editCircle(c, r)`. The ring is that Circle — `circleLineIntersection` can use it.
-
-No parallel `editOffsetFromLine` / `offsetLine` pair: a free parallel **is** `editOffsetLine(L, d)`. Intersect `off`; reuse `off.d`.
-
-## ≡
-
-```
-editCircle(c, r).radius          ≡  (old) editDistanceToPoint(c, r)
-editCircle(c, r)                 ≡  (old) circle(c, editDistanceToPoint(c, r))
-circle(c, dist(c, q))            ≡  circlePointToPoint(c, q)
-editOffsetLine(L, d)             ≡  (old) offsetLine(L, editOffsetFromLine(L, d))
-editOffsetLine(L, d).d           ≡  (old) editOffsetFromLine(L, d)
-line(a, b)                       ≡  linePointToPoint(a, b)
-```
-
-## ≠
-
-```
-editCircle(c, r)                 ≠  circle(c, dist(c, q))     // DOF radius vs through q
-circle(c, r).radius              ≠  editCircle(c, r).radius  // unmarked literal is not a handle
-distToLine(p, L)                 ≠  editOffsetLine(L, d).d    // measured vs free
-lineIntersection(l1, l2)         ≠  editPoint at the hit
-editCircle(c, dist(c, q))        // illegal write site
-```
-
-## Tools
-
-| tool | slots | write |
-| --- | --- | --- |
-| Point | `<Point>` | introductions in the table |
-| Circle | `<Point>`, `<number \| Point>` | `editCircle(c, 2.4)` or `circle(c, dist(c, q))` |
+| Point | `<Point>` | `point(x, y, { edit: true })` / reuse / `lineIntersection` / `circleLineIntersection(..., +1)` |
+| Circle | `<Point>`, `<number \| Point>` | `circle(c, 2.4, { edit: true })` or `circle(c, dist(c, q))` |
 | Line | `<Point>`, `<Point>` | `line(a, b)` |
 | Segment | `<Point>`, `<Point>` | `segment(a, b)` |
-| Offset | `<LineLike>`, `<number>` | `editOffsetLine(L, 1.2)` |
-
-`withoutDraw(() => editCircle(c, r))` if a length is needed with no stroke — same type, hidden draw. Do not add a second combinator for that.
+| Offset | `<LineLike>`, `<number>` | `offsetLine(L, 1.2, { edit: true })` |
