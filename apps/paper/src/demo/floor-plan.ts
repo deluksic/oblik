@@ -225,7 +225,7 @@ export function drawFloorPlan(opts: FloorPlanOpts): Geom[] {
     ...drawFridge(
       { x: min.x + w * 1.2, y: min.y + w * 1.2 + 0.85 },
       clamp(kitchenW * 0.12, 0.55, 0.65),
-      clamp(kitchenD - w * 2.4, 0.75, 0.95),
+      clamp(kY - min.y - w * 2.4, 0.75, 0.95),
     ),
     ...drawIsland(opts.island, 1.1, 0.65),
     ...drawToilet({ x: bathX + w * 1.1, y: min.y + w * 1.1 }),
