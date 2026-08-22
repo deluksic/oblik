@@ -29,7 +29,11 @@ function typedLength(session: ToolSession): number | null {
         : "";
   if (raw.trim() === "") return null;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0.05, n) : null;
+  if (!Number.isFinite(n)) return null;
+  if (session.verb === "offset" || (session.verb === "distance" && session.from?.kind === "line")) {
+    return n;
+  }
+  return Math.max(0.05, Math.abs(n));
 }
 
 function asVec(p: { x: number; y: number }): Vec2 {
