@@ -1,19 +1,19 @@
-# euclid2 physics
+# euclid2 graph
 
-One constructor per object. `{ edit: true }` is a **source declaration**, not a runtime test. Evaluation is always the pure call. Gizmos are a host view of evaluated objects whose construction site is in the edit table.
+One constructor per object. TypeScript types are the object (`Circle`, `Point`, `number`). Literal vs computed is not a TS distinction (`2.4` and `dist(c, q)` are both `number`), so **potential vs actual** editability is AST + scene context.
 
 ```
-circle(c, 2.4, { edit: true })     // Circle; .radius is DOF; write the 2.4
-circle(c, dist(c, q))              // Circle; .radius derived; no handle
-circle(c, 2.4)                     // Circle; constant; no handle
-point(1.2, 0.4, { edit: true })    // Point; .x .y are DOF
+circle(c, 2.4, { edit: true })     // actual: radius handle, write the 2.4
+circle(c, 2.4)                     // potential only: free param, no handle
+circle(c, dist(c, q))              // determined: never a radius handle
+point(1.2, 0.4, { edit: true })
 offsetLine(L, 1.2, { edit: true }) // OffsetLine <: Line; .d is DOF
 ```
 
-`{ edit: true }` means: **numeric literals at this call are write sites**. Names and calls are never writable. Tool inserts the flag; compiler does not infer it from unmarked literals.
+`{ edit: true }` = this scene actually edits the call’s numeric literals. Strip it → object stays, handle gone. Tool writes the flag because it knows which graph it just built.
 
 ```
-circle(c, dist(c, q), { edit: true })   // illegal — nothing to write
+circle(c, dist(c, q), { edit: true })   // reject: not potentially editable
 ```
 
 `{ draw: false }` hides the stroke; type unchanged.
@@ -21,6 +21,21 @@ circle(c, dist(c, q), { edit: true })   // illegal — nothing to write
 ```
 OffsetLine = Line & { d: number; base: LineLike }
 ```
+
+## Potential vs actual
+
+| radius arg | graph | handle in owning scene |
+| --- | --- | --- |
+| `dist(c, q)` / any call or imported value | determined | never |
+| numeric literal | **potential** (free param) | only if `{ edit: true }` |
+| name bound to a scene literal | potential at that binding | only if that site is actual |
+| library `circle(c, 3)` / other scene | potential in *their* source | never here |
+
+**Potential:** this slot is not determined by other nodes (a literal, or a scene-owned name whose initializer is). Write-back has a number to rewrite.
+
+**Actual:** this scene shows a handle. Same graph can be actual in the owner scene and not in a consumer (`withoutWidgets` / import).
+
+TS cannot reject `{ edit: true }` + `dist(...)`. Scene check: actual ⇒ potential (DOF args are numeric literals, including `-1.2`). On failure: diagnostic, no handle, do not snapshot into a literal. Optional fix: strip the flag.
 
 ## Objects
 
@@ -39,31 +54,6 @@ circleCircleIntersection(a: Circle, b: Circle, k: Branch): Point | null
 ```
 
 Projections: `.center` `.radius` `.d` `.x` `.y`. Slot of `T` takes a `T` or writes a projection.
-
-## Compiler
-
-Scene modules only. Walk constructor calls.
-
-1. **Declare** — collect `{ edit: true }`. Record `{ site, callee, literalArgIndexes, fields }`.
-2. **Reject** — `edit: true` with no numeric literals in those slots.
-3. **Inject** — `{ file, at: [line, col] }` onto the call so the value carries identity (pick, gizmo join). Strip `edit` before eval if the runtime API has no such option.
-4. **Publish** — `EditTable`: site → which field(s) of the principal type are DOF.
-
-No gizmos in constructors. No `edit*` combinators.
-
-## Eval
-
-Pure functions. Result is the object (`Circle`, `Point`, …) with projections and `site`. Same type with or without the flag.
-
-## Host (gizmos)
-
-After eval: join drawables/values to `EditTable` by `site`. Spawn handles from **principal type + declared fields**, using evaluated numbers (`circle.radius`, `point.x/y`, `offset.d`).
-
-A visible ring **is** that `Circle`. Intersections see it.
-
-## Write-back
-
-Gizmo drag → `EditTable` site + arg index → rewrite the **literal** in source. Undo is the editor.
 
 ## Tools write
 
