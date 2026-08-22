@@ -339,7 +339,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function flushStatus(): void {
         setPaneStatus(
           pushInspect,
-          error ? "Last good frame · scene threw" : sessionPreview(session)?.hint ?? statusHint(),
+          error ? "Last good frame · scene threw" : session ? "" : statusHint(),
           error,
           cursor,
         );

@@ -141,7 +141,8 @@ export function Pane(props: PaneProps) {
           role={props.error ? "alert" : "status"}
         >
           <span class={styles.statusMsg}>
-            {props.error ?? (props.status.trim() === "" ? "\u00a0" : props.status)}
+            {props.error ??
+              (props.commandBar || props.status.trim() === "" ? "\u00a0" : props.status)}
           </span>
           <span class={styles.statusCursor}>{props.cursor ?? "\u00a0"}</span>
         </p>
