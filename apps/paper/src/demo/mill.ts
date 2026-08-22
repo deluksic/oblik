@@ -1,4 +1,4 @@
-import { box3, circle3, cylinder3, group, line3, type Geom, type Vec3 } from "@design-scenes/geom";
+import { box3, circle3, cylinder3, group, segment3, type Geom, type Vec3 } from "@design-scenes/geom";
 
 import type { PlateOpts } from "./plate";
 
@@ -77,7 +77,7 @@ function slotCut(opts: MillOpts["slot"], zTop: number): Geom[] {
       { x: opts.center.x - halfL, y: opts.center.y - halfW, z: z0 },
       { x: opts.center.x + halfL, y: opts.center.y + halfW, z: zTop },
     ),
-    line3(
+    segment3(
       { x: opts.center.x - halfL, y: opts.center.y, z: zTop },
       { x: opts.center.x + halfL, y: opts.center.y, z: zTop },
     ),

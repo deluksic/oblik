@@ -1,6 +1,6 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnSegment3 } from "@design-scenes/euclid3";
-import { line3 } from "@design-scenes/geom";
+import { segment3 } from "@design-scenes/geom";
 
 import { drawHelicalPair } from "../demo/gear";
 import { gearLayout } from "./gear.scene";
@@ -31,7 +31,7 @@ if (import.meta.hot) {
  */
 export function scene() {
   const g = withoutWidgets(() => readGears(), "gear");
-  const mast = line3(
+  const mast = segment3(
     { x: g.pinion.x, y: g.pinion.y, z: 0 },
     { x: g.pinion.x, y: g.pinion.y, z: 6 },
   );

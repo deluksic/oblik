@@ -1,11 +1,12 @@
 import { createSignal } from "solid-js";
 
 import { createScene } from "./workspace/model";
+import type { SceneEntry } from "@/types";
 
 import styles from "./Welcome.module.css";
 
 export type WelcomeProps = {
-  onCreated: (id: string) => void;
+  onCreated: (id: string, entry: SceneEntry) => void | Promise<void>;
 };
 
 export function Welcome(props: WelcomeProps) {
@@ -16,8 +17,8 @@ export function Welcome(props: WelcomeProps) {
     <div class={styles.welcome}>
       <h2>Design programs, viewed in scenes</h2>
       <p class={styles.lead}>
-        Drop a TypeScript file in <code>scenes/</code> and it shows up here. Or create one now — a
-        circle and two handles, ready to drag.
+        Drop a TypeScript file in <code>scenes/</code> and it shows up here. Or create one now — an
+        empty 2D canvas, ready for Space commands.
       </p>
       <form
         class={styles.form}
@@ -30,7 +31,7 @@ export function Welcome(props: WelcomeProps) {
           setError("");
           setBusy(true);
           void createScene(id)
-            .then((created) => props.onCreated(created))
+            .then(({ id: created, entry }) => props.onCreated(created, entry))
             .catch((err) => {
               setError(err instanceof Error ? err.message : String(err));
               setBusy(false);

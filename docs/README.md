@@ -8,6 +8,7 @@ Prototypes (charter + what we learned):
 
 - [1 — identity and scene widgets](./prototypes/1.md)
 - [2 — catalog and shell layouts](./prototypes/2.md)
-- [3 — insert from the canvas](./prototypes/3.md) — **current:** step 2 (Circle / Line constructors)
+- [3 — insert from the canvas](./prototypes/3.md)
+- [4 — types, introductions, resolvers](./prototypes/4.md) — **current:** Point + Distance only
 
 [Critique](./critique.md) records why unmarked-literal CAD and a single kernel were dropped.

@@ -7,6 +7,18 @@ export type Provenance = {
   createdBy: string;
 };
 
+export type GeomSite = { file: string; line: number; column: number };
+
+export type GeomSiteOpts = { file?: string; at?: [number, number] };
+
+export function geomSiteFromOpts(opts?: GeomSiteOpts): GeomSite | undefined {
+  if (!opts?.file || !opts.at || opts.at.length < 2) return undefined;
+  const line = opts.at[0];
+  const column = opts.at[1];
+  if (typeof line !== "number" || typeof column !== "number") return undefined;
+  return { file: opts.file, line, column };
+}
+
 export type Base = {
   /** Opaque pick identity — unique per geometric value this frame. */
   id: string;
@@ -14,6 +26,8 @@ export type Base = {
   path: string;
   parentId: string | null;
   provenance: Provenance;
+  /** Stable construction site when Vite injected `{ file, at }` on the scene call. */
+  site?: GeomSite;
 };
 
 const pathCounts = new Map<string, number>();
@@ -42,13 +56,14 @@ function captureProvenance(createdBy: string): Provenance {
   return { ...site, createdBy };
 }
 
-export function makeBase(kind: string, createdBy: string): Base {
+export function makeBase(kind: string, createdBy: string, site?: GeomSite): Base {
   const local = nextPathLocal(kind);
   return {
     id: crypto.randomUUID(),
     path: makePath(local),
     parentId: currentParentId,
-    provenance: captureProvenance(createdBy),
+    provenance: site ? { ...site, createdBy } : captureProvenance(createdBy),
+    site,
   };
 }
 

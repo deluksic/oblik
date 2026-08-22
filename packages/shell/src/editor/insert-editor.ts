@@ -1,16 +1,23 @@
 import * as ts from "typescript";
 
-import { findEditCallAt } from "./patch-widget";
+import { findEditCallAt, findIdentifierCallAt } from "./patch-widget.ts";
 
 const SCENE_DRAWN = "__scene";
 
 export type SourceAt = { line: number; column: number };
 
+export type PointRef = { name: string } | { x: number; y: number };
+
 export type EditorInsert =
   | { kind: "point"; x: number; y: number }
   | { kind: "distance"; originName?: string; d: number }
-  | { kind: "circle"; center: string; radius: string }
-  | { kind: "line"; a: string; b: string };
+  | ({ kind: "circle"; center: PointRef } & ({ radius: string } | { r: number }))
+  | { kind: "segment"; a: PointRef; b: PointRef }
+  | { kind: "infiniteLine"; a: PointRef; b: PointRef }
+  | { kind: "intersection"; a: string; b: string }
+  | { kind: "rect"; a: PointRef; b: PointRef }
+  | { kind: "offsetFirst"; base: string; d: number }
+  | { kind: "offsetReuse"; base: string; inset: string };
 
 export function formatNum(n: number): string {
   const q = Math.round(n * 100) / 100;
@@ -108,11 +115,45 @@ export function namedScenePointBindings(source: string): Map<string, ScenePointB
       if (!call || !ts.isIdentifier(call.expression)) continue;
       const fnName = call.expression.text;
       if (fnName === "editPoint") names.set(decl.name.text, "editPoint");
-      else if (fnName === "point") names.set(decl.name.text, "derived");
+      else if (fnName === "point" || fnName === "lineIntersection") {
+        names.set(decl.name.text, "derived");
+      }
     }
   }
   return names;
 }
+
+export type SceneLineBindingKind = "segment" | "line" | "offsetLine";
+
+/** Named line-like geometry in exported `scene()`. */
+export function namedSceneLineBindings(source: string): Map<string, SceneLineBindingKind> {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  const names = new Map<string, SceneLineBindingKind>();
+  if (!fn?.body) return names;
+  for (const stmt of fn.body.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const call = unwrapCall(decl.initializer);
+      if (!call || !ts.isIdentifier(call.expression)) continue;
+      const fnName = call.expression.text;
+      if (fnName === "segment") names.set(decl.name.text, "segment");
+      else if (fnName === "line") names.set(decl.name.text, "line");
+      else if (fnName === "offsetLine") names.set(decl.name.text, "offsetLine");
+    }
+  }
+  return names;
+}
+
+export type SceneLineEval = {
+  name: string;
+  kind: SceneLineBindingKind;
+  origin: Vec2Like;
+  dir: Vec2Like;
+  a?: Vec2Like;
+  b?: Vec2Like;
+};
 
 function numericLiteral(node: ts.Expression): number | null {
   if (ts.isNumericLiteral(node)) return Number(node.text);
@@ -123,6 +164,61 @@ function numericLiteral(node: ts.Expression): number | null {
   ) {
     return -Number(node.operand.text);
   }
+  return null;
+}
+
+type Vec2Like = { x: number; y: number };
+
+function cross2(a: Vec2Like, b: Vec2Like): number {
+  return a.x * b.y - a.y * b.x;
+}
+
+function add(a: Vec2Like, b: Vec2Like): Vec2Like {
+  return { x: a.x + b.x, y: a.y + b.y };
+}
+
+function sub(a: Vec2Like, b: Vec2Like): Vec2Like {
+  return { x: a.x - b.x, y: a.y - b.y };
+}
+
+function mul(v: Vec2Like, s: number): Vec2Like {
+  return { x: v.x * s, y: v.y * s };
+}
+
+function norm(v: Vec2Like): Vec2Like {
+  const l = Math.hypot(v.x, v.y);
+  if (l < 1e-9) return { x: 1, y: 0 };
+  return { x: v.x / l, y: v.y / l };
+}
+
+function perp(v: Vec2Like): Vec2Like {
+  return { x: -v.y, y: v.x };
+}
+
+function lineBasisFromEndpoints(a: Vec2Like, b: Vec2Like): { origin: Vec2Like; dir: Vec2Like } {
+  return { origin: a, dir: norm(sub(b, a)) };
+}
+
+function offsetLineBasis(line: { origin: Vec2Like; dir: Vec2Like }, d: number): {
+  origin: Vec2Like;
+  dir: Vec2Like;
+} {
+  const o = add(line.origin, mul(perp(line.dir), d));
+  return { origin: o, dir: line.dir };
+}
+
+function lineIntersectionMath(
+  a: { origin: Vec2Like; dir: Vec2Like },
+  b: { origin: Vec2Like; dir: Vec2Like },
+): Vec2Like | null {
+  const denom = cross2(a.dir, b.dir);
+  if (Math.abs(denom) < 1e-12) return null;
+  const t = cross2(sub(b.origin, a.origin), b.dir) / denom;
+  return add(a.origin, mul(a.dir, t));
+}
+
+function pointRef(node: ts.Expression): string | null {
+  if (ts.isIdentifier(node)) return node.text;
   return null;
 }
 
@@ -144,13 +240,22 @@ function evalBinary(node: ts.BinaryExpression, env: Map<string, Vec2Like>): numb
   }
 }
 
-type Vec2Like = { x: number; y: number };
-
 function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | null {
   const lit = numericLiteral(node);
   if (lit != null) return lit;
   if (ts.isParenthesizedExpression(node)) return evalNumber(node.expression, env);
   if (ts.isBinaryExpression(node)) return evalBinary(node, env);
+  if (ts.isCallExpression(node)) {
+    const call = unwrapCall(node);
+    if (!call || !ts.isIdentifier(call.expression)) return null;
+    if (call.expression.text === "Math.min" || call.expression.text === "Math.max") {
+      const args = call.arguments
+        .map((arg) => evalNumber(arg, env))
+        .filter((n): n is number => n != null);
+      if (args.length !== call.arguments.length) return null;
+      return call.expression.text === "Math.min" ? Math.min(...args) : Math.max(...args);
+    }
+  }
   if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
     const v = env.get(node.expression.text);
     if (!v) return null;
@@ -160,16 +265,83 @@ function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | n
   return null;
 }
 
-/** Evaluate named `const p = point(...)` in scene() using known editor positions. */
+function resolvePointRef(name: string, env: ReadonlyMap<string, Vec2Like>): Vec2Like | null {
+  return env.get(name) ?? null;
+}
+
+/** Evaluate named line-like geometry in scene() from known points and optional offset values. */
+export function evalSceneLines(
+  source: string,
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+  offsetEvals?: ReadonlyMap<string, number>,
+): SceneLineEval[] {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  if (!fn?.body) return [];
+  const env = new Map<string, { origin: Vec2Like; dir: Vec2Like; a?: Vec2Like; b?: Vec2Like }>();
+  const out: SceneLineEval[] = [];
+  for (const stmt of fn.body.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const call = unwrapCall(decl.initializer);
+      if (!call || !ts.isIdentifier(call.expression)) continue;
+      const fnName = call.expression.text;
+      if (fnName === "segment" || fnName === "line") {
+        const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+        const bName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+        if (!aName || !bName) continue;
+        const a = resolvePointRef(aName, pointEnv);
+        const b = resolvePointRef(bName, pointEnv);
+        if (!a || !b) continue;
+        const basis = lineBasisFromEndpoints(a, b);
+        env.set(decl.name.text, { ...basis, a, b });
+        out.push({
+          name: decl.name.text,
+          kind: fnName,
+          origin: basis.origin,
+          dir: basis.dir,
+          a,
+          b,
+        });
+      } else if (fnName === "offsetLine") {
+        const baseName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+        const insetName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+        if (!baseName || !insetName) continue;
+        const base = env.get(baseName);
+        const d = offsetEvals?.get(insetName);
+        if (!base || d == null) continue;
+        const basis = offsetLineBasis(base, d);
+        env.set(decl.name.text, basis);
+        out.push({
+          name: decl.name.text,
+          kind: "offsetLine",
+          origin: basis.origin,
+          dir: basis.dir,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** Evaluate named `const p = point(...)` and `lineIntersection(a, b)` in scene(). */
 export function evalDerivedScenePoints(
   source: string,
   known: ReadonlyArray<{ name: string; x: number; y: number }>,
+  offsetEvals?: ReadonlyMap<string, number>,
 ): { name: string; x: number; y: number }[] {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
   if (!fn?.body) return [];
   const env = new Map<string, Vec2Like>();
   for (const k of known) env.set(k.name, { x: k.x, y: k.y });
+  const lineEnv = new Map(
+    evalSceneLines(source, env, offsetEvals).map((line) => [
+      line.name,
+      { origin: line.origin, dir: line.dir },
+    ]),
+  );
   const out: { name: string; x: number; y: number }[] = [];
   for (const stmt of fn.body.statements) {
     if (!ts.isVariableStatement(stmt)) continue;
@@ -177,18 +349,195 @@ export function evalDerivedScenePoints(
       if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
       const call = unwrapCall(decl.initializer);
       if (!call || !ts.isIdentifier(call.expression)) continue;
-      if (call.expression.text !== "point") continue;
-      const ax = call.arguments[0];
-      const ay = call.arguments[1];
-      if (!ax || !ay) continue;
-      const x = evalNumber(ax, env);
-      const y = evalNumber(ay, env);
-      if (x == null || y == null) continue;
-      env.set(decl.name.text, { x, y });
-      out.push({ name: decl.name.text, x, y });
+      const fnName = call.expression.text;
+      if (fnName === "point") {
+        const ax = call.arguments[0];
+        const ay = call.arguments[1];
+        if (!ax || !ay) continue;
+        const x = evalNumber(ax, env);
+        const y = evalNumber(ay, env);
+        if (x == null || y == null) continue;
+        env.set(decl.name.text, { x, y });
+        out.push({ name: decl.name.text, x, y });
+      } else if (fnName === "lineIntersection") {
+        const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+        const bName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+        if (!aName || !bName) continue;
+        const la = lineEnv.get(aName);
+        const lb = lineEnv.get(bName);
+        if (!la || !lb) continue;
+        const p = lineIntersectionMath(la, lb);
+        if (!p) continue;
+        env.set(decl.name.text, p);
+        out.push({ name: decl.name.text, x: p.x, y: p.y });
+      }
     }
   }
   return out;
+}
+
+export type SceneLineBinding = {
+  name: string;
+  kind: SceneLineBindingKind;
+};
+
+/** Closest named line binding whose evaluated geometry passes `matchFn`. */
+export function namedSceneLineNear(
+  source: string,
+  drawableKind: SceneLineBindingKind,
+  matchFn: (line: SceneLineEval) => boolean,
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+  offsetEvals?: ReadonlyMap<string, number>,
+): SceneLineBinding | null {
+  const bindings = namedSceneLineBindings(source);
+  const lines = evalSceneLines(source, pointEnv, offsetEvals);
+  for (const line of lines) {
+    if (bindings.get(line.name) !== drawableKind) continue;
+    if (matchFn(line)) return { name: line.name, kind: line.kind };
+  }
+  return null;
+}
+
+/** Const name for a segment/line whose endpoints match within `maxDist`. */
+export function resolveLineBindingName(
+  source: string,
+  segEndpoints: { a: Vec2Like; b: Vec2Like },
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+  maxDist = 0.35,
+): string | null {
+  const { a, b } = segEndpoints;
+  const matchEndpoints = (line: SceneLineEval): boolean => {
+    if (!line.a || !line.b) return false;
+    const direct =
+      Math.hypot(line.a.x - a.x, line.a.y - a.y) <= maxDist &&
+      Math.hypot(line.b.x - b.x, line.b.y - b.y) <= maxDist;
+    const swapped =
+      Math.hypot(line.a.x - b.x, line.a.y - b.y) <= maxDist &&
+      Math.hypot(line.b.x - a.x, line.b.y - a.y) <= maxDist;
+    return direct || swapped;
+  };
+  const hit = namedSceneLineNear(source, "segment", matchEndpoints, pointEnv);
+  if (hit) return hit.name;
+  const infinite = namedSceneLineNear(source, "line", matchEndpoints, pointEnv);
+  return infinite?.name ?? null;
+}
+
+function groupReturnElements(fn: ts.FunctionDeclaration): ts.ArrayLiteralExpression | null {
+  const body = fn.body;
+  if (!body) return null;
+  const last = body.statements[body.statements.length - 1];
+  if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
+  const retExpr = last.expression;
+  if (
+    !ts.isCallExpression(retExpr) ||
+    !ts.isIdentifier(retExpr.expression) ||
+    retExpr.expression.text !== "group"
+  ) {
+    return null;
+  }
+  const arrow = retExpr.arguments[0];
+  if (!arrow || !ts.isArrowFunction(arrow) || !ts.isArrayLiteralExpression(arrow.body)) {
+    return null;
+  }
+  return arrow.body;
+}
+
+function sceneLineFromCall(
+  call: ts.CallExpression,
+  fnName: "segment" | "line",
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+): SceneLineEval | null {
+  const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+  const bName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+  if (!aName || !bName) return null;
+  const a = resolvePointRef(aName, pointEnv);
+  const b = resolvePointRef(bName, pointEnv);
+  if (!a || !b) return null;
+  const basis = lineBasisFromEndpoints(a, b);
+  return {
+    name: "",
+    kind: fnName,
+    origin: basis.origin,
+    dir: basis.dir,
+    a,
+    b,
+  };
+}
+
+/** Inline `segment(...)` / `line(...)` in `group(() => [...])` return. */
+export function inlineSceneLineNear(
+  source: string,
+  drawableKind: "segment" | "line",
+  matchFn: (line: SceneLineEval) => boolean,
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+): { element: ts.Expression; kind: "segment" | "line" } | null {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  const arr = fn ? groupReturnElements(fn) : null;
+  if (!arr) return null;
+  for (const el of arr.elements) {
+    if (ts.isIdentifier(el)) continue;
+    const call = unwrapCall(el);
+    if (!call || !ts.isIdentifier(call.expression)) continue;
+    const fnName = call.expression.text;
+    if (fnName !== drawableKind) continue;
+    const line = sceneLineFromCall(call, fnName, pointEnv);
+    if (!line || !matchFn(line)) continue;
+    return { element: el, kind: fnName };
+  }
+  return null;
+}
+
+function replaceGroupElementByText(
+  source: string,
+  fn: ts.FunctionDeclaration,
+  exprText: string,
+  replacement: string,
+): string {
+  const arr = groupReturnElements(fn);
+  if (!arr) throw new Error("group return not found");
+  const sf = fn.getSourceFile();
+  for (const el of arr.elements) {
+    const text = source.slice(el.getStart(sf), el.getEnd());
+    if (text === exprText) {
+      return source.slice(0, el.getStart(sf)) + replacement + source.slice(el.getEnd());
+    }
+  }
+  throw new Error("inline line not found in group return");
+}
+
+function promoteInlineElement(
+  source: string,
+  element: ts.Expression,
+  kind: "segment" | "line",
+): { source: string; name: string } {
+  const sf = parse(source);
+  const fn = findSceneFunction(sf);
+  if (!fn) throw new Error("no scene()");
+  const used = usedIdentifiers(sf);
+  const prefix = kind === "line" ? "l" : "s";
+  const name = freshName(prefix, used);
+  const file = fn.getSourceFile();
+  const exprText = source.slice(element.getStart(file), element.getEnd());
+  let next = prependBeforeReturn(source, fn, [`const ${name} = ${exprText};`]);
+  const fn2 = findSceneFunction(parse(next));
+  if (!fn2) throw new Error("no scene()");
+  next = replaceGroupElementByText(next, fn2, exprText, name);
+  return { source: next, name };
+}
+
+/** Hoist a matching inline segment/line to `const` so offset can reference it. */
+export function promoteInlineLineBinding(
+  source: string,
+  matchFn: (line: SceneLineEval) => boolean,
+  pointEnv: ReadonlyMap<string, Vec2Like>,
+): { source: string; name: string } | null {
+  for (const kind of ["segment", "line"] as const) {
+    const hit = inlineSceneLineNear(source, kind, matchFn, pointEnv);
+    if (!hit) continue;
+    return promoteInlineElement(source, hit.element, hit.kind);
+  }
+  return null;
 }
 
 function unwrapCall(node: ts.Expression): ts.CallExpression | null {
@@ -222,6 +571,10 @@ function freshName(prefix: string, used: Set<string>): string {
     }
   }
   throw new Error(`could not allocate a name starting with ${prefix}`);
+}
+
+export function nextBindingName(source: string, prefix: string): string {
+  return freshName(prefix, usedIdentifiers(parse(source)));
 }
 
 function indentAt(source: string, pos: number): string {
@@ -279,6 +632,19 @@ function lineStartAt(source: string, pos: number): number {
   return source.lastIndexOf("\n", pos - 1) + 1;
 }
 
+function appendManyConstructorsToReturn(
+  source: string,
+  fn: ts.FunctionDeclaration,
+  ctorExprs: readonly string[],
+): string {
+  if (ctorExprs.length === 0) return source;
+  let next = source;
+  for (const expr of ctorExprs) {
+    next = appendConstructorToReturn(next, findSceneFunction(parse(next)) ?? fn, expr);
+  }
+  return next;
+}
+
 function appendConstructorToReturn(
   source: string,
   fn: ts.FunctionDeclaration,
@@ -308,7 +674,10 @@ function appendConstructorToReturn(
     }
     const arr = arrow.body;
     const lastEl = arr.elements[arr.elements.length - 1];
-    if (!lastEl) throw new Error("group array is empty");
+    if (!lastEl) {
+      const open = arr.getStart(sf) + 1;
+      return source.slice(0, open) + ctorExpr + source.slice(open);
+    }
     const insertPos = lastEl.getEnd();
     return source.slice(0, insertPos) + `, ${ctorExpr}` + source.slice(insertPos);
   }
@@ -342,6 +711,22 @@ function sceneAlreadyBindsDrawn(fn: ts.FunctionDeclaration): boolean {
   return false;
 }
 
+function prependBeforeReturn(source: string, fn: ts.FunctionDeclaration, lines: string[]): string {
+  const body = fn.body;
+  if (!body) throw new Error("scene() has no body");
+  const stmts = body.statements;
+  const last = stmts[stmts.length - 1];
+  if (!last || !ts.isReturnStatement(last) || !last.expression) {
+    throw new Error("scene() must end with a return of some geometry");
+  }
+  const sf = fn.getSourceFile();
+  const start = last.getStart(sf);
+  const lineStart = lineStartAt(source, start);
+  const indent = indentAt(source, start);
+  const chunk = lines.map((ln) => `${indent}${ln}\n`).join("");
+  return source.slice(0, lineStart) + chunk + source.slice(lineStart);
+}
+
 function insertBeforeReturn(source: string, fn: ts.FunctionDeclaration, lines: string[]): string {
   const body = fn.body;
   if (!body) throw new Error("scene() has no body");
@@ -369,58 +754,228 @@ function insertBeforeReturn(source: string, fn: ts.FunctionDeclaration, lines: s
   return source.slice(0, lineStart) + chunk + source.slice(last.getEnd());
 }
 
+function isConstructorKind(kind: EditorInsert["kind"]): boolean {
+  return kind !== "point" && kind !== "distance";
+}
+
+function bindPointRef(
+  ref: PointRef,
+  constLines: string[],
+  used: Set<string>,
+  euclidImports: Set<string>,
+): string {
+  if ("name" in ref) return ref.name;
+  euclidImports.add("editPoint");
+  const name = freshName("p", used);
+  constLines.push(`const ${name} = editPoint(${formatNum(ref.x)}, ${formatNum(ref.y)});`);
+  return name;
+}
+
+function pushRectFromCornerPoints(
+  a: string,
+  b: string,
+  constLines: string[],
+  ctorExprs: string[],
+  used: Set<string>,
+  geomImports: Set<string>,
+): void {
+  geomImports.add("point");
+  geomImports.add("segment");
+  geomImports.add("group");
+  const bl = freshName("bl", used);
+  const tr = freshName("tr", used);
+  const tl = freshName("tl", used);
+  const br = freshName("br", used);
+  constLines.push(
+    `const ${bl} = point(Math.min(${a}.x, ${b}.x), Math.min(${a}.y, ${b}.y));`,
+  );
+  constLines.push(
+    `const ${tr} = point(Math.max(${a}.x, ${b}.x), Math.max(${a}.y, ${b}.y));`,
+  );
+  constLines.push(`const ${tl} = point(${bl}.x, ${tr}.y);`);
+  constLines.push(`const ${br} = point(${tr}.x, ${bl}.y);`);
+  ctorExprs.push(
+    `segment(${bl}, ${tl})`,
+    `segment(${tl}, ${tr})`,
+    `segment(${tr}, ${br})`,
+    `segment(${br}, ${bl})`,
+  );
+}
+
 export function insertEditors(source: string, edits: EditorInsert[]): string {
   if (edits.length === 0) return source;
 
-  const constructors = edits.filter((e) => e.kind === "circle" || e.kind === "line");
-  const editors = edits.filter((e) => e.kind === "point" || e.kind === "distance");
-  if (constructors.length > 0 && editors.length > 0) {
-    throw new Error("cannot mix editor and constructor inserts in one write");
-  }
-  if (constructors.length > 1) {
-    throw new Error("one constructor insert per write");
-  }
-  if (constructors.length === 1) {
-    const c = constructors[0]!;
-    const imports =
-      c.kind === "circle" ? (["circle", "group"] as const) : (["line", "group"] as const);
-    const withImports = ensureNamedImport(source, "@design-scenes/geom", imports);
-    const sf = parse(withImports);
-    const fn = findSceneFunction(sf);
-    if (!fn) throw new Error("no exported scene() function to insert into");
-    const expr = c.kind === "circle" ? `circle(${c.center}, ${c.radius})` : `line(${c.a}, ${c.b})`;
-    return appendConstructorToReturn(withImports, fn, expr);
+  const geomImports = new Set<string>();
+  const euclidImports = new Set<string>();
+  const constLines: string[] = [];
+  const ctorExprs: string[] = [];
+
+  const used = usedIdentifiers(parse(source));
+  let lastPoint: string | undefined;
+
+  for (const e of edits) {
+    switch (e.kind) {
+      case "point": {
+        euclidImports.add("editPoint");
+        const name = freshName("p", used);
+        lastPoint = name;
+        constLines.push(`const ${name} = editPoint(${formatNum(e.x)}, ${formatNum(e.y)});`);
+        break;
+      }
+      case "distance": {
+        euclidImports.add("editDistanceToPoint");
+        const origin = e.originName ?? lastPoint;
+        if (!origin) {
+          throw new Error("distance needs a point in scene() or a new point first");
+        }
+        const name = freshName("d", used);
+        constLines.push(`const ${name} = editDistanceToPoint(${origin}, ${formatNum(e.d)});`);
+        break;
+      }
+      case "circle": {
+        geomImports.add("circle");
+        geomImports.add("group");
+        const center = bindPointRef(e.center, constLines, used, euclidImports);
+        if ("radius" in e) {
+          ctorExprs.push(`circle(${center}, ${e.radius})`);
+        } else {
+          euclidImports.add("editDistanceToPoint");
+          const d = freshName("d", used);
+          constLines.push(`const ${d} = editDistanceToPoint(${center}, ${formatNum(e.r)});`);
+          ctorExprs.push(`circle(${center}, ${d})`);
+        }
+        break;
+      }
+      case "segment": {
+        geomImports.add("segment");
+        geomImports.add("group");
+        const a = bindPointRef(e.a, constLines, used, euclidImports);
+        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        ctorExprs.push(`segment(${a}, ${b})`);
+        break;
+      }
+      case "infiniteLine": {
+        geomImports.add("line");
+        geomImports.add("group");
+        const a = bindPointRef(e.a, constLines, used, euclidImports);
+        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        ctorExprs.push(`line(${a}, ${b})`);
+        break;
+      }
+      case "intersection": {
+        geomImports.add("lineIntersection");
+        geomImports.add("group");
+        ctorExprs.push(`lineIntersection(${e.a}, ${e.b})`);
+        break;
+      }
+      case "rect": {
+        const a = bindPointRef(e.a, constLines, used, euclidImports);
+        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        pushRectFromCornerPoints(a, b, constLines, ctorExprs, used, geomImports);
+        break;
+      }
+      case "offsetFirst": {
+        euclidImports.add("editOffsetFromLine");
+        geomImports.add("offsetLine");
+        geomImports.add("group");
+        const off = freshName("off", used);
+        constLines.push(`const ${off} = editOffsetFromLine(${e.base}, ${formatNum(e.d)});`);
+        ctorExprs.push(`offsetLine(${e.base}, ${off})`);
+        break;
+      }
+      case "offsetReuse": {
+        geomImports.add("offsetLine");
+        geomImports.add("group");
+        ctorExprs.push(`offsetLine(${e.base}, ${e.inset})`);
+        break;
+      }
+    }
   }
 
-  const imports: string[] = [];
-  for (const e of edits) {
-    if (e.kind === "point" && !imports.includes("editPoint")) {
-      imports.push("editPoint");
-    }
-    if (e.kind === "distance" && !imports.includes("editDistanceToPoint")) {
-      imports.push("editDistanceToPoint");
-    }
+  if (!edits.some((e) => isConstructorKind(e.kind)) && constLines.length === 0) return source;
+
+  let next = source;
+  if (geomImports.size > 0) {
+    next = ensureNamedImport(next, "@design-scenes/geom", [...geomImports].sort());
   }
-  const withImports = ensureNamedImport(source, "@design-scenes/euclid2", imports);
-  const sf = parse(withImports);
+  if (euclidImports.size > 0) {
+    next = ensureNamedImport(next, "@design-scenes/euclid2", [...euclidImports].sort());
+  }
+
+  const sf = parse(next);
   const fn = findSceneFunction(sf);
   if (!fn) throw new Error("no exported scene() function to insert into");
-  const used = usedIdentifiers(sf);
-  const lines: string[] = [];
-  let lastPoint: string | undefined;
-  for (const e of editors) {
-    if (e.kind === "point") {
-      const name = freshName("p", used);
-      lastPoint = name;
-      lines.push(`const ${name} = editPoint(${formatNum(e.x)}, ${formatNum(e.y)});`);
-    } else {
-      const origin = e.originName ?? lastPoint;
-      if (!origin) {
-        throw new Error("distance needs a point in scene() or a new point first");
-      }
-      const name = freshName("d", used);
-      lines.push(`const ${name} = editDistanceToPoint(${origin}, ${formatNum(e.d)});`);
-    }
+
+  if (constLines.length > 0) {
+    next = insertBeforeReturn(next, fn, constLines);
   }
-  return insertBeforeReturn(withImports, fn, lines);
+
+  if (ctorExprs.length > 0) {
+    const sf2 = parse(next);
+    const fn2 = findSceneFunction(sf2);
+    if (!fn2) throw new Error("no exported scene() function to insert into");
+    next = appendManyConstructorsToReturn(next, fn2, ctorExprs);
+  }
+
+  return next;
+}
+
+export type ScenePatch = {
+  hoistAt?: SourceAt[];
+  imports?: Record<string, string[]>;
+  statements?: string[];
+  exprs?: string[];
+};
+
+const LINE_CALL_NAMES = new Set(["segment", "line", "offsetLine"]);
+
+export function bindLineAt(
+  source: string,
+  at: SourceAt,
+): { source: string; name: string } | null {
+  const sf = parse(source);
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => LINE_CALL_NAMES.has(n));
+  if (!call || !ts.isIdentifier(call.expression)) return null;
+  let n: ts.Node = call.parent;
+  while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) {
+    n = n.parent;
+  }
+  if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
+    return { source, name: n.name.text };
+  }
+  const fnName = call.expression.text;
+  const kind = fnName === "segment" ? "segment" : "line";
+  return promoteInlineElement(source, call, kind);
+}
+
+export function editCallArgText(source: string, at: SourceAt, argIndex: number): string | null {
+  const sf = parse(source);
+  const call = findEditCallAt(sf, at.line, at.column);
+  if (!call) return null;
+  const arg = call.arguments[argIndex];
+  if (!arg) return null;
+  return source.slice(arg.getStart(sf), arg.getEnd());
+}
+
+export function applyScenePatch(source: string, patch: ScenePatch): string {
+  let next = source;
+  for (const at of patch.hoistAt ?? []) {
+    const hoisted = bindLineAt(next, at);
+    if (!hoisted) throw new Error(`no scene line at ${at.line}:${at.column}`);
+    next = hoisted.source;
+  }
+  for (const [mod, names] of Object.entries(patch.imports ?? {})) {
+    if (names.length > 0) next = ensureNamedImport(next, mod, [...new Set(names)]);
+  }
+  if (patch.statements && patch.statements.length > 0) {
+    const fn = findSceneFunction(parse(next));
+    if (!fn) throw new Error("no exported scene() function to insert into");
+    next = prependBeforeReturn(next, fn, patch.statements);
+  }
+  if (patch.exprs && patch.exprs.length > 0) {
+    const fn = findSceneFunction(parse(next));
+    if (!fn) throw new Error("no exported scene() function to insert into");
+    next = appendManyConstructorsToReturn(next, fn, patch.exprs);
+  }
+  return next;
 }

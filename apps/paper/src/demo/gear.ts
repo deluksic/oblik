@@ -6,7 +6,7 @@ import {
   dist,
   extrude,
   group,
-  line,
+  segment,
   polar,
   polyline,
   rotate,
@@ -138,16 +138,16 @@ export function drawSpurGear(opts: SpurGearOpts): Geom {
           const inner = tooth.rootR;
           const outer = tooth.baseR;
           parts.push(
-            line(at(polar(inner, tooth.root1), c, a), at(polar(outer, tooth.root1), c, a)),
+            segment(at(polar(inner, tooth.root1), c, a), at(polar(outer, tooth.root1), c, a)),
           );
           parts.push(
-            line(at(polar(inner, tooth.root0), c, a), at(polar(outer, tooth.root0), c, a)),
+            segment(at(polar(inner, tooth.root0), c, a), at(polar(outer, tooth.root0), c, a)),
           );
         }
       }
       return parts;
     }),
-    group(() => [line(c, at(polar(pitchR, 0), c, rot))]),
+    group(() => [segment(c, at(polar(pitchR, 0), c, rot))]),
   ]);
 }
 
@@ -177,7 +177,7 @@ export function lineOfAction(
 ): Geom {
   const p = pitchPoint(pinion, pitchRadius);
   const dir = polar(length, Math.PI / 2 - pressureAngle);
-  return line(vec(p.x - dir.x, p.y - dir.y), vec(p.x + dir.x, p.y + dir.y));
+  return segment(vec(p.x - dir.x, p.y - dir.y), vec(p.x + dir.x, p.y + dir.y));
 }
 
 export type GearLayout = {

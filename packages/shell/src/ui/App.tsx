@@ -166,6 +166,11 @@ export function App(props: WorkspaceProps) {
     setSceneId(id);
   }
 
+  async function onWelcomeCreated(id: string, entry: SceneEntry): Promise<void> {
+    await props.onSceneCreated?.(entry);
+    selectScene(id);
+  }
+
   function registerHandle(id: string, handle: PaneHandle | null): void {
     if (handle) handles.set(id, handle);
     else handles.delete(id);
@@ -223,6 +228,15 @@ export function App(props: WorkspaceProps) {
       return;
     }
 
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+
     const bar = commandBar();
     if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
       const draft = bar.numberValue ?? "";
@@ -250,15 +264,6 @@ export function App(props: WorkspaceProps) {
         bar.onNumberDraft(draft + e.key);
         return;
       }
-    }
-
-    const t = e.target;
-    if (
-      t instanceof HTMLInputElement ||
-      t instanceof HTMLTextAreaElement ||
-      t instanceof HTMLSelectElement
-    ) {
-      return;
     }
 
     const isSpace = e.code === "Space" || e.key === " ";
@@ -309,7 +314,7 @@ export function App(props: WorkspaceProps) {
           focusedId={focusedId()}
           paletteMode={paletteMode()}
           commandBar={commandBar()}
-          onWelcomeCreated={selectScene}
+          onWelcomeCreated={onWelcomeCreated}
           onFocusPane={focusPane}
           onPickCommand={pickCommand}
           onClosePicker={() => setPickerOpen(false)}

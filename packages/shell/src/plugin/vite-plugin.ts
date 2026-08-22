@@ -4,19 +4,14 @@ import path from "node:path";
 
 import type { Plugin, ViteDevServer } from "vite";
 
-import { parseSceneSource } from "@/catalog/catalog";
-import { newSceneSource, titleFromId } from "@/catalog/new-scene";
-import { injectSceneSites } from "@/editor/inject-sites";
-import {
-  insertEditors,
-  widgetBindingName,
-  widgetInSceneFunction,
-  type EditorInsert,
-} from "@/editor/insert-editor";
-import { patchWidgetAt } from "@/editor/patch-widget";
-import { SCENE_HELPER_HMR_EVENT } from "@/hmr/scene-hmr";
-import { isSceneId } from "@/layout/grid";
-import type { SceneEntry } from "@/types";
+import { parseSceneSource } from "../catalog/catalog.ts";
+import { newSceneSource, titleFromId } from "../catalog/new-scene.ts";
+import { injectSceneSites } from "../editor/inject-sites.ts";
+import { applyScenePatch, type ScenePatch, type SourceAt } from "../editor/insert-editor.ts";
+import { patchWidgetAt } from "../editor/patch-widget.ts";
+import { SCENE_HELPER_HMR_EVENT } from "../hmr/scene-hmr.ts";
+import { isSceneId } from "../layout/grid.ts";
+import type { SceneEntry } from "../types.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0virtual:scene-catalog";
@@ -86,6 +81,13 @@ export function scanSceneCatalog(sceneDir: string): SceneEntry[] {
 function invalidateCatalog(server: ViteDevServer): void {
   const mod = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
   if (mod) void server.reloadModule(mod);
+}
+
+function invalidateSceneLoaders(server: ViteDevServer): void {
+  for (const mod of server.moduleGraph.idToModuleMap.values()) {
+    const file = mod.file?.replace(/\\/g, "/") ?? "";
+    if (file.endsWith("/scene-loaders.ts")) void server.reloadModule(mod);
+  }
 }
 
 function catalogFingerprint(sceneDir: string): string {
@@ -185,6 +187,53 @@ function rememberedWrite(writes: Map<string, string>, file: string): string | un
   return undefined;
 }
 
+function parseSourceAt(raw: unknown): SourceAt | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.line !== "number" || typeof o.column !== "number") return null;
+  return { line: o.line, column: o.column };
+}
+
+function parseScenePatch(raw: Record<string, unknown>): ScenePatch | string {
+  const patch: ScenePatch = {};
+  if (raw.hoistAt !== undefined) {
+    if (!Array.isArray(raw.hoistAt)) return "hoistAt must be an array";
+    const hoistAt: SourceAt[] = [];
+    for (const item of raw.hoistAt) {
+      const at = parseSourceAt(item);
+      if (!at) return "invalid hoistAt entry";
+      hoistAt.push(at);
+    }
+    patch.hoistAt = hoistAt;
+  }
+  if (raw.imports !== undefined) {
+    if (!raw.imports || typeof raw.imports !== "object" || Array.isArray(raw.imports)) {
+      return "imports must be an object";
+    }
+    const imports: Record<string, string[]> = {};
+    for (const [mod, names] of Object.entries(raw.imports as Record<string, unknown>)) {
+      if (!Array.isArray(names) || names.some((n) => typeof n !== "string")) {
+        return "imports values must be string arrays";
+      }
+      imports[mod] = names as string[];
+    }
+    patch.imports = imports;
+  }
+  if (raw.statements !== undefined) {
+    if (!Array.isArray(raw.statements) || raw.statements.some((s) => typeof s !== "string")) {
+      return "statements must be a string array";
+    }
+    patch.statements = raw.statements as string[];
+  }
+  if (raw.exprs !== undefined) {
+    if (!Array.isArray(raw.exprs) || raw.exprs.some((s) => typeof s !== "string")) {
+      return "exprs must be a string array";
+    }
+    patch.exprs = raw.exprs as string[];
+  }
+  return patch;
+}
+
 export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
@@ -264,12 +313,16 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
             if (url === "/__insert-editor" && req.method === "POST") {
               const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
               const file = raw.file;
-              const rawEdits = raw.edits;
-              if (typeof file !== "string" || !Array.isArray(rawEdits)) {
+              if (typeof file !== "string") {
                 json(res, 400, {
                   ok: false,
-                  error: "expected { file, edits }",
+                  error: "expected { file, statements?, exprs?, imports?, hoistAt? }",
                 });
+                return;
+              }
+              const parsed = parseScenePatch(raw);
+              if (typeof parsed === "string") {
+                json(res, 400, { ok: false, error: parsed });
                 return;
               }
               const abs = resolveUnder(sceneDir, path.basename(file));
@@ -281,93 +334,15 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 return;
               }
               const source = fs.readFileSync(abs, "utf8");
-              const edits: EditorInsert[] = [];
-              for (const item of rawEdits) {
-                if (!item || typeof item !== "object") {
-                  json(res, 400, { ok: false, error: "invalid edit" });
-                  return;
-                }
-                const e = item as Record<string, unknown>;
-                if (e.kind === "point") {
-                  if (typeof e.x !== "number" || typeof e.y !== "number") {
-                    json(res, 400, {
-                      ok: false,
-                      error: "point needs x, y",
-                    });
-                    return;
-                  }
-                  edits.push({ kind: "point", x: e.x, y: e.y });
-                } else if (e.kind === "distance") {
-                  if (typeof e.d !== "number") {
-                    json(res, 400, {
-                      ok: false,
-                      error: "distance needs d",
-                    });
-                    return;
-                  }
-                  let originName = typeof e.originName === "string" ? e.originName : undefined;
-                  const originAt = e.originAt;
-                  if (
-                    originAt &&
-                    typeof originAt === "object" &&
-                    typeof (originAt as { line?: unknown }).line === "number" &&
-                    typeof (originAt as { column?: unknown }).column === "number"
-                  ) {
-                    const at = {
-                      line: (originAt as { line: number }).line,
-                      column: (originAt as { column: number }).column,
-                    };
-                    if (!widgetInSceneFunction(source, at)) {
-                      json(res, 400, {
-                        ok: false,
-                        error:
-                          "That handle is not declared in scene() — place a new point, or pick a point that scene() owns.",
-                      });
-                      return;
-                    }
-                    const name = widgetBindingName(source, at);
-                    if (!name) {
-                      json(res, 400, {
-                        ok: false,
-                        error:
-                          "That point is inline, not a named const. Place a new point instead.",
-                      });
-                      return;
-                    }
-                    originName = name;
-                  }
-                  edits.push({ kind: "distance", originName, d: e.d });
-                } else if (e.kind === "circle") {
-                  if (typeof e.center !== "string" || typeof e.radius !== "string") {
-                    json(res, 400, {
-                      ok: false,
-                      error: "circle needs center, radius",
-                    });
-                    return;
-                  }
-                  edits.push({
-                    kind: "circle",
-                    center: e.center,
-                    radius: e.radius,
-                  });
-                } else if (e.kind === "line") {
-                  if (typeof e.a !== "string" || typeof e.b !== "string") {
-                    json(res, 400, {
-                      ok: false,
-                      error: "line needs a, b",
-                    });
-                    return;
-                  }
-                  edits.push({ kind: "line", a: e.a, b: e.b });
-                } else {
-                  json(res, 400, {
-                    ok: false,
-                    error: `unknown kind ${String(e.kind)}`,
-                  });
-                  return;
-                }
+              try {
+                fs.writeFileSync(abs, applyScenePatch(source, parsed));
+              } catch (err) {
+                json(res, 400, {
+                  ok: false,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                return;
               }
-              fs.writeFileSync(abs, insertEditors(source, edits));
               for (const key of fileAliases(abs)) widgetWrites.delete(key);
               if (vite) hotReloadSceneFile(vite, abs);
               json(res, 200, { ok: true });
@@ -398,8 +373,12 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                   : titleFromId(id);
               fs.writeFileSync(abs, newSceneSource(id, title));
               lastCatalog = "";
-              if (vite) invalidateCatalog(vite);
-              json(res, 200, { ok: true, id, file: `${id}.scene.ts` });
+              const entry = parseSceneSource(abs, fs.readFileSync(abs, "utf8"));
+              if (vite) {
+                invalidateCatalog(vite);
+                invalidateSceneLoaders(vite);
+              }
+              json(res, 200, { ok: true, id, file: `${id}.scene.ts`, entry });
               return;
             }
 

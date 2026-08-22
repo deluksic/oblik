@@ -55,25 +55,21 @@ export async function commitWidget(
   return null;
 }
 
-export type InsertEdit =
-  | { kind: "point"; x: number; y: number }
-  | {
-      kind: "distance";
-      d: number;
-      originName?: string;
-      originAt?: { line: number; column: number };
-    }
-  | { kind: "circle"; center: string; radius: string }
-  | { kind: "line"; a: string; b: string };
+export type ScenePatch = {
+  hoistAt?: { line: number; column: number }[];
+  imports?: Record<string, string[]>;
+  statements?: string[];
+  exprs?: string[];
+};
 
-export async function commitEditors(
+export async function commitScenePatch(
   sceneFile: string,
-  edits: InsertEdit[],
+  patch: ScenePatch,
 ): Promise<string | null> {
   const res = await fetch("/__insert-editor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file: sceneFile, edits }),
+    body: JSON.stringify({ file: sceneFile, ...patch }),
   });
   const body = (await res.json()) as { ok?: boolean; error?: string };
   if (!res.ok || !body.ok) {

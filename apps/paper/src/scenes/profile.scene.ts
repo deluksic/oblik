@@ -15,9 +15,9 @@ export const hint = "X = radial from each rim · Y is world Z";
 export function profileLayout(): ProfileLayout {
   const c0 = editPoint(-0.01, 0.1);
   const r0 = editDistanceToPoint(c0, 0.2);
-  const c1 = editPoint(0.02, 0.35);
-  const r1 = editDistanceToPoint(c1, 0.13);
-  const c2 = editPoint(0.2, 0.03);
+  const c1 = editPoint(-0.01, 0.38);
+  const r1 = editDistanceToPoint(c1, 0.05);
+  const c2 = editPoint(0.16, 0.03);
   const r2 = editDistanceToPoint(c2, 0.11);
   return {
     circles: [

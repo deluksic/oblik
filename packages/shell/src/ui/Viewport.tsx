@@ -32,7 +32,7 @@ export type ViewportProps = {
   focusedId: string | null;
   paletteMode: PaletteMode;
   commandBar: CommandBarState | null;
-  onWelcomeCreated: (id: string) => void;
+  onWelcomeCreated: (id: string, entry: SceneEntry) => void | Promise<void>;
   onFocusPane: (id: string) => void;
   onPickCommand: (id: string) => void;
   onClosePicker: () => void;

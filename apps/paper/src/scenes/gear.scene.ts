@@ -1,5 +1,5 @@
 import { editAngle, editDistanceToPoint, editNumber, editPoint } from "@design-scenes/euclid2";
-import { line, type Vec2 } from "@design-scenes/geom";
+import { segment, type Vec2 } from "@design-scenes/geom";
 
 import {
   centerDistance,
@@ -66,7 +66,7 @@ export function gearLayout(): GearLayout {
 export function scene() {
   const g = gearLayout();
   return [
-    line(g.pinion, g.wheel),
+    segment(g.pinion, g.wheel),
     lineOfAction(g.pinion, g.pitch1, g.alpha, g.pitch1 + g.pitch2 * 0.35),
     drawSpurGear({
       center: g.pinion,

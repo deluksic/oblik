@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import solid from "@solidjs/vite-plugin";
 import { defineConfig } from "vite";
 
-import { sceneDevPlugin } from "../../packages/shell/src/plugin/vite-plugin";
+import { sceneDevPlugin } from "../../packages/shell/src/plugin/vite-plugin.ts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../..");

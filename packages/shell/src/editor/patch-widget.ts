@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names";
+import { EDIT_NAMES } from "./edit-names.ts";
 
 export function formatNum(n: number): string {
   const q = Math.round(n * 100) / 100;
@@ -33,7 +33,28 @@ export function findEditCallAt(
   line: number,
   column: number,
 ): ts.CallExpression | null {
-  const located = collectEditCalls(sourceFile).map((call) => {
+  return findIdentifierCallAt(sourceFile, line, column, (name) => EDIT_NAMES.has(name));
+}
+
+export function findIdentifierCallAt(
+  sourceFile: ts.SourceFile,
+  line: number,
+  column: number,
+  matchName: (name: string) => boolean,
+): ts.CallExpression | null {
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      matchName(node.expression.text)
+    ) {
+      calls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  const located = calls.map((call) => {
     const pos = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
     return { call, line: pos.line + 1, column: pos.character + 1 };
   });
@@ -126,7 +147,8 @@ export function patchWidgetAt(
       name === "editDistanceToPoint" ||
       name === "editDistance3" ||
       name === "editPointOnSegment" ||
-      name === "editPointOnSegment3"
+      name === "editPointOnSegment3" ||
+      name === "editOffsetFromLine"
         ? args[1]
         : args[args.length - 1];
     if (!lastNumeric) throw new Error(`${name} missing argument`);

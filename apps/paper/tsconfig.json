@@ -10,5 +10,5 @@
       "@/*": ["../../packages/shell/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

@@ -54,6 +54,17 @@ export function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return dist(p, lerp(a, b, t));
 }
 
+/** Signed 2D cross of direction vectors (z component). */
+export function cross2(a: Vec2, b: Vec2): number {
+  return a.x * b.y - a.y * b.x;
+}
+
+/** Distance from `p` to the infinite line through `origin` along unit `dir`. */
+export function distToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
+  const n = perp(dir);
+  return Math.abs(dot(sub(p, origin), n));
+}
+
 export function polar(r: number, radians: number): Vec2 {
   return vec(r * Math.cos(radians), r * Math.sin(radians));
 }

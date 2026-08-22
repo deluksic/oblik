@@ -14,6 +14,8 @@ export type {
 export { VIEW_KINDS } from "./types";
 export { isSceneId, paneIdsFromAreas, stackedAreas } from "./layout/grid";
 export { startWorkspace, type WorkspaceProps } from "./workspace";
+export { createCatalogWorkspaceState, type CatalogWorkspaceState } from "./catalog-workspace";
+export { mergeSceneEntry } from "./ui/workspace/model";
 export { filterCommands } from "./palette/filter";
 export { commandBarSnapshotKey, inspectSnapshotKey } from "./ui/workspace/push-guards";
 export {
@@ -29,4 +31,15 @@ export {
   namedScenePointNear,
   namedScenePointBindings,
   evalDerivedScenePoints,
+  namedSceneLineBindings,
+  namedSceneLineNear,
+  inlineSceneLineNear,
+  promoteInlineLineBinding,
+  resolveLineBindingName,
+  evalSceneLines,
+  bindLineAt,
+  applyScenePatch,
+  editCallArgText,
+  nextBindingName,
 } from "./editor/insert-editor";
+export type { ScenePatch, SourceAt } from "./editor/insert-editor";

@@ -9,4 +9,5 @@ export const EDIT_NAMES = new Set([
   "editNumber",
   "editAngle",
   "editVector",
+  "editOffsetFromLine",
 ]);

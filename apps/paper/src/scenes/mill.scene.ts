@@ -1,6 +1,6 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
 import { editPointOnSegment3 } from "@design-scenes/euclid3";
-import { line3 } from "@design-scenes/geom";
+import { segment3 } from "@design-scenes/geom";
 
 import { drawMill, millFromPlate } from "../demo/mill";
 import { plateLayout } from "./plate-layout";
@@ -17,7 +17,7 @@ export const hint = "XY from plate-layout.ts · glider is thickness · LMB orbit
 export function scene() {
   const plate = withoutWidgets(() => plateLayout(), "plate");
   const { x, y } = plate.stock.min;
-  const mast = line3({ x, y, z: 0 }, { x, y, z: 8 });
+  const mast = segment3({ x, y, z: 0 }, { x, y, z: 8 });
   const thickness = Math.max(0.5, editPointOnSegment3(mast, 0.16).z);
   return drawMill(millFromPlate(plate, thickness));
 }

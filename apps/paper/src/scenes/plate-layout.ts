@@ -6,13 +6,13 @@ import {
   editPointOnSegment,
   editVector,
 } from "@design-scenes/euclid2";
-import { line, type Vec2 } from "@design-scenes/geom";
+import { segment, type Vec2 } from "@design-scenes/geom";
 
 function stockEdges(min: Vec2, max: Vec2) {
   return {
-    bottom: line(min, { x: max.x, y: min.y }),
-    top: line({ x: min.x, y: max.y }, max),
-    left: line(min, { x: min.x, y: max.y }),
+    bottom: segment(min, { x: max.x, y: min.y }),
+    top: segment({ x: min.x, y: max.y }, max),
+    left: segment(min, { x: min.x, y: max.y }),
   };
 }
 

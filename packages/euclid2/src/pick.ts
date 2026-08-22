@@ -1,4 +1,11 @@
-import { dist, distToArc, distToSegment, type Drawable, type Vec2 } from "@design-scenes/geom";
+import {
+  dist,
+  distToArc,
+  distToLine,
+  distToSegment,
+  type Drawable,
+  type Vec2,
+} from "@design-scenes/geom";
 
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
@@ -9,6 +16,33 @@ const GIZMO_PX = 12;
 const GEOM_PX = 8;
 
 export type Hit = { target: "gizmo"; gizmo: Gizmo } | { target: "geom"; drawable: Drawable };
+
+function geomDistWorld(world: Vec2, d: Drawable): number {
+  const g = d.geom;
+  if (g.kind === "point") {
+    return Math.hypot(g.x - world.x, g.y - world.y);
+  }
+  if (g.kind === "segment") {
+    return distToSegment(world, g.a, g.b);
+  }
+  if (g.kind === "line") {
+    return distToLine(world, g.origin, g.direction);
+  }
+  if (g.kind === "circle") {
+    return Math.abs(dist(world, g.center) - Math.abs(g.radius));
+  }
+  if (g.kind === "arc") {
+    return distToArc(world, g.center, g.radius, g.a0, g.a1);
+  }
+  let min = Infinity;
+  for (let i = 0; i < g.points.length - 1; i++) {
+    const a = g.points[i];
+    const b = g.points[i + 1];
+    if (!a || !b) continue;
+    min = Math.min(min, distToSegment(world, a, b));
+  }
+  return min;
+}
 
 export function hitTest(
   screen: Vec2,
@@ -52,6 +86,20 @@ export function hitTest(
       if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
         return { target: "gizmo", gizmo: g };
       }
+    } else if (g.kind === "offset") {
+      const span = 12;
+      const a = {
+        x: g.origin.x - g.direction.x * span,
+        y: g.origin.y - g.direction.y * span,
+      };
+      const b = {
+        x: g.origin.x + g.direction.x * span,
+        y: g.origin.y + g.direction.y * span,
+      };
+      const distW = distToSegment(world, a, b);
+      if (distW <= GEOM_PX / cam.scale) {
+        return { target: "gizmo", gizmo: g };
+      }
     } else if (g.kind === "distance") {
       const radiusPx = Math.abs(g.d) * cam.scale;
       const c = worldToScreen(cam, g.origin, width, height);
@@ -82,26 +130,7 @@ export function hitTest(
   const maxWorld = GEOM_PX / cam.scale;
 
   for (const d of drawables) {
-    const g = d.geom;
-    let distW = Infinity;
-    if (g.kind === "point") {
-      distW = Math.hypot(g.x - world.x, g.y - world.y);
-    } else if (g.kind === "line") {
-      distW = distToSegment(world, g.a, g.b);
-    } else if (g.kind === "circle") {
-      distW = Math.abs(dist(world, g.center) - Math.abs(g.radius));
-    } else if (g.kind === "arc") {
-      distW = distToArc(world, g.center, g.radius, g.a0, g.a1);
-    } else {
-      let min = Infinity;
-      for (let i = 0; i < g.points.length - 1; i++) {
-        const a = g.points[i];
-        const b = g.points[i + 1];
-        if (!a || !b) continue;
-        min = Math.min(min, distToSegment(world, a, b));
-      }
-      distW = min;
-    }
+    const distW = geomDistWorld(world, d);
     if (distW <= maxWorld && (!best || distW < best.d)) {
       best = { drawable: d, d: distW };
     }
@@ -109,4 +138,27 @@ export function hitTest(
 
   if (best) return { target: "geom", drawable: best.drawable };
   return null;
+}
+
+/** All geometry within pick radius of `screen`, nearest first. */
+export function hitsNear(
+  screen: Vec2,
+  cam: Camera,
+  width: number,
+  height: number,
+  drawables: readonly Drawable[],
+  maxPx = GEOM_PX,
+): Drawable[] {
+  const world = {
+    x: cam.x + (screen.x - width / 2) / cam.scale,
+    y: cam.y - (screen.y - height / 2) / cam.scale,
+  };
+  const maxWorld = maxPx / cam.scale;
+  const out: { drawable: Drawable; d: number }[] = [];
+  for (const d of drawables) {
+    const distW = geomDistWorld(world, d);
+    if (distW <= maxWorld) out.push({ drawable: d, d: distW });
+  }
+  out.sort((a, b) => a.d - b.d);
+  return out.map((x) => x.drawable);
 }

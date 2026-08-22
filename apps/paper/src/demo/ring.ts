@@ -2,7 +2,7 @@ import {
   add,
   circle,
   group,
-  line,
+  segment,
   polyline,
   wrapBand,
   type Geom,
@@ -71,8 +71,8 @@ export function drawUnrolled(opts: RingOpts): Geom {
   const outline = unrolledOutline(opts);
   return group(() => [
     polyline(outline),
-    line(o, add(o, vec(0, topZ(0, circ, opts.shank, opts.signet)))),
-    line(add(o, vec(circ, 0)), add(o, vec(circ, topZ(circ, circ, opts.shank, opts.signet)))),
+    segment(o, add(o, vec(0, topZ(0, circ, opts.shank, opts.signet)))),
+    segment(add(o, vec(circ, 0)), add(o, vec(circ, topZ(circ, circ, opts.shank, opts.signet)))),
   ]);
 }
 

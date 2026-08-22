@@ -1,5 +1,5 @@
 import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
-import { line } from "@design-scenes/geom";
+import { segment } from "@design-scenes/geom";
 
 import { assembleBeam } from "../demo/beam";
 
@@ -11,7 +11,7 @@ export const sceneFile = "beam-shared.scene.ts";
 export function scene() {
   const a = editPoint(-6.85, 3.83);
   const b = editPoint(5.71, 3.24);
-  const span = line(a, b);
+  const span = segment(a, b);
 
   const p0 = editPointOnSegment(span, 0.25);
   const p1 = editPointOnSegment(span, 0.5);

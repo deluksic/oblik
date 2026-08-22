@@ -125,9 +125,16 @@ function strokeGeom(
     ctx.beginPath();
     ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2);
     ctx.fill();
-  } else if (g.kind === "line") {
+  } else if (g.kind === "segment") {
     pathSeg(ctx, cam, w, h, g.a, g.b);
     ctx.stroke();
+  } else if (g.kind === "line") {
+    pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
+    ctx.setLineDash([8, 6]);
+    ctx.globalAlpha = 0.72;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   } else if (g.kind === "circle") {
     const c = worldToScreen(cam, g.center, w, h);
     ctx.beginPath();
@@ -163,6 +170,20 @@ function pathSeg(
   ctx.beginPath();
   ctx.moveTo(sa.x, sa.y);
   ctx.lineTo(sb.x, sb.y);
+}
+
+function pathInfiniteLine(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  w: number,
+  h: number,
+  origin: Vec2,
+  dir: Vec2,
+): void {
+  const span = Math.max(w, h) / cam.scale + Math.hypot(cam.x, cam.y) + 20;
+  const a = { x: origin.x - dir.x * span, y: origin.y - dir.y * span };
+  const b = { x: origin.x + dir.x * span, y: origin.y + dir.y * span };
+  pathSeg(ctx, cam, w, h, a, b);
 }
 
 function drawGizmo(
@@ -258,6 +279,13 @@ function drawGizmo(
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
     ctx.stroke();
+  } else if (g.kind === "offset") {
+    pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
+    ctx.strokeStyle = active ? "#fff3e6" : `${COL.gizmo}cc`;
+    ctx.lineWidth = active ? 2.2 : 1.6;
+    ctx.setLineDash([6, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 

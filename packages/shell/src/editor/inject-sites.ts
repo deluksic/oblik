@@ -1,18 +1,20 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names";
+import { EDIT_NAMES } from "./edit-names.ts";
+
+const GEOM_SITE_NAMES = new Set(["point", "segment", "line", "circle", "offsetLine"]);
 
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
 
-function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
+function collectSiteCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
   const calls: ts.CallExpression[] = [];
   const visit = (node: ts.Node) => {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      EDIT_NAMES.has(node.expression.text)
+      (EDIT_NAMES.has(node.expression.text) || GEOM_SITE_NAMES.has(node.expression.text))
     ) {
       calls.push(node);
     }
@@ -23,13 +25,12 @@ function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
 }
 
 /**
- * Inject `{ file, at }` onto each edit* in compiled output. Source on disk is
- * unchanged. `file` is workspace-relative; `at` is 1-based line/column of the
- * CallExpression start.
+ * Inject `{ file, at }` onto each edit* and scene geom constructor in compiled
+ * output. Source on disk is unchanged.
  */
 export function injectSceneSites(source: string, file: string): string {
   const sf = parse(source);
-  const calls = collectEditCalls(sf);
+  const calls = collectSiteCalls(sf);
   if (calls.length === 0) return source;
   const splices: { start: number; text: string }[] = [];
   for (const call of calls) {

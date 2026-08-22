@@ -2,8 +2,8 @@ import path from "node:path";
 
 import * as ts from "typescript";
 
-import { isSceneId, layoutFromIds, normalizeAreas } from "@/layout/grid";
-import { VIEW_KINDS, type SceneEntry, type SceneLayout, type ViewKind } from "@/types";
+import { isSceneId, layoutFromIds, normalizeAreas } from "../layout/grid.ts";
+import { VIEW_KINDS, type SceneEntry, type SceneLayout, type ViewKind } from "../types.ts";
 
 function unwrap(expr: ts.Expression): ts.Expression {
   if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) {

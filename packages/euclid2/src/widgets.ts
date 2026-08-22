@@ -1,4 +1,10 @@
-import { point, type Line, type Point } from "@design-scenes/geom";
+import {
+  offsetLine,
+  point,
+  type LineLike,
+  type Point,
+  type Segment,
+} from "@design-scenes/geom";
 import type { Vec2 } from "@design-scenes/geom";
 import { lerp } from "@design-scenes/geom";
 
@@ -65,6 +71,13 @@ export type VectorGizmo = Located & {
   dy: number;
 };
 
+export type OffsetGizmo = Located & {
+  kind: "offset";
+  origin: Vec2;
+  direction: Vec2;
+  d: number;
+};
+
 export type Gizmo =
   | PointGizmo
   | DistanceGizmo
@@ -72,7 +85,8 @@ export type Gizmo =
   | LineGliderGizmo
   | NumberGizmo
   | AngleGizmo
-  | VectorGizmo;
+  | VectorGizmo
+  | OffsetGizmo;
 
 const gizmos: Gizmo[] = [];
 /** Live write-back values, keyed by the 2D scene that owns them. */
@@ -185,7 +199,7 @@ export function editDistanceToPoint(origin: Vec2, d: number, site?: SiteOpts): n
 }
 
 /** Glider on a finite segment. `t` is in `[0, 1]`. */
-export function editPointOnSegment(lineSeg: Line, t: number, site?: SiteOpts): Point {
+export function editPointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts): Point {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
@@ -327,6 +341,27 @@ export function editAngle(origin: Vec2, degrees: number, opts?: AngleEditOpts): 
   return (deg * Math.PI) / 180;
 }
 
+/**
+ * Signed offset distance from a segment or infinite line.
+ * Gizmo is a dashed infinite parallel through the offset line.
+ */
+export function editOffsetFromLine(geom: LineLike, d: number, site?: SiteOpts): number {
+  const located = siteFrom(site);
+  const o = readOverride(located?.site);
+  const dd = o?.[0] ?? d;
+  const off = offsetLine(geom, dd);
+  if (!silent && located) {
+    gizmos.push({
+      kind: "offset",
+      ...located,
+      origin: off.origin,
+      direction: off.direction,
+      d: dd,
+    });
+  }
+  return dd;
+}
+
 export function gizmoValues(g: Gizmo): number[] {
   switch (g.kind) {
     case "point":
@@ -343,5 +378,7 @@ export function gizmoValues(g: Gizmo): number[] {
       return [g.deg];
     case "vector":
       return [g.dx, g.dy];
+    case "offset":
+      return [g.d];
   }
 }

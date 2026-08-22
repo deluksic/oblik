@@ -70,4 +70,5 @@ export type WorkspaceProps = {
   scenes: SceneEntry[];
   loaders: SceneLoaderMap;
   hosts: Partial<Record<ViewKind, ViewHost>>;
+  onSceneCreated?: (entry: SceneEntry) => void | Promise<void>;
 };

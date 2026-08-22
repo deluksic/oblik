@@ -2,7 +2,7 @@ import {
   add,
   circle,
   group,
-  line,
+  segment,
   mul,
   polyline,
   sub,
@@ -128,7 +128,7 @@ function rectOutline(min: Vec2, max: Vec2): Geom {
 function crossAt(center: Vec2, size: number): Geom[] {
   const h = mul({ x: 1, y: 0 }, size);
   const v = mul({ x: 0, y: 1 }, size);
-  return [line(sub(center, h), add(center, h)), line(sub(center, v), add(center, v))];
+  return [segment(sub(center, h), add(center, h)), segment(sub(center, v), add(center, v))];
 }
 
 function pocketWithFillets(min: Vec2, max: Vec2, filletR: number): Geom[] {

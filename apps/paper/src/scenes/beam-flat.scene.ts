@@ -1,5 +1,5 @@
 import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
-import { line } from "@design-scenes/geom";
+import { segment } from "@design-scenes/geom";
 
 import { assembleBeamFlat } from "../demo/beam";
 
@@ -11,7 +11,7 @@ export const sceneFile = "beam-flat.scene.ts";
 export function scene() {
   const aTop = editPoint(-4.72, 0.37);
   const bTop = editPoint(5.89, 1.09);
-  const spanTop = line(aTop, bTop);
+  const spanTop = segment(aTop, bTop);
   const p0Top = editPointOnSegment(spanTop, 0.25);
   const r0Top = editDistanceToPoint(p0Top, 1.18);
   const p1Top = editPointOnSegment(spanTop, 0.49);
@@ -29,7 +29,7 @@ export function scene() {
 
   const aBot = editPoint(9.56, 4.22);
   const bBot = editPoint(-1.26, 6.95);
-  const spanBot = line(aBot, bBot);
+  const spanBot = segment(aBot, bBot);
   const p0Bot = editPointOnSegment(spanBot, 0.3);
   const r0Bot = editDistanceToPoint(p0Bot, 1.24);
   const p1Bot = editPointOnSegment(spanBot, 0.55);

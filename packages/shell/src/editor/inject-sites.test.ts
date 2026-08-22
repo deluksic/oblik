@@ -48,6 +48,13 @@ const a: Vec2 = editPoint(-2.2, 0.15);
   expect(next).toMatch(/editPoint\(1, 2\)/);
 });
 
+test("injects construction sites onto scene geom constructors", () => {
+  const src = `return group(() => [segment(c, p), line(a, b)]);\n`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(/segment\(c, p, \{ file: .+, at: \[\d+, \d+\] \}\)/);
+  expect(out).toMatch(/line\(a, b, \{ file: .+, at: \[\d+, \d+\] \}\)/);
+});
+
 test("injects helper files outside the catalog", () => {
   const helper = "apps/paper/src/scenes/plate-layout.ts";
   const src = `export function plateLayout() {

@@ -42,7 +42,7 @@ Layout files must not import pane modules. Live drag still updates the other pan
 
 | On screen         | Meaning                                          | Writes     |
 | ----------------- | ------------------------------------------------ | ---------- |
-| Cream solid       | Inert geometry (`circle`, `drawPlate`, SDF fill) | nothing    |
+| Cream solid       | Inert geometry (`circle`, `segment`, `drawPlate`, SDF fill) | nothing    |
 | Coral filled dot  | `editPoint` / glider                             | literals   |
 | Coral dashed ring | `editDistanceToPoint`                            | `d`        |
 | Coral arrow       | `editVector`                                     | `dx`, `dy` |
@@ -55,15 +55,15 @@ Layout files must not import pane modules. Live drag still updates the other pan
 
 Commands come from the view host.
 
-euclid2 and sdf2:
+euclid2:
 
-1. **Point** — click empty paper → insert `const p = editPoint(x, y)` into `scene()`.
-2. **Distance** — click an `editPoint` already bound as a named `const` in `scene()`, then type a radius and Enter or click the canvas → insert `const d = editDistanceToPoint(p, r)`. Empty paper for a new origin, then a radius → insert both.
+1. **Point** — empty paper → `editPoint`; two lines under the cursor near their crossing → `lineIntersection(a, b)`; an existing named point is a no-op.
+2. **Distance** — first click is `point | line`: empty/point/crossing → dashed ring (`editDistanceToPoint`); one scene segment/line or offset handle → dashed parallel (`editOffsetFromLine`, no `offsetLine` in the group). Then type a number, click to measure, or reuse a named numeric widget.
+3. **Line** — two points (same Point resolver) → `line(a, b)` so Distance can offset it.
 
-euclid2 only (constructors):
+sdf2: Point + Distance only.
 
-3. **Circle** — click a named `editPoint` in `scene()`, then any named dashed ring → append `circle(p, d)` via `group(() => [__scene, …])`. The ring need not share that center. No new `edit*`.
-4. **Line** — click two named points in `scene()` (`editPoint` or a derived `const b = point(…)`) → append `line(a, b)` the same way.
+Circle, Segment, and Rect are not Space commands in this slice; type them in the scene file.
 
 `scene()` may leave new editors unused.
 
@@ -93,3 +93,5 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | [?scene=gearsplit](http://127.0.0.1:43117/?scene=gearsplit)     | 2D gear and 3D helix side by side. 2D drags update the helix live.                                                                                                                                                              |
 | [?scene=mill](http://127.0.0.1:43117/?scene=mill)               | 3D extrusion of the plate. XY is read from `plate-layout.ts` with gizmos off. Thickness is the 3D glider; write-back patches `mill.scene.ts`.                                                                                   |
 | [?scene=split](http://127.0.0.1:43117/?scene=split)             | Plate 2D and mill 3D. Drag 2D handles and the mill follows **while you drag**; thickness stays a 3D-only widget.                                                                                                                |
+| [?scene=mounting-plate](http://127.0.0.1:43117/?scene=mounting-plate) | Four-hole plate from construction geometry; `drawMountingPlate` in `demo/mounting-plate.ts`. |
+| [?scene=mounting-plate-pair](http://127.0.0.1:43117/?scene=mounting-plate-pair) | Two plates via `drawMountingPlatePair` — shared inset and drill, second origin only. |

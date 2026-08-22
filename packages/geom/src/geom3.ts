@@ -2,7 +2,7 @@ import { makeBase, type Base } from "./identity";
 import type { Vec3 } from "./vec3";
 
 export type Point3 = Base & { kind: "point3"; x: number; y: number; z: number };
-export type Line3 = Base & { kind: "line3"; a: Point3; b: Point3 };
+export type Segment3 = Base & { kind: "segment3"; a: Point3; b: Point3 };
 export type Circle3 = Base & {
   kind: "circle3";
   center: Point3;
@@ -24,20 +24,21 @@ export type Mesh3 = Base & {
   indices: number[];
 };
 
-export type Geom3 = Point3 | Line3 | Circle3 | Box3 | Cylinder3 | Mesh3;
+export type Geom3 = Point3 | Segment3 | Circle3 | Box3 | Cylinder3 | Mesh3;
 
 export function point3(x: number, y: number, z: number): Point3 {
   return { ...makeBase("point3", "point3"), kind: "point3", x, y, z };
 }
 
-export function line3(a: Vec3, b: Vec3): Line3 {
+export function segment3(a: Vec3, b: Vec3): Segment3 {
   return {
-    ...makeBase("line3", "line3"),
-    kind: "line3",
+    ...makeBase("segment3", "segment3"),
+    kind: "segment3",
     a: point3(a.x, a.y, a.z),
     b: point3(b.x, b.y, b.z),
   };
 }
+
 
 export function circle3(center: Vec3, radius: number, normal: Vec3): Circle3 {
   return {

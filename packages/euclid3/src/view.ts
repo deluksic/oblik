@@ -287,7 +287,7 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
     edges.quaternion.copy(mesh.quaternion);
     edges.position.copy(mesh.position);
     group.add(mesh, edges);
-  } else if (g.kind === "line3") {
+  } else if (g.kind === "segment3") {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),
       new THREE.Vector3(g.b.x, g.b.y, g.b.z),
