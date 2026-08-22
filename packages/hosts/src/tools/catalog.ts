@@ -58,7 +58,7 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     id: "slider",
     title: "Slider",
-    hint: "A shared number. Click it later to reuse.",
+    hint: "A named number. Tab for min, max, step. Click it later to reuse.",
     palettes: ["geom"],
     draft: true,
   },

@@ -5,6 +5,7 @@ import {
   defaultCamera,
   drawFrame,
   drawGizmoOverlay,
+  drawNumberHud,
   getGizmos,
   gizmoValues,
   hitTest,
@@ -45,10 +46,13 @@ import { paletteCommands, toolAcceptsDraft } from "./tools/catalog";
 import { drawGhost, sessionGhostView } from "./tools/ghost";
 import { commitScenePatch, peekFile, quantize, renderSnippet } from "./inspect";
 import {
+  advanceSessionField,
+  commitSession,
   hoverSession,
   onSessionClick,
   onSessionNumber,
   sessionDraft,
+  sessionDraftKind,
   sessionPreview,
   startVerb,
   withSessionDraft,
@@ -395,12 +399,28 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const state = {
           ...preview,
           numberValue: toolAcceptsDraft(session.verb) ? sessionDraft(session) : "",
+          draftKind: sessionDraftKind(session),
           onNumber: accept
             ? (n: number) => {
                 if (!session) return;
                 const src = peekText(peekPath);
                 if (!src) return;
                 void applySessionResult(onSessionNumber(session, src, n));
+              }
+            : undefined,
+          onCommit: accept
+            ? () => {
+                if (!session) return;
+                const src = peekText(peekPath);
+                if (!src) return;
+                void applySessionResult(commitSession(session, src));
+              }
+            : undefined,
+          onNextField: session.verb === "slider"
+            ? (dir: 1 | -1 = 1) => {
+                if (!session) return;
+                session = advanceSessionField(session, dir);
+                render(true);
               }
             : undefined,
           onNumberDraft: accept
@@ -452,6 +472,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           const view = sessionGhostView(session, lastHover, ghost);
           drawGhost(ctx2d, cam, w, h, view);
         }
+        drawNumberHud(
+          ctx2d,
+          w,
+          h,
+          mode === "geom" ? (frame?.gizmos ?? []) : sdfGizmos,
+          activeGizmo(),
+        );
         if (quiet && !error) {
           if (session && toolAcceptsDraft(session.verb)) {
             syncCommandBar();

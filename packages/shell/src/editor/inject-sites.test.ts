@@ -97,3 +97,11 @@ test("replaces a user __annotations__ bag and warns", () => {
   expect(r.code).toMatch(new RegExp(`file: ${JSON.stringify(SCENE)}`));
   expect(r.code).not.toMatch(/nope/);
 });
+
+test("slider options keep the value editable", () => {
+  const src = `slider(1.8, { label: "reach", min: 0, max: 4 });\n`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(
+    /slider\(1\.8, \{ label: "reach", min: 0, max: 4, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: true \} \}\)/,
+  );
+});

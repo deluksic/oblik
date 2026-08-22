@@ -15,16 +15,16 @@ export type SliderLayout = {
   knobY: number;
 };
 
-/** Screen-space slots for non-world sliders, stacked from the bottom-left. */
+/** Screen-space slots for non-world sliders, stacked from the top-left. */
 export function layoutNumberSliders(
   gizmos: readonly Gizmo[],
   _cssW: number,
-  cssH: number,
+  _cssH: number,
 ): SliderLayout[] {
   const nums = gizmos.filter((g): g is NumberGizmo => g.kind === "number");
   return nums.map((g, i) => {
     const x = MARGIN;
-    const y = cssH - MARGIN - (i + 1) * PANEL_H - i * STACK_GAP;
+    const y = MARGIN + i * (PANEL_H + STACK_GAP);
     const trackX = x + 14;
     const trackW = PANEL_W - 28;
     const trackY = y + 36;

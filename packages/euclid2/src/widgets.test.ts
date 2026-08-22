@@ -11,6 +11,7 @@ import {
   gizmoValues,
   publishWidgetOverrides,
   setWidgetOverride,
+  slider,
   withoutWidgets,
 } from "./widgets";
 import { beginGeomFrame, circle, collectDrawables, point } from "@design-scenes/geom";
@@ -138,4 +139,22 @@ test("live overrides move annotated constructors during drag", () => {
   expect(A.y).toBe(5);
   expect(reach.radius).toBe(3.1);
   expect(reach.center.x).toBe(4);
+});
+
+test("slider HUD uses label, min, max, step", () => {
+  beginWidgetFrame("sl");
+  slider(1.8, {
+    label: "reach",
+    min: 0,
+    max: 4,
+    step: 0.1,
+    __annotations__: { file: F, at: [9, 1], editable: true },
+  });
+  const g = getGizmos().find((x) => x.kind === "number");
+  expect(g?.kind).toBe("number");
+  if (g?.kind !== "number") return;
+  expect(g.label).toBe("reach");
+  expect(g.min).toBe(0);
+  expect(g.max).toBe(4);
+  expect(g.n).toBe(1.8);
 });

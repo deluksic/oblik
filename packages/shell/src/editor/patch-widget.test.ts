@@ -133,3 +133,10 @@ const r = slider(2.4);
   expect(patchWidgetAt(src, at(src, 0).line, at(src, 0).column, [2])).toMatch(/offsetLine\(ground, 2\)/);
   expect(patchWidgetAt(src, at(src, 1).line, at(src, 1).column, [0.5])).toMatch(/slider\(0\.5\)/);
 });
+
+test("slider with options still patches the value literal", () => {
+  const src = `const reach = slider(1.8, { label: "reach", min: 0, max: 4 });\n`;
+  expect(patchWidgetAt(src, at(src).line, at(src).column, [2.2])).toMatch(
+    /slider\(2\.2, \{ label: "reach", min: 0, max: 4 \}\)/,
+  );
+});

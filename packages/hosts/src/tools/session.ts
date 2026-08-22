@@ -62,11 +62,23 @@ export type LengthBind =
   | { kind: "dist"; other: PointBind }
   | { kind: "signedDist"; other: PointBind };
 
+export type SliderField = "value" | "min" | "max" | "step" | "name";
+
+const SLIDER_FIELDS: readonly SliderField[] = ["value", "min", "max", "step", "name"];
+
 export type ToolSession =
   | { verb: "point" }
   | { verb: "line"; a?: PointBind }
   | { verb: "segment"; a?: PointBind }
-  | { verb: "slider"; typed?: string }
+  | {
+      verb: "slider";
+      field: SliderField;
+      value?: string;
+      min?: string;
+      max?: string;
+      step?: string;
+      name?: string;
+    }
   | {
       verb: "circle";
       center?: PointBind;
@@ -89,16 +101,18 @@ export type ToolSession =
 export type CommandPreview = {
   previewHtml: string;
   acceptNumber?: boolean;
+  draftKind?: "number" | "ident";
   hint?: string;
 };
 
-type DraftSession =
+type LengthDraft =
   | Extract<ToolSession, { verb: "circle" }>
   | Extract<ToolSession, { verb: "offset" }>
-  | Extract<ToolSession, { verb: "slider" }>
   | Extract<ToolSession, { verb: "distance" }>;
 
-export function isDraftSession(session: ToolSession): session is DraftSession {
+type SliderSession = Extract<ToolSession, { verb: "slider" }>;
+
+export function isDraftSession(session: ToolSession): boolean {
   return (
     session.verb === "circle" ||
     session.verb === "offset" ||
@@ -107,13 +121,37 @@ export function isDraftSession(session: ToolSession): session is DraftSession {
   );
 }
 
+function isLengthDraft(session: ToolSession): session is LengthDraft {
+  return session.verb === "circle" || session.verb === "offset" || session.verb === "distance";
+}
+
+function sliderFieldValue(session: SliderSession, field: SliderField): string {
+  return session[field] ?? "";
+}
+
 export function sessionDraft(session: ToolSession): string {
-  return isDraftSession(session) ? (session.typed ?? "") : "";
+  if (session.verb === "slider") return sliderFieldValue(session, session.field);
+  if (isLengthDraft(session)) return session.typed ?? "";
+  return "";
 }
 
 export function withSessionDraft(session: ToolSession, typed: string | undefined): ToolSession {
-  if (!isDraftSession(session)) return session;
-  return { ...session, typed };
+  if (session.verb === "slider") {
+    return { ...session, [session.field]: typed };
+  }
+  if (isLengthDraft(session)) return { ...session, typed };
+  return session;
+}
+
+export function advanceSessionField(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
+  if (session.verb !== "slider") return session;
+  const i = SLIDER_FIELDS.indexOf(session.field);
+  const next = SLIDER_FIELDS[(i + dir + SLIDER_FIELDS.length) % SLIDER_FIELDS.length]!;
+  return { ...session, field: next };
+}
+
+export function sessionDraftKind(session: ToolSession): "number" | "ident" {
+  return session.verb === "slider" && session.field === "name" ? "ident" : "number";
 }
 
 const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
@@ -122,7 +160,7 @@ const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
   line: { verb: "line" },
   segment: { verb: "segment" },
   offset: { verb: "offset" },
-  slider: { verb: "slider" },
+  slider: { verb: "slider", field: "value" },
   distance: { verb: "distance" },
 };
 
@@ -560,10 +598,23 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
     };
   }
   if (session.verb === "slider") {
+    const active = (field: SliderField, label: string): string => {
+      const raw = sliderFieldValue(session, field).trim();
+      if (session.field === field) return slot(raw || label, "is-number");
+      if (raw) return filled(raw);
+      return slot(label, "", "pending");
+    };
+    const name = active("name", "<name>");
+    const value = active("value", "<value>");
+    const min = active("min", "<min>");
+    const max = active("max", "<max>");
+    const step = active("step", "<step>");
+    const opts = `{ min: ${min}<span class="cmd-punct">, </span>max: ${max}<span class="cmd-punct">, </span>step: ${step} }`;
     return {
-      previewHtml: fn("slider", [slot(session.typed?.trim() ? session.typed : "<n>", "is-number")]),
+      previewHtml: `<span class="cmd-punct">const </span>${name}<span class="cmd-punct"> = </span>${fn("slider", [value, opts])}`,
       acceptNumber: true,
-      hint: "Type a value and Enter, or click to measure.",
+      draftKind: session.field === "name" ? "ident" : "number",
+      hint: "Type a value. Tab for min, max, step, and name. Click to measure.",
     };
   }
   if (session.verb === "line" || session.verb === "segment") {
@@ -575,10 +626,12 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
       hint: session.a ? "Click the second point." : "Click the first point.",
     };
   }
+  const lengthLabel =
+    session.verb === "circle" ? "<radius>" : session.verb === "offset" ? "<distance>" : "<d>";
   const dSlot = session.lengthReuse
     ? filled(session.lengthReuse.name)
     : slot(
-        session.typed?.trim() ? session.typed : "<d>",
+        session.typed?.trim() ? session.typed : lengthLabel,
         session.verb === "circle" ? (session.center ? "is-number" : "") : session.from ? "is-number" : "",
         session.verb === "circle" ? (session.center ? "active" : "pending") : session.from ? "active" : "pending",
       );
@@ -957,10 +1010,40 @@ export function compileOffset(
   }
 }
 
-export function compileSlider(src: string, n: number): ScenePatch | { error: string } {
+export function compileSlider(
+  src: string,
+  spec: { value: number; name?: string; min?: number; max?: number; step?: number },
+): ScenePatch | { error: string } {
   const imports = { euclid: new Set<string>(["slider"]), geom: new Set<string>() };
-  const name = nextBindingName(src, "r");
-  return patchOf([], imports, [`const ${name} = slider(${fmt(n)});`]);
+  const name = nextBindingName(src, spec.name?.trim() || "n");
+  const parts = [`label: ${JSON.stringify(name)}`];
+  if (spec.min != null) parts.push(`min: ${fmt(spec.min)}`);
+  if (spec.max != null) parts.push(`max: ${fmt(spec.max)}`);
+  if (spec.step != null) parts.push(`step: ${fmt(spec.step)}`);
+  return patchOf([], imports, [`const ${name} = slider(${fmt(spec.value)}, { ${parts.join(", ")} });`]);
+}
+
+function parseOptNum(raw: string | undefined): number | undefined {
+  const t = raw?.trim() ?? "";
+  if (t === "") return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function identName(raw: string | undefined): string | undefined {
+  const t = raw?.trim() ?? "";
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) return t;
+  return undefined;
+}
+
+function sliderWrite(session: SliderSession, value: number) {
+  return {
+    value,
+    name: identName(session.name),
+    min: parseOptNum(session.min),
+    max: parseOptNum(session.max),
+    step: parseOptNum(session.step),
+  };
 }
 
 export function compileDistance(
@@ -1055,9 +1138,11 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
   }
 
   if (session.verb === "slider") {
-    const typed = session.typed?.trim() ? Number(session.typed) : NaN;
-    if (Number.isFinite(typed)) return commitOrError(compileSlider(src, typed));
-    return commitOrError(compileSlider(src, Math.max(0.05, Math.hypot(ctx.world.x, ctx.world.y) || 1)));
+    const typed = parseOptNum(session.value);
+    if (typed != null) return commitOrError(compileSlider(src, sliderWrite(session, typed)));
+    return commitOrError(
+      compileSlider(src, sliderWrite(session, Math.max(0.05, Math.hypot(ctx.world.x, ctx.world.y) || 1))),
+    );
   }
 
   if (session.verb === "circle") {
@@ -1244,9 +1329,20 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
   return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: s < 0 ? -mag : mag }));
 }
 
+export function commitSession(session: ToolSession, src: string): SessionResult {
+  if (session.verb === "slider") {
+    const value = parseOptNum(session.value);
+    if (value == null) return { kind: "error", message: "Type a value, or click to measure." };
+    return commitOrError(compileSlider(src, sliderWrite(session, value)));
+  }
+  const n = Number(sessionDraft(session).trim());
+  if (!Number.isFinite(n)) return { kind: "error", message: "Type a number first." };
+  return onSessionNumber(session, src, n);
+}
+
 export function onSessionNumber(session: ToolSession, src: string, n: number): SessionResult {
   if (session.verb === "slider") {
-    return commitOrError(compileSlider(src, n));
+    return commitOrError(compileSlider(src, sliderWrite(session, n)));
   }
   if (session.verb === "circle") {
     if (!session.center) return { kind: "error", message: "Pick a center first." };

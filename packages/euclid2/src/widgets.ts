@@ -254,19 +254,29 @@ export function gizmosFromDrawables(drawables: readonly Drawable[]): Gizmo[] {
 }
 
 /** Shared length owned by this call. Length-slot tools reuse the binding name. */
-export function slider(n: number, site?: SiteOpts): number {
-  const located = siteFrom(site);
-  const o = readOverride(located?.site);
-  const v = o?.[0] ?? n;
+export type SliderOpts = {
+  label?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+} & SiteOpts;
+
+export function slider(n: number, opts?: SliderOpts): number {
+  const located = siteFrom(opts);
+  const raw = located ? (readOverride(located.site)?.[0] ?? n) : n;
+  const min = opts?.min ?? Math.min(0, raw);
+  const max = opts?.max ?? Math.max(Math.abs(raw) * 2, 1, min + 1);
+  const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
+  const v = snapEditNumber(raw, min, max, step);
   if (!silent && located && Number.isFinite(v)) {
     gizmos.push({
       kind: "number",
       ...located,
       n: v,
-      label: "",
-      min: Math.min(0, v),
-      max: Math.max(Math.abs(v) * 2, 1),
-      step: 0.01,
+      label: opts?.label?.trim() || "value",
+      min,
+      max,
+      step,
     });
   }
   return v;

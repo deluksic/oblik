@@ -240,11 +240,20 @@ export function App(props: WorkspaceProps) {
     const bar = commandBar();
     if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
       const draft = bar.numberValue ?? "";
+      if (e.key === "Tab" && bar.onNextField) {
+        e.preventDefault();
+        bar.onNextField(e.shiftKey ? -1 : 1);
+        return;
+      }
       if (e.key === "Enter") {
+        e.preventDefault();
+        if (bar.onCommit) {
+          bar.onCommit();
+          return;
+        }
         const trimmed = draft.trim();
         const n = Number(trimmed);
         if (trimmed !== "" && Number.isFinite(n)) {
-          e.preventDefault();
           bar.onNumber?.(n);
         }
         return;
@@ -259,7 +268,8 @@ export function App(props: WorkspaceProps) {
         bar.onNumberDraft(draft === "" ? "" : "");
         return;
       }
-      if (e.key.length === 1 && /[0-9.\-]/.test(e.key)) {
+      const ident = bar.draftKind === "ident";
+      if (e.key.length === 1 && (ident ? /[A-Za-z0-9_]/.test(e.key) : /[0-9.\-]/.test(e.key))) {
         e.preventDefault();
         bar.onNumberDraft(draft + e.key);
         return;

@@ -47,8 +47,14 @@ export type CommandBarState = {
   acceptNumber?: boolean;
   hint?: string;
   numberValue?: string;
+  /** Active inline slot: numbers, or an identifier for slider names. */
+  draftKind?: "number" | "ident";
   onNumber?: (n: number) => void;
   onNumberDraft?: (raw: string) => void;
+  /** Enter — compile from the full session, not only the focused slot. */
+  onCommit?: () => void;
+  /** Tab / Shift+Tab between slider fields. */
+  onNextField?: (dir?: 1 | -1) => void;
 };
 
 export type PaneContext = {

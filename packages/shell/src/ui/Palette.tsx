@@ -157,9 +157,6 @@ export function Palette(props: PaletteProps) {
     if (!layout.acceptNumber || !previewRef.current || !numberRef.current) return;
     const slot = previewRef.current.querySelector<HTMLElement>(".slot.is-number");
     if (!slot) return;
-    const typed = numberRef.current.value;
-    slot.textContent = typed || "<radius>";
-    slot.dataset.placeholder = typed ? typed : "<radius>";
     const row = previewRef.current.parentElement;
     if (!row) return;
     const slotRect = slot.getBoundingClientRect();
@@ -170,7 +167,11 @@ export function Palette(props: PaletteProps) {
     numberRef.current.style.height = `${slotRect.height}px`;
   }
 
-  function tryCommitNumber(commandBar: CommandBarState | null): void {
+  function tryCommit(commandBar: CommandBarState | null): void {
+    if (commandBar?.onCommit) {
+      commandBar.onCommit();
+      return;
+    }
     if (!commandBar?.onNumber || !numberRef.current) return;
     const n = parseDraft(numberRef.current.value);
     if (n == null) return;
@@ -198,6 +199,7 @@ export function Palette(props: PaletteProps) {
         props.mode,
         props.commandBar?.numberValue ?? "",
         props.commandBar?.acceptNumber === true,
+        props.commandBar?.draftKind ?? "number",
       ] as const,
     (layout) => {
       layoutInlineNumber({
@@ -249,7 +251,7 @@ export function Palette(props: PaletteProps) {
                   }}
                   type="text"
                   class={styles.number}
-                  inputmode="decimal"
+                  inputmode={props.commandBar?.draftKind === "ident" ? "text" : "decimal"}
                   autocomplete="off"
                   spellcheck={false}
                   value={props.commandBar?.numberValue ?? ""}
@@ -265,9 +267,14 @@ export function Palette(props: PaletteProps) {
                     );
                   }}
                   onKeyDown={(e) => {
+                    if (e.key === "Tab" && props.commandBar?.onNextField) {
+                      e.preventDefault();
+                      props.commandBar.onNextField(e.shiftKey ? -1 : 1);
+                      return;
+                    }
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      tryCommitNumber(props.commandBar);
+                      tryCommit(props.commandBar);
                     }
                   }}
                 />

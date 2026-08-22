@@ -59,7 +59,6 @@ export function drawFrame(
     const active = g.site === activeGizmo;
     drawGizmo(ctx, cam, cssW, cssH, g, active);
   }
-  drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
 
 /** Gizmos only — for 2D SDF scenes that paint the field themselves. */
@@ -75,6 +74,16 @@ export function drawGizmoOverlay(
     if (g.kind === "number") continue;
     drawGizmo(ctx, cam, cssW, cssH, g, g.site === activeGizmo);
   }
+}
+
+/** HUD last so in-progress ghosts do not cover sliders. */
+export function drawNumberHud(
+  ctx: CanvasRenderingContext2D,
+  cssW: number,
+  cssH: number,
+  gizmos: readonly Gizmo[],
+  activeGizmo: string | null,
+): void {
   drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
 }
 

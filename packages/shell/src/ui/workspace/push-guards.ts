@@ -7,6 +7,7 @@ export function commandBarSnapshotKey(state: CommandBarState | null): string {
     hint: state.hint ?? "",
     numberValue: state.numberValue ?? "",
     acceptNumber: state.acceptNumber === true,
+    draftKind: state.draftKind ?? "number",
   });
 }
 
