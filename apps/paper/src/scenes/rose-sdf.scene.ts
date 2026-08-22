@@ -1,5 +1,5 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
-import { editPointOnSegment3 } from "@design-scenes/euclid3";
+import { pointOnSegment3 } from "@design-scenes/euclid3";
 import { segment3 } from "@design-scenes/geom";
 import { difference, sweep2, union, unionAll } from "@design-scenes/sdf";
 
@@ -41,7 +41,7 @@ export function scene() {
   const layout = withoutWidgets(() => readLayout(), "cylinder");
   const profile = withoutWidgets(() => readProfile(), "profile");
   const mast = segment3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 6 });
-  const height = editPointOnSegment3(mast, 0.05).z;
+  const height = pointOnSegment3(mast, 0.05).z;
   const field = profileSdf(profile);
   const cells = pack7(layout.radius);
   const rings = unionAll(cells.map((cell) => sweep2(cell.origin, layout.radius, field)));

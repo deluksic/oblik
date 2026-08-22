@@ -1,4 +1,4 @@
-import { withoutWidgets, editNumber } from "@design-scenes/euclid2";
+import { slider, withoutWidgets } from "@design-scenes/euclid2";
 
 import { drawPlateNest } from "../demo/plate";
 import { plateLayout } from "./plate-layout";
@@ -13,8 +13,8 @@ export const camera = { x: 0, y: 0, scale: 18 };
  */
 export function scene() {
   const master = withoutWidgets(() => plateLayout(), "plate");
-  const cols = editNumber(3, { label: "Columns", min: 1, max: 4, step: 1 });
-  const rows = editNumber(2, { label: "Rows", min: 1, max: 3, step: 1 });
-  const gap = editNumber(1.75, { label: "Gap", min: 0.25, max: 2.5, step: 0.05 });
+  const cols = slider(3, { label: "Columns", min: 1, max: 4, step: 1 });
+  const rows = slider(2, { label: "Rows", min: 1, max: 3, step: 1 });
+  const gap = slider(1.75, { label: "Gap", min: 0.25, max: 2.5, step: 0.05 });
   return drawPlateNest(master, { cols, rows, gap, countStep: 1 });
 }

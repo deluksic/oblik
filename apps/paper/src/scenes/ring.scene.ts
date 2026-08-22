@@ -1,5 +1,5 @@
-import { editDistanceToPoint, editNumber, editPoint } from "@design-scenes/euclid2";
-import { type Vec2 } from "@design-scenes/geom";
+import { slider } from "@design-scenes/euclid2";
+import { circle, point, type Vec2 } from "@design-scenes/geom";
 
 import { drawRingPlan, drawUnrolled } from "../demo/ring";
 
@@ -22,19 +22,19 @@ export type RingLayout = {
  * distances on the unrolled paper. Gauge feeds the wrap (3D).
  */
 export function ringLayout(): RingLayout {
-  const center = editPoint(-4.2, 5.5);
-  const innerR = editDistanceToPoint(center, 5.47);
+  const center = point(-4.2, 5.5);
+  const innerR = circle(center, 5.47).radius;
   const origin: Vec2 = {
     x: center.x + innerR + 2.8,
     y: center.y - innerR,
   };
-  const shank = editDistanceToPoint(origin, 2.37);
+  const shank = circle(origin, 2.37).radius;
   const mid: Vec2 = {
     x: origin.x + Math.PI * innerR,
     y: origin.y,
   };
-  const signet = editDistanceToPoint(mid, 5.81);
-  const gauge = editNumber(0.4, {
+  const signet = circle(mid, 5.81).radius;
+  const gauge = slider(0.4, {
     label: "Gauge",
     min: 0.4,
     max: 3.2,

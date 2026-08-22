@@ -31,24 +31,23 @@ function at(source: string, i = 0): { line: number; column: number } {
     ts.ScriptKind.TS,
   );
   const call = collectEditCalls(sf)[i];
-  if (!call) throw new Error(`no edit* at ${i}`);
+  if (!call) throw new Error(`no writable call at ${i}`);
   const pos = sf.getLineAndCharacterOfPosition(call.getStart(sf));
   return { line: pos.line + 1, column: pos.character + 1 };
 }
 
-const hello = `import { circle } from "@design-scenes/geom";
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
+const hello = `import { circle, point } from "@design-scenes/geom";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const r = editDistanceToPoint(c, 1);
+  const c = point(0, 0);
+  const r = circle(c, 1);
   return circle(c, r);
 }
 `;
 
-test("inserts editPoint after existing scene widgets", () => {
+test("inserts point after existing scene widgets", () => {
   const next = insertEditors(hello, [{ kind: "point", x: 1.25, y: -0.4 }]);
-  expect(next).toMatch(/^  const p = editPoint\(1\.25, -0\.4\);$/m);
+  expect(next).toMatch(/^  const p = point\(1\.25, -0\.4\);$/m);
   expect(next).toMatch(/^  return circle\(c, r\);$/m);
   expect(widgetBindingName(hello, at(hello, 0))).toBe("c");
   expect(widgetInSceneFunction(hello, at(hello, 0))).toBe(true);
@@ -57,7 +56,7 @@ test("inserts editPoint after existing scene widgets", () => {
 test("stacked inserts keep two-space indent on every line", () => {
   const once = insertEditors(hello, [{ kind: "point", x: 1, y: 2 }]);
   const twice = insertEditors(once, [{ kind: "distance", originName: "p", d: 0.5 }]);
-  expect(twice).toMatch(/const d = editDistanceToPoint\(p, 0\.5\);/);
+  expect(twice).toMatch(/const d = circle\(p, 0\.5\);/);
   const inner = twice.split("export function scene() {\n")[1]?.split("\n}")[0] ?? "";
   for (const line of inner.split("\n")) {
     if (!line.trim()) continue;
@@ -68,10 +67,10 @@ test("stacked inserts keep two-space indent on every line", () => {
 
 test("inserts into scene() before return drawPlate", () => {
   const plate = `import { drawPlate } from "../demo/plate";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function plateLayout() {
-  const min = editPoint(-5, -3);
+  const min = point(-5, -3);
   return { min };
 }
 
@@ -80,7 +79,7 @@ export function scene() {
 }
 `;
   const next = insertEditors(plate, [{ kind: "point", x: 0, y: 1 }]);
-  expect(next).toMatch(/const p = editPoint\(0, 1\);/);
+  expect(next).toMatch(/const p = point\(0, 1\);/);
   expect(next).toMatch(/return drawPlate\(plateLayout\(\)\);/);
   expect(widgetInSceneFunction(plate, at(plate, 0))).toBe(false);
   expect(widgetBindingName(plate, at(plate, 0))).toBe("min");
@@ -91,11 +90,11 @@ test("point then distance in one write shares the new name", () => {
     { kind: "point", x: 2, y: 1 },
     { kind: "distance", d: 0.75 },
   ]);
-  expect(next).toMatch(/const p = editPoint\(2, 1\);/);
-  expect(next).toMatch(/const d = editDistanceToPoint\(p, 0\.75\);/);
+  expect(next).toMatch(/const p = point\(2, 1\);/);
+  expect(next).toMatch(/const d = circle\(p, 0\.75\);/);
 });
 
-test("adds a named import when euclid2 is missing", () => {
+test("adds a named import when point is missing from geom", () => {
   const src = `import { circle } from "@design-scenes/geom";
 
 export function scene() {
@@ -103,23 +102,22 @@ export function scene() {
 }
 `;
   const next = insertEditors(src, [{ kind: "point", x: 0, y: 0 }]);
-  expect(next).toMatch(/import \{ editPoint \} from "@design-scenes\/euclid2";/);
+  expect(next).toMatch(/import \{ circle, point \} from "@design-scenes\/geom";/);
 });
 
 test("circle inserts as a statement", () => {
   const next = insertEditors(hello, [{ kind: "circle", center: { name: "c" }, radius: "r" }]);
   expect(next).toMatch(/^  circle\(c, r\);$/m);
   expect(next).toMatch(/^  return circle\(c, r\);$/m);
-  expect(next).toMatch(/^import \{ circle \} from "@design-scenes\/geom";$/m);
+  expect(next).toMatch(/from "@design-scenes\/geom"/);
 });
 
 test("stacked circle adds another call", () => {
   const grouped = `import { circle } from "@design-scenes/geom";
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const r = editDistanceToPoint(c, 1);
+  const c = point(0, 0);
+  const r = circle(c, 1);
   circle(c, r);
 }
 `;
@@ -129,11 +127,11 @@ export function scene() {
 
 test("segment inserts as a statement", () => {
   const src = `import { circle } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
-  const b = editPoint(1, 0);
+  const a = point(0, 0);
+  const b = point(1, 0);
   circle(a, 1);
 }
 `;
@@ -142,14 +140,14 @@ export function scene() {
   expect(next).toMatch(/^import \{ circle, segment \} from "@design-scenes\/geom";$/m);
 });
 
-test("rect inserts edit points, derived corners, and four segments", () => {
+test("rect inserts points, derived corners, and four segments", () => {
   const src = `export function scene() {}
 `;
   const next = insertEditors(src, [
     { kind: "rect", a: { x: 0, y: 0 }, b: { x: 2, y: 1 } },
   ]);
-  expect(next).toMatch(/const p = editPoint\(0, 0\);/);
-  expect(next).toMatch(/const p2 = editPoint\(2, 1\);/);
+  expect(next).toMatch(/const p = point\(0, 0\);/);
+  expect(next).toMatch(/const p2 = point\(2, 1\);/);
   expect(next).toMatch(/const bl = point\(Math\.min\(p\.x, p2\.x\), Math\.min\(p\.y, p2\.y\)\);/);
   expect(next).toMatch(/const tr = point\(Math\.max\(p\.x, p2\.x\), Math\.max\(p\.y, p2\.y\)\);/);
   expect(next).toMatch(/const tl = point\(bl\.x, tr\.y\);/);
@@ -162,11 +160,10 @@ test("rect inserts edit points, derived corners, and four segments", () => {
 
 test("mixed editor and constructor inserts in one write", () => {
   const src = `import { circle } from "@design-scenes/geom";
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const r = editDistanceToPoint(c, 1);
+  const c = point(0, 0);
+  const r = circle(c, 1);
   return circle(c, r);
 }
 `;
@@ -174,16 +171,16 @@ export function scene() {
     { kind: "point", x: 3, y: 4 },
     { kind: "segment", a: { name: "c" }, b: { name: "p" } },
   ]);
-  expect(next).toMatch(/const p = editPoint\(3, 4\);/);
+  expect(next).toMatch(/const p = point\(3, 4\);/);
   expect(next).toMatch(/segment\(c, p\);/);
 });
 
 test("multiple constructors append in one write", () => {
-  const src = `import { editPoint } from "@design-scenes/euclid2";
+  const src = `import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
-  const b = editPoint(1, 0);
+  const a = point(0, 0);
+  const b = point(1, 0);
   return a;
 }
 `;
@@ -201,27 +198,27 @@ test("distanceOriginName reads the first argument", () => {
 
 test("point insert before grouped return does not rebind __scene", () => {
   const src = `import { circle, group } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
+  const a = point(0, 0);
   const __scene = circle(a, 1);
   return group(() => [__scene, circle(a, 1)]);
 }
 `;
   const next = insertEditors(src, [{ kind: "point", x: -1, y: 2 }]);
   expect(next.match(/const __scene = /g)?.length).toBe(1);
-  expect(next).toMatch(/^  const p = editPoint\(-1, 2\);$/m);
+  expect(next).toMatch(/^  const p = point\(-1, 2\);$/m);
   expect(next).toMatch(/^  return group\(\(\) => \[__scene, circle\(a, 1\)\]\);$/m);
 });
 
 test("namedScenePointNear matches a derived point()", () => {
   const src = `import { point } from "@design-scenes/geom";
-import { editPoint, editVector } from "@design-scenes/euclid2";
+import { vector } from "@design-scenes/euclid2";
 
 export function scene() {
-  const a = editPoint(1, 1);
-  const d = editVector(a, 1, 2);
+  const a = point(1, 1);
+  const d = vector(a, 1, 2);
   const b = point(a.x + d.x, a.y + d.y);
   return point(0, 0);
 }
@@ -237,12 +234,12 @@ export function scene() {
 
 test("evalDerivedScenePoints resolves lineIntersection from scene lines", () => {
   const src = `import { line, segment } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
-  const b = editPoint(2, 0);
-  const c = editPoint(0, 2);
+  const a = point(0, 0);
+  const b = point(2, 0);
+  const c = point(0, 2);
   const h = segment(a, b);
   const v = line(a, c);
   const x = lineIntersection(h, v);
@@ -265,12 +262,11 @@ export function scene() {
 
 test("promoteInlineLineBinding hoists group-return segment to const", () => {
   const src = `import { circle, group, segment } from "@design-scenes/geom";
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const p = editPoint(5, 0);
-  const r = editDistanceToPoint(c, 1);
+  const c = point(0, 0);
+  const p = point(5, 0);
+  const r = circle(c, 1);
   const __scene = circle(c, r);
   return group(() => [__scene, segment(c, p)]);
 }
@@ -288,19 +284,18 @@ export function scene() {
 });
 
 test("promoteInlineLineBinding works for rect edges with derived point() corners", () => {
-  const src = `import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
-import { circle, group, segment, point } from "@design-scenes/geom";
+  const src = `import { circle, group, segment, point } from "@design-scenes/geom";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const r = editDistanceToPoint(c, 2.87);
+  const c = point(0, 0);
+  const r = circle(c, 2.87);
   const __scene = circle(c, r);
-  const p = editPoint(5, 2.96);
+  const p = point(5, 2.96);
   const bl = point(Math.min(c.x, p.x), Math.min(c.y, p.y));
   const tr = point(Math.max(c.x, p.x), Math.max(c.y, p.y));
   const tl = point(bl.x, tr.y);
   const br = point(tr.x, bl.y);
-  const p2 = editPoint(0.02, 2.95);
+  const p2 = point(0.02, 2.95);
   return group(() => [__scene, segment(c, p), segment(bl, tl), segment(tl, tr), segment(tr, br), segment(br, bl), segment(c, p2)]);
 }
 `;
@@ -326,11 +321,11 @@ export function scene() {
 
 test("bindLineAt hoists inline segment at injected construction site", () => {
   const src = `import { group, segment } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const c = editPoint(0, 0);
-  const p = editPoint(5, 0);
+  const c = point(0, 0);
+  const p = point(5, 0);
   return group(() => [segment(c, p)]);
 }
 `;
@@ -344,21 +339,20 @@ export function scene() {
   expect(bound?.source).toMatch(/const s = segment\(c, p\);/);
   const next = applyScenePatch(src, {
     hoistAt: [{ line: Number(m![1]), column: Number(m![2]) }],
-    imports: { "@design-scenes/euclid2": ["editOffsetFromLine"] },
-    statements: ["const off = editOffsetFromLine(s, 1.2);"],
+    imports: { "@design-scenes/geom": ["offsetLine"] },
+    statements: ["const off = offsetLine(s, 1.2);"],
   });
   expect(next).toMatch(/const s = segment\(c, p\);/);
-  expect(next).toMatch(/const off = editOffsetFromLine\(s, 1\.2\);/);
-  expect(next).not.toMatch(/offsetLine\(/);
+  expect(next).toMatch(/const off = offsetLine\(s, 1\.2\);/);
 });
 
 test("bindLineAt hoists a line() statement in a void scene", () => {
   const src = `import { line } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
-  const b = editPoint(1, 0);
+  const a = point(0, 0);
+  const b = point(1, 0);
   line(a, b);
 }
 `;
@@ -374,29 +368,29 @@ export function scene() {
 });
 
 test("applyScenePatch inserts statements and geom imports", () => {
-  const src = `import { editPoint } from "@design-scenes/euclid2";
+  const src = `import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const c = editPoint(0, 0);
+  const c = point(0, 0);
   return c;
 }
 `;
   const next = applyScenePatch(src, {
     imports: {
-      "@design-scenes/euclid2": ["editDistanceToPoint"],
+      "@design-scenes/geom": ["circle"],
     },
-    statements: ["const d = editDistanceToPoint(c, 1.5);"],
+    statements: ["const d = circle(c, 1.5);"],
   });
-  expect(next).toMatch(/editDistanceToPoint/);
-  expect(next).toMatch(/const d = editDistanceToPoint\(c, 1\.5\);/);
+  expect(next).toMatch(/circle/);
+  expect(next).toMatch(/const d = circle\(c, 1\.5\);/);
 });
 
 test("applyScenePatch inserts constructor statements", () => {
-  const src = `import { editPoint } from "@design-scenes/euclid2";
+  const src = `import { point } from "@design-scenes/geom";
 
 export function scene() {
-  const a = editPoint(0, 0);
-  const b = editPoint(1, 0);
+  const a = point(0, 0);
+  const b = point(1, 0);
 }
 `;
   const next = applyScenePatch(src, {

@@ -1,11 +1,9 @@
 import {
-  offsetLine,
   point,
   setGeomLiveReader,
   withoutDraw,
   isFiniteVec,
   type Drawable,
-  type LineLike,
   type Point,
   type Segment,
 } from "@design-scenes/geom";
@@ -148,16 +146,17 @@ export function beginWidgetFrame(source = ""): void {
 }
 
 /**
- * Run edit* without gizmos. Reads `publishWidgetOverrides(source)` from that
- * 2D scene (e.g. plate → mill, cylinder → rose, profile → rose), not the live
- * map of the scene evaluating now. Snapshot keys are file:line:column.
+ * Run constructors and widgets without gizmos. Reads
+ * `publishWidgetOverrides(source)` from that 2D scene (e.g. plate → mill),
+ * not the live map of the scene evaluating now. Snapshot keys are
+ * file:line:column.
  */
 export function withoutWidgets<T>(fn: () => T, source = ""): T {
   silent += 1;
   const prevSource = silentSource;
   silentSource = source;
   try {
-    return fn();
+    return withoutDraw(fn);
   } finally {
     silentSource = prevSource;
     silent -= 1;
@@ -242,6 +241,7 @@ export function gizmoForEditableGeom(
 
 /** Handles for constructors the annotator marked editable. */
 export function gizmosFromDrawables(drawables: readonly Drawable[]): Gizmo[] {
+  if (silent) return [];
   const out: Gizmo[] = [];
   for (const d of drawables) {
     const g = d.geom;
@@ -282,34 +282,8 @@ export function slider(n: number, opts?: SliderOpts): number {
   return v;
 }
 
-export function editPoint(x: number, y: number, site?: SiteOpts): Point {
-  const located = siteFrom(site);
-  const o = readOverride(located?.site);
-  const px = o?.[0] ?? x;
-  const py = o?.[1] ?? y;
-  if (!silent && located) {
-    gizmos.push({ kind: "point", ...located, x: px, y: py });
-  }
-  return withoutDraw(() => point(px, py));
-}
-
-export function editDistanceToPoint(origin: Vec2, d: number, site?: SiteOpts): number {
-  const located = siteFrom(site);
-  const o = readOverride(located?.site);
-  const dist = o?.[0] ?? d;
-  if (!silent && located) {
-    gizmos.push({
-      kind: "distance",
-      ...located,
-      origin: { x: origin.x, y: origin.y },
-      d: dist,
-    });
-  }
-  return dist;
-}
-
 /** Glider on a finite segment. `t` is in `[0, 1]`. */
-export function editPointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts): Point {
+export function pointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts): Point {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
@@ -338,7 +312,7 @@ function unitDir(direction: Vec2): Vec2 {
  * Glider on an infinite line through `origin` along `direction`.
  * `s` is signed distance in world units (not 0–1). Returns the absolute point.
  */
-export function editPointOnLine(
+export function pointOnLine(
   origin: Vec2,
   direction: Vec2,
   s: number,
@@ -368,7 +342,7 @@ export function editPointOnLine(
  * Offset from `origin`. Widget is the handle at origin+(dx,dy).
  * Drag writes dx, dy; origin is geometry, not a write target.
  */
-export function editVector(origin: Vec2, dx: number, dy: number, site?: SiteOpts): Vec2 {
+export function vector(origin: Vec2, dx: number, dy: number, site?: SiteOpts): Vec2 {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const vx = o?.[0] ?? dx;
@@ -392,34 +366,6 @@ export function snapEditNumber(n: number, min: number, max: number, step: number
   return Math.min(max, Math.max(min, q));
 }
 
-export type NumberEditOpts = {
-  label: string;
-  min?: number;
-  max?: number;
-  step?: number;
-} & SiteOpts;
-
-/** Screen-space titled slider. For counts and other non-spatial parameters. */
-export function editNumber(n: number, opts: NumberEditOpts): number {
-  const min = opts.min ?? 0;
-  const max = opts.max ?? Math.max(min + 1, n);
-  const step = opts.step && opts.step > 0 ? opts.step : 1;
-  const located = siteFrom(opts);
-  const v = snapEditNumber(readOverride(located?.site)?.[0] ?? n, min, max, step);
-  if (!silent && located) {
-    gizmos.push({
-      kind: "number",
-      ...located,
-      n: v,
-      label: opts.label,
-      min,
-      max,
-      step,
-    });
-  }
-  return v;
-}
-
 export type AngleEditOpts = {
   /** Gizmo arm length. Default 1.5. */
   radius?: number;
@@ -435,7 +381,7 @@ function wrapDeg(deg: number): number {
  * World-space polar angle around `origin`.
  * The scene literal is degrees (1° snaps, readable source). Returns radians.
  */
-export function editAngle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
+export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
   const located = siteFrom(opts);
   const deg = wrapDeg(readOverride(located?.site)?.[0] ?? degrees);
@@ -449,27 +395,6 @@ export function editAngle(origin: Vec2, degrees: number, opts?: AngleEditOpts): 
     });
   }
   return (deg * Math.PI) / 180;
-}
-
-/**
- * Signed offset distance from a segment or infinite line.
- * Gizmo is an overlay along the offset line.
- */
-export function editOffsetFromLine(geom: LineLike, d: number, site?: SiteOpts): number {
-  const located = siteFrom(site);
-  const o = readOverride(located?.site);
-  const dd = o?.[0] ?? d;
-  const off = withoutDraw(() => offsetLine(geom, dd));
-  if (!silent && located) {
-    gizmos.push({
-      kind: "offset",
-      ...located,
-      origin: off.line.origin,
-      direction: off.line.direction,
-      d: dd,
-    });
-  }
-  return dd;
 }
 
 export function gizmoValues(g: Gizmo): number[] {

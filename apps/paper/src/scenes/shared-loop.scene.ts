@@ -1,4 +1,3 @@
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 import { circle, group, type Circle, point, line, signedDist, offsetLine, dist } from "@design-scenes/geom";
 
 export const title = "Shared loop";
@@ -11,7 +10,7 @@ export const camera = { x: 0, y: 0, scale: 48 };
  * pointer-up rewrites the single 0.4.
  */
 export function scene() {
-  const o = editPoint(0, -0.03);
+  const o = point(0, -0.03);
   const rings: Circle[] = [];
   for (let i = 0; i < 5; i++) {
     const ang = (i / 5) * Math.PI * 2;
@@ -19,14 +18,13 @@ export function scene() {
       x: o.x + Math.cos(ang) * 2.2,
       y: o.y + Math.sin(ang) * 2.2,
     };
-    const r = editDistanceToPoint(p, 1);
-    rings.push(circle(p, r));
+    rings.push(circle(p, 1));
   }
   const p2 = point(3.37, 3.63);
   const ln = line(o, p2);
   const p3 = point(2.45, 4.84);
   const off = offsetLine(ln, signedDist(p3, ln));
-  const k = circle(o, r);
+  const k = circle(o, 1);
   const k2 = circle(o, dist(o, p2));
   return group(() => rings);
 }

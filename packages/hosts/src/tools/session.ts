@@ -800,7 +800,7 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
     return {
       previewHtml: asConst(
         session,
-        fn("editDistanceToPoint", [pointLabel(session.from.point, "<point>", true), dSlot]),
+        fn("circle", [pointLabel(session.from.point, "<point>", true), dSlot]),
       ),
       acceptNumber: naming || !session.lengthReuse,
       draftKind: naming ? "ident" : "number",
@@ -819,7 +819,7 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
         ? filled("offsetLine")
         : slot("<line>", "", "done");
   return {
-    previewHtml: asConst(session, fn("editOffsetFromLine", [lineLabel, dSlot])),
+    previewHtml: asConst(session, fn("offsetLine", [lineLabel, dSlot])),
     acceptNumber: naming || !session.lengthReuse,
     draftKind: naming ? "ident" : "number",
     ...previewMeta(
@@ -1236,7 +1236,7 @@ export function compileDistance(
     const imports = { euclid: new Set<string>(), geom: new Set<string>() };
     if (from.kind === "point") {
       const p = pointExpr(working, statements, from.point, map, imports);
-      imports.euclid.add("editDistanceToPoint");
+      imports.geom.add("circle");
       const dName = bindName(`${working}\n${statements.join("\n")}`, as, "d");
       const arg =
         length.kind === "reuse"
@@ -1246,10 +1246,10 @@ export function compileDistance(
             : length.kind === "field"
               ? `${length.object}.${length.field}`
               : fmt(0);
-      statements.push(`const ${dName} = editDistanceToPoint(${p}, ${arg});`);
+      statements.push(`const ${dName} = circle(${p}, ${arg});`);
     } else {
       const lineE = lineText(from.line, map, imports);
-      imports.euclid.add("editOffsetFromLine");
+      imports.geom.add("offsetLine");
       const off = bindName(`${working}\n${statements.join("\n")}`, as, "off");
       const arg =
         length.kind === "reuse"
@@ -1261,7 +1261,7 @@ export function compileDistance(
             : length.kind === "field"
               ? `${length.negate ? "-" : ""}${length.object}.${length.field}`
               : fmt(0);
-      statements.push(`const ${off} = editOffsetFromLine(${lineE}, ${arg});`);
+      statements.push(`const ${off} = offsetLine(${lineE}, ${arg});`);
     }
     return patchOf(sites, imports, statements);
   } catch (e) {

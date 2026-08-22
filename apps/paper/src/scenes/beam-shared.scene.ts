@@ -1,5 +1,5 @@
-import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
-import { segment } from "@design-scenes/geom";
+import { pointOnSegment } from "@design-scenes/euclid2";
+import { circle, point, segment } from "@design-scenes/geom";
 
 import { assembleBeam } from "../demo/beam";
 
@@ -9,14 +9,14 @@ export const sceneFile = "beam-shared.scene.ts";
 
 /** One radius literal feeds every ring and the roof hub. */
 export function scene() {
-  const a = editPoint(-6.85, 3.83);
-  const b = editPoint(5.71, 3.24);
+  const a = point(-6.85, 3.83);
+  const b = point(5.71, 3.24);
   const span = segment(a, b);
 
-  const p0 = editPointOnSegment(span, 0.25);
-  const p1 = editPointOnSegment(span, 0.5);
-  const p2 = editPointOnSegment(span, 0.75);
-  const r = editDistanceToPoint(p1, 1.33);
+  const p0 = pointOnSegment(span, 0.25);
+  const p1 = pointOnSegment(span, 0.5);
+  const p2 = pointOnSegment(span, 0.75);
+  const r = circle(p1, 1.33).radius;
 
   return assembleBeam({
     span,

@@ -2,7 +2,7 @@
 
 Shell chrome (nav, welcome, viewport panes, inspector, command palette) is Solid 2 (`@design-scenes/shell` under `packages/shell/src/ui/`). Canvas hosts stay vanilla TypeScript in `@design-scenes/hosts`.
 
-A file in `apps/paper/src/scenes/*.scene.ts` is the catalog. Plain `*.ts` in the same folder (e.g. `plate-layout.ts`) can hold shared `edit*` helpers and is not in nav. The shell Vite plugin parses catalog files (does not execute them) into `virtual:scene-catalog`. Nav and `?scene=` come from the catalog. **New scene** on the welcome screen POSTs `/__create-scene` and writes a starter `<id>.scene.ts`.
+A file in `apps/paper/src/scenes/*.scene.ts` is the catalog. Plain `*.ts` in the same folder (e.g. `plate-layout.ts`) can hold shared constructors and is not in nav. The shell Vite plugin parses catalog files (does not execute them) into `virtual:scene-catalog`. Nav and `?scene=` come from the catalog. **New scene** on the welcome screen POSTs `/__create-scene` and writes a starter `<id>.scene.ts`.
 
 Id defaults to the filename stem (`beam.scene.ts` → `beam`). Override with `export const id`.
 
@@ -44,7 +44,7 @@ Layout files must not import pane modules. Live drag still updates the other pan
 | ----------------- | ------------------------------------------------ | ---------- |
 | Cream stroke      | Geometry (`line`, `circle`, `segment`, `drawPlate`, SDF fill) | nothing |
 | Coral             | Editable handle (point, radius, offset, vector, …) | literals |
-| HUD slider        | Number widget (`editNumber` / `slider`)          | `n`        |
+| HUD slider        | Number widget (`slider`)                         | `n`        |
 | Hover / select    | Pick highlight                                   | nothing    |
 
 ## Space palette
@@ -61,7 +61,7 @@ euclid2:
 4. **Offset** — LineLike (Line, Segment, `offset.line`), then Length (same introductions as Circle; Point → `signedDist`). Emits `offsetLine(...)`. Further intersects use `.line`.
 5. **Slider** — type or click-measure → `const r = slider(1.8)`. Length-slot click reuses the name.
 
-sdf2: Point + Distance only (`editPoint` / `editDistanceToPoint`). Existing catalog scenes keep `edit*`; Space on euclid2 no longer inserts them.
+sdf2: Point + Distance only. Point writes `point(x, y)`; Distance writes `circle` / `offsetLine`. Coral rings come from annotated constructors (sdf2 collects drawables even though it does not stroke cream geometry).
 
 `scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). `group()` is only a path namespace. A return value is still flattened for older scenes that list geometry in `group(() => […])`.
 
@@ -77,11 +77,11 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [?scene=beam](http://127.0.0.1:43117/?scene=beam)               | One truss. `group()` namespaces **paths** (`group[0] › line[2]`). The roof uses the middle ring’s `r1`.                                                                                                                         |
 | [?scene=flat](http://127.0.0.1:43117/?scene=flat)               | Two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.                                                                                          |
-| [?scene=shared](http://127.0.0.1:43117/?scene=shared)           | One `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag a ring: everything follows in real time; one literal is written on release.                                                                    |
-| [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `editPoint`. A `for` calls `editDistanceToPoint(p, 0.4)` and `circle(p, r)`. Five rings, one `0.4`. Drag any ring: all five follow; pointer-up rewrites that single literal.             |
-| [?scene=plate](http://127.0.0.1:43117/?scene=plate)             | Milled plate: stock, four corner bolts (one **editVector** inset mirrored to all corners; shared **drill Ø** helpers), polar array, pocket fillets on **editPointOnLine** bisectors, slot (**editPointOnSegment** on top edge). |
+| [?scene=shared](http://127.0.0.1:43117/?scene=shared)           | One `circle(p1, 1.33)` feeds all three rings and `hubRadius`. Drag a ring: everything follows in real time; one literal is written on release.                                                                    |
+| [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `point`. A `for` calls `circle(p, 1)`. Five rings, one `1`. Drag any ring: all five follow; pointer-up rewrites that single literal.             |
+| [?scene=plate](http://127.0.0.1:43117/?scene=plate)             | Milled plate: stock, four corner bolts (one **vector** inset mirrored to all corners; shared **drill Ø** helpers), polar array, pocket fillets on **pointOnLine** bisectors, slot (**pointOnSegment** on top edge). |
 | [?scene=nest](http://127.0.0.1:43117/?scene=nest)               | Print grid. `withoutWidgets(plateLayout)` instanced in a nest; columns / rows / gap are titled sliders. Polar-array **count steps by column**.                                                                                  |
-| [?scene=relative](http://127.0.0.1:43117/?scene=relative)       | Offset handle. Left `editPoint` writes position; `editVector` writes `dx`/`dy`; the second centre is derived.                                                                                                                   |
+| [?scene=relative](http://127.0.0.1:43117/?scene=relative)       | Offset handle. Left `point` writes position; `vector` writes `dx`/`dy`; the second centre is derived.                                                                                                                   |
 | [?scene=gear](http://127.0.0.1:43117/?scene=gear)               | Involute spur pair. Drag the pinion centre, pitch radius, and **mesh angle**. Tooth counts, pressure, and helix are titled sliders. The wheel is derived.                                                                       |
 | [?scene=ring](http://127.0.0.1:43117/?scene=ring)               | Signet band, unrolled. Plan-view bore + developed strip (`2πR`). Shank and signet heights are distances on the paper; Gauge is wall thickness.                                                                                  |
 | [?scene=ringsplit](http://127.0.0.1:43117/?scene=ringsplit)     | Same library wrapped with `wrapBand` around a cylinder. The 3D scene has no widgets — a second view of `ring.ts`.                                                                                                               |

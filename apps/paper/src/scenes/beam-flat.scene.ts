@@ -1,5 +1,5 @@
-import { editDistanceToPoint, editPoint, editPointOnSegment } from "@design-scenes/euclid2";
-import { segment } from "@design-scenes/geom";
+import { pointOnSegment } from "@design-scenes/euclid2";
+import { circle, point, segment } from "@design-scenes/geom";
 
 import { assembleBeamFlat } from "../demo/beam";
 
@@ -7,17 +7,17 @@ export const id = "flat";
 export const title = "Flat";
 export const sceneFile = "beam-flat.scene.ts";
 
-/** Two trusses, no group — each handle is its own unrolled edit*. */
+/** Two trusses, no group — each handle is its own unrolled constructor. */
 export function scene() {
-  const aTop = editPoint(-4.72, 0.37);
-  const bTop = editPoint(5.89, 1.09);
+  const aTop = point(-4.88, 2.49);
+  const bTop = point(5.89, 1.09);
   const spanTop = segment(aTop, bTop);
-  const p0Top = editPointOnSegment(spanTop, 0.25);
-  const r0Top = editDistanceToPoint(p0Top, 1.18);
-  const p1Top = editPointOnSegment(spanTop, 0.49);
-  const r1Top = editDistanceToPoint(p1Top, 2.59);
-  const p2Top = editPointOnSegment(spanTop, 0.75);
-  const r2Top = editDistanceToPoint(p2Top, 1.33);
+  const p0Top = pointOnSegment(spanTop, 0.25);
+  const r0Top = circle(p0Top, 1.18).radius;
+  const p1Top = pointOnSegment(spanTop, 0.51);
+  const r1Top = circle(p1Top, 3.3).radius;
+  const p2Top = pointOnSegment(spanTop, 0.75);
+  const r2Top = circle(p2Top, 1.33).radius;
   const top = assembleBeamFlat({
     span: spanTop,
     rings: [
@@ -27,15 +27,15 @@ export function scene() {
     ],
   });
 
-  const aBot = editPoint(9.56, 4.22);
-  const bBot = editPoint(-1.26, 6.95);
+  const aBot = point(9.56, 4.22);
+  const bBot = point(-1.26, 6.95);
   const spanBot = segment(aBot, bBot);
-  const p0Bot = editPointOnSegment(spanBot, 0.3);
-  const r0Bot = editDistanceToPoint(p0Bot, 1.24);
-  const p1Bot = editPointOnSegment(spanBot, 0.55);
-  const r1Bot = editDistanceToPoint(p1Bot, 1.62);
-  const p2Bot = editPointOnSegment(spanBot, 0.8);
-  const r2Bot = editDistanceToPoint(p2Bot, 1);
+  const p0Bot = pointOnSegment(spanBot, 0.27);
+  const r0Bot = circle(p0Bot, 1.24).radius;
+  const p1Bot = pointOnSegment(spanBot, 0.55);
+  const r1Bot = circle(p1Bot, 1.62).radius;
+  const p2Bot = pointOnSegment(spanBot, 0.8);
+  const r2Bot = circle(p2Bot, 1).radius;
   const bottom = assembleBeamFlat({
     span: spanBot,
     rings: [

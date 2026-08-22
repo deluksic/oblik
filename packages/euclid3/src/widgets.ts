@@ -1,4 +1,4 @@
-import { lerp3, point3, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
+import { lerp3, point3 as makePoint3, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
 
 export type SiteOpts3 = {
   file?: string;
@@ -61,17 +61,17 @@ export function getGizmos3(): readonly Gizmo3[] {
   return gizmos;
 }
 
-export function editPoint3(x: number, y: number, z: number, site?: SiteOpts3): Point3 {
+export function point3(x: number, y: number, z: number, site?: SiteOpts3): Point3 {
   const located = siteFrom(site);
   const o = located ? overrides.get(located.site) : undefined;
   const px = o?.[0] ?? x;
   const py = o?.[1] ?? y;
   const pz = o?.[2] ?? z;
   if (located) gizmos.push({ kind: "point3", ...located, x: px, y: py, z: pz });
-  return point3(px, py, pz);
+  return makePoint3(px, py, pz);
 }
 
-export function editDistance3(origin: Vec3, d: number, site?: SiteOpts3): number {
+export function distance3(origin: Vec3, d: number, site?: SiteOpts3): number {
   const located = siteFrom(site);
   const o = located ? overrides.get(located.site) : undefined;
   const dist = o?.[0] ?? d;
@@ -86,7 +86,7 @@ export function editDistance3(origin: Vec3, d: number, site?: SiteOpts3): number
   return dist;
 }
 
-export function editPointOnSegment3(seg: Segment3, t: number, site?: SiteOpts3): Point3 {
+export function pointOnSegment3(seg: Segment3, t: number, site?: SiteOpts3): Point3 {
   const located = siteFrom(site);
   const o = located ? overrides.get(located.site) : undefined;
   const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
@@ -100,7 +100,7 @@ export function editPointOnSegment3(seg: Segment3, t: number, site?: SiteOpts3):
     });
   }
   const p = lerp3(seg.a, seg.b, tt);
-  return point3(p.x, p.y, p.z);
+  return makePoint3(p.x, p.y, p.z);
 }
 
 export function gizmoValues3(g: Gizmo3): number[] {

@@ -7,6 +7,7 @@ import {
   drawGizmoOverlay,
   drawNumberHud,
   getGizmos,
+  gizmosFromDrawables,
   gizmoValues,
   hitTest,
   numberValueFromPointer,
@@ -22,7 +23,9 @@ import {
   type SceneModule,
 } from "@design-scenes/euclid2";
 import {
+  beginGeomFrame,
   breadcrumb,
+  collectDrawables,
   dist,
   perp,
   projectT,
@@ -214,9 +217,10 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             frame = runScene(sceneMod as unknown as SceneModule, sceneId);
             lastGood = frame;
           } else {
+            beginGeomFrame();
             beginWidgetFrame(sceneId);
             sdf = (sceneMod as unknown as Sdf2SceneMod).scene();
-            sdfGizmos = getGizmos();
+            sdfGizmos = [...getGizmos(), ...gizmosFromDrawables(collectDrawables())];
           }
           error = null;
         } catch (err) {

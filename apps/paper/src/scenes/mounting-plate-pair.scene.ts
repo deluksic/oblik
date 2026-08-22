@@ -1,4 +1,4 @@
-import { editPoint } from "@design-scenes/euclid2";
+import { point } from "@design-scenes/geom";
 
 import { drawMountingPlatePair } from "../demo/mounting-plate";
 import { mountingPlateLayout } from "./mounting-plate-layout";
@@ -10,6 +10,6 @@ export const camera = { x: 4, y: 0.5, scale: 40 };
 
 export function scene() {
   const master = mountingPlateLayout();
-  const secondOrigin = editPoint(5.5, 0);
+  const secondOrigin = point(5.5, 0);
   return drawMountingPlatePair(master, secondOrigin);
 }

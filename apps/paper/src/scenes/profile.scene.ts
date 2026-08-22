@@ -1,4 +1,4 @@
-import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
+import { circle, point } from "@design-scenes/geom";
 
 import { PROFILE_SMOOTH, profileSdf, type ProfileLayout } from "../demo/profile";
 
@@ -13,12 +13,12 @@ export const hint = "X = radial from each rim · Y is world Z";
  * (0 = on the circle), Y is world Z. Three unrolled circles.
  */
 export function profileLayout(): ProfileLayout {
-  const c0 = editPoint(-0.01, 0.1);
-  const r0 = editDistanceToPoint(c0, 0.2);
-  const c1 = editPoint(-0.01, 0.38);
-  const r1 = editDistanceToPoint(c1, 0.05);
-  const c2 = editPoint(0.16, 0.03);
-  const r2 = editDistanceToPoint(c2, 0.11);
+  const c0 = point(-0.01, 0.1);
+  const r0 = circle(c0, 0.2).radius;
+  const c1 = point(-0.01, 0.38);
+  const r1 = circle(c1, 0.05).radius;
+  const c2 = point(0.16, 0.03);
+  const r2 = circle(c2, 0.11).radius;
   return {
     circles: [
       { c: c0, r: r0 },

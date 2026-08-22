@@ -7,7 +7,7 @@ packages/
   geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude, wrapBand), UUID id, path, provenance
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   sdf       @design-scenes/sdf       field CSG (no identity), 2D profile + 3D compile, raymarch view
-  euclid3   @design-scenes/euclid3   3D scene type: Three.js view, editPoint3 / editDistance3 / editPointOnSegment3
+  euclid3   @design-scenes/euclid3   3D scene type: Three.js view, point3 / distance3 / pointOnSegment3
   shell     @design-scenes/shell     Vite plugin (peek, patch, insert-editor, catalog, create-scene) + pane workspace
   hosts     @design-scenes/hosts     pane hosts (2D + 3D); may import euclid2, euclid3, sdf, shell
 apps/
@@ -57,15 +57,15 @@ New writable constructor: one `CALL_SITES` row. New Space verb: one `TOOLS` row 
 
 ## Widget writes
 
-Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `__annotations__: { file, at, editable }` onto the module that runs; disk unchanged. If `__annotations__` is already on the call, overwrite and warn. A loop that calls `editDistanceToPoint(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal `edit*` count.
+Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `__annotations__: { file, at, editable }` onto the module that runs; disk unchanged. If `__annotations__` is already on the call, overwrite and warn. A loop that calls `circle(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal constructor count.
 
 Shared parameters can live in a helper next to catalog scenes (e.g. `plate-layout.ts`). Dragging a plate handle writes that helper; mill’s thickness glider writes `mill.scene.ts`.
 
-Written-back arguments must be **numeric literals**. `editPoint(a.x + 2.4, a.y + 1.05)` cannot be patched (no numeric tokens). Declare the offset with `editVector(origin, dx, dy)` instead (`?scene=relative`).
+Written-back arguments must be **numeric literals**. `point(a.x + 2.4, a.y + 1.05)` cannot be patched (no numeric tokens). Declare the offset with `vector(origin, dx, dy)` instead (`?scene=relative`).
 
-`editNumber(n, { label, min, max, step })` is a screen-space titled slider for counts and other non-spatial parameters. `editAngle(origin, degrees)` is a world-space polar handle (literal is degrees, return value is radians). World gizmos stay for points, radii, angles, offsets, and extrusion thickness. The patcher writes the first numeric argument of `editNumber` and the degree argument of `editAngle`.
+`slider(n, { label, min, max, step })` is a screen-space titled slider for counts and other non-spatial parameters. `angle(origin, degrees)` is a world-space polar handle (literal is degrees, return value is radians). World gizmos stay for points, radii, angles, offsets, and extrusion thickness. The patcher writes the first numeric argument of `slider` and the degree argument of `angle`.
 
-A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, source)` from euclid2: `edit*` do not enqueue gizmos. Silent reads use a **published snapshot** of the source’s overrides (`publishWidgetOverrides(source)` after the 2D frame), keyed by file:line:column. **`source` is the catalog id** (filename stem, or `export const id`). Two 2D editors must not share a channel. `getGizmos()` returns a **copy**. Split mill follows a plate drag because the euclid2 host publishes `"plate"` after each plate evaluate. `?scene=nest` is the same silent read, then a library nest that **steps a parameter by cell**. `?scene=rose` silent-reads `"cylinder"` and `"profile"` side by side.
+A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, source)` from euclid2: constructors do not enqueue gizmos (draw is also silenced). Silent reads use a **published snapshot** of the source’s overrides (`publishWidgetOverrides(source)` after the 2D frame), keyed by file:line:column. **`source` is the catalog id** (filename stem, or `export const id`). Two 2D editors must not share a channel. `getGizmos()` returns a **copy**. Split mill follows a plate drag because the euclid2 host publishes `"plate"` after each plate evaluate. `?scene=nest` is the same silent read, then a library nest that **steps a parameter by cell**. `?scene=rose` silent-reads `"cylinder"` and `"profile"` side by side.
 
 ## HMR
 

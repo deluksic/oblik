@@ -1,5 +1,5 @@
 import { withoutWidgets } from "@design-scenes/euclid2";
-import { editPointOnSegment3 } from "@design-scenes/euclid3";
+import { pointOnSegment3 } from "@design-scenes/euclid3";
 import { segment3 } from "@design-scenes/geom";
 
 import { drawHelicalPair } from "../demo/gear";
@@ -35,6 +35,6 @@ export function scene() {
     { x: g.pinion.x, y: g.pinion.y, z: 0 },
     { x: g.pinion.x, y: g.pinion.y, z: 6 },
   );
-  const height = Math.max(0.4, editPointOnSegment3(mast, 0.1).z);
+  const height = Math.max(0.4, pointOnSegment3(mast, 0.1).z);
   return drawHelicalPair(g, height);
 }

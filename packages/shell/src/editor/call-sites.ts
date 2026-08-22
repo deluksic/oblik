@@ -12,19 +12,15 @@ export type CallSiteSpec = {
 };
 
 export const CALL_SITES: readonly CallSiteSpec[] = [
-  { name: "editPoint", dof: [0, 1], patch: [0, 1] },
   { name: "point", dof: [0, 1], patch: [0, 1] },
-  { name: "editPoint3", dof: [0, 1, 2], patch: [0, 1, 2] },
-  { name: "editDistanceToPoint", dof: [1], patch: [1] },
-  { name: "editDistance3", dof: [1], patch: [1] },
-  { name: "editPointOnSegment", dof: [1], patch: [1] },
-  { name: "editPointOnSegment3", dof: [1], patch: [1] },
-  { name: "editPointOnLine", dof: [2], patch: [2] },
-  { name: "editNumber", dof: [0], patch: [0] },
+  { name: "point3", dof: [0, 1, 2], patch: [0, 1, 2] },
+  { name: "distance3", dof: [1], patch: [1] },
+  { name: "pointOnSegment", dof: [1], patch: [1] },
+  { name: "pointOnSegment3", dof: [1], patch: [1] },
+  { name: "pointOnLine", dof: [2], patch: [2] },
   { name: "slider", dof: [0], patch: [0] },
-  { name: "editAngle", dof: [1], patch: [1] },
-  { name: "editVector", dof: [1, 2], patch: [1, 2] },
-  { name: "editOffsetFromLine", dof: [1], patch: [1] },
+  { name: "angle", dof: [1], patch: [1] },
+  { name: "vector", dof: [1, 2], patch: [1, 2] },
   { name: "circle", dof: [1], patch: [1] },
   { name: "offsetLine", dof: [1], patch: [1] },
   { name: "line" },
@@ -50,7 +46,8 @@ export const WRITABLE_CALL_NAMES = new Set(
   CALL_SITES.filter((s) => s.patch && s.patch.length > 0).map((s) => s.name),
 );
 
-export const EDIT_NAMES = new Set(CALL_SITES.filter((s) => s.name.startsWith("edit")).map((s) => s.name));
+/** @deprecated Prefix is gone; writable callees are `WRITABLE_CALL_NAMES`. */
+export const EDIT_NAMES = new Set<string>();
 
 /** First index and count of a consecutive `patch` run. */
 export function patchSpan(spec: CallSiteSpec): { start: number; count: number } | undefined {

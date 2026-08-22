@@ -51,7 +51,7 @@ export function findSceneFunction(sourceFile: ts.SourceFile): ts.FunctionDeclara
   return null;
 }
 
-/** Const name if this call is `const foo = point(...)` / `editPoint(...)`. */
+/** Const name if this call is `const foo = point(...)`. */
 export function widgetBindingName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
   const call = findIdentifierCallAt(sf, at.line, at.column, (n) => SITE_CALL_NAMES.has(n));
@@ -82,11 +82,11 @@ export function widgetInSceneFunction(source: string, at: SourceAt): boolean {
 
 export type ScenePointBinding = {
   name: string;
-  kind: "editPoint" | "derived";
+  kind: "point" | "derived";
 };
 
 /**
- * Named 2D points in exported `scene()`: `editPoint` and derived `const p = point(...)`.
+ * Named 2D points in exported `scene()`: `point(...)` and derived intersections.
  * Closest match to (x, y) within `maxDist` wins; `null` if none.
  */
 export function namedScenePointNear(
@@ -120,9 +120,8 @@ export function namedScenePointBindings(source: string): Map<string, ScenePointB
       const call = unwrapCall(decl.initializer);
       if (!call || !ts.isIdentifier(call.expression)) continue;
       const fnName = call.expression.text;
-      if (fnName === "editPoint") names.set(decl.name.text, "editPoint");
+      if (fnName === "point") names.set(decl.name.text, "point");
       else if (
-        fnName === "point" ||
         fnName === "lineIntersection" ||
         fnName === "circleLineIntersection" ||
         fnName === "circleCircleIntersection"
@@ -435,6 +434,7 @@ export function evalDerivedScenePoints(
         const y = evalNumber(ay, env);
         if (x == null || y == null) continue;
         env.set(decl.name.text, { x, y });
+        if (known.some((k) => k.name === decl.name.text)) continue;
         out.push({ name: decl.name.text, x, y });
       } else if (fnName === "circle") {
         const cName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
@@ -738,13 +738,13 @@ export function ensureNamedImport(
   return source.slice(0, last.getEnd()) + `, ${missing.join(", ")}` + source.slice(last.getEnd());
 }
 
-/** First argument identifier of editDistanceToPoint(...) at this site, if any. */
+/** First argument identifier of circle(...) at this site, if any. */
 export function distanceOriginName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
   const call = findEditCallAt(sf, at.line, at.column);
   if (!call) return null;
   const expr = call.expression;
-  if (!ts.isIdentifier(expr) || expr.text !== "editDistanceToPoint") {
+  if (!ts.isIdentifier(expr) || expr.text !== "circle") {
     return null;
   }
   const first = call.arguments[0];
@@ -778,12 +778,12 @@ function bindPointRef(
   ref: PointRef,
   constLines: string[],
   used: Set<string>,
-  euclidImports: Set<string>,
+  geomImports: Set<string>,
 ): string {
   if ("name" in ref) return ref.name;
-  euclidImports.add("editPoint");
+  geomImports.add("point");
   const name = freshName("p", used);
-  constLines.push(`const ${name} = editPoint(${formatNum(ref.x)}, ${formatNum(ref.y)});`);
+  constLines.push(`const ${name} = point(${formatNum(ref.x)}, ${formatNum(ref.y)});`);
   return name;
 }
 
@@ -829,46 +829,43 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
   for (const e of edits) {
     switch (e.kind) {
       case "point": {
-        euclidImports.add("editPoint");
+        geomImports.add("point");
         const name = freshName("p", used);
         lastPoint = name;
-        constLines.push(`const ${name} = editPoint(${formatNum(e.x)}, ${formatNum(e.y)});`);
+        constLines.push(`const ${name} = point(${formatNum(e.x)}, ${formatNum(e.y)});`);
         break;
       }
       case "distance": {
-        euclidImports.add("editDistanceToPoint");
+        geomImports.add("circle");
         const origin = e.originName ?? lastPoint;
         if (!origin) {
           throw new Error("distance needs a point in scene() or a new point first");
         }
         const name = freshName("d", used);
-        constLines.push(`const ${name} = editDistanceToPoint(${origin}, ${formatNum(e.d)});`);
+        constLines.push(`const ${name} = circle(${origin}, ${formatNum(e.d)});`);
         break;
       }
       case "circle": {
         geomImports.add("circle");
-        const center = bindPointRef(e.center, constLines, used, euclidImports);
+        const center = bindPointRef(e.center, constLines, used, geomImports);
         if ("radius" in e) {
           constLines.push(`circle(${center}, ${e.radius});`);
         } else {
-          euclidImports.add("editDistanceToPoint");
-          const d = freshName("d", used);
-          constLines.push(`const ${d} = editDistanceToPoint(${center}, ${formatNum(e.r)});`);
-          constLines.push(`circle(${center}, ${d});`);
+          constLines.push(`circle(${center}, ${formatNum(e.r)});`);
         }
         break;
       }
       case "segment": {
         geomImports.add("segment");
-        const a = bindPointRef(e.a, constLines, used, euclidImports);
-        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        const a = bindPointRef(e.a, constLines, used, geomImports);
+        const b = bindPointRef(e.b, constLines, used, geomImports);
         constLines.push(`segment(${a}, ${b});`);
         break;
       }
       case "infiniteLine": {
         geomImports.add("line");
-        const a = bindPointRef(e.a, constLines, used, euclidImports);
-        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        const a = bindPointRef(e.a, constLines, used, geomImports);
+        const b = bindPointRef(e.b, constLines, used, geomImports);
         constLines.push(`line(${a}, ${b});`);
         break;
       }
@@ -878,15 +875,15 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
         break;
       }
       case "rect": {
-        const a = bindPointRef(e.a, constLines, used, euclidImports);
-        const b = bindPointRef(e.b, constLines, used, euclidImports);
+        const a = bindPointRef(e.a, constLines, used, geomImports);
+        const b = bindPointRef(e.b, constLines, used, geomImports);
         pushRectFromCornerPoints(a, b, constLines, used, geomImports);
         break;
       }
       case "offsetFirst": {
-        euclidImports.add("editOffsetFromLine");
+        geomImports.add("offsetLine");
         const off = freshName("off", used);
-        constLines.push(`const ${off} = editOffsetFromLine(${e.base}, ${formatNum(e.d)});`);
+        constLines.push(`const ${off} = offsetLine(${e.base}, ${formatNum(e.d)});`);
         break;
       }
       case "offsetReuse": {

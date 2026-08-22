@@ -1,4 +1,4 @@
-import { editDistanceToPoint } from "@design-scenes/euclid2";
+import { circle } from "@design-scenes/geom";
 
 import { CYLINDER_RADIUS, drawCylinderPlan, type CylinderLayout } from "../demo/cylinder";
 
@@ -13,10 +13,10 @@ const origin = { x: 0, y: 0 };
  * quatrefoil ring radius, centre ball Ø, foil Ø. The hex pack is fixed.
  */
 export function cylinderLayout(): CylinderLayout {
-  const ringR = editDistanceToPoint(origin, 1.21);
-  const centerR = editDistanceToPoint(origin, 0.92);
+  const ringR = circle(origin, 1.21).radius;
+  const centerR = circle(origin, 0.92).radius;
   const ring0 = { x: 0, y: -ringR };
-  const ringBallR = editDistanceToPoint(ring0, 0.87);
+  const ringBallR = circle(ring0, 0.87).radius;
   return {
     radius: CYLINDER_RADIUS,
     ringR,

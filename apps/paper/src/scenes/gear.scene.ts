@@ -1,5 +1,5 @@
-import { editAngle, editDistanceToPoint, editNumber, editPoint } from "@design-scenes/euclid2";
-import { segment, type Vec2 } from "@design-scenes/geom";
+import { angle, slider } from "@design-scenes/euclid2";
+import { circle, point, segment, type Vec2 } from "@design-scenes/geom";
 
 import {
   centerDistance,
@@ -22,18 +22,18 @@ export const camera = { x: 0.4, y: 0.15, scale: 28 };
  * Helix ° is unused in 2D — the 3D scene reads it for twist.
  */
 export function gearLayout(): GearLayout {
-  const pinion = editPoint(-4.75, 0.05);
-  const z1 = editNumber(14, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
-  const z2 = editNumber(40, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
-  const pitch1 = editDistanceToPoint(pinion, 1.8);
-  const pressureDeg = editNumber(25, {
+  const pinion = point(-4.75, 0.05);
+  const z1 = slider(14, { label: "Pinion teeth", min: 8, max: 36, step: 1 });
+  const z2 = slider(40, { label: "Wheel teeth", min: 8, max: 40, step: 1 });
+  const pitch1 = circle(pinion, 1.8).radius;
+  const pressureDeg = slider(25, {
     label: "Pressure °",
     min: 14.5,
     max: 25,
     step: 0.5,
   });
-  const rot1 = editAngle(pinion, 49, { radius: pitch1 });
-  const helixDeg = editNumber(35, {
+  const rot1 = angle(pinion, 49, { radius: pitch1 });
+  const helixDeg = slider(35, {
     label: "Helix °",
     min: 0,
     max: 35,
