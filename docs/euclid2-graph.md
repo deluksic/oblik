@@ -2,17 +2,21 @@
 
 Disk is the graph the tool writes. The **call-site annotator** (today: `injectSceneSites` in the Vite pre-transform) rewrites constructor calls in the **module that runs**. Disk is unchanged.
 
-It already splices `{ file, at: [line, column] }`. It should also splice `{ editable: true }` when that call’s DOF slots are numeric literals.
+Annotator-owned fields live under `__annotations__`, not mixed into user options (`label`, `{ editable: false }`, …). If that key is already present, **overwrite it** and warn.
 
 ```
 // disk                                      // after annotator
-circle(c, 2.4)                            →  circle(c, 2.4, { file, at, editable: true })
-circle(c, dist(c, q))                     →  circle(c, dist(c, q), { file, at })
-point(1.2, 0.4)                           →  point(1.2, 0.4, { file, at, editable: true })
-offsetLine(L, 1.2)                        →  offsetLine(L, 1.2, { file, at, editable: true })
+circle(c, 2.4)
+  → circle(c, 2.4, { __annotations__: { file, at, editable: true } })
+
+circle(c, dist(c, q))
+  → circle(c, dist(c, q), { __annotations__: { file, at, editable: false } })
+
+circle(c, 2.4, { editable: false })
+  → circle(c, 2.4, { editable: false, __annotations__: { file, at, editable: false } })
 ```
 
-`editable: true` is not something the user is meant to maintain. If they type it onto a computation, the annotator does **not** emit it (literals only). If they type `{ editable: false }` next to a literal, honor that (frozen constant).
+`editable: true` in `__annotations__` only when DOF args are numeric literals (and disk did not freeze). User-typed `__annotations__` is never trusted. Public `{ editable: false }` is the freeze.
 
 Not the HMR path (`hot.accept`, swallow widget writes). Same pass on first load and on save.
 
