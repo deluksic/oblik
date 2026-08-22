@@ -24,6 +24,8 @@ export type InspectState = {
   sourceHtml: string;
   status: string;
   error: string | null;
+  /** World cursor, shown on the right of the pane status strip. */
+  cursor?: string | null;
 };
 
 export type InspectPatch = Partial<InspectState>;

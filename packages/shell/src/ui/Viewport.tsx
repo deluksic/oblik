@@ -85,6 +85,7 @@ function LayoutPane(props: LayoutPaneProps) {
         commandBar={props.focusedId === props.id ? props.commandBar : null}
         status={props.inspectByPane()[props.id]?.status ?? ""}
         error={props.inspectByPane()[props.id]?.error ?? null}
+        cursor={props.inspectByPane()[props.id]?.cursor ?? null}
         onFocus={() => props.onFocusPane(props.id)}
         onPickCommand={props.onPickCommand}
         onClosePicker={props.onClosePicker}

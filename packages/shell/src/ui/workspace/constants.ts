@@ -6,6 +6,7 @@ export const WELCOME_INSPECT: InspectState = {
   sourceHtml: `<code class="empty">Nothing to inspect until a pane is focused.</code>`,
   status: "Open a scene from the nav, or create a new TypeScript file.",
   error: null,
+  cursor: null,
 };
 
 export function singleSceneLayout(id: string): SceneLayout {

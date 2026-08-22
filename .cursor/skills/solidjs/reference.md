@@ -63,17 +63,19 @@ export type InspectState = {
   sourceHtml: string;
   status: string;
   error: string | null;
+  /** World cursor (`1.20, -0.45`) on the right of the pane status strip. */
+  cursor?: string | null;
 };
 export type InspectPatch = Partial<InspectState>;
 ```
 
-Hosts call `ctx.onInspect?.(patch)`. Shell merges into a per-pane signal. The focused pane's patch feeds Identity in the inspect column. **Status and error render in a reserved strip at the bottom of that pane** — not a global banner — so a throw in one view does not shift the workspace or other canvases.
+Hosts call `ctx.onInspect?.(patch)`. Shell merges into a per-pane signal. The focused pane's patch feeds Identity in the inspect column. **Status, error, and cursor render in a reserved strip at the bottom of that pane** — status left, world cursor right. A throw in one view does not shift the workspace or other canvases.
 
 `packages/hosts/src/pane.ts` helpers take `InspectPush` instead of DOM elements:
 
 - `showWidgetInspect(push, …)`
 - `showEmptyInspect(push, …)`
-- `setPaneStatus(push, status, error)`
+- `setPaneStatus(push, status, error, cursor?)`
 
 ## Command bar
 

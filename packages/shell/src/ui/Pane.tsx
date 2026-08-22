@@ -29,6 +29,7 @@ export type PaneProps = {
   commandBar: CommandBarState | null;
   status: string;
   error: string | null;
+  cursor: string | null;
   onFocus: () => void;
   onPickCommand: (id: string) => void;
   onClosePicker: () => void;
@@ -137,7 +138,10 @@ export function Pane(props: PaneProps) {
           class={[styles.status, { [styles.statusError]: props.error != null }]}
           role={props.error ? "alert" : "status"}
         >
-          {props.error ?? (props.status.trim() === "" ? "\u00a0" : props.status)}
+          <span class={styles.statusMsg}>
+            {props.error ?? (props.status.trim() === "" ? "\u00a0" : props.status)}
+          </span>
+          <span class={styles.statusCursor}>{props.cursor ?? "\u00a0"}</span>
         </p>
       </div>
     </section>

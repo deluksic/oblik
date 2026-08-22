@@ -44,7 +44,7 @@ import {
 
 import { paletteCommands } from "./tools/catalog";
 import { drawGhost, sessionGhostView } from "./tools/ghost";
-import { commitScenePatch, peekFile, quantize, renderSnippet } from "./inspect";
+import { commitScenePatch, formatWorldCursor, peekFile, quantize, renderSnippet } from "./inspect";
 import {
   advanceSessionField,
   commitSession,
@@ -187,6 +187,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let session: ToolSession | null = null;
       let lastHover: import("./tools/session").SessionHover | null = null;
       let ghost: Vec2 | null = null;
+      let cursor: string | null = null;
 
       // geom-only
       let frame: Frame | null = null;
@@ -329,6 +330,19 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return hintOf(sceneMod, "Space adds an editor · X radial, Y is Z");
         }
         return hintOf(sceneMod, "Space adds an editor · drag handles · wheel zooms");
+      }
+
+      function noteCursor(world: Vec2): void {
+        cursor = formatWorldCursor(world);
+      }
+
+      function flushStatus(): void {
+        setPaneStatus(
+          pushInspect,
+          error ? "Last good frame · scene threw" : sessionPreview(session)?.hint ?? statusHint(),
+          error,
+          cursor,
+        );
       }
 
       function clearTool(): void {
@@ -480,13 +494,10 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         );
         if (quiet && !error) {
           if (session) syncCommandBar();
+          flushStatus();
           return;
         }
-        setPaneStatus(
-          pushInspect,
-          error ? "Last good frame · scene threw" : sessionPreview(session)?.hint ?? statusHint(),
-          error,
-        );
+        flushStatus();
         if (session) syncCommandBar();
         void updateInspect();
       }
@@ -631,17 +642,20 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             x: pan.camX - (p.x - pan.x) / cam.scale,
             y: pan.camY + (p.y - pan.y) / cam.scale,
           };
+          noteCursor(screenToWorld(cam, p, w, height));
           render(true);
           return;
         }
+        const world = screenToWorld(cam, p, w, height);
+        noteCursor(world);
         if (session) {
-          ghost = screenToWorld(cam, p, w, height);
+          ghost = world;
           updateSnap(e, ghost);
           render(true);
           return;
         }
         if (drag) {
-          applyDrag(drag.gizmo, screenToWorld(cam, p, w, height), p, w, height, gizmos(), sceneId);
+          applyDrag(drag.gizmo, world, p, w, height, gizmos(), sceneId);
           evaluate();
           render();
           return;
@@ -662,7 +676,15 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
                   ? "pointer"
                   : "crosshair";
           render();
+          return;
         }
+        flushStatus();
+      }
+
+      function onPointerLeave(): void {
+        if (pan || drag) return;
+        cursor = null;
+        flushStatus();
       }
 
       async function onPointerUp(): Promise<void> {
@@ -690,11 +712,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         e.preventDefault();
         const { w, h } = cssSize(canvas);
         cam = zoomAt(cam, { x: e.offsetX, y: e.offsetY }, w, h, e.deltaY < 0 ? 1.08 : 1 / 1.08);
+        noteCursor(screenToWorld(cam, { x: e.offsetX, y: e.offsetY }, w, h));
         render(true);
       }
 
       canvas.addEventListener("pointerdown", onPointerDown);
       canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerleave", onPointerLeave);
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerCancel);
       canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -757,6 +781,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);
           canvas.removeEventListener("pointermove", onPointerMove);
+          canvas.removeEventListener("pointerleave", onPointerLeave);
           canvas.removeEventListener("pointerup", onPointerUp);
           canvas.removeEventListener("pointercancel", onPointerCancel);
           canvas.removeEventListener("wheel", onWheel);

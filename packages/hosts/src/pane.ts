@@ -58,8 +58,13 @@ export function showEmptyInspect(
   push({ crumb, meta, sourceHtml });
 }
 
-export function setPaneStatus(push: InspectPush, status: string, error: string | null): void {
-  push({ status, error });
+export function setPaneStatus(
+  push: InspectPush,
+  status: string,
+  error: string | null,
+  cursor?: string | null,
+): void {
+  push(cursor === undefined ? { status, error } : { status, error, cursor });
 }
 
 export async function commitGizmoIfChanged(

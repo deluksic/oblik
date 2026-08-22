@@ -2,6 +2,11 @@ export function quantize(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** World cursor for the pane status strip: always two decimals, tabular. */
+export function formatWorldCursor(p: { x: number; y: number }): string {
+  return `${quantize(p.x).toFixed(2)}, ${quantize(p.y).toFixed(2)}`;
+}
+
 export function escapeHtml(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

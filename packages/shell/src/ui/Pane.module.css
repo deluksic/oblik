@@ -59,9 +59,28 @@
   color: var(--muted, #9a9488);
   font-size: 0.75rem;
   line-height: 1.3;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.statusMsg {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusCursor {
+  flex: 0 0 8.5rem;
+  width: 8.5rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text, #ece8de);
+  opacity: 0.72;
 }
 
 .statusError {
