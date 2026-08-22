@@ -1,7 +1,6 @@
 import {
   add,
   ang,
-  arc,
   circle,
   dist,
   extrude,
@@ -113,40 +112,21 @@ export function meshMateRotation(z1: number, z2: number, rot1: number): number {
   return -rot1 * (z1 / z2) + Math.PI - Math.PI / z2;
 }
 
-/** Involute spur: flanks, tip arcs, root arcs in the gaps, pitch + bore. */
+/** Involute spur: one closed outline polyline, pitch + bore, pitch marker. */
 export function drawSpurGear(opts: SpurGearOpts): Geom {
-  const z = Math.max(8, Math.round(opts.teeth));
   const pitchR = Math.max(0.4, Math.abs(opts.pitchRadius));
-  const alpha = Math.min(0.5, Math.max(0.2, opts.pressureAngle));
   const rot = opts.rotation ?? 0;
   const c = opts.center;
-  const tooth = toothParts(pitchR, z, alpha);
   const bore = opts.bore ?? pitchR * 0.32;
-  const step = (Math.PI * 2) / z;
-
+  const ring = gearOutline(opts, 16);
+  if (ring.length >= 2) {
+    const first = ring[0]!;
+    const last = ring[ring.length - 1]!;
+    if (dist(first, last) >= 1e-8) ring.push({ x: first.x, y: first.y });
+  }
   return group(() => [
     group(() => [circle(c, pitchR), circle(c, bore)]),
-    group(() => {
-      const parts: Geom[] = [];
-      for (let i = 0; i < z; i++) {
-        const a = rot + i * step;
-        parts.push(polyline(tooth.right.map((p) => at(p, c, a))));
-        parts.push(polyline(tooth.left.map((p) => at(p, c, a))));
-        parts.push(arc(c, tooth.addR, a + tooth.add0, a + tooth.add1));
-        parts.push(arc(c, tooth.rootR, a + tooth.root1, a + step + tooth.root0));
-        if (tooth.needsRadial) {
-          const inner = tooth.rootR;
-          const outer = tooth.baseR;
-          parts.push(
-            segment(at(polar(inner, tooth.root1), c, a), at(polar(outer, tooth.root1), c, a)),
-          );
-          parts.push(
-            segment(at(polar(inner, tooth.root0), c, a), at(polar(outer, tooth.root0), c, a)),
-          );
-        }
-      }
-      return parts;
-    }),
+    group(() => [polyline(ring)]),
     group(() => [segment(c, at(polar(pitchR, 0), c, rot))]),
   ]);
 }
