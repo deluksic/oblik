@@ -133,7 +133,7 @@ float map(vec2 q) {
 void main() {
   vec2 q;
   q.x = uCam.x + (gl_FragCoord.x - uRes.x * 0.5) / uCam.z;
-  q.y = uCam.y + (uRes.y * 0.5 - gl_FragCoord.y) / uCam.z;
+  q.y = uCam.y - (uRes.y * 0.5 - gl_FragCoord.y) / uCam.z;
   float d = map(q);
   float lip = 1.5 / uCam.z;
   vec3 bg = vec3(0.071, 0.078, 0.110);
