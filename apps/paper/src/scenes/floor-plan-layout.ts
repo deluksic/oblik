@@ -1,11 +1,11 @@
 import { angle, slider, vector } from "@design-scenes/euclid2";
-import { circle, point, type Vec2 } from "@design-scenes/geom";
+import { circle, offsetLine, point, segment, type Vec2 } from "@design-scenes/geom";
 
 import type { FloorPlanOpts } from "../demo/floor-plan";
 
 /**
  * One-bed flat, Y-up: kitchen/bath on the south, living/bedroom on the north.
- * Door gaps are hinge → hinge+width along the wall (`closed` angle).
+ * Inner partitions are offsetLine distances from the outer shell.
  */
 export function floorPlanLayout(): FloorPlanOpts {
   const origin = point(0.42, 0.55);
@@ -16,24 +16,19 @@ export function floorPlanLayout(): FloorPlanOpts {
   const min: Vec2 = { x: origin.x, y: origin.y };
   const max: Vec2 = { x: origin.x + unitW, y: origin.y + unitD };
 
-  const bedroomX = slider(6.8, {
-    label: "Bed wall",
-    min: 4.2,
-    max: unitW - 3,
-    step: 0.1,
-  });
-  const kitchenD = slider(2.7, {
-    label: "Kitchen m",
-    min: 2,
-    max: 3.6,
-    step: 0.1,
-  });
-  const bathW = slider(2.9, {
-    label: "Bath m",
-    min: 1.7,
-    max: 3.2,
-    step: 0.1,
-  });
+  const south = segment(min, { x: max.x, y: min.y });
+  const west = segment(min, { x: min.x, y: max.y });
+  const east = segment({ x: max.x, y: min.y }, max);
+
+  const kitchenPart = offsetLine(south, 2.7);
+  const bedroomPart = offsetLine(west, -6.8);
+  const bathPart = offsetLine(east, 2.9);
+
+  const kY = kitchenPart.line.origin.y;
+  const bedX = bedroomPart.line.origin.x;
+  const bathX = bathPart.line.origin.x;
+  const bathW = bathPart.distance;
+
   const drawerCount = slider(6, {
     label: "Drawers",
     min: 2,
@@ -41,10 +36,6 @@ export function floorPlanLayout(): FloorPlanOpts {
     step: 1,
   });
   const doorW = slider(0.9, { label: "Door m", min: 0.7, max: 1.1, step: 0.02 });
-
-  const kY = min.y + kitchenD;
-  const bathX = max.x - bathW;
-  const bedX = min.x + bedroomX;
 
   const entryClosed = 0;
   const entryT = slider(0.29, { label: "Entry", min: 0.12, max: 0.4, step: 0.01 });
@@ -58,7 +49,7 @@ export function floorPlanLayout(): FloorPlanOpts {
 
   const bathClosed = Math.PI / 2;
   const bathT = slider(0.54, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
-  const bathHinge = point(bathX, min.y + bathT * kitchenD);
+  const bathHinge = point(bathX, min.y + bathT * (kY - min.y));
   const bathSwing = angle(bathHinge, 67, { radius: doorW, from: bathClosed });
 
   const windowT = slider(0.32, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });
