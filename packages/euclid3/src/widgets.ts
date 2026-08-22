@@ -3,6 +3,12 @@ import { lerp3, point3 as makePoint3, type Segment3, type Point3, type Vec3 } fr
 export type SiteOpts3 = {
   file?: string;
   at?: [number, number];
+  editable?: boolean;
+  __annotations__?: {
+    file?: string;
+    at?: [number, number];
+    editable?: boolean;
+  };
 };
 
 export type GizmoAt3 = { file: string; line: number; column: number };
@@ -35,13 +41,16 @@ const gizmos: Gizmo3[] = [];
 const overrides = new Map<string, number[]>();
 
 function siteFrom(opts?: SiteOpts3): Located | null {
-  if (!opts?.file || !opts.at || opts.at.length < 2) return null;
-  const line = opts.at[0];
-  const column = opts.at[1];
+  const nested = opts?.__annotations__;
+  const file = nested?.file ?? opts?.file;
+  const at = nested?.at ?? opts?.at;
+  if (!file || !at || at.length < 2) return null;
+  const line = at[0];
+  const column = at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
   return {
-    site: `${opts.file}:${line}:${column}`,
-    at: { file: opts.file, line, column },
+    site: `${file}:${line}:${column}`,
+    at: { file, line, column },
   };
 }
 
