@@ -1,5 +1,5 @@
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
-import { circle, group, type Circle } from "@design-scenes/geom";
+import { circle, group, type Circle, point, line, signedDist, offsetLine, dist } from "@design-scenes/geom";
 
 export const title = "Shared loop";
 export const sceneFile = "shared-loop.scene.ts";
@@ -22,5 +22,11 @@ export function scene() {
     const r = editDistanceToPoint(p, 1);
     rings.push(circle(p, r));
   }
+  const p2 = point(3.37, 3.63);
+  const ln = line(o, p2);
+  const p3 = point(2.45, 4.84);
+  const off = offsetLine(ln, signedDist(p3, ln));
+  const k = circle(o, r);
+  const k2 = circle(o, dist(o, p2));
   return group(() => rings);
 }
