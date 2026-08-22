@@ -57,7 +57,7 @@ GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs t
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current charter: [prototypes/4.md](./prototypes/4.md).
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current 2D language: [euclid2-graph.md](./euclid2-graph.md) (P4’s Distance-only palette is a slice, not the destination).
 
 Packages and rules: [layout.md](./layout.md). Catalog and palette: [scenes.md](./scenes.md).
 
