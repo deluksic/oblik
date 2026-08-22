@@ -49,6 +49,7 @@ Flex/grid children need `min-height: 0` and a defined row height:
 - `.viewportGrid` — `flex: 1; min-height: 0`
 - `.pane` — `height: 100%; display: flex; flex-direction: column`
 - `.view` — flex column, `flex: 1; min-height: 0`
+- `.stage` — canvas + Space overlay; `position: relative; flex: 1; min-height: 0` (prompt docks here, above the status strip)
 - `.canvas` — `flex: 1; min-height: 0`
 - `.status` — reserved `flex: 0 0 1.85rem` at the bottom of the pane (always present; error only restyles it)
 

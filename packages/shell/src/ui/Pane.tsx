@@ -106,34 +106,36 @@ export function Pane(props: PaneProps) {
         {props.mount.entry.view} · {props.mount.entry.file}
       </p>
       <div class={[styles.view, { [styles.viewError]: props.error != null }]}>
-        <canvas
-          ref={setCanvas}
-          class={styles.canvas}
-          tabindex={0}
-          aria-label={props.mount.entry.title}
-        />
-        <Errored fallback={(err) => <p class={styles.error}>{String(err())}</p>}>
-          <Loading fallback={<PaneLoading />}>
-            <Show when={canvas()}>
-              {(el) => (
-                <LivePane
-                  canvas={el()}
-                  mount={props.mount}
-                  paletteMode={props.paletteMode}
-                  commandBar={props.commandBar}
-                  onPickCommand={props.onPickCommand}
-                  onClosePicker={props.onClosePicker}
-                  onNumberDraft={props.onNumberDraft}
-                  onCommandBar={props.onCommandBar}
-                  onInspect={props.onInspect}
-                  onLiveChange={props.onLiveChange}
-                  onFocus={props.onFocus}
-                  onHandle={props.onHandle}
-                />
-              )}
-            </Show>
-          </Loading>
-        </Errored>
+        <div class={styles.stage}>
+          <canvas
+            ref={setCanvas}
+            class={styles.canvas}
+            tabindex={0}
+            aria-label={props.mount.entry.title}
+          />
+          <Errored fallback={(err) => <p class={styles.error}>{String(err())}</p>}>
+            <Loading fallback={<PaneLoading />}>
+              <Show when={canvas()}>
+                {(el) => (
+                  <LivePane
+                    canvas={el()}
+                    mount={props.mount}
+                    paletteMode={props.paletteMode}
+                    commandBar={props.commandBar}
+                    onPickCommand={props.onPickCommand}
+                    onClosePicker={props.onClosePicker}
+                    onNumberDraft={props.onNumberDraft}
+                    onCommandBar={props.onCommandBar}
+                    onInspect={props.onInspect}
+                    onLiveChange={props.onLiveChange}
+                    onFocus={props.onFocus}
+                    onHandle={props.onHandle}
+                  />
+                )}
+              </Show>
+            </Loading>
+          </Errored>
+        </div>
         <p
           class={[styles.status, { [styles.statusError]: props.error != null }]}
           role={props.error ? "alert" : "status"}
