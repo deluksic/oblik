@@ -30,7 +30,10 @@ export function normalizeFile(file: string): string {
   const cleaned = file.replace(/^\/+/, "");
   const cut =
     cleaned.match(/(packages\/[^/]+\/src\/\S+)$/) ?? cleaned.match(/(apps\/[^/]+\/src\/\S+)$/);
-  return cut?.[1] ?? cleaned;
+  if (cut?.[1]) return cut[1];
+  // Vite serves the paper app from /src/…, not /apps/paper/src/…
+  if (cleaned.startsWith("src/")) return `apps/paper/${cleaned}`;
+  return cleaned;
 }
 
 function parseFrame(raw: string): CallSite | null {
