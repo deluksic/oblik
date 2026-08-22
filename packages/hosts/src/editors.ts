@@ -392,7 +392,7 @@ export function drawEditorGhost(
     const end = snap ?? cursor;
     if (a && end) {
       const dir = norm(sub(end, a));
-      drawInfiniteThrough(ctx, cam, w, h, a, dir, true);
+      drawInfiniteThrough(ctx, cam, w, h, a, dir, false);
       ctx.globalAlpha = 0.85;
       const sa = worldToScreen(cam, a, w, h);
       ctx.beginPath();
@@ -449,7 +449,7 @@ export function drawEditorGhost(
         const offOrigin = add(line.origin, mul(perp(line.dir), d));
         ctx.globalAlpha = 0.72;
         ctx.lineWidth = 2;
-        drawInfiniteThrough(ctx, cam, w, h, offOrigin, line.dir, true);
+        drawInfiniteThrough(ctx, cam, w, h, offOrigin, line.dir, false);
       }
       drawInfiniteThrough(ctx, cam, w, h, line.origin, line.dir, false);
       ctx.globalAlpha = 0.85;

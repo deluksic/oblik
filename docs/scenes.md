@@ -42,7 +42,7 @@ Layout files must not import pane modules. Live drag still updates the other pan
 
 | On screen         | Meaning                                          | Writes     |
 | ----------------- | ------------------------------------------------ | ---------- |
-| Solid stroke      | Geometry (`circle`, `segment`, `drawPlate`, SDF fill) | nothing |
+| Solid stroke      | Geometry (`line`, `circle`, `segment`, `drawPlate`, SDF fill) | nothing |
 | Filled dot        | Point widget (`editPoint` / glider)              | literals   |
 | Dashed ring       | Distance widget (`editDistanceToPoint`)          | `d`        |
 | Arrow             | Vector widget (`editVector`)                     | `dx`, `dy` |

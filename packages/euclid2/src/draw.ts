@@ -130,11 +130,7 @@ function strokeGeom(
     ctx.stroke();
   } else if (g.kind === "line") {
     pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
-    ctx.setLineDash([8, 6]);
-    ctx.globalAlpha = 0.72;
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
   } else if (g.kind === "circle") {
     const c = worldToScreen(cam, g.center, w, h);
     ctx.beginPath();
