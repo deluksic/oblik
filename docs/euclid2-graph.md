@@ -28,11 +28,11 @@ OffsetLine = Line & { d: number; base: LineLike }
 
 ## Potential vs actual
 
-| radius arg | graph | `editable` from annotator |
+| radius arg | graph | `__annotations__.editable` |
 | --- | --- | --- |
-| `dist(c, q)` / call / imported | determined | omit |
-| numeric literal | potential | `true`, unless disk says `editable: false` |
-| name bound to a scene literal | potential at that binding | not at this call (nothing to write here) |
+| `dist(c, q)` / call / imported | determined | `false` |
+| numeric literal | potential | `true`, unless disk says `{ editable: false }` |
+| name bound to a scene literal | potential at that binding | `false` at this call (write the binding, not here) |
 
 TS types do not distinguish `2.4` from `dist(c, q)`. The annotator does.
 
