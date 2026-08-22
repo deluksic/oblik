@@ -40,6 +40,7 @@ export function floorPlanLayout(): FloorPlanOpts {
     max: 6,
     step: 1,
   });
+  const doorW = slider(0.9, { label: "Door m", min: 0.7, max: 1.1, step: 0.02 });
 
   const kY = min.y + kitchenD;
   const bathX = max.x - bathW;
@@ -47,24 +48,21 @@ export function floorPlanLayout(): FloorPlanOpts {
   const entryClosed = 0;
   const entryT = slider(0.25, { label: "Entry", min: 0.12, max: 0.4, step: 0.01 });
   const entryHinge = point(min.x + entryT * unitW, min.y);
-  const entryWidth = circle(entryHinge, 0.9).radius;
-  const entrySwing = angle(entryHinge, 90, { radius: entryWidth });
+  const entrySwing = angle(entryHinge, 90, { radius: doorW });
 
   const bedClosed = Math.PI / 2;
   const bedT = slider(0.51, { label: "Bed door", min: 0.2, max: 0.75, step: 0.01 });
   const bedHinge = point(bedroomX, kY + bedT * (max.y - kY));
-  const bedWidth = circle(bedHinge, 0.82).radius;
-  const bedSwing = angle(bedHinge, 0, { radius: bedWidth });
+  const bedSwing = angle(bedHinge, 31, { radius: doorW });
 
   const bathClosed = Math.PI / 2;
   const bathT = slider(0.57, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
   const bathHinge = point(bathX, min.y + bathT * kitchenD);
-  const bathWidth = circle(bathHinge, 0.72).radius;
-  const bathSwing = angle(bathHinge, 180, { radius: bathWidth });
+  const bathSwing = angle(bathHinge, 180, { radius: doorW });
 
   const windowT = slider(0.42, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });
   const windowCenter = point(min.x + windowT * unitW, max.y);
-  const windowWidth = circle(windowCenter, 1.4).radius;
+  const windowWidth = circle(windowCenter, 1.06).radius;
 
   const islandAnchor = point((min.x + bathX) * 0.5, (min.y + kY) * 0.5);
   const island = vector(islandAnchor, 0.4, 0.15);
@@ -75,9 +73,9 @@ export function floorPlanLayout(): FloorPlanOpts {
     bedroomX,
     kitchenY: kY,
     bathW,
-    entry: { hinge: entryHinge, width: entryWidth, swing: entrySwing, closed: entryClosed },
-    bedDoor: { hinge: bedHinge, width: bedWidth, swing: bedSwing, closed: bedClosed },
-    bathDoor: { hinge: bathHinge, width: bathWidth, swing: bathSwing, closed: bathClosed },
+    entry: { hinge: entryHinge, width: doorW, swing: entrySwing, closed: entryClosed },
+    bedDoor: { hinge: bedHinge, width: doorW, swing: bedSwing, closed: bedClosed },
+    bathDoor: { hinge: bathHinge, width: doorW, swing: bathSwing, closed: bathClosed },
     window: { center: windowCenter, width: windowWidth },
     island,
     drawerCount,
