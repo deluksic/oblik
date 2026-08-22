@@ -73,6 +73,8 @@ export type AngleGizmo = Located & {
   radius: number;
   /** Reference ray, world radians CCW from +X. */
   from: number;
+  /** Same |deg|, reflected open direction across `from`. */
+  mirror?: boolean;
 };
 
 export type VectorGizmo = Located & {
@@ -384,6 +386,8 @@ export type AngleEditOpts = {
   radius?: number;
   /** Reference ray in world radians (CCW from +X). Degrees are relative to this. */
   from?: number;
+  /** Reflect open direction across `from` — same |degrees|, opposite sweep. */
+  mirror?: boolean;
 } & SiteOpts;
 
 /** Signed degrees in (−180, 180]. */
@@ -393,8 +397,14 @@ export function wrapAngleDeg(deg: number): number {
   return Math.round(d);
 }
 
-export function angleWorldRad(originFrom: number, deg: number): number {
-  return originFrom + (deg * Math.PI) / 180;
+export function angleWorldRad(from: number, deg: number): number {
+  return from + (deg * Math.PI) / 180;
+}
+
+/** World radians for the open leaf (after optional mirror). */
+export function angleDisplayRad(from: number, deg: number, mirror = false): number {
+  const forward = angleWorldRad(from, deg);
+  return mirror ? 2 * from - forward : forward;
 }
 
 /**
@@ -404,6 +414,7 @@ export function angleWorldRad(originFrom: number, deg: number): number {
 export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
   const from = opts?.from ?? 0;
+  const mirror = opts?.mirror ?? false;
   const located = siteFrom(opts);
   const deg = wrapAngleDeg(readOverride(located?.site)?.[0] ?? degrees);
   if (!silent && located) {
@@ -414,9 +425,10 @@ export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): numb
       deg,
       radius,
       from,
+      mirror,
     });
   }
-  return angleWorldRad(from, deg);
+  return angleDisplayRad(from, deg, mirror);
 }
 
 export function gizmoValues(g: Gizmo): number[] {

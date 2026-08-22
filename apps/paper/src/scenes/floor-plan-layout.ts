@@ -4,8 +4,8 @@ import { circle, offsetLine, point, segment, type Vec2 } from "@design-scenes/ge
 import type { FloorPlanOpts } from "../demo/floor-plan";
 
 /** One angle call site — every door shares the same open sweep. */
-const doorOpen = (hinge: Vec2, closed: number, width: number) =>
-  angle(hinge, -88, { radius: width, from: closed });
+const doorOpen = (hinge: Vec2, closed: number, width: number, mirror = false) =>
+  angle(hinge, 69, { radius: width, from: closed, mirror });
 
 /** Move hinge to the far jamb and reverse closed when `flip` is true. */
 const doorSide = (anchor: Vec2, closed: number, width: number, flip: boolean) => {
@@ -56,17 +56,17 @@ export function floorPlanLayout(): FloorPlanOpts {
   const entryT = slider(0.29, { label: "Entry", min: 0.12, max: 0.4, step: 0.01 });
   const entryAnchor = point(min.x + entryT * unitW, min.y);
   const entry = doorSide(entryAnchor, 0, doorW, false);
-  const entrySwing = doorOpen(entry.hinge, entry.closed, doorW);
+  const entrySwing = doorOpen(entry.hinge, entry.closed, doorW, false);
 
   const bedT = slider(0.58, { label: "Bed door", min: 0.2, max: 0.75, step: 0.01 });
   const bedAnchor = point(bedX, kY + bedT * (max.y - kY));
-  const bedDoorSide = doorSide(bedAnchor, Math.PI / 2, doorW, true);
-  const bedSwing = doorOpen(bedDoorSide.hinge, bedDoorSide.closed, doorW);
+  const bedDoorSide = doorSide(bedAnchor, Math.PI / 2, doorW, false);
+  const bedSwing = doorOpen(bedDoorSide.hinge, bedDoorSide.closed, doorW, true);
 
   const bathT = slider(0.54, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
   const bathAnchor = point(bathX, min.y + bathT * (kY - min.y));
   const bathDoorSide = doorSide(bathAnchor, Math.PI / 2, doorW, true);
-  const bathSwing = doorOpen(bathDoorSide.hinge, bathDoorSide.closed, doorW);
+  const bathSwing = doorOpen(bathDoorSide.hinge, bathDoorSide.closed, doorW, true);
 
   const windowT = slider(0.32, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });
   const windowCenter = point(min.x + windowT * unitW, max.y);

@@ -176,3 +176,14 @@ test("angle degrees are relative to from; return is world radians", () => {
   expect(g.deg).toBe(-59);
   expect(g.from).toBeCloseTo(Math.PI / 2);
 });
+
+test("angle mirror reflects world direction; same deg, opposite swing", () => {
+  beginWidgetFrame("mir");
+  const site = { __annotations__: { file: F, at: [12, 1] as [number, number], editable: true } };
+  const from = Math.PI / 2;
+  const forward = angle({ x: 0, y: 0 }, 69, { from, radius: 1, ...site });
+  const mirrored = angle({ x: 0, y: 0 }, 69, { from, radius: 1, mirror: true, ...site });
+  expect(forward).toBeCloseTo((159 * Math.PI) / 180, 6);
+  expect(mirrored).toBeCloseTo((21 * Math.PI) / 180, 6);
+  expect(forward + mirrored).toBeCloseTo(Math.PI, 6);
+});

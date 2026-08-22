@@ -150,7 +150,9 @@ function applyDrag(
   } else if (g.kind === "angle") {
     const worldDeg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
     const fromDeg = (g.from * 180) / Math.PI;
-    setWidgetOverride(g.site, [wrapAngleDeg(worldDeg - fromDeg)], sceneId);
+    let rel = wrapAngleDeg(worldDeg - fromDeg);
+    if (g.mirror) rel = wrapAngleDeg(-rel);
+    setWidgetOverride(g.site, [rel], sceneId);
   } else if (g.kind === "vector") {
     setWidgetOverride(
       g.site,

@@ -1,10 +1,10 @@
-import type { Drawable, Vec2 } from "@design-scenes/geom";
+import { sweepCCW } from "@design-scenes/geom";
 
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { layoutNumberSliders } from "./hud";
 import { handleOwnsInk } from "./ink";
-import { angleWorldRad, gizmoIsPointLike, type Gizmo } from "./widgets";
+import { angleDisplayRad, angleWorldRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const COL = {
   bg: "#12141c",
@@ -282,7 +282,7 @@ function drawGizmo(
     ctx.stroke();
   } else if (g.kind === "angle") {
     const from = g.from;
-    const rad = angleWorldRad(from, g.deg);
+    const rad = angleDisplayRad(from, g.deg, g.mirror);
     const ref = {
       x: g.origin.x + Math.cos(from) * g.radius,
       y: g.origin.y + Math.sin(from) * g.radius,
@@ -307,7 +307,7 @@ function drawGizmo(
       Math.abs(g.radius) * 0.38 * cam.scale,
       -from,
       -rad,
-      g.deg >= 0,
+      sweepCCW(from, rad) <= Math.PI,
     );
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
