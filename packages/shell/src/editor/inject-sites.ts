@@ -39,7 +39,10 @@ function trailingObject(call: ts.CallExpression): ts.ObjectLiteralExpression | u
   return undefined;
 }
 
-function propertyNamed(obj: ts.ObjectLiteralExpression, name: string): ts.ObjectLiteralElementLike | undefined {
+function propertyNamed(
+  obj: ts.ObjectLiteralExpression,
+  name: string,
+): ts.ObjectLiteralElementLike | undefined {
   return obj.properties.find(
     (p) =>
       (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
@@ -103,7 +106,8 @@ export function annotateCallSites(source: string, file: string, mapSource = file
       }
       const kept = last.properties.filter((p) => {
         const n =
-          (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && ts.isIdentifier(p.name)
+          (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
+          ts.isIdentifier(p.name)
             ? p.name.text
             : "";
         return n !== "__annotations__";
