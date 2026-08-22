@@ -1,6 +1,6 @@
 # Design programs, viewed in scenes
 
-TypeScript libraries stay pure. **Scenes** attach widgets (`editPoint`, `editDistanceToPoint`, `editPointOnSegment`, `editPointOnLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
+TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `offsetLine`, `slider`) and legacy widgets (`editPoint`, `editDistanceToPoint`, `editPointOnSegment`, `editPointOnLine`) plus a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
 Docs: [docs/README.md](./docs/README.md).
 
@@ -17,9 +17,10 @@ Scene catalog and controls: [docs/scenes.md](./docs/scenes.md).
 
 ## Try
 
-- **Space** — command palette. **Point** places `editPoint`. **Distance** places `editDistanceToPoint`.
-- Drag **points**, the **glider** on the span, or a **dashed radius**.
+- **Space** — command palette. On 2D paper: **Point**, **Circle**, **Line**, **Segment**, **Offset**, **Slider**. They write constructors (`point`, `circle`, `line`, `segment`, `offsetLine`, `slider`), not `edit*`.
+- Open [?scene=shelf](http://127.0.0.1:43117/?scene=shelf) for the construction-graph figure (ground, shelf, reach, lamp).
+- Drag **points**, a **radius ring**, or an **offset** parallel. Length-slot clicks reuse `.radius`, `.distance`, or a slider name.
 - Click a tick: inspector shows **path**, **id**, and the **creation site**.
 - Wheel zooms; drag empty paper (or Alt-drag) to pan.
 
-Each `edit*` CallExpression is one write target. A loop of five `editDistanceToPoint` is five gizmos and one literal.
+Each writable CallExpression is one write target. A loop of five `editDistanceToPoint` is five gizmos and one literal. Annotated constructors (`point(0, 0)`, `circle(A, 2.5)`) get the same handles when their DOF args are numeric literals.

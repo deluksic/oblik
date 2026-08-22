@@ -7,11 +7,13 @@ import {
   editPointOnLine,
   editVector,
   getGizmos,
+  gizmosFromDrawables,
   gizmoValues,
   publishWidgetOverrides,
   setWidgetOverride,
   withoutWidgets,
 } from "./widgets";
+import { beginGeomFrame, circle, collectDrawables, point } from "@design-scenes/geom";
 
 const F = "apps/paper/src/scenes/plate-layout.ts";
 const pt = { file: F, at: [1, 1] as [number, number] };
@@ -111,4 +113,29 @@ test("editPointOnLine max clamps s", () => {
     max: 1,
   });
   expect(p.x).toBe(1);
+});
+
+test("annotated constructors spawn gizmos; dist() radius does not", () => {
+  beginGeomFrame();
+  beginWidgetFrame("ann");
+  const A = point(0, 0, { __annotations__: { file: F, at: [1, 1], editable: true } });
+  circle(A, 2.5, { __annotations__: { file: F, at: [2, 1], editable: true } });
+  circle(A, 3, { __annotations__: { file: F, at: [3, 1], editable: false } });
+  const gs = gizmosFromDrawables(collectDrawables());
+  expect(gs.filter((g) => g.kind === "point")).toHaveLength(1);
+  expect(gs.filter((g) => g.kind === "distance")).toHaveLength(1);
+  expect(gs.find((g) => g.kind === "distance" && g.d === 2.5)).toBeTruthy();
+});
+
+test("live overrides move annotated constructors during drag", () => {
+  setWidgetOverride(`${F}:1:1`, [4, 5], "live");
+  setWidgetOverride(`${F}:2:1`, [3.1], "live");
+  beginGeomFrame();
+  beginWidgetFrame("live");
+  const A = point(0, 0, { __annotations__: { file: F, at: [1, 1], editable: true } });
+  const reach = circle(A, 2.5, { __annotations__: { file: F, at: [2, 1], editable: true } });
+  expect(A.x).toBe(4);
+  expect(A.y).toBe(5);
+  expect(reach.radius).toBe(3.1);
+  expect(reach.center.x).toBe(4);
 });

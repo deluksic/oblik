@@ -1,7 +1,10 @@
 import {
   offsetLine,
   point,
+  setGeomLiveReader,
   withoutDraw,
+  isFiniteVec,
+  type Drawable,
   type LineLike,
   type Point,
   type Segment,
@@ -12,6 +15,12 @@ import { lerp } from "@design-scenes/geom";
 export type SiteOpts = {
   file?: string;
   at?: [number, number];
+  editable?: boolean;
+  __annotations__?: {
+    file?: string;
+    at?: [number, number];
+    editable?: boolean;
+  };
 };
 
 export type GizmoAt = { file: string; line: number; column: number };
@@ -108,13 +117,16 @@ function overridesOf(source: string): Map<string, number[]> {
 }
 
 function siteFrom(opts?: SiteOpts): Located | null {
-  if (!opts?.file || !opts.at || opts.at.length < 2) return null;
-  const line = opts.at[0];
-  const column = opts.at[1];
+  const nested = opts?.__annotations__;
+  const file = nested?.file ?? opts?.file;
+  const at = nested?.at ?? opts?.at;
+  if (!file || !at || at.length < 2) return null;
+  const line = at[0];
+  const column = at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
   return {
-    site: `${opts.file}:${line}:${column}`,
-    at: { file: opts.file, line, column },
+    site: `${file}:${line}:${column}`,
+    at: { file, line, column },
   };
 }
 
@@ -127,6 +139,11 @@ function readOverride(site: string | undefined): number[] | undefined {
 export function beginWidgetFrame(source = ""): void {
   activeSource = source;
   gizmos.length = 0;
+  setGeomLiveReader((site) => {
+    const key = `${site.file}:${site.line}:${site.column}`;
+    if (silent) return importedBySource.get(silentSource)?.get(key);
+    return overridesBySource.get(activeSource)?.get(key);
+  });
 }
 
 /**
@@ -171,6 +188,69 @@ export function clearImportedOverrides(source?: string): void {
  * second 2D editor’s beginWidgetFrame() clears it in place. */
 export function getGizmos(): readonly Gizmo[] {
   return gizmos.slice();
+}
+
+function locatedFromGeomSite(site: { file: string; line: number; column: number }): Located {
+  return {
+    site: `${site.file}:${site.line}:${site.column}`,
+    at: { file: site.file, line: site.line, column: site.column },
+  };
+}
+
+/** Handles for constructors the annotator marked editable. */
+export function gizmosFromDrawables(drawables: readonly Drawable[]): Gizmo[] {
+  const out: Gizmo[] = [];
+  for (const d of drawables) {
+    const g = d.geom;
+    if (!g.editable || !g.site) continue;
+    const located = locatedFromGeomSite(g.site);
+    const o = readOverride(located.site);
+    if (g.kind === "point") {
+      const x = o?.[0] ?? g.x;
+      const y = o?.[1] ?? g.y;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      out.push({ kind: "point", ...located, x, y });
+    } else if (g.kind === "circle") {
+      const dist = o?.[0] ?? g.radius;
+      if (!isFiniteVec(g.center) || !Number.isFinite(dist)) continue;
+      out.push({
+        kind: "distance",
+        ...located,
+        origin: { x: g.center.x, y: g.center.y },
+        d: dist,
+      });
+    } else if (g.kind === "line" && g.offsetDistance != null) {
+      const dd = o?.[0] ?? g.offsetDistance;
+      if (!isFiniteVec(g.origin) || !isFiniteVec(g.direction) || !Number.isFinite(dd)) continue;
+      out.push({
+        kind: "offset",
+        ...located,
+        origin: g.origin,
+        direction: g.direction,
+        d: dd,
+      });
+    }
+  }
+  return out;
+}
+
+/** Shared length owned by this call. Length-slot tools reuse the binding name. */
+export function slider(n: number, site?: SiteOpts): number {
+  const located = siteFrom(site);
+  const o = readOverride(located?.site);
+  const v = o?.[0] ?? n;
+  if (!silent && located && Number.isFinite(v)) {
+    gizmos.push({
+      kind: "number",
+      ...located,
+      n: v,
+      label: "",
+      min: Math.min(0, v),
+      max: Math.max(Math.abs(v) * 2, 1),
+      step: 0.01,
+    });
+  }
+  return v;
 }
 
 export function editPoint(x: number, y: number, site?: SiteOpts): Point {
@@ -355,8 +435,8 @@ export function editOffsetFromLine(geom: LineLike, d: number, site?: SiteOpts): 
     gizmos.push({
       kind: "offset",
       ...located,
-      origin: off.origin,
-      direction: off.direction,
+      origin: off.line.origin,
+      direction: off.line.direction,
       d: dd,
     });
   }

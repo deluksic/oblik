@@ -1,6 +1,7 @@
 import * as ts from "typescript";
 
 import { findEditCallAt, findIdentifierCallAt } from "./patch-widget.ts";
+import { EDIT_NAMES } from "./edit-names.ts";
 
 export type SourceAt = { line: number; column: number };
 
@@ -50,10 +51,23 @@ export function findSceneFunction(sourceFile: ts.SourceFile): ts.FunctionDeclara
   return null;
 }
 
-/** Const name if this edit* is `const foo = editPoint(...)`. */
+const BINDING_CALL_NAMES = new Set([
+  ...EDIT_NAMES,
+  "point",
+  "segment",
+  "line",
+  "circle",
+  "offsetLine",
+  "slider",
+  "lineIntersection",
+  "circleLineIntersection",
+  "circleCircleIntersection",
+]);
+
+/** Const name if this call is `const foo = point(...)` / `editPoint(...)`. */
 export function widgetBindingName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
-  const call = findEditCallAt(sf, at.line, at.column);
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
   if (!call) return null;
   let n: ts.Node = call.parent;
   while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) {
@@ -63,11 +77,18 @@ export function widgetBindingName(source: string, at: SourceAt): string | null {
   return null;
 }
 
+export function widgetCallName(source: string, at: SourceAt): string | null {
+  const sf = parse(source);
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
+  if (!call || !ts.isIdentifier(call.expression)) return null;
+  return call.expression.text;
+}
+
 /** True when that widget’s call sits inside exported `scene()`. */
 export function widgetInSceneFunction(source: string, at: SourceAt): boolean {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
-  const call = findEditCallAt(sf, at.line, at.column);
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
   if (!fn || !call) return false;
   return isInNode(call, fn);
 }
@@ -113,7 +134,12 @@ export function namedScenePointBindings(source: string): Map<string, ScenePointB
       if (!call || !ts.isIdentifier(call.expression)) continue;
       const fnName = call.expression.text;
       if (fnName === "editPoint") names.set(decl.name.text, "editPoint");
-      else if (fnName === "point" || fnName === "lineIntersection") {
+      else if (
+        fnName === "point" ||
+        fnName === "lineIntersection" ||
+        fnName === "circleLineIntersection" ||
+        fnName === "circleCircleIntersection"
+      ) {
         names.set(decl.name.text, "derived");
       }
     }
@@ -155,12 +181,10 @@ export type SceneLineEval = {
 
 function numericLiteral(node: ts.Expression): number | null {
   if (ts.isNumericLiteral(node)) return Number(node.text);
-  if (
-    ts.isPrefixUnaryExpression(node) &&
-    node.operator === ts.SyntaxKind.MinusToken &&
-    ts.isNumericLiteral(node.operand)
-  ) {
-    return -Number(node.operand.text);
+  if (ts.isPrefixUnaryExpression(node) && ts.isNumericLiteral(node.operand)) {
+    const n = Number(node.operand.text);
+    if (node.operator === ts.SyntaxKind.MinusToken) return -n;
+    if (node.operator === ts.SyntaxKind.PlusToken) return n;
   }
   return null;
 }
@@ -215,8 +239,65 @@ function lineIntersectionMath(
   return add(a.origin, mul(a.dir, t));
 }
 
+function dot2(a: Vec2Like, b: Vec2Like): number {
+  return a.x * b.x + a.y * b.y;
+}
+
+function circleLineMath(
+  c: { center: Vec2Like; radius: number },
+  l: { origin: Vec2Like; dir: Vec2Like },
+  k: number,
+): Vec2Like | null {
+  const w = sub(l.origin, c.center);
+  const dw = dot2(l.dir, w);
+  const disc = dw * dw - (dot2(w, w) - c.radius * c.radius);
+  if (!(disc >= 0) || !Number.isFinite(disc)) return null;
+  const t = -dw + k * Math.sqrt(disc);
+  const p = add(l.origin, mul(l.dir, t));
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  return p;
+}
+
 function pointRef(node: ts.Expression): string | null {
   if (ts.isIdentifier(node)) return node.text;
+  return null;
+}
+
+function lineArgName(node: ts.Expression | undefined): string | null {
+  if (!node) return null;
+  if (ts.isIdentifier(node)) return node.text;
+  if (
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.name.text === "line"
+  ) {
+    return node.expression.text;
+  }
+  return null;
+}
+
+function evalOffsetDistance(
+  node: ts.Expression | undefined,
+  offsetEvals: ReadonlyMap<string, number> | undefined,
+  distances: ReadonlyMap<string, number>,
+): number | null {
+  if (!node) return null;
+  const lit = numericLiteral(node);
+  if (lit != null) return lit;
+  if (ts.isIdentifier(node)) {
+    return offsetEvals?.get(node.text) ?? distances.get(node.text) ?? null;
+  }
+  if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.MinusToken) {
+    const inner = evalOffsetDistance(node.operand, offsetEvals, distances);
+    return inner == null ? null : -inner;
+  }
+  if (
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.name.text === "distance"
+  ) {
+    return offsetEvals?.get(node.expression.text) ?? distances.get(node.expression.text) ?? null;
+  }
   return null;
 }
 
@@ -253,6 +334,15 @@ function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | n
       if (args.length !== call.arguments.length) return null;
       return call.expression.text === "Math.min" ? Math.min(...args) : Math.max(...args);
     }
+    if (call.expression.text === "dist") {
+      const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+      const bName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+      if (!aName || !bName) return null;
+      const a = env.get(aName);
+      const b = env.get(bName);
+      if (!a || !b) return null;
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
   }
   if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
     const v = env.get(node.expression.text);
@@ -277,6 +367,7 @@ export function evalSceneLines(
   const fn = findSceneFunction(sf);
   if (!fn?.body) return [];
   const env = new Map<string, { origin: Vec2Like; dir: Vec2Like; a?: Vec2Like; b?: Vec2Like }>();
+  const distances = new Map<string, number>();
   const out: SceneLineEval[] = [];
   for (const stmt of fn.body.statements) {
     if (!ts.isVariableStatement(stmt)) continue;
@@ -303,14 +394,14 @@ export function evalSceneLines(
           b,
         });
       } else if (fnName === "offsetLine") {
-        const baseName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
-        const insetName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
-        if (!baseName || !insetName) continue;
+        const baseName = lineArgName(call.arguments[0]);
+        const d = evalOffsetDistance(call.arguments[1], offsetEvals, distances);
+        if (!baseName || d == null) continue;
         const base = env.get(baseName);
-        const d = offsetEvals?.get(insetName);
-        if (!base || d == null) continue;
+        if (!base) continue;
         const basis = offsetLineBasis(base, d);
         env.set(decl.name.text, basis);
+        distances.set(decl.name.text, d);
         out.push({
           name: decl.name.text,
           kind: "offsetLine",
@@ -340,6 +431,7 @@ export function evalDerivedScenePoints(
       { origin: line.origin, dir: line.dir },
     ]),
   );
+  const circles = new Map<string, { center: Vec2Like; radius: number }>();
   const out: { name: string; x: number; y: number }[] = [];
   for (const stmt of fn.body.statements) {
     if (!ts.isVariableStatement(stmt)) continue;
@@ -357,14 +449,32 @@ export function evalDerivedScenePoints(
         if (x == null || y == null) continue;
         env.set(decl.name.text, { x, y });
         out.push({ name: decl.name.text, x, y });
+      } else if (fnName === "circle") {
+        const cName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+        const center = cName ? env.get(cName) : null;
+        const radius = call.arguments[1] ? evalNumber(call.arguments[1], env) : null;
+        if (!center || radius == null || !Number.isFinite(radius)) continue;
+        circles.set(decl.name.text, { center, radius });
       } else if (fnName === "lineIntersection") {
-        const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
-        const bName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+        const aName = lineArgName(call.arguments[0]);
+        const bName = lineArgName(call.arguments[1]);
         if (!aName || !bName) continue;
         const la = lineEnv.get(aName);
         const lb = lineEnv.get(bName);
         if (!la || !lb) continue;
         const p = lineIntersectionMath(la, lb);
+        if (!p) continue;
+        env.set(decl.name.text, p);
+        out.push({ name: decl.name.text, x: p.x, y: p.y });
+      } else if (fnName === "circleLineIntersection") {
+        const cName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
+        const lName = lineArgName(call.arguments[1]);
+        const k = call.arguments[2] ? numericLiteral(call.arguments[2]) : null;
+        if (!cName || !lName || k == null) continue;
+        const circ = circles.get(cName);
+        const ln = lineEnv.get(lName);
+        if (!circ || !ln) continue;
+        const p = circleLineMath(circ, ln, k);
         if (!p) continue;
         env.set(decl.name.text, p);
         out.push({ name: decl.name.text, x: p.x, y: p.y });

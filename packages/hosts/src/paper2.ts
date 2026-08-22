@@ -44,7 +44,7 @@ import {
 import {
   drawEditorGhost,
   EDITOR_COMMANDS,
-  LINE_COMMAND,
+  CONSTRUCTION_COMMANDS,
   type GhostSnap,
 } from "./editors";
 import { commitScenePatch, peekFile, quantize, renderSnippet } from "./inspect";
@@ -151,8 +151,8 @@ function applyDrag(
     );
   } else if (g.kind === "offset") {
     const n = perp(g.direction);
-    const signed = (world.x - g.origin.x) * n.x + (world.y - g.origin.y) * n.y;
-    setWidgetOverride(g.site, [quantize(signed)], sceneId);
+    const delta = (world.x - g.origin.x) * n.x + (world.y - g.origin.y) * n.y;
+    setWidgetOverride(g.site, [quantize(g.d + delta)], sceneId);
   } else if (g.kind === "number") {
     setWidgetOverride(g.site, [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)], sceneId);
   }
@@ -401,7 +401,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const accept = Boolean(preview.acceptNumber);
         const state = {
           ...preview,
-          numberValue: session.verb === "distance" ? (session.typed ?? "") : "",
+          numberValue:
+            session.verb === "distance" ||
+            session.verb === "circle" ||
+            session.verb === "offset" ||
+            session.verb === "slider"
+              ? (session.typed ?? "")
+              : "",
           onNumber: accept
             ? (n: number) => {
                 if (!session) return;
@@ -412,7 +418,15 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             : undefined,
           onNumberDraft: accept
             ? (raw: string) => {
-                if (!session || session.verb !== "distance") return;
+                if (
+                  !session ||
+                  (session.verb !== "distance" &&
+                    session.verb !== "circle" &&
+                    session.verb !== "offset" &&
+                    session.verb !== "slider")
+                ) {
+                  return;
+                }
                 const trimmed = raw.trim();
                 if (trimmed === "") {
                   session = { ...session, typed: undefined };
@@ -456,7 +470,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
         }
         if (session && lastHover?.ghost !== "none") {
-          const ghostTool = sessionAsGhostTool(session, lastHover);
+          const tool = session;
+          const ghostTool = sessionAsGhostTool(tool, lastHover);
           drawEditorGhost(
             ctx2d,
             cam,
@@ -465,11 +480,19 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             ghostTool,
             ghost,
             snap,
-            lastHover?.ghost === "parallel" && session.from?.kind === "line",
+            lastHover?.ghost === "parallel" &&
+              (tool.verb === "distance" || tool.verb === "offset") &&
+              tool.from?.kind === "line",
           );
         }
         if (quiet && !error) {
-          if (session?.verb === "distance" && session.from) {
+          if (
+            session &&
+            (session.verb === "distance" ||
+              session.verb === "circle" ||
+              session.verb === "offset" ||
+              session.verb === "slider")
+          ) {
             syncCommandBar();
           }
           return;
@@ -506,6 +529,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       function scenePointEvals(sceneSrc?: string): { name: string; x: number; y: number }[] {
+        const src = sceneSrc ?? peekText(peekPath);
         const out: { name: string; x: number; y: number }[] = [];
         const seen = new Set<string>();
         const add = (name: string, x: number, y: number) => {
@@ -526,7 +550,15 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             if (name) add(name, g.dx, g.dy);
           }
         }
-        const src = sceneSrc ?? peekText(peekPath);
+        for (const d of drawables()) {
+          const g = d.geom;
+          if (g.kind !== "point" || !g.site) continue;
+          if (!Number.isFinite(g.x) || !Number.isFinite(g.y)) continue;
+          const cached = peekText(g.site.file) ?? src;
+          if (!cached || !widgetInSceneFunction(cached, g.site)) continue;
+          const name = widgetBindingName(cached, g.site);
+          if (name) add(name, g.x, g.y);
+        }
         if (src) {
           const offsetEvals = sceneOffsetEvals();
           for (const d of evalDerivedScenePoints(src, out, offsetEvals)) add(d.name, d.x, d.y);
@@ -728,7 +760,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           evaluate(false);
           render(opts?.quiet ?? false);
         },
-        commands: () => (mode === "geom" ? [...EDITOR_COMMANDS, LINE_COMMAND] : EDITOR_COMMANDS),
+        commands: () => (mode === "geom" ? CONSTRUCTION_COMMANDS : EDITOR_COMMANDS),
         runCommand(id) {
           const next = startVerb(id);
           if (!next) return;

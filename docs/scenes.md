@@ -57,13 +57,13 @@ Commands come from the view host.
 
 euclid2:
 
-1. **Point** — empty paper → `editPoint`; two lines under the cursor near their crossing → `lineIntersection(a, b)` (derived geometry, no widget); an existing named point is a no-op.
-2. **Distance** — first click is `point | line`: empty/point/crossing → dashed ring (`editDistanceToPoint`); one scene segment/line or offset handle → dashed parallel (`editOffsetFromLine`). `offsetLine` is a derived line (not drawn). Then type a number, click to measure, or reuse a named numeric widget.
-3. **Line** — two points (same Point resolver) → `line(a, b)` so Distance can offset it.
+1. **Point** — empty paper → `point(x, y)`; named point → no-op; line crossing → `lineIntersection`; circle ∩ line → `circleLineIntersection(..., ±1)` from the click.
+2. **Circle** — Point, then Length: literal / measure → `circle(c, 2.4)`; Offset → `.distance`; Circle → `.radius`; slider → the name; Point → `dist(c, q)`.
+3. **Line** / **Segment** — two Points → `line(a, b)` / `segment(a, b)`.
+4. **Offset** — LineLike (Line, Segment, `offset.line`), then Length (same introductions as Circle; Point → `signedDist`). Emits `offsetLine(...)`. Further intersects use `.line`.
+5. **Slider** — type or click-measure → `const r = slider(1.8)`. Length-slot click reuses the name.
 
-sdf2: Point + Distance only.
-
-Circle, Segment, and Rect are not Space commands in this slice; type them in the scene file.
+sdf2: Point + Distance only (`editPoint` / `editDistanceToPoint`). Existing catalog scenes keep `edit*`; Space on euclid2 no longer inserts them.
 
 `scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). `group()` is only a path namespace. A return value is still flattened for older scenes that list geometry in `group(() => […])`.
 
@@ -95,3 +95,4 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | [?scene=split](http://127.0.0.1:43117/?scene=split)             | Plate 2D and mill 3D. Drag 2D handles and the mill follows **while you drag**; thickness stays a 3D-only widget.                                                                                                                |
 | [?scene=mounting-plate](http://127.0.0.1:43117/?scene=mounting-plate) | Four-hole plate from construction geometry; `drawMountingPlate` in `demo/mounting-plate.ts`. |
 | [?scene=mounting-plate-pair](http://127.0.0.1:43117/?scene=mounting-plate-pair) | Two plates via `drawMountingPlatePair` — shared inset and drill, second origin only. |
+| [?scene=shelf](http://127.0.0.1:43117/?scene=shelf) | Construction graph: ground, shelf offset, reach circle, lamp beam. Handles on A, B, lamp, `1.8`, `2.5` — not on P, Q, beam, or cellar. |

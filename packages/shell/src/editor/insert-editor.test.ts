@@ -13,6 +13,7 @@ import {
   promoteInlineLineBinding,
   resolveLineBindingName,
   widgetBindingName,
+  widgetCallName,
   widgetInSceneFunction,
 } from "./insert-editor";
 import { injectSceneSites } from "./inject-sites";
@@ -331,7 +332,9 @@ export function scene() {
 }
 `;
   const injected = injectSceneSites(src, "apps/paper/src/scenes/plate.scene.ts");
-  const m = injected.match(/segment\(c, p, \{ file: .+, at: \[(\d+), (\d+)\] \}/);
+  const m = injected.match(
+    /segment\(c, p, \{ __annotations__: \{ file: .+, at: \[(\d+), (\d+)\], editable: false \} \}/,
+  );
   expect(m).toBeTruthy();
   const bound = bindLineAt(src, { line: Number(m![1]), column: Number(m![2]) });
   expect(bound?.name).toBe("s");
@@ -357,7 +360,9 @@ export function scene() {
 }
 `;
   const injected = injectSceneSites(src, "apps/paper/src/scenes/new-scene.scene.ts");
-  const m = injected.match(/line\(a, b, \{ file: .+, at: \[(\d+), (\d+)\] \}/);
+  const m = injected.match(
+    /line\(a, b, \{ __annotations__: \{ file: .+, at: \[(\d+), (\d+)\], editable: false \} \}/,
+  );
   expect(m).toBeTruthy();
   const bound = bindLineAt(src, { line: Number(m![1]), column: Number(m![2]) });
   expect(bound?.name).toBe("l");
@@ -396,4 +401,80 @@ export function scene() {
     exprs: ["line(a, b)"],
   });
   expect(next).toMatch(/line\(a, b\);/);
+});
+
+test("evalSceneLines accepts offsetLine numeric literals and .distance", () => {
+  const src = `import { line, offsetLine, point } from "@design-scenes/geom";
+
+export function scene() {
+  const A = point(0, 0);
+  const B = point(4, 0);
+  const ground = line(A, B);
+  const shelf = offsetLine(ground, 1.8);
+  const cellar = offsetLine(ground, -shelf.distance);
+}
+`;
+  const env = new Map([
+    ["A", { x: 0, y: 0 }],
+    ["B", { x: 4, y: 0 }],
+  ]);
+  const lines = evalSceneLines(src, env);
+  expect(lines.map((l) => l.name)).toEqual(["ground", "shelf", "cellar"]);
+  expect(lines[1]!.origin.y).toBeCloseTo(1.8);
+  expect(lines[2]!.origin.y).toBeCloseTo(-1.8);
+});
+
+test("evalDerivedScenePoints resolves circleLineIntersection(+1)", () => {
+  const src = `import { circle, circleLineIntersection, line, offsetLine, point } from "@design-scenes/geom";
+
+export function scene() {
+  const A = point(0, 0);
+  const B = point(6, 0);
+  const ground = line(A, B);
+  const shelf = offsetLine(ground, 0);
+  const reach = circle(A, 2.5);
+  const P = circleLineIntersection(reach, shelf.line, +1);
+}
+`;
+  const known = [
+    { name: "A", x: 0, y: 0 },
+    { name: "B", x: 6, y: 0 },
+  ];
+  const derived = evalDerivedScenePoints(src, known);
+  const p = derived.find((d) => d.name === "P");
+  expect(p?.x).toBeCloseTo(2.5);
+  expect(p?.y).toBeCloseTo(0);
+});
+
+test("widgetBindingName names constructor and intersection consts", () => {
+  const src = `export function scene() {
+  const A = point(0, 0);
+  const reach = circle(A, 2.5);
+  const P = circleLineIntersection(reach, shelf.line, +1);
+}
+`;
+  const loc = (name: string) => {
+    const sf = ts.createSourceFile("s.ts", src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let call: ts.CallExpression | undefined;
+    const visit = (node: ts.Node) => {
+      if (
+        !call &&
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === name
+      ) {
+        call = node;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    if (!call) throw new Error(name);
+    const pos = sf.getLineAndCharacterOfPosition(call.getStart(sf));
+    return { line: pos.line + 1, column: pos.character + 1 };
+  };
+  expect(widgetBindingName(src, loc("point"))).toBe("A");
+  expect(widgetBindingName(src, loc("circle"))).toBe("reach");
+  expect(widgetBindingName(src, loc("circleLineIntersection"))).toBe("P");
+  expect(widgetCallName(src, loc("circle"))).toBe("circle");
+  expect(widgetInSceneFunction(src, loc("circleLineIntersection"))).toBe(true);
 });

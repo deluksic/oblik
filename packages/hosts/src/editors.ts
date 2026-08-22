@@ -15,10 +15,19 @@ export const EDITOR_COMMANDS: CommandSpec[] = [
   },
 ];
 
+export const CONSTRUCTION_COMMANDS: CommandSpec[] = [
+  { id: "point", title: "Point", hint: "Empty paper, a named point, or a crossing." },
+  { id: "circle", title: "Circle", hint: "Center, then radius, a length, or a point." },
+  { id: "line", title: "Line", hint: "Two points — infinite." },
+  { id: "segment", title: "Segment", hint: "Two points — finite." },
+  { id: "offset", title: "Offset", hint: "A line, then a distance or another length." },
+  { id: "slider", title: "Slider", hint: "A shared number. Click it later to reuse." },
+];
+
 export const LINE_COMMAND: CommandSpec = {
   id: "line",
   title: "Line",
-  hint: "Two points — infinite line. Then Distance can offset it.",
+  hint: "Two points — infinite line.",
 };
 
 export const GEOM_CONSTRUCTOR_COMMANDS: CommandSpec[] = [];

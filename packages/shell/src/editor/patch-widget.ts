@@ -2,6 +2,12 @@ import * as ts from "typescript";
 
 import { EDIT_NAMES } from "./edit-names.ts";
 
+const CONSTRUCTOR_WRITE_NAMES = new Set(["point", "circle", "offsetLine", "slider"]);
+
+function isWritableCall(name: string): boolean {
+  return EDIT_NAMES.has(name) || CONSTRUCTOR_WRITE_NAMES.has(name);
+}
+
 export function formatNum(n: number): string {
   const q = Math.round(n * 100) / 100;
   if (Object.is(q, -0)) return "0";
@@ -18,7 +24,7 @@ export function collectEditCalls(sourceFile: ts.SourceFile): ts.CallExpression[]
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      EDIT_NAMES.has(node.expression.text)
+      isWritableCall(node.expression.text)
     ) {
       calls.push(node);
     }
@@ -33,7 +39,7 @@ export function findEditCallAt(
   line: number,
   column: number,
 ): ts.CallExpression | null {
-  return findIdentifierCallAt(sourceFile, line, column, (name) => EDIT_NAMES.has(name));
+  return findIdentifierCallAt(sourceFile, line, column, isWritableCall);
 }
 
 export function findIdentifierCallAt(
@@ -118,23 +124,25 @@ export function patchWidgetAt(
   const sourceFile = parse(source);
   const call = findEditCallAt(sourceFile, line, column);
   if (!call) {
-    throw new Error(`no edit* at ${line}:${column}`);
+    throw new Error(`no writable call at ${line}:${column}`);
   }
 
   const name = (call.expression as ts.Identifier).text;
   const args = call.arguments;
   let spans: { start: number; end: number; text: string }[];
 
-  if (name === "editNumber") {
+  if (name === "editNumber" || name === "slider") {
     spans = patchArgs(sourceFile, args, 0, 1, values, name);
   } else if (name === "editAngle") {
     spans = patchArgs(sourceFile, args, 1, 1, values, name);
-  } else if (name === "editPoint") {
+  } else if (name === "editPoint" || name === "point") {
     spans = patchArgs(sourceFile, args, 0, 2, values, name);
   } else if (name === "editPoint3") {
     spans = patchArgs(sourceFile, args, 0, 3, values, name);
   } else if (name === "editVector") {
     spans = patchArgs(sourceFile, args, 1, 2, values, name);
+  } else if (name === "circle" || name === "offsetLine") {
+    spans = patchArgs(sourceFile, args, 1, 1, values, name);
   } else if (name === "editPointOnLine") {
     const arg = args[2];
     if (!arg) throw new Error(`${name} missing s argument`);

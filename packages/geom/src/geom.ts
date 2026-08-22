@@ -2,14 +2,26 @@ import type { Geom3 } from "./geom3";
 import {
   makeBase,
   geomSiteFromOpts,
+  geomEditableFromOpts,
+  geomLiveValues,
   constructGeom,
-  withoutDraw,
   takeFrameGeoms,
   type Base,
   type GeomSiteOpts,
   type Group,
 } from "./identity";
-import { add, cross2, mul, norm, perp, sub, type Vec2 } from "./vec";
+import {
+  add,
+  cross2,
+  dot,
+  isFiniteVec,
+  mul,
+  norm,
+  perp,
+  signedDistToLine,
+  sub,
+  type Vec2,
+} from "./vec";
 
 export type Point = Base & { kind: "point"; x: number; y: number };
 /** Finite stroke between two endpoints. */
@@ -19,6 +31,8 @@ export type Line = Base & {
   kind: "line";
   origin: Point;
   direction: Vec2;
+  /** Present when this line was produced by `offsetLine`. */
+  offsetDistance?: number;
 };
 export type Circle = Base & { kind: "circle"; center: Point; radius: number };
 export type Arc = Base & {
@@ -37,15 +51,32 @@ export type Geom = Geom2 | Geom3 | Group;
 
 export type LineLike = Segment | Line;
 
+/** Parallel construction: drawn line plus the signed distance that produced it. */
+export type OffsetLine = { line: Line; distance: number };
+
+export type Branch = 1 | -1;
+
+function siteBase(kind: string, createdBy: string, opts?: GeomSiteOpts): Base {
+  return makeBase(kind, createdBy, geomSiteFromOpts(opts), geomEditableFromOpts(opts));
+}
+
+function liveNums(opts?: GeomSiteOpts): number[] | undefined {
+  if (!geomEditableFromOpts(opts)) return undefined;
+  return geomLiveValues(geomSiteFromOpts(opts));
+}
+
 export function point(x: number, y: number, site?: GeomSiteOpts): Point {
-  return constructGeom(
-    () => ({ ...makeBase("point", "point", geomSiteFromOpts(site)), kind: "point", x, y }) as Point,
-  );
+  return constructGeom(() => {
+    const o = liveNums(site);
+    const px = o?.[0] ?? x;
+    const py = o?.[1] ?? y;
+    return { ...siteBase("point", "point", site), kind: "point", x: px, y: py } as Point;
+  });
 }
 
 export function segment(a: Vec2, b: Vec2, site?: GeomSiteOpts): Segment {
   return constructGeom(() => ({
-    ...makeBase("segment", "segment", geomSiteFromOpts(site)),
+    ...siteBase("segment", "segment", site),
     kind: "segment",
     a: point(a.x, a.y),
     b: point(b.x, b.y),
@@ -57,28 +88,33 @@ export function line(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
   return constructGeom(() => makeLine(a, b, site));
 }
 
-function makeLine(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
+function makeLine(a: Vec2, b: Vec2, site?: GeomSiteOpts, offsetDistance?: number): Line {
   const dir = norm(sub(b, a));
   return {
-    ...makeBase("line", "line", geomSiteFromOpts(site)),
+    ...siteBase("line", "line", site),
     kind: "line",
     origin: point(a.x, a.y),
     direction: dir,
+    offsetDistance,
   };
 }
 
 export function circle(center: Vec2, radius: number, site?: GeomSiteOpts): Circle {
-  return constructGeom(() => ({
-    ...makeBase("circle", "circle", geomSiteFromOpts(site)),
-    kind: "circle",
-    center: point(center.x, center.y),
-    radius,
-  }));
+  return constructGeom(() => {
+    const o = liveNums(site);
+    const r = o?.[0] ?? radius;
+    return {
+      ...siteBase("circle", "circle", site),
+      kind: "circle",
+      center: point(center.x, center.y),
+      radius: r,
+    };
+  });
 }
 
 export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
   return constructGeom(() => ({
-    ...makeBase("arc", "arc"),
+    ...siteBase("arc", "arc"),
     kind: "arc",
     center: point(center.x, center.y),
     radius,
@@ -89,7 +125,7 @@ export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
 
 export function polyline(points: Vec2[]): Polyline {
   return constructGeom(() => ({
-    ...makeBase("polyline", "polyline"),
+    ...siteBase("polyline", "polyline"),
     kind: "polyline",
     points: points.map((p) => point(p.x, p.y)),
   }));
@@ -102,27 +138,115 @@ function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   return { origin: g.a, dir: norm(sub(g.b, g.a)) };
 }
 
-/** Parallel infinite line, offset by signed distance along the left normal. Derived — not drawn. */
-export function offsetLine(geom: LineLike, signedD: number, site?: GeomSiteOpts): Line {
-  return withoutDraw(() => {
-    const { origin, dir } = lineBasis(geom);
-    const n = perp(dir);
-    const o = add(origin, mul(n, signedD));
-    return makeLine(o, add(o, dir), site);
-  });
+/** Signed distance to the infinite carrier of `geom` (left normal). */
+export function signedDist(p: Vec2, geom: LineLike): number {
+  const { origin, dir } = lineBasis(geom);
+  return signedDistToLine(p, origin, dir);
 }
 
-/** Intersection of two infinite lines; `null` when parallel. */
-export function lineIntersection(a: LineLike, b: LineLike): Point | null {
+/**
+ * Parallel infinite line, offset by signed distance along the left normal.
+ * Draws `.line`. Distance is the field tools copy in a Length slot.
+ */
+export function offsetLine(geom: LineLike, signedD: number, site?: GeomSiteOpts): OffsetLine {
+  const o = liveNums(site);
+  const d = o?.[0] ?? signedD;
+  const { origin, dir } = lineBasis(geom);
+  const n = perp(dir);
+  const p = add(origin, mul(n, d));
+  const offset = constructGeom(() => makeLine(p, add(p, dir), site, d));
+  return { line: offset, distance: d };
+}
+
+function nanPoint(site?: GeomSiteOpts): Point {
+  return point(Number.NaN, Number.NaN, site);
+}
+
+/** Intersection of two infinite lines. Parallel → NaN coords. */
+export function lineIntersection(a: LineLike, b: LineLike, site?: GeomSiteOpts): Point {
   return constructGeom(() => {
     const la = lineBasis(a);
     const lb = lineBasis(b);
     const denom = cross2(la.dir, lb.dir);
-    if (Math.abs(denom) < 1e-12) return null;
+    if (!Number.isFinite(denom) || Math.abs(denom) < 1e-12) return nanPoint(site);
     const t = cross2(sub(lb.origin, la.origin), lb.dir) / denom;
     const p = add(la.origin, mul(la.dir, t));
-    return point(p.x, p.y);
+    if (!isFiniteVec(p)) return nanPoint(site);
+    return point(p.x, p.y, site);
   });
+}
+
+/**
+ * Line/circle hits. `k` is the ±sqrt branch, frozen at creation.
+ * No hit → NaN coords (does not hop to the other root).
+ */
+export function circleLineIntersection(
+  c: Circle,
+  l: LineLike,
+  k: Branch,
+  site?: GeomSiteOpts,
+): Point {
+  return constructGeom(() => {
+    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius)) return nanPoint(site);
+    const { origin, dir } = lineBasis(l);
+    const w = sub(origin, c.center);
+    const dw = dot(dir, w);
+    const disc = dw * dw - (dot(w, w) - c.radius * c.radius);
+    if (!(disc >= 0) || !Number.isFinite(disc)) return nanPoint(site);
+    const t = -dw + k * Math.sqrt(disc);
+    const p = add(origin, mul(dir, t));
+    if (!isFiniteVec(p)) return nanPoint(site);
+    return point(p.x, p.y, site);
+  });
+}
+
+/** Circle/circle hits. `k` is the side of the center line. No hit → NaN. */
+export function circleCircleIntersection(
+  a: Circle,
+  b: Circle,
+  k: Branch,
+  site?: GeomSiteOpts,
+): Point {
+  return constructGeom(() => {
+    if (!isFiniteVec(a.center) || !isFiniteVec(b.center)) return nanPoint(site);
+    if (!Number.isFinite(a.radius) || !Number.isFinite(b.radius)) return nanPoint(site);
+    const dvec = sub(b.center, a.center);
+    const d = Math.hypot(dvec.x, dvec.y);
+    if (d < 1e-12) return nanPoint(site);
+    const aa = (a.radius * a.radius - b.radius * b.radius + d * d) / (2 * d);
+    const h2 = a.radius * a.radius - aa * aa;
+    if (!(h2 >= 0) || !Number.isFinite(h2)) return nanPoint(site);
+    const h = Math.sqrt(h2);
+    const mid = add(a.center, mul(dvec, aa / d));
+    const n = perp({ x: dvec.x / d, y: dvec.y / d });
+    const p = add(mid, mul(n, k * h));
+    if (!isFiniteVec(p)) return nanPoint(site);
+    return point(p.x, p.y, site);
+  });
+}
+
+function geom2IsFinite(s: Geom2): boolean {
+  switch (s.kind) {
+    case "point":
+      return isFiniteVec(s);
+    case "segment":
+      return isFiniteVec(s.a) && isFiniteVec(s.b);
+    case "line":
+      return isFiniteVec(s.origin) && isFiniteVec(s.direction);
+    case "circle":
+      return isFiniteVec(s.center) && Number.isFinite(s.radius);
+    case "arc":
+      return (
+        isFiniteVec(s.center) &&
+        Number.isFinite(s.radius) &&
+        Number.isFinite(s.a0) &&
+        Number.isFinite(s.a1)
+      );
+    case "polyline":
+      return s.points.every(isFiniteVec);
+    default:
+      return false;
+  }
 }
 
 export type Drawable =
@@ -160,6 +284,7 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
     walk(
       g,
       (s) => {
+        if (!geom2IsFinite(s)) return;
         switch (s.kind) {
           case "point":
             out.push({ geom: s });
@@ -201,7 +326,8 @@ function asDrawable(g: unknown): Drawable | null {
     case "circle":
     case "arc":
     case "polyline":
-      return { geom: s };
+      if (!geom2IsFinite(s)) return null;
+      return { geom: s } as Drawable;
     default:
       return null;
   }

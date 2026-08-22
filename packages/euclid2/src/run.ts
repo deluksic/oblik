@@ -1,6 +1,6 @@
 import { beginGeomFrame, collectDrawables, type Drawable, type Geom } from "@design-scenes/geom";
 
-import { beginWidgetFrame, getGizmos, type Gizmo } from "./widgets";
+import { beginWidgetFrame, getGizmos, gizmosFromDrawables, type Gizmo } from "./widgets";
 
 export type Frame = {
   geom: Geom | Geom[] | undefined;
@@ -18,9 +18,10 @@ export function runScene(mod: SceneModule, source = ""): Frame {
   beginGeomFrame();
   beginWidgetFrame(source);
   const geom = mod.scene();
+  const drawables = collectDrawables(geom);
   return {
     geom: geom ?? undefined,
-    drawables: collectDrawables(geom),
-    gizmos: getGizmos(),
+    drawables,
+    gizmos: [...getGizmos(), ...gizmosFromDrawables(drawables)],
   };
 }

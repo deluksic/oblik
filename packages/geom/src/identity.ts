@@ -9,14 +9,54 @@ export type Provenance = {
 
 export type GeomSite = { file: string; line: number; column: number };
 
-export type GeomSiteOpts = { file?: string; at?: [number, number] };
+export type GeomAnnotations = {
+  file?: string;
+  at?: [number, number];
+  editable?: boolean;
+};
+
+export type GeomSiteOpts = {
+  file?: string;
+  at?: [number, number];
+  editable?: boolean;
+  __annotations__?: GeomAnnotations;
+};
+
+function annotationsOf(opts?: GeomSiteOpts): GeomAnnotations | undefined {
+  if (!opts) return undefined;
+  const a = opts.__annotations__;
+  return {
+    file: a?.file ?? opts.file,
+    at: a?.at ?? opts.at,
+    editable: a?.editable ?? opts.editable,
+  };
+}
 
 export function geomSiteFromOpts(opts?: GeomSiteOpts): GeomSite | undefined {
-  if (!opts?.file || !opts.at || opts.at.length < 2) return undefined;
-  const line = opts.at[0];
-  const column = opts.at[1];
+  const a = annotationsOf(opts);
+  if (!a?.file || !a.at || a.at.length < 2) return undefined;
+  const line = a.at[0];
+  const column = a.at[1];
   if (typeof line !== "number" || typeof column !== "number") return undefined;
-  return { file: opts.file, line, column };
+  return { file: a.file, line, column };
+}
+
+export function geomEditableFromOpts(opts?: GeomSiteOpts): boolean {
+  return annotationsOf(opts)?.editable === true;
+}
+
+export type GeomLiveReader = (site: GeomSite) => number[] | undefined;
+
+let liveReader: GeomLiveReader | null = null;
+
+/** Host overlay for live widget drags. geom stays gizmo-free. */
+export function setGeomLiveReader(reader: GeomLiveReader | null): void {
+  liveReader = reader;
+}
+
+export function geomLiveValues(site: GeomSite | undefined): number[] | undefined {
+  if (!site || !liveReader) return undefined;
+  return liveReader(site);
 }
 
 export type Base = {
@@ -26,8 +66,10 @@ export type Base = {
   path: string;
   parentId: string | null;
   provenance: Provenance;
-  /** Stable construction site when Vite injected `{ file, at }` on the scene call. */
+  /** Stable construction site when the call-site annotator injected `__annotations__`. */
   site?: GeomSite;
+  /** True when this constructor owns numeric literals in source. */
+  editable?: boolean;
 };
 
 const pathCounts = new Map<string, number>();
@@ -60,7 +102,7 @@ export function beginGeomFrame(): void {
   frameGeoms.length = 0;
 }
 
-/** Skip drawing (widgets, derived `offsetLine`). */
+/** Skip drawing (widgets). */
 export function withoutDraw<T>(fn: () => T): T {
   drawSilent += 1;
   try {
@@ -109,7 +151,7 @@ function captureProvenance(createdBy: string): Provenance {
   return { ...site, createdBy };
 }
 
-export function makeBase(kind: string, createdBy: string, site?: GeomSite): Base {
+export function makeBase(kind: string, createdBy: string, site?: GeomSite, editable?: boolean): Base {
   const local = nextPathLocal(kind);
   return {
     id: crypto.randomUUID(),
@@ -117,6 +159,7 @@ export function makeBase(kind: string, createdBy: string, site?: GeomSite): Base
     parentId: currentParentId,
     provenance: site ? { ...site, createdBy } : captureProvenance(createdBy),
     site,
+    editable,
   };
 }
 

@@ -39,7 +39,7 @@ test("loop of five distances is one write target", () => {
     collectEditCalls(
       ts.createSourceFile("s.ts", next, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
     ).length,
-  ).toBe(2);
+  ).toBe(3);
 });
 
 test("two editPoint in different functions patch independently", () => {
@@ -112,4 +112,24 @@ test("editPointOnSegment patches t", () => {
   const loc = at(src, 0);
   const next = patchWidgetAt(src, loc.line, loc.column, [0.61]);
   expect(next).toMatch(/editPointOnSegment\(span, 0\.61\)/);
+});
+
+test("point and circle constructor literals patch", () => {
+  const src = `const A = point(0, 0);
+const reach = circle(A, 2.5);
+`;
+  const locA = at(src, 0);
+  const nextA = patchWidgetAt(src, locA.line, locA.column, [1.2, 0.4]);
+  expect(nextA).toMatch(/point\(1\.2, 0\.4\)/);
+  const locC = at(nextA, 1);
+  const nextC = patchWidgetAt(nextA, locC.line, locC.column, [3.1]);
+  expect(nextC).toMatch(/circle\(A, 3\.1\)/);
+});
+
+test("offsetLine and slider patch the length literal", () => {
+  const src = `const shelf = offsetLine(ground, 1.8);
+const r = slider(2.4);
+`;
+  expect(patchWidgetAt(src, at(src, 0).line, at(src, 0).column, [2])).toMatch(/offsetLine\(ground, 2\)/);
+  expect(patchWidgetAt(src, at(src, 1).line, at(src, 1).column, [0.5])).toMatch(/slider\(0\.5\)/);
 });

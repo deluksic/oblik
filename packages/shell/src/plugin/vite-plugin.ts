@@ -6,7 +6,7 @@ import type { Plugin, ViteDevServer } from "vite";
 
 import { parseSceneSource } from "../catalog/catalog.ts";
 import { newSceneSource, titleFromId } from "../catalog/new-scene.ts";
-import { injectSceneSites } from "../editor/inject-sites.ts";
+import { annotateCallSites } from "../editor/inject-sites.ts";
 import { applyScenePatch, type ScenePatch, type SourceAt } from "../editor/insert-editor.ts";
 import { patchWidgetAt } from "../editor/patch-widget.ts";
 import { SCENE_HELPER_HMR_EVENT } from "../hmr/scene-hmr.ts";
@@ -408,7 +408,9 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       const file = id.split("?")[0] ?? "";
       if (isInjectableTs(workspaceRoot, file) && !isSceneLoadersModule(id)) {
         const rel = workspaceRelPath(path.resolve(file), workspaceRoot);
-        return { code: injectSceneSites(code, rel), map: null };
+        const annotated = annotateCallSites(code, rel);
+        for (const warning of annotated.warnings) this.warn(warning);
+        return { code: annotated.code, map: null };
       }
       if (!isSceneLoadersModule(id)) return undefined;
       if (code.includes("/* __scene_hmr_accept */")) return undefined;

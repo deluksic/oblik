@@ -39,15 +39,15 @@ export function drawMountingPlate(opts: MountingPlateCorners): Geom[] {
   const top = segment(br, tl);
   const left = segment(tl, bl);
 
-  const hBottom = offsetLine(bottom, opts.inset);
-  const hRight = offsetLine(right, opts.inset);
-  const hTop = offsetLine(top, opts.inset);
-  const hLeft = offsetLine(left, opts.inset);
+  const hBottom = offsetLine(bottom, opts.inset).line;
+  const hRight = offsetLine(right, opts.inset).line;
+  const hTop = offsetLine(top, opts.inset).line;
+  const hLeft = offsetLine(left, opts.inset).line;
 
-  const c0 = lineIntersection(hBottom, hLeft)!;
-  const c1 = lineIntersection(hBottom, hRight)!;
-  const c2 = lineIntersection(hTop, hRight)!;
-  const c3 = lineIntersection(hTop, hLeft)!;
+  const c0 = lineIntersection(hBottom, hLeft);
+  const c1 = lineIntersection(hBottom, hRight);
+  const c2 = lineIntersection(hTop, hRight);
+  const c3 = lineIntersection(hTop, hLeft);
 
   return [
     bottom,
@@ -95,6 +95,6 @@ export function rectDiagonals(origin: Vec2, opp: Vec2): [Line, Line] {
 export function centerHole(origin: Vec2, opp: Vec2, holeR: number): Geom | null {
   const [d1, d2] = rectDiagonals(origin, opp);
   const c = lineIntersection(d1, d2);
-  if (!c) return null;
+  if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return null;
   return circle(c, holeR);
 }

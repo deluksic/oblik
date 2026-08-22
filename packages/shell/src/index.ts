@@ -26,6 +26,7 @@ export {
 } from "./hmr/scene-hmr";
 export {
   widgetBindingName,
+  widgetCallName,
   widgetInSceneFunction,
   distanceOriginName,
   namedScenePointNear,

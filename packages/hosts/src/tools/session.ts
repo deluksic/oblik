@@ -2,6 +2,7 @@ import type { Camera, Gizmo, Hit } from "@design-scenes/euclid2";
 import { hitsNear } from "@design-scenes/euclid2";
 import {
   add,
+  circleLineIntersection,
   dist,
   distToLine,
   dot,
@@ -9,6 +10,7 @@ import {
   lineIntersection,
   perp,
   sub,
+  type Circle,
   type Drawable,
   type GeomSite,
   type LineLike,
@@ -19,6 +21,7 @@ import {
   editCallArgText,
   nextBindingName,
   widgetBindingName,
+  widgetCallName,
   widgetInSceneFunction,
   type ScenePatch,
   type SourceAt,
@@ -27,14 +30,22 @@ import {
 import type { CommandPreview, EditorTool } from "../editors";
 
 export type LineBind =
-  | { kind: "named"; name: string }
-  | { kind: "site"; site: SourceAt }
+  | { kind: "named"; name: string; field?: "line" }
+  | { kind: "site"; site: SourceAt; field?: "line" }
   | { kind: "expr"; expr: string };
 
 export type PointBind =
   | { kind: "named"; name: string; x: number; y: number }
   | { kind: "free"; x: number; y: number }
-  | { kind: "intersection"; a: LineBind; b: LineBind; x: number; y: number };
+  | { kind: "intersection"; a: LineBind; b: LineBind; x: number; y: number }
+  | {
+      kind: "circleLine";
+      circle: string;
+      line: LineBind;
+      k: 1 | -1;
+      x: number;
+      y: number;
+    };
 
 export type FromBind =
   | { kind: "point"; point: PointBind }
@@ -42,11 +53,28 @@ export type FromBind =
 
 export type LengthBind =
   | { kind: "fresh"; value: number }
-  | { kind: "reuse"; name: string; negate?: boolean };
+  | { kind: "reuse"; name: string; negate?: boolean }
+  | { kind: "field"; object: string; field: "radius" | "distance"; negate?: boolean }
+  | { kind: "dist"; other: PointBind }
+  | { kind: "signedDist"; other: PointBind };
 
 export type ToolSession =
   | { verb: "point" }
   | { verb: "line"; a?: PointBind }
+  | { verb: "segment"; a?: PointBind }
+  | { verb: "slider"; typed?: string }
+  | {
+      verb: "circle";
+      center?: PointBind;
+      lengthReuse?: { name: string; signed: boolean };
+      typed?: string;
+    }
+  | {
+      verb: "offset";
+      from?: FromBind;
+      lengthReuse?: { name: string; signed: boolean };
+      typed?: string;
+    }
   | {
       verb: "distance";
       from?: FromBind;
@@ -174,12 +202,18 @@ function gizmoName(src: string, g: Gizmo): string | null {
 function lineWithSite(
   d: Drawable,
   sceneFile: string,
+  src: string,
 ): { bind: LineBind; line: LineLike; id: string } | null {
   const g = d.geom;
   if (g.kind !== "segment" && g.kind !== "line") return null;
   const site = siteAt(g.site, sceneFile);
   if (!site) return null;
-  return { bind: { kind: "site", site }, line: g, id: g.id };
+  const field = g.kind === "line" && g.offsetDistance != null ? ("line" as const) : undefined;
+  const name = widgetBindingName(src, site);
+  const bind: LineBind = name
+    ? { kind: "named", name, field }
+    : { kind: "site", site, field };
+  return { bind, line: g, id: g.id };
 }
 
 function offsetAsLine(
@@ -187,11 +221,18 @@ function offsetAsLine(
   g: Extract<Gizmo, { kind: "offset" }>,
 ): { bind: LineBind; line: LineLike; id: string } | null {
   const name = gizmoName(src, g);
-  const base = editCallArgText(src, { line: g.at.line, column: g.at.column }, 0);
-  if (!name || !base) return null;
+  if (!name) return null;
+  const at = { line: g.at.line, column: g.at.column };
+  const callee = widgetCallName(src, at);
+  const basis = line(g.origin, add(g.origin, g.direction));
+  if (callee === "offsetLine") {
+    return { bind: { kind: "named", name, field: "line" }, line: basis, id: g.site };
+  }
+  const base = editCallArgText(src, at, 0);
+  if (!base) return null;
   return {
-    bind: { kind: "expr", expr: `offsetLine(${base}, ${name})` },
-    line: line(g.origin, add(g.origin, g.direction)),
+    bind: { kind: "expr", expr: `offsetLine(${base}, ${name}).line` },
+    line: basis,
     id: g.site,
   };
 }
@@ -212,7 +253,7 @@ export function lineLikesNear(ctx: PickCtx): { bind: LineBind; line: LineLike; i
     out.push(hit);
   };
   for (const d of hitsNear(ctx.screen, ctx.cam, ctx.w, ctx.h, ctx.drawables)) {
-    push(lineWithSite(d, ctx.sceneFile));
+    push(lineWithSite(d, ctx.sceneFile, ctx.sceneSrc));
   }
   const maxW = 8 / ctx.cam.scale;
   for (const g of ctx.gizmos) {
@@ -223,7 +264,37 @@ export function lineLikesNear(ctx: PickCtx): { bind: LineBind; line: LineLike; i
   return out;
 }
 
-export function resolveCrossing(ctx: PickCtx): PointBind | null {
+function allSceneLineLikes(ctx: PickCtx): { bind: LineBind; line: LineLike; id: string }[] {
+  const out: { bind: LineBind; line: LineLike; id: string }[] = [];
+  const seen = new Set<string>();
+  const push = (hit: { bind: LineBind; line: LineLike; id: string } | null) => {
+    if (!hit || seen.has(hit.id)) return;
+    seen.add(hit.id);
+    out.push(hit);
+  };
+  for (const d of ctx.drawables) {
+    push(lineWithSite(d, ctx.sceneFile, ctx.sceneSrc));
+  }
+  for (const g of ctx.gizmos) {
+    if (g.kind === "offset") push(offsetAsLine(ctx.sceneSrc, g));
+  }
+  return out;
+}
+
+function namedCircles(ctx: PickCtx): { name: string; circle: Circle }[] {
+  const out: { name: string; circle: Circle }[] = [];
+  for (const d of ctx.drawables) {
+    if (d.geom.kind !== "circle") continue;
+    const site = siteAt(d.geom.site, ctx.sceneFile);
+    if (!site) continue;
+    const name = widgetBindingName(ctx.sceneSrc, site);
+    if (!name) continue;
+    out.push({ name, circle: d.geom });
+  }
+  return out;
+}
+
+function resolveLineLineCrossing(ctx: PickCtx): PointBind | null {
   const likes = lineLikesNear(ctx);
   if (likes.length < 2) return null;
   for (let i = 0; i < likes.length - 1; i++) {
@@ -231,12 +302,46 @@ export function resolveCrossing(ctx: PickCtx): PointBind | null {
       const a = likes[i]!;
       const b = likes[j]!;
       const pt = lineIntersection(a.line, b.line);
-      if (!pt) continue;
+      if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
       if (Math.hypot(pt.x - ctx.world.x, pt.y - ctx.world.y) > 0.35) continue;
       return { kind: "intersection", a: a.bind, b: b.bind, x: pt.x, y: pt.y };
     }
   }
   return null;
+}
+
+function resolveCircleLineCrossing(ctx: PickCtx): PointBind | null {
+  const likes = allSceneLineLikes(ctx);
+  if (likes.length === 0) return null;
+  const circs = namedCircles(ctx);
+  if (circs.length === 0) return null;
+  let best: PointBind | null = null;
+  let bestD = 0.35;
+  for (const c of circs) {
+    for (const ll of likes) {
+      for (const k of [1, -1] as const) {
+        const pt = circleLineIntersection(c.circle, ll.line, k);
+        if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+        const d = Math.hypot(pt.x - ctx.world.x, pt.y - ctx.world.y);
+        if (d <= bestD) {
+          bestD = d;
+          best = { kind: "circleLine", circle: c.name, line: ll.bind, k, x: pt.x, y: pt.y };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+export function resolveCrossing(ctx: PickCtx): PointBind | null {
+  const cl = resolveCircleLineCrossing(ctx);
+  const ll = resolveLineLineCrossing(ctx);
+  if (cl && ll) {
+    const dCl = Math.hypot(cl.x - ctx.world.x, cl.y - ctx.world.y);
+    const dLl = Math.hypot(ll.x - ctx.world.x, ll.y - ctx.world.y);
+    return dCl <= dLl ? cl : ll;
+  }
+  return cl ?? ll;
 }
 
 function pointFromGizmo(ctx: PickCtx): PointBind | null {
@@ -330,27 +435,72 @@ export function resolveDistanceFrom(ctx: PickCtx): DistanceFromHit {
   return { kind: "empty" };
 }
 
-export function resolveLength(ctx: PickCtx): LengthBind | "ignore" | "measure" {
+function lengthFromGizmo(ctx: PickCtx, g: Gizmo): LengthBind | "ignore" {
+  const name = gizmoName(ctx.sceneSrc, g);
+  if (!name) return "ignore";
+  if (g.kind === "number") return { kind: "reuse", name };
+  if (g.kind === "offset") return { kind: "field", object: name, field: "distance" };
+  if (g.kind === "distance") {
+    const circ = ctx.drawables.find(
+      (d) =>
+        d.geom.kind === "circle" &&
+        d.geom.site &&
+        `${d.geom.site.file}:${d.geom.site.line}:${d.geom.site.column}` === g.site,
+    );
+    if (circ) return { kind: "field", object: name, field: "radius" };
+    return { kind: "reuse", name };
+  }
+  return "ignore";
+}
+
+export function resolveLength(ctx: PickCtx, mode: "circle" | "offset" | "distance" = "distance"): LengthBind | "ignore" | "measure" {
   if (ctx.hit?.target === "gizmo") {
     const g = ctx.hit.gizmo;
     if (g.kind === "distance" || g.kind === "offset" || g.kind === "number") {
-      const name = gizmoName(ctx.sceneSrc, g);
-      if (!name) return "ignore";
-      return { kind: "reuse", name };
+      return lengthFromGizmo(ctx, g);
+    }
+    if (g.kind === "point" || g.kind === "glider" || g.kind === "lineGlider") {
+      const p = pointFromGizmo(ctx);
+      if (!p) return "ignore";
+      return mode === "offset" ? { kind: "signedDist", other: p } : { kind: "dist", other: p };
     }
     return "ignore";
   }
-  if (ctx.hit?.target === "geom") return "ignore";
+  if (ctx.hit?.target === "geom") {
+    const g = ctx.hit.drawable.geom;
+    if (g.kind === "circle") {
+      const site = siteAt(g.site, ctx.sceneFile);
+      const name = site ? widgetBindingName(ctx.sceneSrc, site) : null;
+      if (name) return { kind: "field", object: name, field: "radius" };
+      return "ignore";
+    }
+    if (g.kind === "line" && g.offsetDistance != null) {
+      const site = siteAt(g.site, ctx.sceneFile);
+      const name = site ? widgetBindingName(ctx.sceneSrc, site) : null;
+      if (name) return { kind: "field", object: name, field: "distance" };
+      return "ignore";
+    }
+    const geomPt = pointFromGeom(ctx);
+    if (geomPt) {
+      return mode === "offset" ? { kind: "signedDist", other: geomPt } : { kind: "dist", other: geomPt };
+    }
+    return "ignore";
+  }
+  const named = namedPointNear(ctx.namedPoints, ctx.world, pickRadius(ctx));
+  if (named) {
+    return mode === "offset" ? { kind: "signedDist", other: named } : { kind: "dist", other: named };
+  }
   return "measure";
 }
 
-export function sessionAsGhostTool(session: ToolSession, hover: SessionHover | null): EditorTool {
+export function sessionAsGhostTool(session: ToolSession, _hover: SessionHover | null): EditorTool {
   if (session.verb === "point") return { id: "point" };
-  if (session.verb === "line") {
+  if (session.verb === "slider") return { id: "point" };
+  if (session.verb === "line" || session.verb === "segment") {
     if (!session.a) return { id: "point" };
     const p = session.a;
     return {
-      id: "infiniteLine",
+      id: session.verb === "line" ? "infiniteLine" : "segment",
       a: {
         x: p.x,
         y: p.y,
@@ -358,6 +508,27 @@ export function sessionAsGhostTool(session: ToolSession, hover: SessionHover | n
       },
     };
   }
+  if (session.verb === "circle") {
+    if (!session.center) return { id: "point" };
+    const p = session.center;
+    return {
+      id: "circle",
+      center: {
+        x: p.x,
+        y: p.y,
+        ...(p.kind === "named" ? { name: p.name } : {}),
+      },
+      typedRadius: session.typed,
+    };
+  }
+  if (session.verb === "offset" && session.from?.kind === "line") {
+    return {
+      id: "offset",
+      baseLine: { origin: session.from.origin, dir: session.from.dir },
+      typedDistance: session.typed,
+    };
+  }
+  if (session.verb === "offset") return { id: "point" };
   if (session.from?.kind === "point") {
     const p = session.from.point;
     return {
@@ -386,51 +557,93 @@ export function startVerb(id: string): ToolSession | null {
   if (id === "point") return { verb: "point" };
   if (id === "distance") return { verb: "distance" };
   if (id === "line") return { verb: "line" };
+  if (id === "segment") return { verb: "segment" };
+  if (id === "circle") return { verb: "circle" };
+  if (id === "offset") return { verb: "offset" };
+  if (id === "slider") return { verb: "slider" };
   return null;
+}
+
+function pointLabel(p: PointBind | undefined, slotName: string, filledIf: boolean): string {
+  if (!p) return slot(slotName, "", filledIf ? "pending" : "active");
+  if (p.kind === "named") return filled(p.name);
+  if (p.kind === "intersection") return filled("lineIntersection");
+  if (p.kind === "circleLine") return filled("circleLineIntersection");
+  return slot(slotName, "", "done");
 }
 
 export function sessionPreview(session: ToolSession | null): CommandPreview | null {
   if (!session) return null;
   if (session.verb === "point") {
     return {
-      previewHtml: fn("editPoint", [slot("<x>"), slot("<y>")]),
+      previewHtml: fn("point", [slot("<x>"), slot("<y>")]),
       hint: "Click empty paper or a line crossing.",
     };
   }
-  if (session.verb === "line") {
-    const a = session.a
-      ? session.a.kind === "named"
-        ? filled(session.a.name)
-        : session.a.kind === "intersection"
-          ? filled("lineIntersection")
-          : slot("<a>", "", "done")
-      : slot("<a>");
-    const b = slot("<b>", "", session.a ? "active" : "pending");
+  if (session.verb === "slider") {
     return {
-      previewHtml: fn("line", [a, b]),
+      previewHtml: fn("slider", [slot(session.typed?.trim() ? session.typed : "<n>", "is-number")]),
+      acceptNumber: true,
+      hint: "Type a value and Enter, or click to measure.",
+    };
+  }
+  if (session.verb === "line" || session.verb === "segment") {
+    const a = pointLabel(session.a, "<a>", false);
+    const b = slot("<b>", "", session.a ? "active" : "pending");
+    const name = session.verb === "line" ? "line" : "segment";
+    return {
+      previewHtml: fn(name, [a, b]),
       hint: session.a ? "Click the second point." : "Click the first point.",
     };
   }
   const dSlot = session.lengthReuse
     ? filled(session.lengthReuse.name)
-    : slot(session.typed?.trim() ? session.typed : "<d>", session.from ? "is-number" : "", session.from ? "active" : "pending");
+    : slot(
+        session.typed?.trim() ? session.typed : "<d>",
+        session.verb === "circle" ? (session.center ? "is-number" : "") : session.from ? "is-number" : "",
+        session.verb === "circle" ? (session.center ? "active" : "pending") : session.from ? "active" : "pending",
+      );
+  if (session.verb === "circle") {
+    return {
+      previewHtml: fn("circle", [pointLabel(session.center, "<center>", false), dSlot]),
+      acceptNumber: !!session.center && !session.lengthReuse,
+      hint: session.center
+        ? "Type a radius, click empty, a length, or a point."
+        : "Click the center.",
+    };
+  }
+  if (session.verb === "offset") {
+    if (!session.from || session.from.kind !== "line") {
+      return {
+        previewHtml: fn("offsetLine", [slot("<line>"), dSlot]),
+        hint: "Click a scene line or offset.",
+      };
+    }
+    const lineLabel =
+      session.from.line.kind === "named"
+        ? filled(
+            session.from.line.field === "line"
+              ? `${session.from.line.name}.line`
+              : session.from.line.name,
+          )
+        : session.from.line.kind === "expr"
+          ? filled("offsetLine")
+          : slot("<line>", "", "done");
+    return {
+      previewHtml: fn("offsetLine", [lineLabel, dSlot]),
+      acceptNumber: !session.lengthReuse,
+      hint: "Type a distance, click a side, a length, or a point.",
+    };
+  }
   if (!session.from) {
     return {
       previewHtml: fn("distance", [slot("<from>"), dSlot]),
-      hint: session.lengthReuse
-        ? "Length reused. Click a point or a scene line."
-        : "Click a point, a crossing, a scene line, or an offset handle.",
+      hint: "Click a point, a crossing, a scene line, or an offset handle.",
     };
   }
   if (session.from.kind === "point") {
-    const p =
-      session.from.point.kind === "named"
-        ? filled(session.from.point.name)
-        : session.from.point.kind === "intersection"
-          ? filled("lineIntersection")
-          : slot("<point>", "", "done");
     return {
-      previewHtml: fn("editDistanceToPoint", [p, dSlot]),
+      previewHtml: fn("editDistanceToPoint", [pointLabel(session.from.point, "<point>", true), dSlot]),
       acceptNumber: !session.lengthReuse,
       hint: "Type a radius and Enter, click to measure, or reuse a dashed ring.",
     };
@@ -449,12 +662,21 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
 }
 
 export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
-  if (session.verb === "point" || session.verb === "line") {
+  if (
+    session.verb === "point" ||
+    session.verb === "line" ||
+    session.verb === "segment" ||
+    session.verb === "slider" ||
+    (session.verb === "circle" && !session.center)
+  ) {
+    if (session.verb === "slider") {
+      return { snap: { kind: "point", x: ctx.world.x, y: ctx.world.y }, ghost: "none", hoverId: null };
+    }
     const p = resolvePoint(ctx);
     if (p === "ignore") return { snap: null, ghost: "none", hoverId: null };
     return {
       snap: {
-        kind: p.kind === "intersection" ? "intersection" : "point",
+        kind: p.kind === "intersection" || p.kind === "circleLine" ? "intersection" : "point",
         x: p.x,
         y: p.y,
       },
@@ -463,12 +685,41 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
     };
   }
 
-  if (!session.from) {
+  if (session.verb === "circle" && session.center) {
+    return { snap: null, ghost: "ring", hoverId: null };
+  }
+
+  if (session.verb === "offset" && session.from?.kind === "line") {
+    return {
+      snap: null,
+      ghost: "parallel",
+      lineBasis: { origin: session.from.origin, dir: session.from.dir },
+      hoverId: null,
+    };
+  }
+
+  if (session.verb === "offset" && !session.from) {
+    const hit = resolveDistanceFrom(ctx);
+    if (hit.kind === "line") {
+      const hoverId =
+        ctx.hit?.target === "geom" &&
+        (ctx.hit.drawable.geom.kind === "segment" || ctx.hit.drawable.geom.kind === "line")
+          ? ctx.hit.drawable.geom.id
+          : null;
+      return { snap: null, ghost: "none", hoverId };
+    }
+    return { snap: null, ghost: "none", hoverId: null };
+  }
+
+  if (!("from" in session) || !session.from) {
     const hit = resolveDistanceFrom(ctx);
     if (hit.kind === "point") {
       return {
         snap: {
-          kind: hit.point.kind === "intersection" ? "intersection" : "point",
+          kind:
+            hit.point.kind === "intersection" || hit.point.kind === "circleLine"
+              ? "intersection"
+              : "point",
           x: hit.point.x,
           y: hit.point.y,
         },
@@ -532,18 +783,19 @@ function lineText(
   map: Map<string, string>,
   imports: { geom: Set<string> },
 ): string {
-  if (bind.kind === "named") return bind.name;
+  if (bind.kind === "named") return bind.field === "line" ? `${bind.name}.line` : bind.name;
   if (bind.kind === "expr") {
     imports.geom.add("offsetLine");
     return bind.expr;
   }
   const n = map.get(`${bind.site.line}:${bind.site.column}`);
   if (!n) throw new Error("unbound line");
-  return n;
+  return bind.field === "line" ? `${n}.line` : n;
 }
 
 function collectLines(from: FromBind | PointBind): LineBind[] {
   if (from.kind === "intersection") return [from.a, from.b];
+  if (from.kind === "circleLine") return [from.line];
   if (from.kind === "line") return [from.line];
   if (from.kind === "point") return collectLines(from.point);
   return [];
@@ -559,8 +811,17 @@ function pointExpr(
   if (point.kind === "named") return point.name;
   if (point.kind === "free") {
     const name = nextBindingName(`${working}\n${statements.join("\n")}`, "p");
-    imports.euclid.add("editPoint");
-    statements.push(`const ${name} = editPoint(${fmt(point.x)}, ${fmt(point.y)});`);
+    imports.geom.add("point");
+    statements.push(`const ${name} = point(${fmt(point.x)}, ${fmt(point.y)});`);
+    return name;
+  }
+  if (point.kind === "circleLine") {
+    imports.geom.add("circleLineIntersection");
+    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "x");
+    const k = point.k === 1 ? "+1" : "-1";
+    statements.push(
+      `const ${name} = circleLineIntersection(${point.circle}, ${lineText(point.line, map, imports)}, ${k});`,
+    );
     return name;
   }
   imports.geom.add("lineIntersection");
@@ -617,11 +878,110 @@ export function compileLine(src: string, a: PointBind, b: PointBind): ScenePatch
     const ae = pointExpr(working, statements, a, map, imports);
     const be = pointExpr(working, statements, b, map, imports);
     imports.geom.add("line");
-    statements.push(`line(${ae}, ${be});`);
+    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "ln");
+    statements.push(`const ${name} = line(${ae}, ${be});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+export function compileSegment(src: string, a: PointBind, b: PointBind): ScenePatch | { error: string } {
+  if (samePoint(a, b)) return { error: "Pick two different points." };
+  const sites = uniqueHoists([...collectLines(a), ...collectLines(b)]);
+  try {
+    const { src: working, map } = hoistNames(src, sites);
+    const statements: string[] = [];
+    const imports = { euclid: new Set<string>(), geom: new Set<string>() };
+    const ae = pointExpr(working, statements, a, map, imports);
+    const be = pointExpr(working, statements, b, map, imports);
+    imports.geom.add("segment");
+    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "seg");
+    statements.push(`const ${name} = segment(${ae}, ${be});`);
+    return patchOf(sites, imports, statements);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+function lengthArg(
+  working: string,
+  statements: string[],
+  length: LengthBind,
+  map: Map<string, string>,
+  imports: { euclid: Set<string>; geom: Set<string> },
+  centerExpr?: string,
+  lineExpr?: string,
+): string {
+  if (length.kind === "fresh") return fmt(length.value);
+  if (length.kind === "reuse") return length.negate ? `-${length.name}` : length.name;
+  if (length.kind === "field") {
+    const t = `${length.object}.${length.field}`;
+    return length.negate ? `-${t}` : t;
+  }
+  if (length.kind === "dist") {
+    if (!centerExpr) throw new Error("dist needs a center");
+    const q = pointExpr(working, statements, length.other, map, imports);
+    imports.geom.add("dist");
+    return `dist(${centerExpr}, ${q})`;
+  }
+  if (!lineExpr) throw new Error("signedDist needs a line");
+  const q = pointExpr(working, statements, length.other, map, imports);
+  imports.geom.add("signedDist");
+  return `signedDist(${q}, ${lineExpr})`;
+}
+
+function lengthHoists(length: LengthBind): LineBind[] {
+  if (length.kind === "dist" || length.kind === "signedDist") return collectLines(length.other);
+  return [];
+}
+
+export function compileCircle(
+  src: string,
+  center: PointBind,
+  length: LengthBind,
+): ScenePatch | { error: string } {
+  const sites = uniqueHoists([...collectLines(center), ...lengthHoists(length)]);
+  try {
+    const { src: working, map } = hoistNames(src, sites);
+    const statements: string[] = [];
+    const imports = { euclid: new Set<string>(), geom: new Set<string>() };
+    const c = pointExpr(working, statements, center, map, imports);
+    const arg = lengthArg(working, statements, length, map, imports, c);
+    imports.geom.add("circle");
+    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "k");
+    statements.push(`const ${name} = circle(${c}, ${arg});`);
+    return patchOf(sites, imports, statements);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function compileOffset(
+  src: string,
+  from: Extract<FromBind, { kind: "line" }>,
+  length: LengthBind,
+): ScenePatch | { error: string } {
+  const sites = uniqueHoists([...collectLines(from), ...lengthHoists(length)]);
+  try {
+    const { src: working, map } = hoistNames(src, sites);
+    const statements: string[] = [];
+    const imports = { euclid: new Set<string>(), geom: new Set<string>() };
+    const lineE = lineText(from.line, map, imports);
+    const arg = lengthArg(working, statements, length, map, imports, undefined, lineE);
+    imports.geom.add("offsetLine");
+    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "off");
+    statements.push(`const ${name} = offsetLine(${lineE}, ${arg});`);
+    return patchOf(sites, imports, statements);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function compileSlider(src: string, n: number): ScenePatch | { error: string } {
+  const imports = { euclid: new Set<string>(["slider"]), geom: new Set<string>() };
+  const name = nextBindingName(src, "r");
+  return patchOf([], imports, [`const ${name} = slider(${fmt(n)});`]);
 }
 
 export function compileDistance(
@@ -641,14 +1001,29 @@ export function compileDistance(
       const p = pointExpr(working, statements, from.point, map, imports);
       imports.euclid.add("editDistanceToPoint");
       const dName = nextBindingName(`${working}\n${statements.join("\n")}`, "d");
-      const arg = length.kind === "reuse" ? length.name : fmt(length.value);
+      const arg =
+        length.kind === "reuse"
+          ? length.name
+          : length.kind === "fresh"
+            ? fmt(length.value)
+            : length.kind === "field"
+              ? `${length.object}.${length.field}`
+              : fmt(0);
       statements.push(`const ${dName} = editDistanceToPoint(${p}, ${arg});`);
     } else {
       const lineE = lineText(from.line, map, imports);
       imports.euclid.add("editOffsetFromLine");
       const off = nextBindingName(`${working}\n${statements.join("\n")}`, "off");
       const arg =
-        length.kind === "reuse" ? (length.negate ? `-${length.name}` : length.name) : fmt(length.value);
+        length.kind === "reuse"
+          ? length.negate
+            ? `-${length.name}`
+            : length.name
+          : length.kind === "fresh"
+            ? fmt(length.value)
+            : length.kind === "field"
+              ? `${length.negate ? "-" : ""}${length.object}.${length.field}`
+              : fmt(0);
       statements.push(`const ${off} = editOffsetFromLine(${lineE}, ${arg});`);
     }
     return patchOf(sites, imports, statements);
@@ -688,6 +1063,117 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       return { kind: "error", message: "Pick two different points." };
     }
     return commitOrError(compileLine(src, session.a, p));
+  }
+
+  if (session.verb === "segment") {
+    const p = resolvePoint(ctx);
+    if (p === "ignore") return { kind: "session", session };
+    if (!session.a) return { kind: "session", session: { verb: "segment", a: p } };
+    if (samePoint(session.a, p)) {
+      return { kind: "error", message: "Pick two different points." };
+    }
+    return commitOrError(compileSegment(src, session.a, p));
+  }
+
+  if (session.verb === "slider") {
+    const typed = session.typed?.trim() ? Number(session.typed) : NaN;
+    if (Number.isFinite(typed)) return commitOrError(compileSlider(src, typed));
+    return commitOrError(compileSlider(src, Math.max(0.05, Math.hypot(ctx.world.x, ctx.world.y) || 1)));
+  }
+
+  if (session.verb === "circle") {
+    if (!session.center) {
+      const p = resolvePoint(ctx);
+      if (p === "ignore") return { kind: "session", session };
+      if (session.lengthReuse) {
+        return commitOrError(
+          compileCircle(src, p, { kind: "reuse", name: session.lengthReuse.name }),
+        );
+      }
+      return { kind: "session", session: { verb: "circle", center: p, typed: session.typed } };
+    }
+    const len = resolveLength(ctx, "circle");
+    if (len === "ignore") return { kind: "session", session };
+    if (len !== "measure") return commitOrError(compileCircle(src, session.center, len));
+    const typed = session.typed?.trim() ? Number(session.typed) : NaN;
+    if (Number.isFinite(typed)) {
+      return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: typed }));
+    }
+    if (session.lengthReuse) {
+      return commitOrError(
+        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }),
+      );
+    }
+    return commitOrError(
+      compileCircle(src, session.center, {
+        kind: "fresh",
+        value: radiusBetween(session.center, ctx.world),
+      }),
+    );
+  }
+
+  if (session.verb === "offset") {
+    if (!session.from) {
+      const hit = resolveDistanceFrom(ctx);
+      if (hit.kind === "ignore") return { kind: "session", session };
+      if (hit.kind === "noSite") {
+        return {
+          kind: "error",
+          message: "That geometry has no construction site in scene() — library strokes cannot bind.",
+        };
+      }
+      if (hit.kind === "earlyLength") {
+        return {
+          kind: "session",
+          session: { verb: "offset", lengthReuse: { name: hit.name, signed: false }, typed: session.typed },
+        };
+      }
+      if (hit.kind === "line") {
+        return {
+          kind: "session",
+          session: {
+            verb: "offset",
+            from: { kind: "line", line: hit.line, origin: hit.origin, dir: hit.dir },
+            lengthReuse: session.lengthReuse,
+            typed: session.typed,
+          },
+        };
+      }
+      return { kind: "error", message: "Click a line to offset." };
+    }
+    if (session.from.kind !== "line") {
+      return { kind: "error", message: "Click a line to offset." };
+    }
+    const from = session.from;
+    const len = resolveLength(ctx, "offset");
+    if (len === "ignore") return { kind: "session", session };
+    if (len !== "measure") {
+      let bind = len;
+      if (bind.kind === "reuse" || bind.kind === "field") {
+        const s = signedOffset(from.origin, from.dir, ctx.world);
+        if (s < 0 && session.lengthReuse && !session.lengthReuse.signed) {
+          bind = { ...bind, negate: true };
+        }
+      }
+      return commitOrError(compileOffset(src, from, bind));
+    }
+    const typed = session.typed?.trim() ? Number(session.typed) : NaN;
+    if (Number.isFinite(typed)) {
+      return commitOrError(compileOffset(src, from, { kind: "fresh", value: typed }));
+    }
+    if (session.lengthReuse) {
+      const s = signedOffset(from.origin, from.dir, ctx.world);
+      return commitOrError(
+        compileOffset(src, from, {
+          kind: "reuse",
+          name: session.lengthReuse.name,
+          negate: s < 0 && !session.lengthReuse.signed,
+        }),
+      );
+    }
+    const s = signedOffset(from.origin, from.dir, ctx.world);
+    const mag = Math.max(0.05, Math.abs(s));
+    return commitOrError(compileOffset(src, from, { kind: "fresh", value: s < 0 ? -mag : mag }));
   }
 
   if (!session.from) {
@@ -738,7 +1224,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
   const len = resolveLength(ctx);
   if (len === "ignore") return { kind: "session", session };
   if (len !== "measure") {
-    if (session.from.kind === "line" && !len.negate) {
+    if (session.from.kind === "line" && (len.kind === "reuse" || len.kind === "field") && !len.negate) {
       const s = signedOffset(session.from.origin, session.from.dir, ctx.world);
       if (s < 0 && session.lengthReuse && !session.lengthReuse.signed) {
         return commitOrError(compileDistance(src, session.from, { ...len, negate: true }));
@@ -780,6 +1266,29 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
 }
 
 export function onSessionNumber(session: ToolSession, src: string, n: number): SessionResult {
+  if (session.verb === "slider") {
+    return commitOrError(compileSlider(src, n));
+  }
+  if (session.verb === "circle") {
+    if (!session.center) return { kind: "error", message: "Pick a center first." };
+    if (session.lengthReuse) {
+      return commitOrError(
+        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }),
+      );
+    }
+    return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: n }));
+  }
+  if (session.verb === "offset") {
+    if (!session.from || session.from.kind !== "line") {
+      return { kind: "error", message: "Pick a line first." };
+    }
+    if (session.lengthReuse) {
+      return commitOrError(
+        compileOffset(src, session.from, { kind: "reuse", name: session.lengthReuse.name }),
+      );
+    }
+    return commitOrError(compileOffset(src, session.from, { kind: "fresh", value: n }));
+  }
   if (session.verb !== "distance" || !session.from) {
     return { kind: "error", message: "Pick a from first." };
   }

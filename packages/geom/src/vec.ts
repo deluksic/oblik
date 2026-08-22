@@ -65,6 +65,15 @@ export function distToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
   return Math.abs(dot(sub(p, origin), n));
 }
 
+/** Left-normal signed distance (same sign as `offsetLine`). */
+export function signedDistToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
+  return dot(sub(p, origin), perp(dir));
+}
+
+export function isFiniteVec(p: Vec2): boolean {
+  return Number.isFinite(p.x) && Number.isFinite(p.y);
+}
+
 export function polar(r: number, radians: number): Vec2 {
   return vec(r * Math.cos(radians), r * Math.sin(radians));
 }

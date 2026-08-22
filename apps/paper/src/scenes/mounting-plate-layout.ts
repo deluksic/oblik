@@ -21,10 +21,10 @@ export function mountingPlateLayout() {
   const left = segment(tl, bl);
 
   const inset = editOffsetFromLine(bottom, 0.45);
-  const hBottom = offsetLine(bottom, inset);
-  const hLeft = offsetLine(left, inset);
+  const hBottom = offsetLine(bottom, inset).line;
+  const hLeft = offsetLine(left, inset).line;
 
-  const c0 = lineIntersection(hBottom, hLeft)!;
+  const c0 = lineIntersection(hBottom, hLeft);
   const holeR = editDistanceToPoint(c0, 0.18);
 
   return { origin, opp, inset, holeR };

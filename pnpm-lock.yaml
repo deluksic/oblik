@@ -72,7 +72,11 @@ importers:
         specifier: ^0.172.0
         version: 0.172.0
 
-  packages/geom: {}
+  packages/geom:
+    devDependencies:
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3))
 
   packages/hosts:
     dependencies:
