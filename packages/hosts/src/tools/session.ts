@@ -73,7 +73,7 @@ export type ToolSession = {
   /** Tab focuses the binding name. Slider and Point use `field` instead. */
   naming?: boolean;
 } & (
-  | { verb: "point"; field: PointField; x?: string; y?: string }
+  | { verb: "point"; field: PointField; x?: string; y?: string; open?: boolean }
   | { verb: "line"; a?: PointBind }
   | { verb: "segment"; a?: PointBind }
   | {
@@ -163,8 +163,8 @@ export function sessionDraft(session: ToolSession): string {
 
 export function withSessionDraft(session: ToolSession, typed: string | undefined): ToolSession {
   if (session.verb === "point") {
-    if (session.field === "name") return { ...session, name: typed };
-    return { ...session, [session.field]: typed };
+    if (session.field === "name") return { ...session, name: typed, open: true };
+    return { ...session, [session.field]: typed, open: true };
   }
   if (isNaming(session)) return { ...session, name: typed };
   if (session.verb === "slider") {
@@ -183,7 +183,7 @@ export function advanceSessionField(session: ToolSession, dir: 1 | -1 = 1): Tool
   if (session.verb === "point") {
     const i = POINT_FIELDS.indexOf(session.field);
     const next = POINT_FIELDS[(i + dir + POINT_FIELDS.length) % POINT_FIELDS.length]!;
-    return { ...session, field: next };
+    return { ...session, field: next, open: true };
   }
   return { ...session, naming: !session.naming };
 }
@@ -650,11 +650,11 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
     };
     return {
       previewHtml: asConst(session, fn("point", [coord("x", "<x>"), coord("y", "<y>")])),
-      acceptNumber: true,
+      acceptNumber: naming || session.open === true,
       draftKind: naming ? "ident" : "number",
       hint: naming
         ? "Type a name. Tab back to x / y, or click to place."
-        : "Type x or y. Tab to the other, or click to fill what's empty.",
+        : "Click to place. Type an x or y to lock that axis; click fills the other.",
     };
   }
   if (session.verb === "slider") {

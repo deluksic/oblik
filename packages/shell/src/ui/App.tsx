@@ -245,9 +245,9 @@ export function App(props: WorkspaceProps) {
         return;
       }
     }
-    if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
+    if (paletteMode() === "prompt" && bar?.onNumberDraft) {
       const draft = bar.numberValue ?? "";
-      if (e.key === "Enter") {
+      if (bar.acceptNumber && e.key === "Enter") {
         e.preventDefault();
         if (bar.onCommit) {
           bar.onCommit();
@@ -260,12 +260,12 @@ export function App(props: WorkspaceProps) {
         }
         return;
       }
-      if (e.key === "Backspace") {
+      if (bar.acceptNumber && e.key === "Backspace") {
         e.preventDefault();
         bar.onNumberDraft(draft === "" ? "" : draft.slice(0, -1));
         return;
       }
-      if (e.key === "Delete") {
+      if (bar.acceptNumber && e.key === "Delete") {
         e.preventDefault();
         bar.onNumberDraft(draft === "" ? "" : "");
         return;

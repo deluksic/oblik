@@ -396,6 +396,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         const accept = Boolean(preview.acceptNumber);
+        const draftOpen = accept || session.verb === "point";
         const state = {
           ...preview,
           numberValue: accept ? sessionDraft(session) : "",
@@ -421,7 +422,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             session = advanceSessionField(session, dir);
             render(true);
           },
-          onNumberDraft: accept
+          onNumberDraft: draftOpen
             ? (raw: string) => {
                 if (!session) return;
                 const trimmed = raw.trim();
