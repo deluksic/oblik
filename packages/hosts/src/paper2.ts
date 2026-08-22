@@ -16,6 +16,7 @@ import {
   runScene,
   screenToWorld,
   setWidgetOverride,
+  wrapAngleDeg,
   zoomAt,
   type Camera,
   type Frame,
@@ -147,9 +148,9 @@ function applyDrag(
     if (g.max != null) s = Math.min(g.max, s);
     setWidgetOverride(g.site, [quantize(s)], sceneId);
   } else if (g.kind === "angle") {
-    let deg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
-    if (deg < 0) deg += 360;
-    setWidgetOverride(g.site, [Math.round(deg) % 360], sceneId);
+    const worldDeg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
+    const fromDeg = (g.from * 180) / Math.PI;
+    setWidgetOverride(g.site, [wrapAngleDeg(worldDeg - fromDeg)], sceneId);
   } else if (g.kind === "vector") {
     setWidgetOverride(
       g.site,

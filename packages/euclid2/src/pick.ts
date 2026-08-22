@@ -10,7 +10,7 @@ import {
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { hitNumberSlider } from "./hud";
-import { gizmoIsPointLike, type Gizmo } from "./widgets";
+import { angleWorldRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const GIZMO_PX = 12;
 const GEOM_PX = 8;
@@ -72,7 +72,7 @@ function pointLikeScreen(g: Gizmo, cam: Camera, width: number, height: number): 
     return worldToScreen(cam, { x: g.origin.x + g.dx, y: g.origin.y + g.dy }, width, height);
   }
   if (g.kind === "angle") {
-    const rad = (g.deg * Math.PI) / 180;
+    const rad = angleWorldRad(g.from, g.deg);
     return worldToScreen(
       cam,
       {

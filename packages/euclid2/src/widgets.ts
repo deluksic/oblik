@@ -68,9 +68,11 @@ export type NumberGizmo = Located & {
 export type AngleGizmo = Located & {
   kind: "angle";
   origin: Vec2;
-  /** Degrees, 0–360, CCW from +X. */
+  /** Degrees, −180…180, CCW from `from`. */
   deg: number;
   radius: number;
+  /** Reference ray, world radians CCW from +X. */
+  from: number;
 };
 
 export type VectorGizmo = Located & {
@@ -380,22 +382,30 @@ export function snapEditNumber(n: number, min: number, max: number, step: number
 export type AngleEditOpts = {
   /** Gizmo arm length. Default 1.5. */
   radius?: number;
+  /** Reference ray in world radians (CCW from +X). Degrees are relative to this. */
+  from?: number;
 } & SiteOpts;
 
-function wrapDeg(deg: number): number {
-  let d = deg % 360;
-  if (d < 0) d += 360;
+/** Signed degrees in (−180, 180]. */
+export function wrapAngleDeg(deg: number): number {
+  let d = ((((deg + 180) % 360) + 360) % 360) - 180;
+  if (d === -180) return 180;
   return Math.round(d);
 }
 
+export function angleWorldRad(originFrom: number, deg: number): number {
+  return originFrom + (deg * Math.PI) / 180;
+}
+
 /**
- * World-space polar angle around `origin`.
- * The scene literal is degrees (1° snaps, readable source). Returns radians.
+ * Polar angle around `origin`. The scene literal is degrees from `opts.from`
+ * (default +X). Returns world radians.
  */
 export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
   const radius = Math.max(0.2, opts?.radius ?? 1.5);
+  const from = opts?.from ?? 0;
   const located = siteFrom(opts);
-  const deg = wrapDeg(readOverride(located?.site)?.[0] ?? degrees);
+  const deg = wrapAngleDeg(readOverride(located?.site)?.[0] ?? degrees);
   if (!silent && located) {
     gizmos.push({
       kind: "angle",
@@ -403,9 +413,10 @@ export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): numb
       origin: { x: origin.x, y: origin.y },
       deg,
       radius,
+      from,
     });
   }
-  return (deg * Math.PI) / 180;
+  return angleWorldRad(from, deg);
 }
 
 export function gizmoValues(g: Gizmo): number[] {

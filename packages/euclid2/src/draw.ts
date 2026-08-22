@@ -4,7 +4,7 @@ import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { layoutNumberSliders } from "./hud";
 import { handleOwnsInk } from "./ink";
-import { gizmoIsPointLike, type Gizmo } from "./widgets";
+import { angleWorldRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const COL = {
   bg: "#12141c",
@@ -281,16 +281,34 @@ function drawGizmo(
     ctx.arc(c.x, c.y, Math.abs(g.d) * cam.scale, 0, Math.PI * 2);
     ctx.stroke();
   } else if (g.kind === "angle") {
-    const rad = (g.deg * Math.PI) / 180;
+    const from = g.from;
+    const rad = angleWorldRad(from, g.deg);
+    const ref = {
+      x: g.origin.x + Math.cos(from) * g.radius,
+      y: g.origin.y + Math.sin(from) * g.radius,
+    };
     const tip = {
       x: g.origin.x + Math.cos(rad) * g.radius,
       y: g.origin.y + Math.sin(rad) * g.radius,
     };
+    pathSeg(ctx, cam, w, h, g.origin, ref);
+    ctx.strokeStyle = `${COL.gizmo}66`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = hot ? 2.4 : 1.6;
     pathSeg(ctx, cam, w, h, g.origin, tip);
     ctx.stroke();
     const c = worldToScreen(cam, g.origin, w, h);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, Math.abs(g.radius) * 0.38 * cam.scale, 0, -rad, true);
+    ctx.arc(
+      c.x,
+      c.y,
+      Math.abs(g.radius) * 0.38 * cam.scale,
+      -from,
+      -rad,
+      g.deg >= 0,
+    );
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();

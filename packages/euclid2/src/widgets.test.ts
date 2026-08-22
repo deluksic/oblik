@@ -11,6 +11,7 @@ import {
   slider,
   vector,
   withoutWidgets,
+  angle,
 } from "./widgets";
 import { beginGeomFrame, circle, collectDrawables, point } from "@design-scenes/geom";
 
@@ -162,4 +163,16 @@ test("slider HUD uses label, min, max, step", () => {
   expect(g.min).toBe(0);
   expect(g.max).toBe(4);
   expect(g.n).toBe(1.8);
+});
+
+test("angle degrees are relative to from; return is world radians", () => {
+  beginWidgetFrame("ang");
+  const site = { __annotations__: { file: F, at: [11, 1] as [number, number], editable: true } };
+  const world = angle({ x: 0, y: 0 }, -59, { from: Math.PI / 2, radius: 1, ...site });
+  expect(world).toBeCloseTo((31 * Math.PI) / 180, 6);
+  const g = getGizmos().find((x) => x.kind === "angle");
+  expect(g?.kind).toBe("angle");
+  if (g?.kind !== "angle") return;
+  expect(g.deg).toBe(-59);
+  expect(g.from).toBeCloseTo(Math.PI / 2);
 });

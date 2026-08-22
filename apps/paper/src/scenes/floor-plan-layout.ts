@@ -49,17 +49,17 @@ export function floorPlanLayout(): FloorPlanOpts {
   const entryClosed = 0;
   const entryT = slider(0.29, { label: "Entry", min: 0.12, max: 0.4, step: 0.01 });
   const entryHinge = point(min.x + entryT * unitW, min.y);
-  const entrySwing = angle(entryHinge, 62, { radius: doorW });
+  const entrySwing = angle(entryHinge, 62, { radius: doorW, from: entryClosed });
 
   const bedClosed = Math.PI / 2;
   const bedT = slider(0.2, { label: "Bed door", min: 0.2, max: 0.75, step: 0.01 });
   const bedHinge = point(bedX, kY + bedT * (max.y - kY));
-  const bedSwing = angle(bedHinge, 31, { radius: doorW });
+  const bedSwing = angle(bedHinge, -59, { radius: doorW, from: bedClosed });
 
   const bathClosed = Math.PI / 2;
   const bathT = slider(0.54, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
   const bathHinge = point(bathX, min.y + bathT * kitchenD);
-  const bathSwing = angle(bathHinge, 157, { radius: doorW });
+  const bathSwing = angle(bathHinge, 67, { radius: doorW, from: bathClosed });
 
   const windowT = slider(0.32, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });
   const windowCenter = point(min.x + windowT * unitW, max.y);
