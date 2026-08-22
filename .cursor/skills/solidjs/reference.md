@@ -70,7 +70,7 @@ export type InspectState = {
 export type InspectPatch = Partial<InspectState>;
 ```
 
-Hosts call `ctx.onInspect?.(patch)`. Shell merges into a per-pane signal. The focused pane's patch feeds Identity in the inspect column. **Status, error, and cursor render in a reserved strip at the bottom of that pane** — status left, world cursor right. A throw in one view does not shift the workspace or other canvases.
+Hosts call `ctx.onInspect?.(patch)`. Shell merges into a per-pane signal. The focused pane's patch feeds Identity in the inspect column. **Error and cursor render in a reserved strip at the bottom of that pane** — world cursor right. Tool instructions live only on the Space prompt; the strip stays blank on the left while a command is open (errors still show). A throw in one view does not shift the workspace or other canvases.
 
 `packages/hosts/src/pane.ts` helpers take `InspectPush` instead of DOM elements:
 
