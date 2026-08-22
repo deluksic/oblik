@@ -5,7 +5,19 @@ import type { FloorPlanOpts } from "../demo/floor-plan";
 
 /** One angle call site — every door shares the same open sweep. */
 const doorOpen = (hinge: Vec2, closed: number, width: number) =>
-  angle(hinge, 62, { radius: width, from: closed });
+  angle(hinge, -88, { radius: width, from: closed });
+
+/** Move hinge to the far jamb and reverse closed when `flip` is true. */
+const doorSide = (anchor: Vec2, closed: number, width: number, flip: boolean) => {
+  if (!flip) return { hinge: anchor, closed };
+  return {
+    hinge: {
+      x: anchor.x + Math.cos(closed) * width,
+      y: anchor.y + Math.sin(closed) * width,
+    },
+    closed: closed + Math.PI,
+  };
+};
 
 /**
  * One-bed flat, Y-up: kitchen/bath on the south, living/bedroom on the north.
@@ -41,20 +53,20 @@ export function floorPlanLayout(): FloorPlanOpts {
   });
   const doorW = slider(1.1, { label: "Door m", min: 0.7, max: 1.1, step: 0.02 });
 
-  const entryClosed = 0;
   const entryT = slider(0.29, { label: "Entry", min: 0.12, max: 0.4, step: 0.01 });
-  const entryHinge = point(min.x + entryT * unitW, min.y);
-  const entrySwing = doorOpen(entryHinge, entryClosed, doorW);
+  const entryAnchor = point(min.x + entryT * unitW, min.y);
+  const entry = doorSide(entryAnchor, 0, doorW, false);
+  const entrySwing = doorOpen(entry.hinge, entry.closed, doorW);
 
-  const bedClosed = Math.PI / 2;
   const bedT = slider(0.58, { label: "Bed door", min: 0.2, max: 0.75, step: 0.01 });
-  const bedHinge = point(bedX, kY + bedT * (max.y - kY));
-  const bedSwing = doorOpen(bedHinge, bedClosed, doorW);
+  const bedAnchor = point(bedX, kY + bedT * (max.y - kY));
+  const bedDoorSide = doorSide(bedAnchor, Math.PI / 2, doorW, true);
+  const bedSwing = doorOpen(bedDoorSide.hinge, bedDoorSide.closed, doorW);
 
-  const bathClosed = Math.PI / 2;
   const bathT = slider(0.54, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
-  const bathHinge = point(bathX, min.y + bathT * (kY - min.y));
-  const bathSwing = doorOpen(bathHinge, bathClosed, doorW);
+  const bathAnchor = point(bathX, min.y + bathT * (kY - min.y));
+  const bathDoorSide = doorSide(bathAnchor, Math.PI / 2, doorW, true);
+  const bathSwing = doorOpen(bathDoorSide.hinge, bathDoorSide.closed, doorW);
 
   const windowT = slider(0.32, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });
   const windowCenter = point(min.x + windowT * unitW, max.y);
@@ -70,9 +82,9 @@ export function floorPlanLayout(): FloorPlanOpts {
     bedroomX: bedX,
     kitchenY: kY,
     bathW,
-    entry: { hinge: entryHinge, width: doorW, swing: entrySwing, closed: entryClosed },
-    bedDoor: { hinge: bedHinge, width: doorW, swing: bedSwing, closed: bedClosed },
-    bathDoor: { hinge: bathHinge, width: doorW, swing: bathSwing, closed: bathClosed },
+    entry: { hinge: entry.hinge, width: doorW, swing: entrySwing, closed: entry.closed },
+    bedDoor: { hinge: bedDoorSide.hinge, width: doorW, swing: bedSwing, closed: bedDoorSide.closed },
+    bathDoor: { hinge: bathDoorSide.hinge, width: doorW, swing: bathSwing, closed: bathDoorSide.closed },
     window: { center: windowCenter, width: windowWidth },
     island,
     drawerCount,
