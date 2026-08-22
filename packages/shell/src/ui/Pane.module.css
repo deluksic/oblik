@@ -13,8 +13,9 @@
   border-left: none;
 }
 
-.paneFocused {
-  box-shadow: inset 0 2px 0 0 var(--accent, #e8876a);
+.paneFocused .label {
+  background: #1b202b;
+  color: var(--text, #ece8de);
 }
 
 .label {
@@ -52,6 +53,11 @@
   touch-action: none;
   cursor: crosshair;
   background: #12141c;
+}
+
+.canvas:focus,
+.canvas:focus-visible {
+  outline: none;
 }
 
 .status {
