@@ -95,6 +95,36 @@
   font-weight: 600;
 }
 
+.preview :global(.slot.is-invalid),
+.preview :global(.arg-done .slot.is-invalid) {
+  color: #ff7b72;
+  text-decoration: underline wavy #ff7b72;
+  text-underline-offset: 0.12em;
+}
+
+.hasInlineNumber .preview :global(.slot.is-number.is-invalid) {
+  color: transparent;
+}
+
+.hasInlineNumber .preview :global(.slot.is-number.is-invalid)::after {
+  content: none;
+}
+
+.numberInvalid {
+  color: #ff7b72;
+  caret-color: #ff7b72;
+  text-decoration: underline wavy #ff7b72;
+  text-underline-offset: 0.12em;
+}
+
+.hintError {
+  color: #ff7b72;
+}
+
+.promptInvalid {
+  border-color: #ff7b7288;
+}
+
 .hasInlineNumber .preview :global(.slot.is-number) {
   color: transparent;
   position: relative;

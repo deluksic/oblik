@@ -4,12 +4,15 @@ import { expect, test } from "vitest";
 import {
   applyScenePatch,
   bindLineAt,
+  bindingNameError,
   distanceOriginName,
   evalDerivedScenePoints,
   evalSceneLines,
   insertEditors,
+  isBindingName,
   namedSceneLineBindings,
   namedScenePointNear,
+  nextBindingName,
   promoteInlineLineBinding,
   resolveLineBindingName,
   widgetBindingName,
@@ -477,4 +480,26 @@ test("widgetBindingName names constructor and intersection consts", () => {
   expect(widgetBindingName(src, loc("circleLineIntersection"))).toBe("P");
   expect(widgetCallName(src, loc("circle"))).toBe("circle");
   expect(widgetInSceneFunction(src, loc("circleLineIntersection"))).toBe(true);
+});
+
+test("bindingNameError rejects invalid identifiers but allows empty and valid names", () => {
+  expect(bindingNameError(undefined)).toBeNull();
+  expect(bindingNameError("")).toBeNull();
+  expect(bindingNameError("  ")).toBeNull();
+  expect(bindingNameError("shelf")).toBeNull();
+  expect(bindingNameError("_a1")).toBeNull();
+  expect(isBindingName("shelf")).toBe(true);
+
+  expect(bindingNameError("my point")).not.toBeNull();
+  expect(bindingNameError("1bad")).not.toBeNull();
+  expect(bindingNameError("bad-name")).not.toBeNull();
+});
+
+test("nextBindingName disambiguates valid duplicate prefixes", () => {
+  const src = `export function scene() {
+  const p = point(0, 0);
+  const p2 = point(1, 0);
+}`;
+  expect(nextBindingName(src, "p")).toBe("p3");
+  expect(nextBindingName(src, "shelf")).toBe("shelf");
 });

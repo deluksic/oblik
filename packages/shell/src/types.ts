@@ -47,6 +47,9 @@ export type CommandBarState = {
   acceptNumber?: boolean;
   hint?: string;
   numberValue?: string;
+  /** Typed binding name is present but not a valid identifier. */
+  draftInvalid?: boolean;
+  draftError?: string;
   /** Active inline slot: numbers, or an identifier for slider names. */
   draftKind?: "number" | "ident";
   onNumber?: (n: number) => void;

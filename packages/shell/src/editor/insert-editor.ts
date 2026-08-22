@@ -666,6 +666,22 @@ function usedIdentifiers(sf: ts.SourceFile): Set<string> {
   return names;
 }
 
+const BINDING_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** Non-empty scene binding names must be valid JS identifiers. */
+export function isBindingName(raw: string | undefined): boolean {
+  const t = raw?.trim() ?? "";
+  return t !== "" && BINDING_NAME_RE.test(t);
+}
+
+/** User-facing error when a typed name is present but not a valid identifier. */
+export function bindingNameError(raw: string | undefined): string | null {
+  const t = raw?.trim() ?? "";
+  if (t === "") return null;
+  if (BINDING_NAME_RE.test(t)) return null;
+  return "Name must start with a letter or underscore, then use only letters, digits, or underscores.";
+}
+
 function freshName(prefix: string, used: Set<string>): string {
   if (!used.has(prefix)) {
     used.add(prefix);

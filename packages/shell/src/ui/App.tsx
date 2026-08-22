@@ -249,6 +249,7 @@ export function App(props: WorkspaceProps) {
       const draft = bar.numberValue ?? "";
       if (bar.acceptNumber && e.key === "Enter") {
         e.preventDefault();
+        if (bar.draftInvalid) return;
         if (bar.onCommit) {
           bar.onCommit();
           return;

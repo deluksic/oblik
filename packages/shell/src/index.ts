@@ -42,5 +42,7 @@ export {
   applyScenePatch,
   editCallArgText,
   nextBindingName,
+  isBindingName,
+  bindingNameError,
 } from "./editor/insert-editor";
 export type { ScenePatch, SourceAt } from "./editor/insert-editor";

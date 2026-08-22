@@ -168,6 +168,7 @@ export function Palette(props: PaletteProps) {
   }
 
   function tryCommit(commandBar: CommandBarState | null): void {
+    if (commandBar?.draftInvalid) return;
     if (commandBar?.onCommit) {
       commandBar.onCommit();
       return;
@@ -200,6 +201,7 @@ export function Palette(props: PaletteProps) {
         props.commandBar?.numberValue ?? "",
         props.commandBar?.acceptNumber === true,
         props.commandBar?.draftKind ?? "number",
+        props.commandBar?.draftInvalid === true,
       ] as const,
     (layout) => {
       layoutInlineNumber({
@@ -221,6 +223,7 @@ export function Palette(props: PaletteProps) {
             [styles.promptDock]: props.mode === "prompt",
             [styles.hasInlineNumber]: props.commandBar?.acceptNumber === true,
             [styles.isTyping]: (props.commandBar?.numberValue?.trim() ?? "") !== "",
+            [styles.promptInvalid]: props.commandBar?.draftInvalid === true,
           },
         ]}
         onPointerDown={(e) => {
@@ -250,7 +253,7 @@ export function Palette(props: PaletteProps) {
                     numberRef.current = el;
                   }}
                   type="text"
-                  class={styles.number}
+                  class={[styles.number, { [styles.numberInvalid]: props.commandBar?.draftInvalid === true }]}
                   inputmode={props.commandBar?.draftKind === "ident" ? "text" : "decimal"}
                   autocomplete="off"
                   spellcheck={false}
@@ -280,7 +283,9 @@ export function Palette(props: PaletteProps) {
                 />
               </Show>
             </div>
-            <p class={styles.hint}>{props.commandBar?.hint ?? ""}</p>
+            <p class={[styles.hint, { [styles.hintError]: props.commandBar?.draftInvalid === true }]}>
+              {props.commandBar?.hint ?? ""}
+            </p>
           </div>
         </Show>
       </div>
