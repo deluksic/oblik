@@ -63,15 +63,17 @@ export type LengthBind =
   | { kind: "signedDist"; other: PointBind };
 
 export type SliderField = "value" | "min" | "max" | "step" | "name";
+export type PointField = "x" | "y" | "name";
 
 const SLIDER_FIELDS: readonly SliderField[] = ["value", "min", "max", "step", "name"];
+const POINT_FIELDS: readonly PointField[] = ["x", "y", "name"];
 
 export type ToolSession = {
   name?: string;
-  /** Tab focuses the binding name. Slider uses `field` instead. */
+  /** Tab focuses the binding name. Slider and Point use `field` instead. */
   naming?: boolean;
 } & (
-  | { verb: "point" }
+  | { verb: "point"; field: PointField; x?: string; y?: string }
   | { verb: "line"; a?: PointBind }
   | { verb: "segment"; a?: PointBind }
   | {
@@ -141,7 +143,8 @@ function identName(raw: string | undefined): string | undefined {
 }
 
 export function isNaming(session: ToolSession): boolean {
-  return session.verb === "slider" ? session.field === "name" : session.naming === true;
+  if (session.verb === "slider" || session.verb === "point") return session.field === "name";
+  return session.naming === true;
 }
 
 function asName(session: ToolSession): string | undefined {
@@ -149,6 +152,9 @@ function asName(session: ToolSession): string | undefined {
 }
 
 export function sessionDraft(session: ToolSession): string {
+  if (session.verb === "point") {
+    return (session.field === "name" ? session.name : session[session.field]) ?? "";
+  }
   if (isNaming(session)) return session.name ?? "";
   if (session.verb === "slider") return sliderFieldValue(session, session.field);
   if (isLengthDraft(session)) return session.typed ?? "";
@@ -156,6 +162,10 @@ export function sessionDraft(session: ToolSession): string {
 }
 
 export function withSessionDraft(session: ToolSession, typed: string | undefined): ToolSession {
+  if (session.verb === "point") {
+    if (session.field === "name") return { ...session, name: typed };
+    return { ...session, [session.field]: typed };
+  }
   if (isNaming(session)) return { ...session, name: typed };
   if (session.verb === "slider") {
     return { ...session, [session.field]: typed };
@@ -170,6 +180,11 @@ export function advanceSessionField(session: ToolSession, dir: 1 | -1 = 1): Tool
     const next = SLIDER_FIELDS[(i + dir + SLIDER_FIELDS.length) % SLIDER_FIELDS.length]!;
     return { ...session, field: next };
   }
+  if (session.verb === "point") {
+    const i = POINT_FIELDS.indexOf(session.field);
+    const next = POINT_FIELDS[(i + dir + POINT_FIELDS.length) % POINT_FIELDS.length]!;
+    return { ...session, field: next };
+  }
   return { ...session, naming: !session.naming };
 }
 
@@ -178,7 +193,7 @@ export function sessionDraftKind(session: ToolSession): "number" | "ident" {
 }
 
 const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
-  point: { verb: "point" },
+  point: { verb: "point", field: "x" },
   circle: { verb: "circle" },
   line: { verb: "line" },
   segment: { verb: "segment" },
@@ -627,13 +642,19 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
   if (!session) return null;
   const naming = isNaming(session);
   if (session.verb === "point") {
+    const coord = (axis: "x" | "y", label: string): string => {
+      const raw = (session[axis] ?? "").trim();
+      if (session.field === axis) return slot(raw || label, "is-number");
+      if (raw) return filled(raw);
+      return slot(label, "", "pending");
+    };
     return {
-      previewHtml: asConst(session, fn("point", [slot("<x>"), slot("<y>")])),
-      acceptNumber: naming,
+      previewHtml: asConst(session, fn("point", [coord("x", "<x>"), coord("y", "<y>")])),
+      acceptNumber: true,
       draftKind: naming ? "ident" : "number",
       hint: naming
-        ? "Type a name. Tab back, then click empty paper or a crossing."
-        : "Click empty paper or a line crossing. Tab to name it.",
+        ? "Type a name. Tab back to x / y, or click to place."
+        : "Type x or y. Tab to the other, or click to fill what's empty.",
     };
   }
   if (session.verb === "slider") {
@@ -774,6 +795,27 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
   ) {
     if (session.verb === "slider") {
       return { snap: { kind: "point", x: ctx.world.x, y: ctx.world.y }, ghost: "none", hoverId: null };
+    }
+    if (session.verb === "point") {
+      const p = resolvePoint(ctx);
+      const base = p === "ignore" ? ctx.world : p;
+      const x = parseOptNum(session.x) ?? base.x;
+      const y = parseOptNum(session.y) ?? base.y;
+      return {
+        snap: {
+          kind:
+            p !== "ignore" &&
+            parseOptNum(session.x) == null &&
+            parseOptNum(session.y) == null &&
+            (p.kind === "intersection" || p.kind === "circleLine")
+              ? "intersection"
+              : "point",
+          x,
+          y,
+        },
+        ghost: "point",
+        hoverId: null,
+      };
     }
     const p = resolvePoint(ctx);
     if (p === "ignore") return { snap: null, ghost: "none", hoverId: null };
@@ -1196,6 +1238,15 @@ function commitOrError(patch: ScenePatch | { error: string }): SessionResult {
 
 export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string): SessionResult {
   if (session.verb === "point") {
+    const tx = parseOptNum(session.x);
+    const ty = parseOptNum(session.y);
+    if (tx != null || ty != null) {
+      const hit = resolvePoint(ctx);
+      const base = hit === "ignore" ? ctx.world : hit;
+      return commitOrError(
+        compilePoint(src, { kind: "free", x: tx ?? base.x, y: ty ?? base.y }, asName(session)),
+      );
+    }
     const p = resolvePoint(ctx);
     if (p === "ignore") return { kind: "session", session };
     if (p.kind === "named") {
@@ -1421,6 +1472,15 @@ export function commitSession(session: ToolSession, src: string): SessionResult 
     const value = parseOptNum(session.value);
     if (value == null) return { kind: "error", message: "Type a value, or click to measure." };
     return commitOrError(compileSlider(src, sliderWrite(session, value)));
+  }
+  if (session.verb === "point") {
+    const x = parseOptNum(session.x);
+    const y = parseOptNum(session.y);
+    if (x != null && y != null) {
+      return commitOrError(compilePoint(src, { kind: "free", x, y }, asName(session)));
+    }
+    if (isNaming(session)) return { kind: "session", session: { ...session, field: "x" } };
+    return { kind: "error", message: "Type both x and y, or click to fill the empty one." };
   }
   if (isNaming(session) && !isLengthDraft(session)) {
     return { kind: "session", session: { ...session, naming: false } };

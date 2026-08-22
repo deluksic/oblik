@@ -26,7 +26,7 @@ export const TOOLS: readonly ToolSpec[] = [
   {
     id: "point",
     title: "Point",
-    hint: "Empty paper, a named point, or a crossing. Tab to name it.",
+    hint: "Empty paper, a named point, or a crossing. Type x / y or click.",
     palettes: ["geom", "sdf2"],
   },
   {
