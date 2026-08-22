@@ -25,6 +25,7 @@ export const CALL_SITES: readonly CallSiteSpec[] = [
   { name: "offsetLine", dof: [1], patch: [1] },
   { name: "line" },
   { name: "segment" },
+  { name: "polyline" },
   { name: "lineIntersection" },
   { name: "circleLineIntersection" },
   { name: "circleCircleIntersection" },

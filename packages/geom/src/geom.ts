@@ -123,9 +123,9 @@ export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
   }));
 }
 
-export function polyline(points: Vec2[]): Polyline {
+export function polyline(points: Vec2[], site?: GeomSiteOpts): Polyline {
   return constructGeom(() => ({
-    ...siteBase("polyline", "polyline"),
+    ...siteBase("polyline", "polyline", site),
     kind: "polyline",
     points: points.map((p) => point(p.x, p.y)),
   }));

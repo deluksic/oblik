@@ -119,7 +119,7 @@ function workspaceRelPath(absFile: string, root: string): string {
 function isInjectableTs(workspaceRoot: string, file: string): boolean {
   const abs = path.resolve(file).replace(/\\/g, "/");
   const root = path.resolve(workspaceRoot).replace(/\\/g, "/");
-  if (!abs.startsWith(root + "/")) return false;
+  if (!abs.startsWith(`${root}/apps/`)) return false;
   if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) return false;
   if (abs.includes("/node_modules/")) return false;
   return true;
@@ -408,9 +408,10 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
       const file = id.split("?")[0] ?? "";
       if (isInjectableTs(workspaceRoot, file) && !isSceneLoadersModule(id)) {
         const rel = workspaceRelPath(path.resolve(file), workspaceRoot);
-        const annotated = annotateCallSites(code, rel);
+        const annotated = annotateCallSites(code, rel, id);
         for (const warning of annotated.warnings) this.warn(warning);
-        return { code: annotated.code, map: null };
+        if (annotated.code === code) return undefined;
+        return { code: annotated.code, map: annotated.map };
       }
       if (!isSceneLoadersModule(id)) return undefined;
       if (code.includes("/* __scene_hmr_accept */")) return undefined;

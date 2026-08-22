@@ -90,6 +90,19 @@ test("public editable: false freezes a literal", () => {
   expect(out).toMatch(/editable: false, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \}/);
 });
 
+test("polyline identity site is the CallExpression line in the original source", () => {
+  const src = `function rect() {
+  return polyline([
+    a, b,
+  ]);
+}
+`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(
+    /polyline\(\[\s*a, b,\s*\], \{ __annotations__: \{ file: .+, at: \[2, \d+\], editable: false \} \}\)/,
+  );
+});
+
 test("replaces a user __annotations__ bag and warns", () => {
   const src = `point(0, 0, { __annotations__: { file: "nope", at: [1, 1], editable: true } });\n`;
   const r = annotateCallSites(src, SCENE);

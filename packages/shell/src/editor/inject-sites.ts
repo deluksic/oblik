@@ -1,3 +1,4 @@
+import MagicString from "magic-string";
 import * as ts from "typescript";
 
 import { callSiteSpec, isSiteCall } from "./call-sites.ts";
@@ -71,13 +72,17 @@ function annotationsText(file: string, line: number, column: number, editable: b
   return `__annotations__: { file: ${JSON.stringify(file)}, at: [${line}, ${column}], editable: ${editable} }`;
 }
 
-export type AnnotateResult = { code: string; warnings: string[] };
+export type AnnotateResult = {
+  code: string;
+  warnings: string[];
+  map?: { mappings: string; names: string[]; sources: string[]; version: 3 };
+};
 
 /**
- * Inject `__annotations__: { file, at, editable }` onto edit* / geom constructors
- * in compiled output. Source on disk is unchanged.
+ * Inject `__annotations__: { file, at, editable }` onto constructors.
+ * Source on disk is unchanged. `at` is 1-based in this `source` text.
  */
-export function annotateCallSites(source: string, file: string): AnnotateResult {
+export function annotateCallSites(source: string, file: string, mapSource = file): AnnotateResult {
   const sf = parse(source);
   const calls = collectSiteCalls(sf);
   if (calls.length === 0) return { code: source, warnings: [] };
@@ -119,11 +124,16 @@ export function annotateCallSites(source: string, file: string): AnnotateResult 
     }
   }
   splices.sort((a, b) => b.start - a.start);
-  let next = source;
+  const ms = new MagicString(source);
   for (const s of splices) {
-    next = next.slice(0, s.start) + s.text + next.slice(s.end);
+    if (s.start === s.end) ms.appendLeft(s.start, s.text);
+    else ms.update(s.start, s.end, s.text);
   }
-  return { code: next, warnings };
+  return {
+    code: ms.toString(),
+    warnings,
+    map: ms.generateMap({ hires: true, includeContent: true, source: mapSource }),
+  };
 }
 
 export function injectSceneSites(source: string, file: string): string {
