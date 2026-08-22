@@ -66,6 +66,7 @@ import {
   commitGizmoIfChanged,
   cssSize,
   eventPos,
+  movedPastClick,
   observePaneResize,
   pruneSelection,
   scenePeekPath,
@@ -187,7 +188,14 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let error: string | null = null;
       let closed = false;
       let hoverGizmo: Gizmo | null = null;
-      let drag: { site: string; start: number[]; gizmo: Gizmo } | null = null;
+      let drag: {
+        site: string;
+        start: number[];
+        gizmo: Gizmo;
+        x: number;
+        y: number;
+        moved: boolean;
+      } | null = null;
       let pan: { x: number; y: number; camX: number; camY: number } | null = null;
       let session: ToolSession | null = null;
       let lastHover: import("./tools/session").SessionHover | null = null;
@@ -607,11 +615,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         if (h?.target === "gizmo") {
-          selected = { target: "gizmo", site: h.gizmo.site };
           drag = {
             site: h.gizmo.site,
             start: gizmoValues(h.gizmo),
             gizmo: h.gizmo,
+            x: p.x,
+            y: p.y,
+            moved: false,
           };
           canvas.style.cursor = h.gizmo.kind === "number" ? "ew-resize" : "grab";
           canvas.setPointerCapture(e.pointerId);
@@ -653,6 +663,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         if (drag) {
+          if (!drag.moved) {
+            if (!movedPastClick(drag.x, drag.y, p.x, p.y)) {
+              flushStatus();
+              return;
+            }
+            drag.moved = true;
+          }
           applyDrag(drag.gizmo, world, p, w, height, gizmos(), sceneId);
           evaluate();
           render();
@@ -698,8 +715,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         if (!drag) return;
         const dragging = drag;
-        const g = gizmos().find((x) => x.site === dragging.site);
         drag = null;
+        if (!dragging.moved) {
+          selected = { target: "gizmo", site: dragging.site };
+          render();
+          return;
+        }
+        const g = gizmos().find((x) => x.site === dragging.site);
         const now = g ? gizmoValues(g) : dragging.start;
         const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;

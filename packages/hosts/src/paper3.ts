@@ -19,6 +19,7 @@ import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@desi
 import { peekFile, quantize, renderSnippet } from "./inspect";
 import {
   commitGizmoIfChanged,
+  movedPastClick,
   observePaneResize,
   pruneSelection,
   scenePeekPath,
@@ -106,7 +107,14 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       let sceneMod = mod as Record<string, unknown>;
       let error: string | null = null;
       let hoverGizmo: Gizmo3 | null = null;
-      let drag: { site: string; start: number[]; gizmo: Gizmo3 } | null = null;
+      let drag: {
+        site: string;
+        start: number[];
+        gizmo: Gizmo3;
+        x: number;
+        y: number;
+        moved: boolean;
+      } | null = null;
       let selected: Selection | null = null;
 
       // space-only
@@ -260,12 +268,14 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         if (e.button !== 0) return;
         const h = view.hitTest(e.clientX, e.clientY);
         if (h?.target === "gizmo") {
-          selected = { target: "gizmo", site: h.gizmo.site };
           view.controls.enabled = false;
           drag = {
             site: h.gizmo.site,
             start: gizmoValues3(h.gizmo),
             gizmo: h.gizmo,
+            x: e.clientX,
+            y: e.clientY,
+            moved: false,
           };
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
@@ -285,6 +295,10 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
 
       function onPointerMove(e: PointerEvent): void {
         if (drag) {
+          if (!drag.moved) {
+            if (!movedPastClick(drag.x, drag.y, e.clientX, e.clientY)) return;
+            drag.moved = true;
+          }
           applyGizmoDrag(view, drag.gizmo, e.clientX, e.clientY);
           evaluate();
           ctx.onLiveChange();
@@ -317,8 +331,13 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           return;
         }
         const dragging = drag;
-        const g = gizmos().find((x) => x.site === dragging.site);
         drag = null;
+        if (!dragging.moved) {
+          selected = { target: "gizmo", site: dragging.site };
+          sync();
+          return;
+        }
+        const g = gizmos().find((x) => x.site === dragging.site);
         const now = g ? gizmoValues3(g) : dragging.start;
         const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;

@@ -33,6 +33,13 @@ export function eventPos(canvas: HTMLCanvasElement, e: PointerEvent): { x: numbe
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
+/** Pointer travel below this is a click, not a drag. */
+export const PICK_CLICK_PX = 4;
+
+export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
+  return Math.hypot(toX - fromX, toY - fromY) >= PICK_CLICK_PX;
+}
+
 export type InspectPush = (patch: InspectPatch) => void;
 
 /**

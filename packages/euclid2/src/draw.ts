@@ -14,6 +14,7 @@ const COL = {
   hover: "#f0c14a",
   selected: "#7ec8e3",
   gizmo: "#e8876a",
+  gizmoHot: "#fff3e6",
 };
 
 export function resizeCanvas(canvas: HTMLCanvasElement): void {
@@ -94,7 +95,7 @@ function gizmoInk(
   selected: string | null,
 ): { color: string; hot: boolean } {
   if (site === selected) return { color: COL.selected, hot: true };
-  if (site === hover) return { color: COL.hover, hot: true };
+  if (site === hover) return { color: COL.gizmoHot, hot: true };
   return { color: COL.gizmo, hot: false };
 }
 

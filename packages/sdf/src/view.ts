@@ -36,6 +36,7 @@ const COL = {
   hover: 0xf0c14a,
   selected: 0x7ec8e3,
   gizmo: 0xe8876a,
+  gizmoHot: 0xfff3e6,
 };
 
 /** Raymarch at this fraction of CSS pixels. Gizmos stay 1×. */
@@ -350,7 +351,7 @@ function gizmoEmphasis(
 function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Object3D {
   const group = new THREE.Group();
   const color =
-    emphasis === "selected" ? COL.selected : emphasis === "hover" ? COL.hover : COL.gizmo;
+    emphasis === "selected" ? COL.selected : emphasis === "hover" ? COL.gizmoHot : COL.gizmo;
   const hot = emphasis != null;
   const mat = new THREE.MeshLambertMaterial({ color });
   if (g.kind === "point3") {
