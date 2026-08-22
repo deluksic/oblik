@@ -1,18 +1,6 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names.ts";
-
-const GEOM_SITE_NAMES = new Set([
-  "point",
-  "segment",
-  "line",
-  "circle",
-  "offsetLine",
-  "slider",
-  "lineIntersection",
-  "circleLineIntersection",
-  "circleCircleIntersection",
-]);
+import { callSiteSpec, isSiteCall } from "./call-sites.ts";
 
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -24,7 +12,7 @@ function collectSiteCalls(sourceFile: ts.SourceFile): ts.CallExpression[] {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      (EDIT_NAMES.has(node.expression.text) || GEOM_SITE_NAMES.has(node.expression.text))
+      isSiteCall(node.expression.text)
     ) {
       calls.push(node);
     }
@@ -66,33 +54,9 @@ function isFrozen(obj: ts.ObjectLiteralExpression): boolean {
 }
 
 function dofEditable(name: string, args: readonly ts.Expression[]): boolean {
-  switch (name) {
-    case "point":
-    case "editPoint":
-      return isNumericDof(args[0]) && isNumericDof(args[1]);
-    case "editPoint3":
-      return isNumericDof(args[0]) && isNumericDof(args[1]) && isNumericDof(args[2]);
-    case "circle":
-      return isNumericDof(args[1]);
-    case "offsetLine":
-    case "editDistanceToPoint":
-    case "editDistance3":
-    case "editOffsetFromLine":
-    case "editPointOnSegment":
-    case "editPointOnSegment3":
-      return isNumericDof(args[1]);
-    case "slider":
-    case "editNumber":
-      return isNumericDof(args[0]);
-    case "editAngle":
-      return isNumericDof(args[1]);
-    case "editPointOnLine":
-      return isNumericDof(args[2]);
-    case "editVector":
-      return isNumericDof(args[1]) && isNumericDof(args[2]);
-    default:
-      return false;
-  }
+  const dof = callSiteSpec(name)?.dof;
+  if (!dof || dof.length === 0) return false;
+  return dof.every((i) => isNumericDof(args[i]));
 }
 
 function callEditable(call: ts.CallExpression): boolean {

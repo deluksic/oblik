@@ -3,6 +3,7 @@ import type { Drawable, Vec2 } from "@design-scenes/geom";
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { layoutNumberSliders } from "./hud";
+import { handleOwnsInk } from "./ink";
 import type { Gizmo } from "./widgets";
 
 const COL = {
@@ -46,7 +47,7 @@ export function drawFrame(
   drawGrid(ctx, cssW, cssH, cam);
 
   for (const d of drawables) {
-    if (d.geom.editable) continue;
+    if (handleOwnsInk(d.geom)) continue;
     const id = d.geom.id;
     const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
     const width = id === selectedId || id === hoverId ? 2.4 : 1.5;

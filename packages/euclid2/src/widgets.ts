@@ -9,6 +9,7 @@ import {
   type Point,
   type Segment,
 } from "@design-scenes/geom";
+import { handleOwnsInk } from "./ink";
 import type { Vec2 } from "@design-scenes/geom";
 import { lerp } from "@design-scenes/geom";
 
@@ -197,39 +198,57 @@ function locatedFromGeomSite(site: { file: string; line: number; column: number 
   };
 }
 
+/**
+ * Kind table: editable geom → gizmo. Point handle, radius ring, offset overlay.
+ * Line / segment have no DOF here (drag the endpoints).
+ */
+export function gizmoForEditableGeom(
+  geom: Drawable["geom"],
+  located: Located,
+  override: number[] | undefined,
+): Gizmo | null {
+  if (!handleOwnsInk(geom) || !geom.site) return null;
+  if (geom.kind === "point") {
+    const x = override?.[0] ?? geom.x;
+    const y = override?.[1] ?? geom.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { kind: "point", ...located, x, y };
+  }
+  if (geom.kind === "circle") {
+    const d = override?.[0] ?? geom.radius;
+    if (!isFiniteVec(geom.center) || !Number.isFinite(d)) return null;
+    return {
+      kind: "distance",
+      ...located,
+      origin: { x: geom.center.x, y: geom.center.y },
+      d,
+    };
+  }
+  if (geom.kind === "line" && geom.offsetDistance != null) {
+    const dd = override?.[0] ?? geom.offsetDistance;
+    if (!isFiniteVec(geom.origin) || !isFiniteVec(geom.direction) || !Number.isFinite(dd)) {
+      return null;
+    }
+    return {
+      kind: "offset",
+      ...located,
+      origin: geom.origin,
+      direction: geom.direction,
+      d: dd,
+    };
+  }
+  return null;
+}
+
 /** Handles for constructors the annotator marked editable. */
 export function gizmosFromDrawables(drawables: readonly Drawable[]): Gizmo[] {
   const out: Gizmo[] = [];
   for (const d of drawables) {
     const g = d.geom;
-    if (!g.editable || !g.site) continue;
+    if (!g.site) continue;
     const located = locatedFromGeomSite(g.site);
-    const o = readOverride(located.site);
-    if (g.kind === "point") {
-      const x = o?.[0] ?? g.x;
-      const y = o?.[1] ?? g.y;
-      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-      out.push({ kind: "point", ...located, x, y });
-    } else if (g.kind === "circle") {
-      const dist = o?.[0] ?? g.radius;
-      if (!isFiniteVec(g.center) || !Number.isFinite(dist)) continue;
-      out.push({
-        kind: "distance",
-        ...located,
-        origin: { x: g.center.x, y: g.center.y },
-        d: dist,
-      });
-    } else if (g.kind === "line" && g.offsetDistance != null) {
-      const dd = o?.[0] ?? g.offsetDistance;
-      if (!isFiniteVec(g.origin) || !isFiniteVec(g.direction) || !Number.isFinite(dd)) continue;
-      out.push({
-        kind: "offset",
-        ...located,
-        origin: g.origin,
-        direction: g.direction,
-        d: dd,
-      });
-    }
+    const giz = gizmoForEditableGeom(g, located, readOverride(located.site));
+    if (giz) out.push(giz);
   }
   return out;
 }

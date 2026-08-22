@@ -20,10 +20,11 @@ packages/shell/src/
     filter.ts
 
   editor/               # AST insert/patch (vite + hosts)
+    call-sites.ts       # one table: annotator dof, patch, binding names
     insert-editor.ts
     patch-widget.ts
     inject-sites.ts
-    edit-names.ts
+    edit-names.ts       # re-exports EDIT_NAMES from call-sites
 
   catalog/              # scene catalog parsing + scaffolding
     catalog.ts

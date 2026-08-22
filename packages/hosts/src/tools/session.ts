@@ -1,3 +1,7 @@
+/**
+ * Tool session: slot resolvers, click, compile, command-bar preview.
+ * Palette membership is `tools/catalog.ts`. Ghost paint is `tools/ghost.ts`.
+ */
 import type { Camera, Gizmo, Hit } from "@design-scenes/euclid2";
 import { hitsNear } from "@design-scenes/euclid2";
 import {
@@ -27,7 +31,7 @@ import {
   type SourceAt,
 } from "@design-scenes/shell";
 
-import type { CommandPreview, EditorTool } from "../editors";
+import { toolById, type ToolVerb } from "./catalog";
 
 export type LineBind =
   | { kind: "named"; name: string; field?: "line" }
@@ -81,6 +85,46 @@ export type ToolSession =
       lengthReuse?: { name: string; signed: boolean };
       typed?: string;
     };
+
+export type CommandPreview = {
+  previewHtml: string;
+  acceptNumber?: boolean;
+  hint?: string;
+};
+
+type DraftSession =
+  | Extract<ToolSession, { verb: "circle" }>
+  | Extract<ToolSession, { verb: "offset" }>
+  | Extract<ToolSession, { verb: "slider" }>
+  | Extract<ToolSession, { verb: "distance" }>;
+
+export function isDraftSession(session: ToolSession): session is DraftSession {
+  return (
+    session.verb === "circle" ||
+    session.verb === "offset" ||
+    session.verb === "slider" ||
+    session.verb === "distance"
+  );
+}
+
+export function sessionDraft(session: ToolSession): string {
+  return isDraftSession(session) ? (session.typed ?? "") : "";
+}
+
+export function withSessionDraft(session: ToolSession, typed: string | undefined): ToolSession {
+  if (!isDraftSession(session)) return session;
+  return { ...session, typed };
+}
+
+const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
+  point: { verb: "point" },
+  circle: { verb: "circle" },
+  line: { verb: "line" },
+  segment: { verb: "segment" },
+  offset: { verb: "offset" },
+  slider: { verb: "slider" },
+  distance: { verb: "distance" },
+};
 
 export type PickCtx = {
   hit: Hit | null;
@@ -493,75 +537,10 @@ export function resolveLength(ctx: PickCtx, mode: "circle" | "offset" | "distanc
   return "measure";
 }
 
-export function sessionAsGhostTool(session: ToolSession, _hover: SessionHover | null): EditorTool {
-  if (session.verb === "point") return { id: "point" };
-  if (session.verb === "slider") return { id: "point" };
-  if (session.verb === "line" || session.verb === "segment") {
-    if (!session.a) return { id: "point" };
-    const p = session.a;
-    return {
-      id: session.verb === "line" ? "infiniteLine" : "segment",
-      a: {
-        x: p.x,
-        y: p.y,
-        ...(p.kind === "named" ? { name: p.name } : {}),
-      },
-    };
-  }
-  if (session.verb === "circle") {
-    if (!session.center) return { id: "point" };
-    const p = session.center;
-    return {
-      id: "circle",
-      center: {
-        x: p.x,
-        y: p.y,
-        ...(p.kind === "named" ? { name: p.name } : {}),
-      },
-      typedRadius: session.typed,
-    };
-  }
-  if (session.verb === "offset" && session.from?.kind === "line") {
-    return {
-      id: "offset",
-      baseLine: { origin: session.from.origin, dir: session.from.dir },
-      typedDistance: session.typed,
-    };
-  }
-  if (session.verb === "offset") return { id: "point" };
-  if (session.from?.kind === "point") {
-    const p = session.from.point;
-    return {
-      id: "distance",
-      origin: {
-        x: p.x,
-        y: p.y,
-        name: p.kind === "named" ? p.name : undefined,
-      },
-      typedRadius: session.typed,
-    };
-  }
-  if (session.from?.kind === "line") {
-    const basis = { origin: session.from.origin, dir: session.from.dir };
-    return {
-      id: "offset",
-      base: "line",
-      baseLine: basis,
-      typedDistance: session.typed,
-    };
-  }
-  return { id: "distance", typedRadius: session.typed };
-}
-
 export function startVerb(id: string): ToolSession | null {
-  if (id === "point") return { verb: "point" };
-  if (id === "distance") return { verb: "distance" };
-  if (id === "line") return { verb: "line" };
-  if (id === "segment") return { verb: "segment" };
-  if (id === "circle") return { verb: "circle" };
-  if (id === "offset") return { verb: "offset" };
-  if (id === "slider") return { verb: "slider" };
-  return null;
+  const tool = toolById(id);
+  if (!tool) return null;
+  return { ...EMPTY_SESSION[tool.id] };
 }
 
 function pointLabel(p: PointBind | undefined, slotName: string, filledIf: boolean): string {

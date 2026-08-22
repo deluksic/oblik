@@ -1,7 +1,7 @@
 import * as ts from "typescript";
 
+import { SITE_CALL_NAMES } from "./call-sites.ts";
 import { findEditCallAt, findIdentifierCallAt } from "./patch-widget.ts";
-import { EDIT_NAMES } from "./edit-names.ts";
 
 export type SourceAt = { line: number; column: number };
 
@@ -51,23 +51,10 @@ export function findSceneFunction(sourceFile: ts.SourceFile): ts.FunctionDeclara
   return null;
 }
 
-const BINDING_CALL_NAMES = new Set([
-  ...EDIT_NAMES,
-  "point",
-  "segment",
-  "line",
-  "circle",
-  "offsetLine",
-  "slider",
-  "lineIntersection",
-  "circleLineIntersection",
-  "circleCircleIntersection",
-]);
-
 /** Const name if this call is `const foo = point(...)` / `editPoint(...)`. */
 export function widgetBindingName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
-  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => SITE_CALL_NAMES.has(n));
   if (!call) return null;
   let n: ts.Node = call.parent;
   while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) {
@@ -79,7 +66,7 @@ export function widgetBindingName(source: string, at: SourceAt): string | null {
 
 export function widgetCallName(source: string, at: SourceAt): string | null {
   const sf = parse(source);
-  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => SITE_CALL_NAMES.has(n));
   if (!call || !ts.isIdentifier(call.expression)) return null;
   return call.expression.text;
 }
@@ -88,7 +75,7 @@ export function widgetCallName(source: string, at: SourceAt): string | null {
 export function widgetInSceneFunction(source: string, at: SourceAt): boolean {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
-  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => BINDING_CALL_NAMES.has(n));
+  const call = findIdentifierCallAt(sf, at.line, at.column, (n) => SITE_CALL_NAMES.has(n));
   if (!fn || !call) return false;
   return isInNode(call, fn);
 }

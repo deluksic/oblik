@@ -41,6 +41,20 @@ apps/
 
 `group()` is a folder in the breadcrumb. Picking works without it.
 
+## Catalogs
+
+Three lists, three layers. Shell must not import geom / euclid2 / hosts, so this cannot be one module.
+
+| What | Where | Hook |
+| --- | --- | --- |
+| Scene callees (annotator, write-back, binding names) | `packages/shell/src/editor/call-sites.ts` | `dof` / `patch` on a row |
+| Space tools (palette, number bar) | `packages/hosts/src/tools/catalog.ts` | `palettes` / `draft` on a row |
+| Handle ink | `packages/euclid2/src/ink.ts` + `gizmoForEditableGeom` in `widgets.ts` | skip cream; spawn gizmos |
+
+Click / compile / preview stay in `packages/hosts/src/tools/session.ts` because they share Point / Length / LineLike resolvers. Ghost drawing consumes `sessionGhostView` (`packages/hosts/src/tools/ghost.ts`).
+
+New writable constructor: one `CALL_SITES` row. New Space verb: one `TOOLS` row plus a `ToolSession` variant and compile in session.ts. Do not add a fourth name list in paper2, the annotator, or the patcher.
+
 ## Widget writes
 
 Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `__annotations__: { file, at, editable }` onto the module that runs; disk unchanged. If `__annotations__` is already on the call, overwrite and warn. A loop that calls `editDistanceToPoint(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal `edit*` count.

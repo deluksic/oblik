@@ -41,20 +41,17 @@ import {
   widgetInSceneFunction,
 } from "@design-scenes/shell";
 
-import {
-  drawEditorGhost,
-  EDITOR_COMMANDS,
-  CONSTRUCTION_COMMANDS,
-  type GhostSnap,
-} from "./editors";
+import { paletteCommands, toolAcceptsDraft } from "./tools/catalog";
+import { drawGhost, sessionGhostView } from "./tools/ghost";
 import { commitScenePatch, peekFile, quantize, renderSnippet } from "./inspect";
 import {
-  sessionPreview,
   hoverSession,
   onSessionClick,
   onSessionNumber,
-  sessionAsGhostTool,
+  sessionDraft,
+  sessionPreview,
   startVerb,
+  withSessionDraft,
   type PickCtx,
   type ToolSession,
 } from "./tools/session";
@@ -186,8 +183,6 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let session: ToolSession | null = null;
       let lastHover: import("./tools/session").SessionHover | null = null;
       let ghost: Vec2 | null = null;
-      let snap: GhostSnap | null = null;
-      let snapGizmo: Gizmo | null = null;
 
       // geom-only
       let frame: Frame | null = null;
@@ -234,7 +229,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       function activeGizmo(): string | null {
-        return drag?.site ?? snapGizmo?.site ?? hoverGizmo?.site ?? null;
+        return drag?.site ?? hoverGizmo?.site ?? null;
       }
 
       function currentTarget(): {
@@ -335,8 +330,6 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function clearTool(): void {
         session = null;
         ghost = null;
-        snap = null;
-        snapGizmo = null;
         lastHover = null;
         ctx.onCommandBar?.(null);
       }
@@ -401,13 +394,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const accept = Boolean(preview.acceptNumber);
         const state = {
           ...preview,
-          numberValue:
-            session.verb === "distance" ||
-            session.verb === "circle" ||
-            session.verb === "offset" ||
-            session.verb === "slider"
-              ? (session.typed ?? "")
-              : "",
+          numberValue: toolAcceptsDraft(session.verb) ? sessionDraft(session) : "",
           onNumber: accept
             ? (n: number) => {
                 if (!session) return;
@@ -418,23 +405,15 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             : undefined,
           onNumberDraft: accept
             ? (raw: string) => {
-                if (
-                  !session ||
-                  (session.verb !== "distance" &&
-                    session.verb !== "circle" &&
-                    session.verb !== "offset" &&
-                    session.verb !== "slider")
-                ) {
-                  return;
-                }
+                if (!session || !toolAcceptsDraft(session.verb)) return;
                 const trimmed = raw.trim();
                 if (trimmed === "") {
-                  session = { ...session, typed: undefined };
+                  session = withSessionDraft(session, undefined);
                   render(true);
                   return;
                 }
-                if (session.typed === raw) return;
-                session = { ...session, typed: raw };
+                if (sessionDraft(session) === raw) return;
+                session = withSessionDraft(session, raw);
                 render(true);
               }
             : undefined,
@@ -469,30 +448,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           drawAxes(ctx2d, w, h, cam);
           drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
         }
-        if (session && lastHover?.ghost !== "none") {
-          const tool = session;
-          const ghostTool = sessionAsGhostTool(tool, lastHover);
-          drawEditorGhost(
-            ctx2d,
-            cam,
-            w,
-            h,
-            ghostTool,
-            ghost,
-            snap,
-            lastHover?.ghost === "parallel" &&
-              (tool.verb === "distance" || tool.verb === "offset") &&
-              tool.from?.kind === "line",
-          );
+        if (session) {
+          const view = sessionGhostView(session, lastHover, ghost);
+          drawGhost(ctx2d, cam, w, h, view);
         }
         if (quiet && !error) {
-          if (
-            session &&
-            (session.verb === "distance" ||
-              session.verb === "circle" ||
-              session.verb === "offset" ||
-              session.verb === "slider")
-          ) {
+          if (session && toolAcceptsDraft(session.verb)) {
             syncCommandBar();
           }
           return;
@@ -567,22 +528,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       function updateSnap(e: PointerEvent, world: Vec2): void {
-        snap = null;
-        snapGizmo = null;
         lastHover = null;
         if (!session) return;
         const c = pickCtxFor(e, world);
         if (!c) return;
         const hover = hoverSession(session, c);
         lastHover = hover;
-        if (hover.snap) {
-          snap = {
-            kind: hover.snap.kind,
-            x: hover.snap.x,
-            y: hover.snap.y,
-            d: hover.snap.d,
-          };
-        }
         if (hover.hoverId) {
           hoverId = hover.hoverId;
         } else if (session.verb === "distance" && !session.from) {
@@ -760,14 +711,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           evaluate(false);
           render(opts?.quiet ?? false);
         },
-        commands: () => (mode === "geom" ? CONSTRUCTION_COMMANDS : EDITOR_COMMANDS),
+        commands: () => paletteCommands(mode),
         runCommand(id) {
           const next = startVerb(id);
           if (!next) return;
           session = next;
           ghost = null;
-          snap = null;
-          snapGizmo = null;
           lastHover = null;
           render();
         },

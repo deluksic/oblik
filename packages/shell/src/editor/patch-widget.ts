@@ -1,11 +1,9 @@
 import * as ts from "typescript";
 
-import { EDIT_NAMES } from "./edit-names.ts";
-
-const CONSTRUCTOR_WRITE_NAMES = new Set(["point", "circle", "offsetLine", "slider"]);
+import { callSiteSpec, patchSpan, WRITABLE_CALL_NAMES } from "./call-sites.ts";
 
 function isWritableCall(name: string): boolean {
-  return EDIT_NAMES.has(name) || CONSTRUCTOR_WRITE_NAMES.has(name);
+  return WRITABLE_CALL_NAMES.has(name);
 }
 
 export function formatNum(n: number): string {
@@ -128,43 +126,12 @@ export function patchWidgetAt(
   }
 
   const name = (call.expression as ts.Identifier).text;
-  const args = call.arguments;
-  let spans: { start: number; end: number; text: string }[];
-
-  if (name === "editNumber" || name === "slider") {
-    spans = patchArgs(sourceFile, args, 0, 1, values, name);
-  } else if (name === "editAngle") {
-    spans = patchArgs(sourceFile, args, 1, 1, values, name);
-  } else if (name === "editPoint" || name === "point") {
-    spans = patchArgs(sourceFile, args, 0, 2, values, name);
-  } else if (name === "editPoint3") {
-    spans = patchArgs(sourceFile, args, 0, 3, values, name);
-  } else if (name === "editVector") {
-    spans = patchArgs(sourceFile, args, 1, 2, values, name);
-  } else if (name === "circle" || name === "offsetLine") {
-    spans = patchArgs(sourceFile, args, 1, 1, values, name);
-  } else if (name === "editPointOnLine") {
-    const arg = args[2];
-    if (!arg) throw new Error(`${name} missing s argument`);
-    const span = numericSpan(sourceFile, arg);
-    if (!span) throw new Error(`${name} s is not a numeric literal`);
-    if (values[0] === undefined) throw new Error(`${name} write needs a value`);
-    spans = [{ ...span, text: formatNum(values[0]) }];
-  } else {
-    const lastNumeric =
-      name === "editDistanceToPoint" ||
-      name === "editDistance3" ||
-      name === "editPointOnSegment" ||
-      name === "editPointOnSegment3" ||
-      name === "editOffsetFromLine"
-        ? args[1]
-        : args[args.length - 1];
-    if (!lastNumeric) throw new Error(`${name} missing argument`);
-    const span = numericSpan(sourceFile, lastNumeric);
-    if (!span) throw new Error(`${name} last arg is not a numeric literal`);
-    if (values[0] === undefined) throw new Error(`${name} write needs a value`);
-    spans = [{ ...span, text: formatNum(values[0]) }];
+  const spec = callSiteSpec(name);
+  const span = spec ? patchSpan(spec) : undefined;
+  if (!span) {
+    throw new Error(`${name} is not a writable call`);
   }
+  const spans = patchArgs(sourceFile, call.arguments, span.start, span.count, values, name);
 
   spans.sort((a, b) => b.start - a.start);
   let next = source;
