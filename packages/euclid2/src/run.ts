@@ -1,15 +1,15 @@
-import { beginGeomFrame, flatten, type Drawable, type Geom } from "@design-scenes/geom";
+import { beginGeomFrame, collectDrawables, type Drawable, type Geom } from "@design-scenes/geom";
 
 import { beginWidgetFrame, getGizmos, type Gizmo } from "./widgets";
 
 export type Frame = {
-  geom: Geom | Geom[];
+  geom: Geom | Geom[] | undefined;
   drawables: Drawable[];
   gizmos: readonly Gizmo[];
 };
 
 export type SceneModule = {
-  scene: () => Geom | Geom[];
+  scene: () => Geom | Geom[] | void;
   sceneFile: string;
   view?: "euclid2";
 };
@@ -19,8 +19,8 @@ export function runScene(mod: SceneModule, source = ""): Frame {
   beginWidgetFrame(source);
   const geom = mod.scene();
   return {
-    geom,
-    drawables: flatten(geom),
+    geom: geom ?? undefined,
+    drawables: collectDrawables(geom),
     gizmos: getGizmos(),
   };
 }

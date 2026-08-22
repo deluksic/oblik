@@ -1,5 +1,14 @@
 import type { Geom3 } from "./geom3";
-import { makeBase, geomSiteFromOpts, type Base, type GeomSiteOpts, type Group } from "./identity";
+import {
+  makeBase,
+  geomSiteFromOpts,
+  constructGeom,
+  withoutDraw,
+  takeFrameGeoms,
+  type Base,
+  type GeomSiteOpts,
+  type Group,
+} from "./identity";
 import { add, cross2, mul, norm, perp, sub, type Vec2 } from "./vec";
 
 export type Point = Base & { kind: "point"; x: number; y: number };
@@ -29,20 +38,26 @@ export type Geom = Geom2 | Geom3 | Group;
 export type LineLike = Segment | Line;
 
 export function point(x: number, y: number, site?: GeomSiteOpts): Point {
-  return { ...makeBase("point", "point", geomSiteFromOpts(site)), kind: "point", x, y };
+  return constructGeom(
+    () => ({ ...makeBase("point", "point", geomSiteFromOpts(site)), kind: "point", x, y }) as Point,
+  );
 }
 
 export function segment(a: Vec2, b: Vec2, site?: GeomSiteOpts): Segment {
-  return {
+  return constructGeom(() => ({
     ...makeBase("segment", "segment", geomSiteFromOpts(site)),
     kind: "segment",
     a: point(a.x, a.y),
     b: point(b.x, b.y),
-  };
+  }));
 }
 
 /** Infinite line through `a` and `b`. */
 export function line(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
+  return constructGeom(() => makeLine(a, b, site));
+}
+
+function makeLine(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
   const dir = norm(sub(b, a));
   return {
     ...makeBase("line", "line", geomSiteFromOpts(site)),
@@ -53,31 +68,31 @@ export function line(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
 }
 
 export function circle(center: Vec2, radius: number, site?: GeomSiteOpts): Circle {
-  return {
+  return constructGeom(() => ({
     ...makeBase("circle", "circle", geomSiteFromOpts(site)),
     kind: "circle",
     center: point(center.x, center.y),
     radius,
-  };
+  }));
 }
 
 export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
-  return {
+  return constructGeom(() => ({
     ...makeBase("arc", "arc"),
     kind: "arc",
     center: point(center.x, center.y),
     radius,
     a0,
     a1,
-  };
+  }));
 }
 
 export function polyline(points: Vec2[]): Polyline {
-  return {
+  return constructGeom(() => ({
     ...makeBase("polyline", "polyline"),
     kind: "polyline",
     points: points.map((p) => point(p.x, p.y)),
-  };
+  }));
 }
 
 function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
@@ -87,23 +102,27 @@ function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   return { origin: g.a, dir: norm(sub(g.b, g.a)) };
 }
 
-/** Parallel infinite line, offset by signed distance along the left normal. */
+/** Parallel infinite line, offset by signed distance along the left normal. Derived — not drawn. */
 export function offsetLine(geom: LineLike, signedD: number, site?: GeomSiteOpts): Line {
-  const { origin, dir } = lineBasis(geom);
-  const n = perp(dir);
-  const o = add(origin, mul(n, signedD));
-  return line(o, add(o, dir), site);
+  return withoutDraw(() => {
+    const { origin, dir } = lineBasis(geom);
+    const n = perp(dir);
+    const o = add(origin, mul(n, signedD));
+    return makeLine(o, add(o, dir), site);
+  });
 }
 
 /** Intersection of two infinite lines; `null` when parallel. */
 export function lineIntersection(a: LineLike, b: LineLike): Point | null {
-  const la = lineBasis(a);
-  const lb = lineBasis(b);
-  const denom = cross2(la.dir, lb.dir);
-  if (Math.abs(denom) < 1e-12) return null;
-  const t = cross2(sub(lb.origin, la.origin), lb.dir) / denom;
-  const p = add(la.origin, mul(la.dir, t));
-  return point(p.x, p.y);
+  return constructGeom(() => {
+    const la = lineBasis(a);
+    const lb = lineBasis(b);
+    const denom = cross2(la.dir, lb.dir);
+    if (Math.abs(denom) < 1e-12) return null;
+    const t = cross2(sub(lb.origin, la.origin), lb.dir) / denom;
+    const p = add(la.origin, mul(la.dir, t));
+    return point(p.x, p.y);
+  });
 }
 
 export type Drawable =
@@ -168,6 +187,47 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
     for (const g of geom) visit(g);
   } else {
     visit(geom);
+  }
+  return out;
+}
+
+function asDrawable(g: unknown): Drawable | null {
+  if (!g || typeof g !== "object" || !("kind" in g)) return null;
+  const s = g as Geom2;
+  switch (s.kind) {
+    case "point":
+    case "segment":
+    case "line":
+    case "circle":
+    case "arc":
+    case "polyline":
+      return { geom: s };
+    default:
+      return null;
+  }
+}
+
+export function getDrawn(): Drawable[] {
+  const out: Drawable[] = [];
+  for (const g of takeFrameGeoms()) {
+    const d = asDrawable(g);
+    if (d) out.push(d);
+  }
+  return out;
+}
+
+/** Emitted constructors plus optional `scene()` return, de-duplicated by `id`. */
+export function collectDrawables(returned?: Geom | Geom[] | void | null): Drawable[] {
+  const out: Drawable[] = [];
+  const seen = new Set<string>();
+  const add = (d: Drawable) => {
+    if (seen.has(d.geom.id)) return;
+    seen.add(d.geom.id);
+    out.push(d);
+  };
+  for (const d of getDrawn()) add(d);
+  if (returned != null) {
+    for (const d of flatten(returned)) add(d);
   }
   return out;
 }

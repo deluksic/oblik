@@ -44,9 +44,8 @@ export function scene() {
 
 test("inserts editPoint after existing scene widgets", () => {
   const next = insertEditors(hello, [{ kind: "point", x: 1.25, y: -0.4 }]);
-  expect(next).toMatch(/^  const __scene = circle\(c, r\);$/m);
   expect(next).toMatch(/^  const p = editPoint\(1\.25, -0\.4\);$/m);
-  expect(next).toMatch(/^  return __scene;$/m);
+  expect(next).toMatch(/^  return circle\(c, r\);$/m);
   expect(widgetBindingName(hello, at(hello, 0))).toBe("c");
   expect(widgetInSceneFunction(hello, at(hello, 0))).toBe(true);
 });
@@ -54,7 +53,6 @@ test("inserts editPoint after existing scene widgets", () => {
 test("stacked inserts keep two-space indent on every line", () => {
   const once = insertEditors(hello, [{ kind: "point", x: 1, y: 2 }]);
   const twice = insertEditors(once, [{ kind: "distance", originName: "p", d: 0.5 }]);
-  expect(twice.match(/const __scene = /g)?.length).toBe(1);
   expect(twice).toMatch(/const d = editDistanceToPoint\(p, 0\.5\);/);
   const inner = twice.split("export function scene() {\n")[1]?.split("\n}")[0] ?? "";
   for (const line of inner.split("\n")) {
@@ -64,7 +62,7 @@ test("stacked inserts keep two-space indent on every line", () => {
   }
 });
 
-test("rewrites return drawPlate so layout widgets still run first", () => {
+test("inserts into scene() before return drawPlate", () => {
   const plate = `import { drawPlate } from "../demo/plate";
 import { editPoint } from "@design-scenes/euclid2";
 
@@ -78,8 +76,8 @@ export function scene() {
 }
 `;
   const next = insertEditors(plate, [{ kind: "point", x: 0, y: 1 }]);
-  expect(next).toMatch(/const __scene = drawPlate\(plateLayout\(\)\);/);
   expect(next).toMatch(/const p = editPoint\(0, 1\);/);
+  expect(next).toMatch(/return drawPlate\(plateLayout\(\)\);/);
   expect(widgetInSceneFunction(plate, at(plate, 0))).toBe(false);
   expect(widgetBindingName(plate, at(plate, 0))).toBe("min");
 });
@@ -104,51 +102,44 @@ export function scene() {
   expect(next).toMatch(/import \{ editPoint \} from "@design-scenes\/euclid2";/);
 });
 
-test("circle wraps a plain return in group", () => {
+test("circle inserts as a statement", () => {
   const next = insertEditors(hello, [{ kind: "circle", center: { name: "c" }, radius: "r" }]);
-  expect(next).toMatch(/^  const __scene = circle\(c, r\);$/m);
-  expect(next).toMatch(/^  return group\(\(\) => \[__scene, circle\(c, r\)\]\);$/m);
-  expect(next).toMatch(/^import \{ circle, group \} from "@design-scenes\/geom";$/m);
+  expect(next).toMatch(/^  circle\(c, r\);$/m);
+  expect(next).toMatch(/^  return circle\(c, r\);$/m);
+  expect(next).toMatch(/^import \{ circle \} from "@design-scenes\/geom";$/m);
 });
 
-test("stacked circle appends inside an existing group", () => {
-  const grouped = `import { circle, group } from "@design-scenes/geom";
+test("stacked circle adds another call", () => {
+  const grouped = `import { circle } from "@design-scenes/geom";
 import { editDistanceToPoint, editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
   const c = editPoint(0, 0);
   const r = editDistanceToPoint(c, 1);
-  const __scene = circle(c, r);
-  return group(() => [__scene, circle(c, r)]);
+  circle(c, r);
 }
 `;
   const next = insertEditors(grouped, [{ kind: "circle", center: { name: "c" }, radius: "r" }]);
-  expect(next.match(/const __scene = /g)?.length).toBe(1);
-  expect(next).toMatch(/return group\(\(\) => \[__scene, circle\(c, r\), circle\(c, r\)\]\);/);
+  expect(next.match(/circle\(c, r\);/g)?.length).toBe(2);
 });
 
-test("segment appends when __scene is already the return", () => {
+test("segment inserts as a statement", () => {
   const src = `import { circle } from "@design-scenes/geom";
 import { editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
   const a = editPoint(0, 0);
   const b = editPoint(1, 0);
-  const __scene = circle(a, 1);
-  return __scene;
+  circle(a, 1);
 }
 `;
   const next = insertEditors(src, [{ kind: "segment", a: { name: "a" }, b: { name: "b" } }]);
-  expect(next).toMatch(/^  return group\(\(\) => \[__scene, segment\(a, b\)\]\);$/m);
-  expect(next).toMatch(/^import \{ circle, group, segment \} from "@design-scenes\/geom";$/m);
+  expect(next).toMatch(/^  segment\(a, b\);$/m);
+  expect(next).toMatch(/^import \{ circle, segment \} from "@design-scenes\/geom";$/m);
 });
 
 test("rect inserts edit points, derived corners, and four segments", () => {
-  const src = `import { group } from "@design-scenes/geom";
-
-export function scene() {
-  return group(() => []);
-}
+  const src = `export function scene() {}
 `;
   const next = insertEditors(src, [
     { kind: "rect", a: { x: 0, y: 0 }, b: { x: 2, y: 1 } },
@@ -159,9 +150,10 @@ export function scene() {
   expect(next).toMatch(/const tr = point\(Math\.max\(p\.x, p2\.x\), Math\.max\(p\.y, p2\.y\)\);/);
   expect(next).toMatch(/const tl = point\(bl\.x, tr\.y\);/);
   expect(next).toMatch(/const br = point\(tr\.x, bl\.y\);/);
-  expect(next).toMatch(
-    /return group\(\(\) => \[__scene, segment\(bl, tl\), segment\(tl, tr\), segment\(tr, br\), segment\(br, bl\)\]\);/,
-  );
+  expect(next).toMatch(/segment\(bl, tl\);/);
+  expect(next).toMatch(/segment\(tl, tr\);/);
+  expect(next).toMatch(/segment\(tr, br\);/);
+  expect(next).toMatch(/segment\(br, bl\);/);
 });
 
 test("mixed editor and constructor inserts in one write", () => {
@@ -179,7 +171,7 @@ export function scene() {
     { kind: "segment", a: { name: "c" }, b: { name: "p" } },
   ]);
   expect(next).toMatch(/const p = editPoint\(3, 4\);/);
-  expect(next).toMatch(/return group\(\(\) => \[__scene, segment\(c, p\)\]\);/);
+  expect(next).toMatch(/segment\(c, p\);/);
 });
 
 test("multiple constructors append in one write", () => {
@@ -195,16 +187,15 @@ export function scene() {
     { kind: "segment", a: { name: "a" }, b: { name: "b" } },
     { kind: "infiniteLine", a: { name: "a" }, b: { name: "b" } },
   ]);
-  expect(next).toMatch(
-    /return group\(\(\) => \[__scene, segment\(a, b\), line\(a, b\)\]\);/,
-  );
+  expect(next).toMatch(/segment\(a, b\);/);
+  expect(next).toMatch(/line\(a, b\);/);
 });
 
 test("distanceOriginName reads the first argument", () => {
   expect(distanceOriginName(hello, at(hello, 1))).toBe("c");
 });
 
-test("point insert after grouped __scene return does not rebind __scene", () => {
+test("point insert before grouped return does not rebind __scene", () => {
   const src = `import { circle, group } from "@design-scenes/geom";
 import { editPoint } from "@design-scenes/euclid2";
 
@@ -355,6 +346,25 @@ export function scene() {
   expect(next).not.toMatch(/offsetLine\(/);
 });
 
+test("bindLineAt hoists a line() statement in a void scene", () => {
+  const src = `import { line } from "@design-scenes/geom";
+import { editPoint } from "@design-scenes/euclid2";
+
+export function scene() {
+  const a = editPoint(0, 0);
+  const b = editPoint(1, 0);
+  line(a, b);
+}
+`;
+  const injected = injectSceneSites(src, "apps/paper/src/scenes/new-scene.scene.ts");
+  const m = injected.match(/line\(a, b, \{ file: .+, at: \[(\d+), (\d+)\] \}/);
+  expect(m).toBeTruthy();
+  const bound = bindLineAt(src, { line: Number(m![1]), column: Number(m![2]) });
+  expect(bound?.name).toBe("l");
+  expect(bound?.source).toMatch(/const l = line\(a, b\);/);
+  expect(bound?.source).not.toMatch(/^\s+line\(a, b\);$/m);
+});
+
 test("applyScenePatch inserts statements and geom imports", () => {
   const src = `import { editPoint } from "@design-scenes/euclid2";
 
@@ -373,19 +383,17 @@ export function scene() {
   expect(next).toMatch(/const d = editDistanceToPoint\(c, 1\.5\);/);
 });
 
-test("applyScenePatch appends exprs into an empty group return", () => {
-  const src = `import { group } from "@design-scenes/geom";
-import { editPoint } from "@design-scenes/euclid2";
+test("applyScenePatch inserts constructor statements", () => {
+  const src = `import { editPoint } from "@design-scenes/euclid2";
 
 export function scene() {
   const a = editPoint(0, 0);
   const b = editPoint(1, 0);
-  return group(() => []);
 }
 `;
   const next = applyScenePatch(src, {
     imports: { "@design-scenes/geom": ["line"] },
     exprs: ["line(a, b)"],
   });
-  expect(next).toMatch(/return group\(\(\) => \[line\(a, b\)\]\);/);
+  expect(next).toMatch(/line\(a, b\);/);
 });

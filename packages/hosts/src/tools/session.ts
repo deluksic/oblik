@@ -73,6 +73,7 @@ export type SessionHover = {
   ghost: "point" | "ring" | "parallel" | "none";
   lineBasis?: { origin: Vec2; dir: Vec2 };
   hoverId: string | null;
+  hoverGizmoSite?: string | null;
 };
 
 export type SessionResult =
@@ -124,6 +125,10 @@ function siteAt(site: GeomSite | undefined, sceneFile: string): SourceAt | null 
   return { line: site.line, column: site.column };
 }
 
+function pickRadius(ctx: PickCtx): number {
+  return Math.max(0.12, 12 / ctx.cam.scale);
+}
+
 function namedPointNear(
   pts: { name: string; x: number; y: number }[],
   world: Vec2,
@@ -139,6 +144,22 @@ function namedPointNear(
     }
   }
   return best;
+}
+
+function worldOriginNear(ctx: PickCtx): PointBind | null {
+  const max = pickRadius(ctx);
+  if (Math.hypot(ctx.world.x, ctx.world.y) > max) return null;
+  const named = namedPointNear(ctx.namedPoints, { x: 0, y: 0 }, max);
+  if (named) return named;
+  return { kind: "free", x: 0, y: 0 };
+}
+
+function pointFromGeom(ctx: PickCtx): PointBind | null {
+  if (ctx.hit?.target !== "geom" || ctx.hit.drawable.geom.kind !== "point") return null;
+  const g = ctx.hit.drawable.geom;
+  const named = namedPointNear(ctx.namedPoints, g, pickRadius(ctx));
+  if (named) return named;
+  return { kind: "free", x: g.x, y: g.y };
 }
 
 function gizmoInScene(src: string, g: Gizmo): boolean {
@@ -228,12 +249,18 @@ function pointFromGizmo(ctx: PickCtx): PointBind | null {
       : g.kind === "glider"
         ? { x: g.a.x + (g.b.x - g.a.x) * g.t, y: g.a.y + (g.b.y - g.a.y) * g.t }
         : add(g.origin, { x: g.direction.x * g.s, y: g.direction.y * g.s });
-  return namedPointNear(ctx.namedPoints, pos, 0.25);
+  const named = namedPointNear(ctx.namedPoints, pos, pickRadius(ctx));
+  if (named) return named;
+  const name = gizmoName(ctx.sceneSrc, g);
+  if (name) return { kind: "named", name, x: pos.x, y: pos.y };
+  return { kind: "free", x: pos.x, y: pos.y };
 }
 
 export function resolvePoint(ctx: PickCtx): PointBind | "ignore" {
   const namedGizmo = pointFromGizmo(ctx);
   if (namedGizmo) return namedGizmo;
+  const geomPt = pointFromGeom(ctx);
+  if (geomPt) return geomPt;
   const crossing = resolveCrossing(ctx);
   if (crossing) return crossing;
   if (ctx.hit?.target === "gizmo") {
@@ -241,8 +268,10 @@ export function resolvePoint(ctx: PickCtx): PointBind | "ignore" {
     if (k === "distance" || k === "offset" || k === "number" || k === "angle") return "ignore";
   }
   if (ctx.hit?.target === "geom" && ctx.hit.drawable.geom.kind === "circle") return "ignore";
-  const named = namedPointNear(ctx.namedPoints, ctx.world);
+  const named = namedPointNear(ctx.namedPoints, ctx.world, pickRadius(ctx));
   if (named) return named;
+  const origin = worldOriginNear(ctx);
+  if (origin) return origin;
   return { kind: "free", x: ctx.world.x, y: ctx.world.y };
 }
 
@@ -259,6 +288,8 @@ export function resolveDistanceFrom(ctx: PickCtx): DistanceFromHit {
     const named = pointFromGizmo(ctx);
     if (named) return { kind: "point", point: named };
   }
+  const geomPt = pointFromGeom(ctx);
+  if (geomPt) return { kind: "point", point: geomPt };
   const crossing = resolveCrossing(ctx);
   if (crossing) return { kind: "point", point: crossing };
 
@@ -292,8 +323,10 @@ export function resolveDistanceFrom(ctx: PickCtx): DistanceFromHit {
     return { kind: "line", line: hit.bind, origin: od.origin, dir: od.dir };
   }
 
-  const named = namedPointNear(ctx.namedPoints, ctx.world);
+  const named = namedPointNear(ctx.namedPoints, ctx.world, pickRadius(ctx));
   if (named) return { kind: "point", point: named };
+  const origin = worldOriginNear(ctx);
+  if (origin) return { kind: "point", point: origin };
   return { kind: "empty" };
 }
 
@@ -337,14 +370,11 @@ export function sessionAsGhostTool(session: ToolSession, hover: SessionHover | n
       typedRadius: session.typed,
     };
   }
-  if (session.from?.kind === "line" || hover?.ghost === "parallel") {
-    const basis =
-      session.from?.kind === "line"
-        ? { origin: session.from.origin, dir: session.from.dir }
-        : hover?.lineBasis;
+  if (session.from?.kind === "line") {
+    const basis = { origin: session.from.origin, dir: session.from.dir };
     return {
       id: "offset",
-      base: basis ? "line" : undefined,
+      base: "line",
       baseLine: basis,
       typedDistance: session.typed,
     };
@@ -447,12 +477,12 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
       };
     }
     if (hit.kind === "line") {
-      return {
-        snap: null,
-        ghost: "parallel",
-        lineBasis: { origin: hit.origin, dir: hit.dir },
-        hoverId: hit.line.kind === "site" ? null : null,
-      };
+      const hoverId =
+        ctx.hit?.target === "geom" &&
+        (ctx.hit.drawable.geom.kind === "segment" || ctx.hit.drawable.geom.kind === "line")
+          ? ctx.hit.drawable.geom.id
+          : null;
+      return { snap: null, ghost: "none", hoverId };
     }
     return {
       snap: { kind: "point", x: ctx.world.x, y: ctx.world.y },
@@ -462,8 +492,7 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
   }
 
   if (session.from.kind === "point") {
-    const p = session.from.point;
-    return { snap: { kind: "point", x: p.x, y: p.y }, ghost: "ring", hoverId: null };
+    return { snap: null, ghost: "ring", hoverId: null };
   }
   return {
     snap: null,
@@ -498,9 +527,16 @@ function hoistNames(src: string, sites: SourceAt[]): { src: string; map: Map<str
   return { src: next, map };
 }
 
-function lineText(bind: LineBind, map: Map<string, string>): string {
+function lineText(
+  bind: LineBind,
+  map: Map<string, string>,
+  imports: { geom: Set<string> },
+): string {
   if (bind.kind === "named") return bind.name;
-  if (bind.kind === "expr") return bind.expr;
+  if (bind.kind === "expr") {
+    imports.geom.add("offsetLine");
+    return bind.expr;
+  }
   const n = map.get(`${bind.site.line}:${bind.site.column}`);
   if (!n) throw new Error("unbound line");
   return n;
@@ -530,7 +566,7 @@ function pointExpr(
   imports.geom.add("lineIntersection");
   const name = nextBindingName(`${working}\n${statements.join("\n")}`, "x");
   statements.push(
-    `const ${name} = lineIntersection(${lineText(point.a, map)}, ${lineText(point.b, map)});`,
+    `const ${name} = lineIntersection(${lineText(point.a, map, imports)}, ${lineText(point.b, map, imports)});`,
   );
   return name;
 }
@@ -581,8 +617,8 @@ export function compileLine(src: string, a: PointBind, b: PointBind): ScenePatch
     const ae = pointExpr(working, statements, a, map, imports);
     const be = pointExpr(working, statements, b, map, imports);
     imports.geom.add("line");
-    imports.geom.add("group");
-    return patchOf(sites, imports, statements, [`line(${ae}, ${be})`]);
+    statements.push(`line(${ae}, ${be});`);
+    return patchOf(sites, imports, statements);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -608,8 +644,7 @@ export function compileDistance(
       const arg = length.kind === "reuse" ? length.name : fmt(length.value);
       statements.push(`const ${dName} = editDistanceToPoint(${p}, ${arg});`);
     } else {
-      if (from.line.kind === "expr") imports.geom.add("offsetLine");
-      const lineE = lineText(from.line, map);
+      const lineE = lineText(from.line, map, imports);
       imports.euclid.add("editOffsetFromLine");
       const off = nextBindingName(`${working}\n${statements.join("\n")}`, "off");
       const arg =

@@ -455,7 +455,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           drawAxes(ctx2d, w, h, cam);
           drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
         }
-        if (session) {
+        if (session && lastHover?.ghost !== "none") {
           const ghostTool = sessionAsGhostTool(session, lastHover);
           drawEditorGhost(
             ctx2d,
@@ -465,7 +465,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             ghostTool,
             ghost,
             snap,
-            lastHover?.ghost === "parallel" && session.verb === "distance" && !session.from,
+            lastHover?.ghost === "parallel" && session.from?.kind === "line",
           );
         }
         if (quiet && !error) {
@@ -551,11 +551,14 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             d: hover.snap.d,
           };
         }
-        if (hover.ghost === "parallel" && c.hit?.target === "geom") {
-          const k = c.hit.drawable.geom.kind;
-          if (k === "segment" || k === "line") hoverId = c.hit.drawable.geom.id;
+        if (hover.hoverId) {
+          hoverId = hover.hoverId;
         } else if (session.verb === "distance" && !session.from) {
           hoverId = null;
+        }
+        hoverGizmo = c.hit?.target === "gizmo" ? c.hit.gizmo : null;
+        if (c.hit?.target === "geom" && c.hit.drawable.geom.kind === "point") {
+          hoverId = c.hit.drawable.geom.id;
         }
       }
 

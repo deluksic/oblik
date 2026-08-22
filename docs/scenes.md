@@ -14,7 +14,7 @@ export const camera = { x: 0, y: 0, scale: 16 };
 export const camera3 = { position: [18, -24, 13], target: [0.3, 0, 1.15] };
 export const sceneFile = "beam.scene.ts";
 export function scene() {
-  /* … */
+  /* widgets + constructors; return is optional */
 }
 ```
 
@@ -38,16 +38,16 @@ export const layout = {
 
 Layout files must not import pane modules. Live drag still updates the other panes via widget channels (`"plate"`, `"cylinder"`, `"profile"`). A missing id in `areas` shows an error in the empty slot; other panes still mount.
 
-## Visual language
+## Marks
 
 | On screen         | Meaning                                          | Writes     |
 | ----------------- | ------------------------------------------------ | ---------- |
-| Cream solid       | Inert geometry (`circle`, `segment`, `drawPlate`, SDF fill) | nothing    |
-| Coral filled dot  | `editPoint` / glider                             | literals   |
-| Coral dashed ring | `editDistanceToPoint`                            | `d`        |
-| Coral arrow       | `editVector`                                     | `dx`, `dy` |
-| HUD slider        | `editNumber`                                     | `n`        |
-| Gold / blue       | pick highlight                                   | nothing    |
+| Solid stroke      | Geometry (`circle`, `segment`, `drawPlate`, SDF fill) | nothing |
+| Filled dot        | Point widget (`editPoint` / glider)              | literals   |
+| Dashed ring       | Distance widget (`editDistanceToPoint`)          | `d`        |
+| Arrow             | Vector widget (`editVector`)                     | `dx`, `dy` |
+| HUD slider        | Number widget (`editNumber`)                     | `n`        |
+| Hover / select    | Pick highlight                                   | nothing    |
 
 ## Space palette
 
@@ -57,19 +57,19 @@ Commands come from the view host.
 
 euclid2:
 
-1. **Point** — empty paper → `editPoint`; two lines under the cursor near their crossing → `lineIntersection(a, b)`; an existing named point is a no-op.
-2. **Distance** — first click is `point | line`: empty/point/crossing → dashed ring (`editDistanceToPoint`); one scene segment/line or offset handle → dashed parallel (`editOffsetFromLine`, no `offsetLine` in the group). Then type a number, click to measure, or reuse a named numeric widget.
+1. **Point** — empty paper → `editPoint`; two lines under the cursor near their crossing → `lineIntersection(a, b)` (derived geometry, no widget); an existing named point is a no-op.
+2. **Distance** — first click is `point | line`: empty/point/crossing → dashed ring (`editDistanceToPoint`); one scene segment/line or offset handle → dashed parallel (`editOffsetFromLine`). `offsetLine` is a derived line (not drawn). Then type a number, click to measure, or reuse a named numeric widget.
 3. **Line** — two points (same Point resolver) → `line(a, b)` so Distance can offset it.
 
 sdf2: Point + Distance only.
 
 Circle, Segment, and Rect are not Space commands in this slice; type them in the scene file.
 
-`scene()` may leave new editors unused.
+`scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). `group()` is only a path namespace. A return value is still flattened for older scenes that list geometry in `group(() => […])`.
+
+Inserts add statements inside `scene()` (before an existing `return`, or at the end of a void body). A handle declared in `plateLayout()` (outside `scene()`) is refused.
 
 Esc cancels the active command and closes the docked prompt. The completed command is one text edit. Undo is the editor.
-
-Inserting after `return drawPlate(plateLayout())` rewrites to `const __scene = drawPlate(plateLayout()); …; return __scene` so new editors stay in `scene()`. A handle declared in `plateLayout()` (outside `scene()`) is refused.
 
 euclid3 and sdf field: Space reports no insert commands yet.
 

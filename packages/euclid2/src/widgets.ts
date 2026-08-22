@@ -1,6 +1,7 @@
 import {
   offsetLine,
   point,
+  withoutDraw,
   type LineLike,
   type Point,
   type Segment,
@@ -180,7 +181,7 @@ export function editPoint(x: number, y: number, site?: SiteOpts): Point {
   if (!silent && located) {
     gizmos.push({ kind: "point", ...located, x: px, y: py });
   }
-  return point(px, py);
+  return withoutDraw(() => point(px, py));
 }
 
 export function editDistanceToPoint(origin: Vec2, d: number, site?: SiteOpts): number {
@@ -213,7 +214,7 @@ export function editPointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts)
     });
   }
   const p = lerp(lineSeg.a, lineSeg.b, tt);
-  return point(p.x, p.y);
+  return withoutDraw(() => point(p.x, p.y));
 }
 
 export type LineEditOpts = SiteOpts & { min?: number; max?: number };
@@ -251,11 +252,11 @@ export function editPointOnLine(
       max: opts?.max,
     });
   }
-  return point(origin.x + dir.x * ss, origin.y + dir.y * ss);
+  return withoutDraw(() => point(origin.x + dir.x * ss, origin.y + dir.y * ss));
 }
 
 /**
- * Offset from `origin`. Gizmo is the coral handle at origin+(dx,dy).
+ * Offset from `origin`. Widget is the handle at origin+(dx,dy).
  * Drag writes dx, dy; origin is geometry, not a write target.
  */
 export function editVector(origin: Vec2, dx: number, dy: number, site?: SiteOpts): Vec2 {

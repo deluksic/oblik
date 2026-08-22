@@ -3,7 +3,7 @@ import { circle, group, segment, point } from "@design-scenes/geom";
 
 export const title = "Relative";
 export const sceneFile = "relative.scene.ts";
-export const hint = "Left is position. Coral arrow is the offset. b is derived.";
+export const hint = "Left is position. Vector widget is the offset. b is derived.";
 
 /**
  * `a` writes position. `d` writes the offset (dx, dy). `b` is derived, not an editor.

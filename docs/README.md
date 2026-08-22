@@ -2,7 +2,7 @@
 
 - [Intent](./intent.md) — programs, pure libraries, declared editors
 - [Layout](./layout.md) — packages, import rules, identity, widget write-back
-- [Scenes](./scenes.md) — catalog, layouts, visual language, Space palette
+- [Scenes](./scenes.md) — catalog, layouts, marks, Space palette
 
 Prototypes (charter + what we learned):
 

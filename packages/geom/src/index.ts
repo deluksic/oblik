@@ -14,6 +14,8 @@ export {
   lineIntersection,
   flatten,
   flatten3,
+  getDrawn,
+  collectDrawables,
   type Point,
   type Segment,
   type Line,

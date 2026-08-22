@@ -306,7 +306,7 @@ export function drawEditorGhost(
         (snap?.kind === "distance" && snap.d != null
           ? snap.d
           : cursor
-            ? radiusBetween(origin, snap ?? cursor)
+            ? radiusBetween(origin, cursor)
             : 0.2);
       const c = worldToScreen(cam, origin, w, h);
       ctx.setLineDash([5, 5]);

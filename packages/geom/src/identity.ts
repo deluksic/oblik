@@ -33,11 +33,64 @@ export type Base = {
 const pathCounts = new Map<string, number>();
 let currentParentPath: string | null = null;
 let currentParentId: string | null = null;
+let constructDepth = 0;
+let drawSilent = 0;
+const frameGeoms: unknown[] = [];
+
+const DRAWN_KINDS = new Set([
+  "point",
+  "segment",
+  "line",
+  "circle",
+  "arc",
+  "polyline",
+  "point3",
+  "segment3",
+  "circle3",
+  "box3",
+  "cylinder3",
+  "mesh3",
+]);
 
 export function beginGeomFrame(): void {
   pathCounts.clear();
   currentParentPath = null;
   currentParentId = null;
+  constructDepth = 0;
+  frameGeoms.length = 0;
+}
+
+/** Skip drawing (widgets, derived `offsetLine`). */
+export function withoutDraw<T>(fn: () => T): T {
+  drawSilent += 1;
+  try {
+    return fn();
+  } finally {
+    drawSilent -= 1;
+  }
+}
+
+/** Register a constructor result unless nested inside another constructor or `withoutDraw`. */
+export function constructGeom<T>(fn: () => T): T {
+  constructDepth += 1;
+  try {
+    const v = fn();
+    if (constructDepth === 1 && drawSilent === 0 && isDrawnKind(v)) {
+      frameGeoms.push(v);
+    }
+    return v;
+  } finally {
+    constructDepth -= 1;
+  }
+}
+
+function isDrawnKind(v: unknown): boolean {
+  if (!v || typeof v !== "object" || !("kind" in v)) return false;
+  return DRAWN_KINDS.has((v as { kind: string }).kind);
+}
+
+export function takeFrameGeoms(): unknown[] {
+  return frameGeoms.slice();
 }
 
 function nextPathLocal(kind: string): string {
@@ -70,7 +123,7 @@ export function makeBase(kind: string, createdBy: string, site?: GeomSite): Base
 export type Group = Base & { kind: "group"; children: unknown[] };
 
 /** Optional path namespace. Does not affect pick identity. */
-export function group<T>(fn: () => T[]): Group {
+export function group<T>(fn: () => T[] | void): Group {
   const local = nextPathLocal("group");
   const path = makePath(local);
   const id = crypto.randomUUID();
@@ -86,7 +139,7 @@ export function group<T>(fn: () => T[]): Group {
   const prevId = currentParentId;
   currentParentPath = path;
   currentParentId = id;
-  node.children = fn();
+  node.children = fn() ?? [];
   currentParentPath = prevPath;
   currentParentId = prevId;
   return node;
