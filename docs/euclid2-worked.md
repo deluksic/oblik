@@ -2,6 +2,8 @@
 
 Figure: two points on a ground line, a parallel shelf, a reach circle at A that hits the shelf at P, a lamp whose beam is the circle through P, that beam hits the ground at Q, a line through P and Q, and a cellar parallel at the same distance on the other side.
 
+Misses are NaN. `[LENGTH]` is the uniform length projection (`Circle` radius, `OffsetLine` signed d, `Segment` chord). Length-slot disk is always `name[LENGTH]`, never `.radius` / `.d`.
+
 ## Gestures → disk
 
 | # | tool | clicks | disk |
@@ -17,9 +19,11 @@ Figure: two points on a ground line, a parallel shelf, a reach circle at A that 
 | 9 | Circle | lamp, then P | `const beam = circle(lamp, dist(lamp, P))` |
 | 10 | Point | `beam ∩ ground` | `const Q = circleLineIntersection(beam, ground, +1)` |
 | 11 | Line | P, Q | `line(P, Q)` |
-| 12 | Offset | ground, then shelf’s **`.d` handle** (other side) | `const cellar = offsetLine(ground, -shelf.d)` |
+| 12 | Offset | ground, then shelf in the **Length** slot (other side) | `const cellar = offsetLine(ground, -shelf[LENGTH])` |
 
 ```ts
+import { LENGTH, point, line, circle, offsetLine, segment, dist, circleLineIntersection } from "@design-scenes/geom";
+
 export function scene() {
   const A = point(0, 0);
   const B = point(6, 0.4);
@@ -37,11 +41,13 @@ export function scene() {
   const Q = circleLineIntersection(beam, ground, +1);
   line(P, Q);
 
-  const cellar = offsetLine(ground, -shelf.d);
+  const cellar = offsetLine(ground, -shelf[LENGTH]);
 }
 ```
 
-`shelf` is `OffsetLine <: Line`: intersect it, and read `.d`. `cellar` is determined by that `.d`.
+Length slot on step 12: hit is `HasLength` and finite → writer emits `shelf[LENGTH]`. Same writer on `reach` would emit `reach[LENGTH]` (radius as a length). It does not know `OffsetLine` vs `Circle`.
+
+`ground` is a `Line`: no `HasLength`. Length slot on the stroke is a miss, not `ground[LENGTH]`.
 
 ## After the call-site annotator
 
@@ -49,97 +55,64 @@ export function scene() {
 | --- | --- | --- |
 | `point(0, 0)` | true | `0`, `0` |
 | `point(6, 0.4)` | true | `6`, `0.4` |
-| `line(A, B)` | false | — (drag A, B) |
+| `line(A, B)` | false | — |
 | `offsetLine(ground, 1.8)` | true | `1.8` |
 | `circle(A, 2.5)` | true | `2.5` |
-| `circleLineIntersection(reach, shelf, +1)` | false | branch is a literal but not a drag DOF |
+| `circleLineIntersection(reach, shelf, +1)` | false | — |
 | `segment(A, P)` | false | — |
 | `point(2.2, 3.1)` | true | lamp |
-| `circle(lamp, dist(lamp, P))` | false | — (P and lamp drive r) |
+| `circle(lamp, dist(lamp, P))` | false | — |
 | `circleLineIntersection(beam, ground, +1)` | false | — |
 | `line(P, Q)` | false | — |
-| `offsetLine(ground, -shelf.d)` | false | — (shelf owns d) |
+| `offsetLine(ground, -shelf[LENGTH])` | false | — |
 
-Handles: A, B, lamp, shelf distance, reach radius. Not: P, Q, beam radius, cellar, ground as a whole.
+Handles: A, B, lamp, shelf `[LENGTH]`, reach `[LENGTH]`. Shown only while those placement values are finite.
+
+## NaN
+
+Drag reach `2.5` until it no longer meets the shelf: `P` is `{ x: NaN, y: NaN }`. Then `dist(lamp, P)` is NaN, `beam[LENGTH]` is NaN, `Q` is NaN, `segment(A, P)` and `line(P, Q)` are NaN.
+
+Omit: P, Q, segment, beam, PQ. Keep: A, B, lamp, ground, shelf, cellar, reach, and the handles on A, B, lamp, `1.8`, `2.5`. Drag `2.5` out again and the downstream ink returns on the same `+1` branch (or stays NaN if that root is still gone).
+
+`lineIntersection(ground, shelf)` is a NaN point, never `null`. Point tool must not treat a NaN hit as empty paper.
 
 ## Drags (DAG)
 
 | drag | follows |
 | --- | --- |
 | A | ground, shelf, cellar, reach, P, segment, beam, Q, PQ |
-| B | ground (direction), shelf, cellar, Q’s line, not reach’s radius |
-| shelf `1.8` | shelf, P, beam, Q, PQ, cellar (`-shelf.d`) |
+| B | ground, shelf, cellar, not reach `[LENGTH]` |
+| shelf `1.8` | shelf, P, beam, Q, PQ, cellar (`-shelf[LENGTH]`) |
 | reach `2.5` | P, segment, beam, Q, PQ |
 | lamp | beam, Q, PQ; P does not move |
-| P | cannot; not a handle |
-
-`beam` through P: lamp drives the circle; P does not stay on it if you could drag a beam radius (there isn’t one).
 
 ## Where it falls apart
 
-**1. Shared `const r = 1.8`**
+**1. Shared `const r = 1.8`** — still no constructor to annotate. `[LENGTH]` does not help; the `const` is a `number`.
 
-Hand-written `circle(A, r); offsetLine(ground, r)`: both args are names, annotator sets `editable: false`, **no handles**. Potential editability sits on the `const`, which has no constructor to hang a ring or parallel on. Tools never emit this; typing it is a dead end unless the annotator chases one-hop scene literals (then: which gizmo shape?).
+**2. Length slot still has three introductions.** Writer is uniform for `HasLength`; it still branches for Point (`dist` / `signedDist`) vs type/measure (`literal`). Click P in Circle’s Length slot is `dist(lamp, P)`, not `P[LENGTH]` (Point is not `HasLength`).
 
-**2. Offset slot vs Circle slot (asymmetric unless we copy it)**
+**3. Same ink, two slots.** Length slot → `shelf[LENGTH]`. LineLike slot → `shelf` as line. Slot-active, not `.d` vs `.radius`. Teaching “click the shelf to copy height” still needs the Length slot to be the one open.
 
-Circle second slot: `number | Point` → `2.5` or `dist(lamp, P)`. Offset second slot must be the same shape or Offset is weaker:
+**4. Branch `+1` does not hop.** P becomes NaN, handles on P were never there; reach’s handle stays.
 
-| click | must write |
-| --- | --- |
-| type / empty | `offsetLine(ground, 1.8)` |
-| point R | `offsetLine(ground, signedDist(R, ground))` |
-| another offset’s `.d` | `offsetLine(ground, shelf.d)` or `-shelf.d` |
+**5. Glider frame** on `line(A,B)` vs `offsetLine` — unchanged.
 
-Without `signedDist`, “parallel through this point” cannot be said. With it, drag R moves the parallel; **drag the parallel and keep R on it** is two-way — not in the graph.
+**6. Offset of a segment** — still an infinite `OffsetLine`. `segment[LENGTH]` is the chord; Offset’s first slot is `LineLike`, so clicking the segment offsets the line, it does not copy the chord. Copying the chord is Length slot: `offsetLine(ground, AP[LENGTH])`.
 
-**3. Same ink, two types**
+**7. `-shelf[LENGTH]` is a computation** — cellar has no handle. Independent other-side distance is a new literal.
 
-Shelf is a `Line` and has `.d`. Offset tool, first slot `LineLike`: click the stroke → `offsetLine(shelf, …)` (offset the offset). Second slot `number`: click the **distance handle** → `shelf.d`. Clicking the stroke in a Length slot is a miss or a wrong bind. Step 12 only works if `.d` is a distinct hit target. If the handle *is* the stroke (drag perpendicular on the line), Length vs LineLike is **which tool slot is active**, not which pixels. That is workable; it is easy to teach wrong (“click the shelf to copy height” copies the line instead).
+**8. Beam vs reach** — same `Circle` type; only annotator `editable` differs. `beam[LENGTH]` exists (for reuse) but is not a write site.
 
-**4. `+1` / `-1` is a frozen branch**
+**9. Two-way coincidences, missing foot/tangent/midpoint** — unchanged.
 
-`P` does not hop to the other root when the circle shrinks or A moves past the tangent. It goes undefined. Correct for DAG; feels like a bug if the user “meant the other hit.” No type-level fix; a later tool could rewrite the literal `+1` → `-1`.
+**10. One `[LENGTH]` per type.** An arc’s radius vs arc-length cannot both be *the* length. Pick one in the catalog.
 
-**5. `lineIntersection(ground, shelf)`**
-
-Parallels → `null`. A Point-tool click near “where they meet” (vanishing) must not become `editPoint` at the cursor. Easy to get wrong in the resolver.
-
-**6. `pointOnLine(shelf, s)` (Point tool on the shelf, not at P)**
-
-`s` is along `shelf.direction` from `shelf.origin`. `offsetLine` that keeps direction and does `origin + n*d` is fine: the glider rides the parallel. `line(A, B)` uses **A as origin**: drag A *along* the line and a glider with fixed `s` slides with A instead of staying in the world. Carrier frame is part of the graph, not implied by `Line`.
-
-**7. Offset of a segment**
-
-Click a `segment(A, B)` for Offset: `LineLike` accepts it, result is still an **infinite** `OffsetLine`. User may expect a finite parallel. Type-compatible, intent-wrong. Separate `offsetSegment` or refuse Segment in that slot.
-
-**8. Cellar sign is a computation**
-
-`-shelf.d` is not a literal → no cellar handle. Linked distances are correct for step 12. Independent other-side distance is a **new literal** from click-empty, not a projection. Two different graphs, one tool; the Length resolver has to pick.
-
-**9. Beam has no radius handle — by design, and it feels like a missing tool**
-
-`circle(lamp, dist(lamp, P))` vs `circle(lamp, 2.5)` are the same `Circle` type. Only `__annotations__.editable` differs. User who “just wanted to resize the beam” must delete `dist` and insert a literal (and lose through-P). The language cannot be both.
-
-**10. Two-way coincidences the figure suggests**
-
-- Drag reach so P stays under A (vertical).
-- Drag shelf and keep P; also keep beam radius.
-- Drag Q along the ground and have the lamp follow (inverse of `circleLineIntersection`).
-
-All of those are extra constraints, not projections. The graph will not do them. A solver as a later pure function could, on a subgraph.
-
-**11. Missing constructors, not type holes**
-
-Midpoint, perpendicular, foot of perpendicular (`project(lamp, ground)`), tangents from lamp to `reach`. Users will try to fake them with offsets of magic numbers. That is a catalog gap. It will be mistaken for the DAG “not being enough.”
-
-**12. Annotator does not see `+1` as editable, and should not**
-
-Branch is a literal. A handle on it would be a discrete toggle, not a drag. If we later want that, it is a different annotation (`editable: "branch"`), not `number` write-back.
+**11. `Line[LENGTH]` is absent, not `Infinity`.** A Length click on `ground` does not write a number. Infinite as a length is not a value in the graph.
 
 ## What still holds
 
-- `shelf` as intersectable line **and** `shelf.d` as the cellar’s distance is the OffsetLine product type, not two functions.
-- Free vs through (`reach` vs `beam`) is literal vs `dist`, which the annotator can see.
-- Write-back targets are only the five literal sites above.
-- Stripping freeze: `circle(A, 2.5, { editable: false })` keeps the constant; annotator sets `__annotations__.editable: false`.
+- Tool writer: `HasLength && finite → name[LENGTH]`. No per-kind field names.
+- `shelf` is still a line you intersect and a length you read.
+- Free vs through is literal vs `dist` / `[LENGTH]`.
+- NaN is total: no `null`, no hopping, no handle at a non-finite placement.
