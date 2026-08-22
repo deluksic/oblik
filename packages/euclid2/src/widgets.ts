@@ -97,6 +97,17 @@ export type Gizmo =
   | VectorGizmo
   | OffsetGizmo;
 
+/** Point-sized grab targets — pick and paint these above lines and rings. */
+export function gizmoIsPointLike(g: Gizmo): boolean {
+  return (
+    g.kind === "point" ||
+    g.kind === "glider" ||
+    g.kind === "lineGlider" ||
+    g.kind === "vector" ||
+    g.kind === "angle"
+  );
+}
+
 const gizmos: Gizmo[] = [];
 /** Live write-back values, keyed by the 2D scene that owns them. */
 const overridesBySource = new Map<string, Map<string, number[]>>();

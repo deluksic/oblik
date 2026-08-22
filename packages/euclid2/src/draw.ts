@@ -4,7 +4,7 @@ import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { layoutNumberSliders } from "./hud";
 import { handleOwnsInk } from "./ink";
-import type { Gizmo } from "./widgets";
+import { gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const COL = {
   bg: "#12141c",
@@ -48,7 +48,7 @@ export function drawFrame(
   drawGrid(ctx, cssW, cssH, cam);
 
   for (const d of drawables) {
-    if (handleOwnsInk(d.geom)) continue;
+    if (handleOwnsInk(d.geom) || d.geom.kind === "point") continue;
     const id = d.geom.id;
     const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
     const width = id === selectedId || id === hoverId ? 2.4 : 1.5;
@@ -56,7 +56,19 @@ export function drawFrame(
   }
 
   for (const g of gizmos) {
-    if (g.kind === "number") continue;
+    if (g.kind === "number" || gizmoIsPointLike(g)) continue;
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+  }
+
+  for (const d of drawables) {
+    if (handleOwnsInk(d.geom) || d.geom.kind !== "point") continue;
+    const id = d.geom.id;
+    const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
+    strokeGeom(ctx, cam, cssW, cssH, d, color, id === selectedId || id === hoverId ? 2.4 : 1.5);
+  }
+
+  for (const g of gizmos) {
+    if (!gizmoIsPointLike(g)) continue;
     drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
   }
 }
@@ -72,7 +84,11 @@ export function drawGizmoOverlay(
   selectedGizmo: string | null,
 ): void {
   for (const g of gizmos) {
-    if (g.kind === "number") continue;
+    if (g.kind === "number" || gizmoIsPointLike(g)) continue;
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+  }
+  for (const g of gizmos) {
+    if (!gizmoIsPointLike(g)) continue;
     drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
   }
 }

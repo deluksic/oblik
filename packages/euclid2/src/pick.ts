@@ -10,7 +10,7 @@ import {
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { hitNumberSlider } from "./hud";
-import type { Gizmo } from "./widgets";
+import { gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const GIZMO_PX = 12;
 const GEOM_PX = 8;
@@ -44,6 +44,76 @@ function geomDistWorld(world: Vec2, d: Drawable): number {
   return min;
 }
 
+function pointLikeScreen(g: Gizmo, cam: Camera, width: number, height: number): Vec2 | null {
+  if (g.kind === "point") return worldToScreen(cam, g, width, height);
+  if (g.kind === "glider") {
+    return worldToScreen(
+      cam,
+      {
+        x: g.a.x + (g.b.x - g.a.x) * g.t,
+        y: g.a.y + (g.b.y - g.a.y) * g.t,
+      },
+      width,
+      height,
+    );
+  }
+  if (g.kind === "lineGlider") {
+    return worldToScreen(
+      cam,
+      {
+        x: g.origin.x + g.direction.x * g.s,
+        y: g.origin.y + g.direction.y * g.s,
+      },
+      width,
+      height,
+    );
+  }
+  if (g.kind === "vector") {
+    return worldToScreen(cam, { x: g.origin.x + g.dx, y: g.origin.y + g.dy }, width, height);
+  }
+  if (g.kind === "angle") {
+    const rad = (g.deg * Math.PI) / 180;
+    return worldToScreen(
+      cam,
+      {
+        x: g.origin.x + Math.cos(rad) * g.radius,
+        y: g.origin.y + Math.sin(rad) * g.radius,
+      },
+      width,
+      height,
+    );
+  }
+  return null;
+}
+
+function hitExtendedGizmo(
+  g: Gizmo,
+  screen: Vec2,
+  world: Vec2,
+  cam: Camera,
+  width: number,
+  height: number,
+): boolean {
+  if (g.kind === "offset") {
+    const span = 12;
+    const a = {
+      x: g.origin.x - g.direction.x * span,
+      y: g.origin.y - g.direction.y * span,
+    };
+    const b = {
+      x: g.origin.x + g.direction.x * span,
+      y: g.origin.y + g.direction.y * span,
+    };
+    return distToSegment(world, a, b) <= GEOM_PX / cam.scale;
+  }
+  if (g.kind === "distance") {
+    const radiusPx = Math.abs(g.d) * cam.scale;
+    const c = worldToScreen(cam, g.origin, width, height);
+    return Math.abs(Math.hypot(c.x - screen.x, c.y - screen.y) - radiusPx) <= GIZMO_PX;
+  }
+  return false;
+}
+
 export function hitTest(
   screen: Vec2,
   cam: Camera,
@@ -62,80 +132,41 @@ export function hitTest(
 
   for (let i = gizmos.length - 1; i >= 0; i--) {
     const g = gizmos[i];
-    if (!g) continue;
-    if (g.kind === "point") {
-      const s = worldToScreen(cam, g, width, height);
-      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "glider") {
-      const p = {
-        x: g.a.x + (g.b.x - g.a.x) * g.t,
-        y: g.a.y + (g.b.y - g.a.y) * g.t,
-      };
-      const s = worldToScreen(cam, p, width, height);
-      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "lineGlider") {
-      const p = {
-        x: g.origin.x + g.direction.x * g.s,
-        y: g.origin.y + g.direction.y * g.s,
-      };
-      const s = worldToScreen(cam, p, width, height);
-      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "offset") {
-      const span = 12;
-      const a = {
-        x: g.origin.x - g.direction.x * span,
-        y: g.origin.y - g.direction.y * span,
-      };
-      const b = {
-        x: g.origin.x + g.direction.x * span,
-        y: g.origin.y + g.direction.y * span,
-      };
-      const distW = distToSegment(world, a, b);
-      if (distW <= GEOM_PX / cam.scale) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "distance") {
-      const radiusPx = Math.abs(g.d) * cam.scale;
-      const c = worldToScreen(cam, g.origin, width, height);
-      const d = Math.hypot(c.x - screen.x, c.y - screen.y);
-      if (Math.abs(d - radiusPx) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "vector") {
-      const tip = { x: g.origin.x + g.dx, y: g.origin.y + g.dy };
-      const s = worldToScreen(cam, tip, width, height);
-      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
-    } else if (g.kind === "angle") {
-      const rad = (g.deg * Math.PI) / 180;
-      const p = {
-        x: g.origin.x + Math.cos(rad) * g.radius,
-        y: g.origin.y + Math.sin(rad) * g.radius,
-      };
-      const s = worldToScreen(cam, p, width, height);
-      if (Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
-        return { target: "gizmo", gizmo: g };
-      }
+    if (!g || !gizmoIsPointLike(g)) continue;
+    const s = pointLikeScreen(g, cam, width, height);
+    if (s && Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
+      return { target: "gizmo", gizmo: g };
+    }
+  }
+
+  const pointPx = GIZMO_PX / cam.scale;
+  let bestPoint: { drawable: Drawable; d: number } | null = null;
+  for (const d of drawables) {
+    if (d.geom.kind !== "point") continue;
+    const distW = geomDistWorld(world, d);
+    if (distW <= pointPx && (!bestPoint || distW < bestPoint.d)) {
+      bestPoint = { drawable: d, d: distW };
+    }
+  }
+  if (bestPoint) return { target: "geom", drawable: bestPoint.drawable };
+
+  for (let i = gizmos.length - 1; i >= 0; i--) {
+    const g = gizmos[i];
+    if (!g || gizmoIsPointLike(g) || g.kind === "number") continue;
+    if (hitExtendedGizmo(g, screen, world, cam, width, height)) {
+      return { target: "gizmo", gizmo: g };
     }
   }
 
   let best: { drawable: Drawable; d: number } | null = null;
   const maxWorld = GEOM_PX / cam.scale;
-
   for (const d of drawables) {
+    if (d.geom.kind === "point") continue;
     const distW = geomDistWorld(world, d);
     if (distW <= maxWorld && (!best || distW < best.d)) {
       best = { drawable: d, d: distW };
     }
   }
-
   if (best) return { target: "geom", drawable: best.drawable };
   return null;
 }
@@ -159,6 +190,11 @@ export function hitsNear(
     const distW = geomDistWorld(world, d);
     if (distW <= maxWorld) out.push({ drawable: d, d: distW });
   }
-  out.sort((a, b) => a.d - b.d);
+  out.sort((a, b) => {
+    const pa = a.drawable.geom.kind === "point" ? 0 : 1;
+    const pb = b.drawable.geom.kind === "point" ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return a.d - b.d;
+  });
   return out.map((x) => x.drawable);
 }
