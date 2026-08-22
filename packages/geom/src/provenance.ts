@@ -20,8 +20,9 @@ const INFRA = [
 ];
 
 function isInfra(file: string): boolean {
-  if (file.endsWith("/main.ts")) return true;
-  return INFRA.some((p) => file.includes(p));
+  const f = file.startsWith("/") ? file : `/${file}`;
+  if (f.endsWith("/main.ts")) return true;
+  return INFRA.some((p) => f.includes(p));
 }
 
 /** Repo-relative path: apps/paper/src/demo/beam.ts */
