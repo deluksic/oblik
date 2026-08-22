@@ -5,6 +5,7 @@ import {
   mul,
   polyline,
   segment,
+  sweepCCW,
   type Geom,
   type Vec2,
 } from "@design-scenes/geom";
@@ -123,7 +124,10 @@ function doorLeaf(opening: Opening, inset: Vec2): Geom[] {
     x: hinge.x + Math.cos(opening.swing) * w,
     y: hinge.y + Math.sin(opening.swing) * w,
   };
-  return [segment(hinge, tip), arc(hinge, w, opening.closed, opening.swing)];
+  const ccw = sweepCCW(opening.closed, opening.swing);
+  const a0 = ccw <= Math.PI ? opening.closed : opening.swing;
+  const a1 = ccw <= Math.PI ? opening.swing : opening.closed;
+  return [segment(hinge, tip), arc(hinge, w, a0, a1)];
 }
 
 function windowSill(center: Vec2, width: number, inward: Vec2): Geom[] {
