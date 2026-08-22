@@ -1,7 +1,7 @@
 import { worldToScreen, type Camera } from "@design-scenes/euclid2";
 import { add, mul, perp, sub, type Vec2 } from "@design-scenes/geom";
 
-import { radiusBetween, sessionDraft, signedOffset, type SessionHover, type ToolSession } from "./session";
+import { radiusBetween, signedOffset, type SessionHover, type ToolSession } from "./session";
 
 const EDITOR = "#e8876a";
 const SNAP = "#f0c14a";
@@ -21,8 +21,13 @@ function norm(v: Vec2): Vec2 {
 }
 
 function typedLength(session: ToolSession): number | null {
-  const raw = sessionDraft(session).trim();
-  if (raw === "") return null;
+  const raw =
+    session.verb === "slider"
+      ? (session.value ?? "")
+      : session.verb === "circle" || session.verb === "offset" || session.verb === "distance"
+        ? (session.typed ?? "")
+        : "";
+  if (raw.trim() === "") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.max(0.05, n) : null;
 }

@@ -238,13 +238,15 @@ export function App(props: WorkspaceProps) {
     }
 
     const bar = commandBar();
-    if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
-      const draft = bar.numberValue ?? "";
+    if (paletteMode() === "prompt" && bar) {
       if (e.key === "Tab" && bar.onNextField) {
         e.preventDefault();
         bar.onNextField(e.shiftKey ? -1 : 1);
         return;
       }
+    }
+    if (paletteMode() === "prompt" && bar?.acceptNumber && bar.onNumberDraft) {
+      const draft = bar.numberValue ?? "";
       if (e.key === "Enter") {
         e.preventDefault();
         if (bar.onCommit) {

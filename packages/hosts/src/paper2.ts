@@ -42,7 +42,7 @@ import {
   widgetInSceneFunction,
 } from "@design-scenes/shell";
 
-import { paletteCommands, toolAcceptsDraft } from "./tools/catalog";
+import { paletteCommands } from "./tools/catalog";
 import { drawGhost, sessionGhostView } from "./tools/ghost";
 import { commitScenePatch, peekFile, quantize, renderSnippet } from "./inspect";
 import {
@@ -398,7 +398,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const accept = Boolean(preview.acceptNumber);
         const state = {
           ...preview,
-          numberValue: toolAcceptsDraft(session.verb) ? sessionDraft(session) : "",
+          numberValue: accept ? sessionDraft(session) : "",
           draftKind: sessionDraftKind(session),
           onNumber: accept
             ? (n: number) => {
@@ -416,16 +416,14 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
                 void applySessionResult(commitSession(session, src));
               }
             : undefined,
-          onNextField: session.verb === "slider"
-            ? (dir: 1 | -1 = 1) => {
-                if (!session) return;
-                session = advanceSessionField(session, dir);
-                render(true);
-              }
-            : undefined,
+          onNextField: (dir: 1 | -1 = 1) => {
+            if (!session) return;
+            session = advanceSessionField(session, dir);
+            render(true);
+          },
           onNumberDraft: accept
             ? (raw: string) => {
-                if (!session || !toolAcceptsDraft(session.verb)) return;
+                if (!session) return;
                 const trimmed = raw.trim();
                 if (trimmed === "") {
                   session = withSessionDraft(session, undefined);
@@ -480,9 +478,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           activeGizmo(),
         );
         if (quiet && !error) {
-          if (session && toolAcceptsDraft(session.verb)) {
-            syncCommandBar();
-          }
+          if (session) syncCommandBar();
           return;
         }
         setPaneStatus(

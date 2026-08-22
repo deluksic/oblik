@@ -66,7 +66,11 @@ export type SliderField = "value" | "min" | "max" | "step" | "name";
 
 const SLIDER_FIELDS: readonly SliderField[] = ["value", "min", "max", "step", "name"];
 
-export type ToolSession =
+export type ToolSession = {
+  name?: string;
+  /** Tab focuses the binding name. Slider uses `field` instead. */
+  naming?: boolean;
+} & (
   | { verb: "point" }
   | { verb: "line"; a?: PointBind }
   | { verb: "segment"; a?: PointBind }
@@ -96,7 +100,8 @@ export type ToolSession =
       from?: FromBind;
       lengthReuse?: { name: string; signed: boolean };
       typed?: string;
-    };
+    }
+);
 
 export type CommandPreview = {
   previewHtml: string;
@@ -129,13 +134,29 @@ function sliderFieldValue(session: SliderSession, field: SliderField): string {
   return session[field] ?? "";
 }
 
+function identName(raw: string | undefined): string | undefined {
+  const t = raw?.trim() ?? "";
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) return t;
+  return undefined;
+}
+
+export function isNaming(session: ToolSession): boolean {
+  return session.verb === "slider" ? session.field === "name" : session.naming === true;
+}
+
+function asName(session: ToolSession): string | undefined {
+  return identName(session.name);
+}
+
 export function sessionDraft(session: ToolSession): string {
+  if (isNaming(session)) return session.name ?? "";
   if (session.verb === "slider") return sliderFieldValue(session, session.field);
   if (isLengthDraft(session)) return session.typed ?? "";
   return "";
 }
 
 export function withSessionDraft(session: ToolSession, typed: string | undefined): ToolSession {
+  if (isNaming(session)) return { ...session, name: typed };
   if (session.verb === "slider") {
     return { ...session, [session.field]: typed };
   }
@@ -144,14 +165,16 @@ export function withSessionDraft(session: ToolSession, typed: string | undefined
 }
 
 export function advanceSessionField(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
-  if (session.verb !== "slider") return session;
-  const i = SLIDER_FIELDS.indexOf(session.field);
-  const next = SLIDER_FIELDS[(i + dir + SLIDER_FIELDS.length) % SLIDER_FIELDS.length]!;
-  return { ...session, field: next };
+  if (session.verb === "slider") {
+    const i = SLIDER_FIELDS.indexOf(session.field);
+    const next = SLIDER_FIELDS[(i + dir + SLIDER_FIELDS.length) % SLIDER_FIELDS.length]!;
+    return { ...session, field: next };
+  }
+  return { ...session, naming: !session.naming };
 }
 
 export function sessionDraftKind(session: ToolSession): "number" | "ident" {
-  return session.verb === "slider" && session.field === "name" ? "ident" : "number";
+  return isNaming(session) ? "ident" : "number";
 }
 
 const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
@@ -589,12 +612,28 @@ function pointLabel(p: PointBind | undefined, slotName: string, filledIf: boolea
   return slot(slotName, "", "done");
 }
 
+function nameSlot(session: ToolSession): string {
+  const raw = session.name?.trim() ?? "";
+  if (isNaming(session)) return slot(raw || "<name>", "is-number");
+  if (raw) return filled(raw);
+  return slot("<name>", "", "pending");
+}
+
+function asConst(session: ToolSession, call: string): string {
+  return `<span class="cmd-punct">const </span>${nameSlot(session)}<span class="cmd-punct"> = </span>${call}`;
+}
+
 export function sessionPreview(session: ToolSession | null): CommandPreview | null {
   if (!session) return null;
+  const naming = isNaming(session);
   if (session.verb === "point") {
     return {
-      previewHtml: fn("point", [slot("<x>"), slot("<y>")]),
-      hint: "Click empty paper or a line crossing.",
+      previewHtml: asConst(session, fn("point", [slot("<x>"), slot("<y>")])),
+      acceptNumber: naming,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back, then click empty paper or a crossing."
+        : "Click empty paper or a line crossing. Tab to name it.",
     };
   }
   if (session.verb === "slider") {
@@ -604,51 +643,67 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
       if (raw) return filled(raw);
       return slot(label, "", "pending");
     };
-    const name = active("name", "<name>");
     const value = active("value", "<value>");
     const min = active("min", "<min>");
     const max = active("max", "<max>");
     const step = active("step", "<step>");
     const opts = `{ min: ${min}<span class="cmd-punct">, </span>max: ${max}<span class="cmd-punct">, </span>step: ${step} }`;
     return {
-      previewHtml: `<span class="cmd-punct">const </span>${name}<span class="cmd-punct"> = </span>${fn("slider", [value, opts])}`,
+      previewHtml: asConst(session, fn("slider", [value, opts])),
       acceptNumber: true,
-      draftKind: session.field === "name" ? "ident" : "number",
+      draftKind: naming ? "ident" : "number",
       hint: "Type a value. Tab for min, max, step, and name. Click to measure.",
     };
   }
   if (session.verb === "line" || session.verb === "segment") {
     const a = pointLabel(session.a, "<a>", false);
     const b = slot("<b>", "", session.a ? "active" : "pending");
-    const name = session.verb === "line" ? "line" : "segment";
+    const callName = session.verb === "line" ? "line" : "segment";
     return {
-      previewHtml: fn(name, [a, b]),
-      hint: session.a ? "Click the second point." : "Click the first point.",
+      previewHtml: asConst(session, fn(callName, [a, b])),
+      acceptNumber: naming,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back, then click a point."
+        : session.a
+          ? "Click the second point. Tab to name it."
+          : "Click the first point. Tab to name it.",
     };
   }
   const lengthLabel =
     session.verb === "circle" ? "<radius>" : session.verb === "offset" ? "<distance>" : "<d>";
+  const numberOpen =
+    session.verb === "circle"
+      ? Boolean(session.center) && !session.lengthReuse
+      : Boolean(session.from) && !session.lengthReuse;
   const dSlot = session.lengthReuse
     ? filled(session.lengthReuse.name)
     : slot(
         session.typed?.trim() ? session.typed : lengthLabel,
-        session.verb === "circle" ? (session.center ? "is-number" : "") : session.from ? "is-number" : "",
-        session.verb === "circle" ? (session.center ? "active" : "pending") : session.from ? "active" : "pending",
+        numberOpen && !naming ? "is-number" : "",
+        numberOpen ? "active" : "pending",
       );
   if (session.verb === "circle") {
     return {
-      previewHtml: fn("circle", [pointLabel(session.center, "<center>", false), dSlot]),
-      acceptNumber: !!session.center && !session.lengthReuse,
-      hint: session.center
-        ? "Type a radius, click empty, a length, or a point."
-        : "Click the center.",
+      previewHtml: asConst(session, fn("circle", [pointLabel(session.center, "<center>", false), dSlot])),
+      acceptNumber: naming || numberOpen,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back to the radius."
+        : session.center
+          ? "Type a radius, click empty, a length, or a point. Tab to name it."
+          : "Click the center. Tab to name it.",
     };
   }
   if (session.verb === "offset") {
     if (!session.from || session.from.kind !== "line") {
       return {
-        previewHtml: fn("offsetLine", [slot("<line>"), dSlot]),
-        hint: "Click a scene line or offset.",
+        previewHtml: asConst(session, fn("offsetLine", [slot("<line>"), dSlot])),
+        acceptNumber: naming,
+        draftKind: naming ? "ident" : "number",
+        hint: naming
+          ? "Type a name. Tab back, then click a line."
+          : "Click a scene line or offset. Tab to name it.",
       };
     }
     const lineLabel =
@@ -662,22 +717,35 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
           ? filled("offsetLine")
           : slot("<line>", "", "done");
     return {
-      previewHtml: fn("offsetLine", [lineLabel, dSlot]),
-      acceptNumber: !session.lengthReuse,
-      hint: "Type a distance, click a side, a length, or a point.",
+      previewHtml: asConst(session, fn("offsetLine", [lineLabel, dSlot])),
+      acceptNumber: naming || !session.lengthReuse,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back to the distance."
+        : "Type a distance, click a side, a length, or a point. Tab to name it.",
     };
   }
   if (!session.from) {
     return {
-      previewHtml: fn("distance", [slot("<from>"), dSlot]),
-      hint: "Click a point, a crossing, a scene line, or an offset handle.",
+      previewHtml: asConst(session, fn("distance", [slot("<from>"), dSlot])),
+      acceptNumber: naming,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back, then click a from."
+        : "Click a point, a crossing, a scene line, or an offset handle. Tab to name it.",
     };
   }
   if (session.from.kind === "point") {
     return {
-      previewHtml: fn("editDistanceToPoint", [pointLabel(session.from.point, "<point>", true), dSlot]),
-      acceptNumber: !session.lengthReuse,
-      hint: "Type a radius and Enter, click to measure, or reuse a ring.",
+      previewHtml: asConst(
+        session,
+        fn("editDistanceToPoint", [pointLabel(session.from.point, "<point>", true), dSlot]),
+      ),
+      acceptNumber: naming || !session.lengthReuse,
+      draftKind: naming ? "ident" : "number",
+      hint: naming
+        ? "Type a name. Tab back to the radius."
+        : "Type a radius and Enter, click to measure, or reuse a ring. Tab to name it.",
     };
   }
   const lineLabel =
@@ -687,9 +755,12 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
         ? filled("offsetLine")
         : slot("<line>", "", "done");
   return {
-    previewHtml: fn("editOffsetFromLine", [lineLabel, dSlot]),
-    acceptNumber: !session.lengthReuse,
-    hint: "Type a distance, click a side, or reuse a numeric widget.",
+    previewHtml: asConst(session, fn("editOffsetFromLine", [lineLabel, dSlot])),
+    acceptNumber: naming || !session.lengthReuse,
+    draftKind: naming ? "ident" : "number",
+    hint: naming
+      ? "Type a name. Tab back to the distance."
+      : "Type a distance, click a side, or reuse a numeric widget. Tab to name it.",
   };
 }
 
@@ -833,23 +904,28 @@ function collectLines(from: FromBind | PointBind): LineBind[] {
   return [];
 }
 
+function bindName(src: string, as: string | undefined, fallback: string): string {
+  return nextBindingName(src, identName(as) || fallback);
+}
+
 function pointExpr(
   working: string,
   statements: string[],
   point: PointBind,
   map: Map<string, string>,
   imports: { euclid: Set<string>; geom: Set<string> },
+  prefer?: string,
 ): string {
   if (point.kind === "named") return point.name;
   if (point.kind === "free") {
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "p");
+    const name = bindName(`${working}\n${statements.join("\n")}`, prefer, "p");
     imports.geom.add("point");
     statements.push(`const ${name} = point(${fmt(point.x)}, ${fmt(point.y)});`);
     return name;
   }
   if (point.kind === "circleLine") {
     imports.geom.add("circleLineIntersection");
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "x");
+    const name = bindName(`${working}\n${statements.join("\n")}`, prefer, "x");
     const k = point.k === 1 ? "+1" : "-1";
     statements.push(
       `const ${name} = circleLineIntersection(${point.circle}, ${lineText(point.line, map, imports)}, ${k});`,
@@ -857,7 +933,7 @@ function pointExpr(
     return name;
   }
   imports.geom.add("lineIntersection");
-  const name = nextBindingName(`${working}\n${statements.join("\n")}`, "x");
+  const name = bindName(`${working}\n${statements.join("\n")}`, prefer, "x");
   statements.push(
     `const ${name} = lineIntersection(${lineText(point.a, map, imports)}, ${lineText(point.b, map, imports)});`,
   );
@@ -881,14 +957,18 @@ function patchOf(
   };
 }
 
-export function compilePoint(src: string, point: PointBind): ScenePatch | { error: string } {
+export function compilePoint(
+  src: string,
+  point: PointBind,
+  as?: string,
+): ScenePatch | { error: string } {
   if (point.kind === "named") return { error: "Already a point." };
   const sites = uniqueHoists(collectLines(point));
   try {
     const { src: working, map } = hoistNames(src, sites);
     const statements: string[] = [];
     const imports = { euclid: new Set<string>(), geom: new Set<string>() };
-    pointExpr(working, statements, point, map, imports);
+    pointExpr(working, statements, point, map, imports, as);
     return patchOf(sites, imports, statements);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -900,7 +980,12 @@ function samePoint(a: PointBind, b: PointBind): boolean {
   return Math.hypot(a.x - b.x, a.y - b.y) < 0.05;
 }
 
-export function compileLine(src: string, a: PointBind, b: PointBind): ScenePatch | { error: string } {
+export function compileLine(
+  src: string,
+  a: PointBind,
+  b: PointBind,
+  as?: string,
+): ScenePatch | { error: string } {
   if (samePoint(a, b)) return { error: "Pick two different points." };
   const sites = uniqueHoists([...collectLines(a), ...collectLines(b)]);
   try {
@@ -910,7 +995,7 @@ export function compileLine(src: string, a: PointBind, b: PointBind): ScenePatch
     const ae = pointExpr(working, statements, a, map, imports);
     const be = pointExpr(working, statements, b, map, imports);
     imports.geom.add("line");
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "ln");
+    const name = bindName(`${working}\n${statements.join("\n")}`, as, "ln");
     statements.push(`const ${name} = line(${ae}, ${be});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
@@ -918,7 +1003,12 @@ export function compileLine(src: string, a: PointBind, b: PointBind): ScenePatch
   }
 }
 
-export function compileSegment(src: string, a: PointBind, b: PointBind): ScenePatch | { error: string } {
+export function compileSegment(
+  src: string,
+  a: PointBind,
+  b: PointBind,
+  as?: string,
+): ScenePatch | { error: string } {
   if (samePoint(a, b)) return { error: "Pick two different points." };
   const sites = uniqueHoists([...collectLines(a), ...collectLines(b)]);
   try {
@@ -928,7 +1018,7 @@ export function compileSegment(src: string, a: PointBind, b: PointBind): ScenePa
     const ae = pointExpr(working, statements, a, map, imports);
     const be = pointExpr(working, statements, b, map, imports);
     imports.geom.add("segment");
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "seg");
+    const name = bindName(`${working}\n${statements.join("\n")}`, as, "seg");
     statements.push(`const ${name} = segment(${ae}, ${be});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
@@ -972,6 +1062,7 @@ export function compileCircle(
   src: string,
   center: PointBind,
   length: LengthBind,
+  as?: string,
 ): ScenePatch | { error: string } {
   const sites = uniqueHoists([...collectLines(center), ...lengthHoists(length)]);
   try {
@@ -981,7 +1072,7 @@ export function compileCircle(
     const c = pointExpr(working, statements, center, map, imports);
     const arg = lengthArg(working, statements, length, map, imports, c);
     imports.geom.add("circle");
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "k");
+    const name = bindName(`${working}\n${statements.join("\n")}`, as, "k");
     statements.push(`const ${name} = circle(${c}, ${arg});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
@@ -993,6 +1084,7 @@ export function compileOffset(
   src: string,
   from: Extract<FromBind, { kind: "line" }>,
   length: LengthBind,
+  as?: string,
 ): ScenePatch | { error: string } {
   const sites = uniqueHoists([...collectLines(from), ...lengthHoists(length)]);
   try {
@@ -1002,7 +1094,7 @@ export function compileOffset(
     const lineE = lineText(from.line, map, imports);
     const arg = lengthArg(working, statements, length, map, imports, undefined, lineE);
     imports.geom.add("offsetLine");
-    const name = nextBindingName(`${working}\n${statements.join("\n")}`, "off");
+    const name = bindName(`${working}\n${statements.join("\n")}`, as, "off");
     statements.push(`const ${name} = offsetLine(${lineE}, ${arg});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
@@ -1015,7 +1107,7 @@ export function compileSlider(
   spec: { value: number; name?: string; min?: number; max?: number; step?: number },
 ): ScenePatch | { error: string } {
   const imports = { euclid: new Set<string>(["slider"]), geom: new Set<string>() };
-  const name = nextBindingName(src, spec.name?.trim() || "n");
+  const name = bindName(src, spec.name, "n");
   const parts = [`label: ${JSON.stringify(name)}`];
   if (spec.min != null) parts.push(`min: ${fmt(spec.min)}`);
   if (spec.max != null) parts.push(`max: ${fmt(spec.max)}`);
@@ -1028,12 +1120,6 @@ function parseOptNum(raw: string | undefined): number | undefined {
   if (t === "") return undefined;
   const n = Number(t);
   return Number.isFinite(n) ? n : undefined;
-}
-
-function identName(raw: string | undefined): string | undefined {
-  const t = raw?.trim() ?? "";
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) return t;
-  return undefined;
 }
 
 function sliderWrite(session: SliderSession, value: number) {
@@ -1050,6 +1136,7 @@ export function compileDistance(
   src: string,
   from: FromBind,
   length: LengthBind,
+  as?: string,
 ): ScenePatch | { error: string } {
   const sites = uniqueHoists([
     ...collectLines(from),
@@ -1062,7 +1149,7 @@ export function compileDistance(
     if (from.kind === "point") {
       const p = pointExpr(working, statements, from.point, map, imports);
       imports.euclid.add("editDistanceToPoint");
-      const dName = nextBindingName(`${working}\n${statements.join("\n")}`, "d");
+      const dName = bindName(`${working}\n${statements.join("\n")}`, as, "d");
       const arg =
         length.kind === "reuse"
           ? length.name
@@ -1075,7 +1162,7 @@ export function compileDistance(
     } else {
       const lineE = lineText(from.line, map, imports);
       imports.euclid.add("editOffsetFromLine");
-      const off = nextBindingName(`${working}\n${statements.join("\n")}`, "off");
+      const off = bindName(`${working}\n${statements.join("\n")}`, as, "off");
       const arg =
         length.kind === "reuse"
           ? length.negate
@@ -1114,27 +1201,27 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
     if (p.kind === "named") {
       return { kind: "error", message: "Already a point." };
     }
-    return commitOrError(compilePoint(src, p));
+    return commitOrError(compilePoint(src, p, asName(session)));
   }
 
   if (session.verb === "line") {
     const p = resolvePoint(ctx);
     if (p === "ignore") return { kind: "session", session };
-    if (!session.a) return { kind: "session", session: { verb: "line", a: p } };
+    if (!session.a) return { kind: "session", session: { ...session, a: p } };
     if (samePoint(session.a, p)) {
       return { kind: "error", message: "Pick two different points." };
     }
-    return commitOrError(compileLine(src, session.a, p));
+    return commitOrError(compileLine(src, session.a, p, asName(session)));
   }
 
   if (session.verb === "segment") {
     const p = resolvePoint(ctx);
     if (p === "ignore") return { kind: "session", session };
-    if (!session.a) return { kind: "session", session: { verb: "segment", a: p } };
+    if (!session.a) return { kind: "session", session: { ...session, a: p } };
     if (samePoint(session.a, p)) {
       return { kind: "error", message: "Pick two different points." };
     }
-    return commitOrError(compileSegment(src, session.a, p));
+    return commitOrError(compileSegment(src, session.a, p, asName(session)));
   }
 
   if (session.verb === "slider") {
@@ -1146,33 +1233,34 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
   }
 
   if (session.verb === "circle") {
+    const named = asName(session);
     if (!session.center) {
       const p = resolvePoint(ctx);
       if (p === "ignore") return { kind: "session", session };
       if (session.lengthReuse) {
         return commitOrError(
-          compileCircle(src, p, { kind: "reuse", name: session.lengthReuse.name }),
+          compileCircle(src, p, { kind: "reuse", name: session.lengthReuse.name }, named),
         );
       }
-      return { kind: "session", session: { verb: "circle", center: p, typed: session.typed } };
+      return { kind: "session", session: { ...session, center: p } };
     }
     const len = resolveLength(ctx, "circle");
     if (len === "ignore") return { kind: "session", session };
-    if (len !== "measure") return commitOrError(compileCircle(src, session.center, len));
+    if (len !== "measure") return commitOrError(compileCircle(src, session.center, len, named));
     const typed = session.typed?.trim() ? Number(session.typed) : NaN;
     if (Number.isFinite(typed)) {
-      return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: typed }));
+      return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: typed }, named));
     }
     if (session.lengthReuse) {
       return commitOrError(
-        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }),
+        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }, named),
       );
     }
     return commitOrError(
       compileCircle(src, session.center, {
         kind: "fresh",
         value: radiusBetween(session.center, ctx.world),
-      }),
+      }, named),
     );
   }
 
@@ -1189,17 +1277,15 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       if (hit.kind === "earlyLength") {
         return {
           kind: "session",
-          session: { verb: "offset", lengthReuse: { name: hit.name, signed: false }, typed: session.typed },
+          session: { ...session, lengthReuse: { name: hit.name, signed: false } },
         };
       }
       if (hit.kind === "line") {
         return {
           kind: "session",
           session: {
-            verb: "offset",
+            ...session,
             from: { kind: "line", line: hit.line, origin: hit.origin, dir: hit.dir },
-            lengthReuse: session.lengthReuse,
-            typed: session.typed,
           },
         };
       }
@@ -1209,6 +1295,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       return { kind: "error", message: "Click a line to offset." };
     }
     const from = session.from;
+    const named = asName(session);
     const len = resolveLength(ctx, "offset");
     if (len === "ignore") return { kind: "session", session };
     if (len !== "measure") {
@@ -1219,11 +1306,11 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
           bind = { ...bind, negate: true };
         }
       }
-      return commitOrError(compileOffset(src, from, bind));
+      return commitOrError(compileOffset(src, from, bind, named));
     }
     const typed = session.typed?.trim() ? Number(session.typed) : NaN;
     if (Number.isFinite(typed)) {
-      return commitOrError(compileOffset(src, from, { kind: "fresh", value: typed }));
+      return commitOrError(compileOffset(src, from, { kind: "fresh", value: typed }, named));
     }
     if (session.lengthReuse) {
       const s = signedOffset(from.origin, from.dir, ctx.world);
@@ -1232,12 +1319,12 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
           kind: "reuse",
           name: session.lengthReuse.name,
           negate: s < 0 && !session.lengthReuse.signed,
-        }),
+        }, named),
       );
     }
     const s = signedOffset(from.origin, from.dir, ctx.world);
     const mag = Math.max(0.05, Math.abs(s));
-    return commitOrError(compileOffset(src, from, { kind: "fresh", value: s < 0 ? -mag : mag }));
+    return commitOrError(compileOffset(src, from, { kind: "fresh", value: s < 0 ? -mag : mag }, named));
   }
 
   if (!session.from) {
@@ -1259,7 +1346,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       const next: ToolSession = { ...session, from: { kind: "point", point: hit.point } };
       if (session.lengthReuse) {
         return commitOrError(
-          compileDistance(src, next.from!, { kind: "reuse", name: session.lengthReuse.name }),
+          compileDistance(src, next.from!, { kind: "reuse", name: session.lengthReuse.name }, asName(session)),
         );
       }
       return { kind: "session", session: next };
@@ -1291,15 +1378,15 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
     if (session.from.kind === "line" && (len.kind === "reuse" || len.kind === "field") && !len.negate) {
       const s = signedOffset(session.from.origin, session.from.dir, ctx.world);
       if (s < 0 && session.lengthReuse && !session.lengthReuse.signed) {
-        return commitOrError(compileDistance(src, session.from, { ...len, negate: true }));
+        return commitOrError(compileDistance(src, session.from, { ...len, negate: true }, asName(session)));
       }
     }
-    return commitOrError(compileDistance(src, session.from, len));
+    return commitOrError(compileDistance(src, session.from, len, asName(session)));
   }
 
   const typed = session.typed?.trim() ? Number(session.typed) : NaN;
   if (Number.isFinite(typed)) {
-    return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: typed }));
+    return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: typed }, asName(session)));
   }
 
   if (session.lengthReuse) {
@@ -1310,23 +1397,23 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
           kind: "reuse",
           name: session.lengthReuse.name,
           negate: s < 0 && !session.lengthReuse.signed,
-        }),
+        }, asName(session)),
       );
     }
     return commitOrError(
-      compileDistance(src, session.from, { kind: "reuse", name: session.lengthReuse.name }),
+      compileDistance(src, session.from, { kind: "reuse", name: session.lengthReuse.name }, asName(session)),
     );
   }
 
   if (session.from.kind === "point") {
     const p = session.from.point;
     return commitOrError(
-      compileDistance(src, session.from, { kind: "fresh", value: radiusBetween(p, ctx.world) }),
+      compileDistance(src, session.from, { kind: "fresh", value: radiusBetween(p, ctx.world) }, asName(session)),
     );
   }
   const s = signedOffset(session.from.origin, session.from.dir, ctx.world);
   const mag = Math.max(0.05, Math.abs(s));
-  return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: s < 0 ? -mag : mag }));
+  return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: s < 0 ? -mag : mag }, asName(session)));
 }
 
 export function commitSession(session: ToolSession, src: string): SessionResult {
@@ -1335,12 +1422,19 @@ export function commitSession(session: ToolSession, src: string): SessionResult 
     if (value == null) return { kind: "error", message: "Type a value, or click to measure." };
     return commitOrError(compileSlider(src, sliderWrite(session, value)));
   }
-  const n = Number(sessionDraft(session).trim());
-  if (!Number.isFinite(n)) return { kind: "error", message: "Type a number first." };
+  if (isNaming(session) && !isLengthDraft(session)) {
+    return { kind: "session", session: { ...session, naming: false } };
+  }
+  const n = Number((isLengthDraft(session) ? session.typed : sessionDraft(session))?.trim());
+  if (!Number.isFinite(n)) {
+    if (isNaming(session)) return { kind: "session", session: { ...session, naming: false } };
+    return { kind: "error", message: "Type a number first." };
+  }
   return onSessionNumber(session, src, n);
 }
 
 export function onSessionNumber(session: ToolSession, src: string, n: number): SessionResult {
+  const named = asName(session);
   if (session.verb === "slider") {
     return commitOrError(compileSlider(src, sliderWrite(session, n)));
   }
@@ -1348,10 +1442,10 @@ export function onSessionNumber(session: ToolSession, src: string, n: number): S
     if (!session.center) return { kind: "error", message: "Pick a center first." };
     if (session.lengthReuse) {
       return commitOrError(
-        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }),
+        compileCircle(src, session.center, { kind: "reuse", name: session.lengthReuse.name }, named),
       );
     }
-    return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: n }));
+    return commitOrError(compileCircle(src, session.center, { kind: "fresh", value: n }, named));
   }
   if (session.verb === "offset") {
     if (!session.from || session.from.kind !== "line") {
@@ -1359,18 +1453,19 @@ export function onSessionNumber(session: ToolSession, src: string, n: number): S
     }
     if (session.lengthReuse) {
       return commitOrError(
-        compileOffset(src, session.from, { kind: "reuse", name: session.lengthReuse.name }),
+        compileOffset(src, session.from, { kind: "reuse", name: session.lengthReuse.name }, named),
       );
     }
-    return commitOrError(compileOffset(src, session.from, { kind: "fresh", value: n }));
+    return commitOrError(compileOffset(src, session.from, { kind: "fresh", value: n }, named));
   }
   if (session.verb !== "distance" || !session.from) {
-    return { kind: "error", message: "Pick a from first." };
+    return { kind: "error", message: "Nothing to commit." };
   }
   if (session.lengthReuse) {
     return commitOrError(
-      compileDistance(src, session.from, { kind: "reuse", name: session.lengthReuse.name }),
+      compileDistance(src, session.from, { kind: "reuse", name: session.lengthReuse.name }, named),
     );
   }
-  return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: n }));
+  return commitOrError(compileDistance(src, session.from, { kind: "fresh", value: n }, named));
 }
+
