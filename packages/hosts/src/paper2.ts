@@ -33,7 +33,7 @@ import {
   type Drawable,
   type Vec2,
 } from "@design-scenes/geom";
-import { fillSdf2, type Sdf2 } from "@design-scenes/sdf";
+import { Sdf2View, type Sdf2 } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commandBarSnapshotKey,
@@ -202,6 +202,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       // sdf2-only
       let sdf: Sdf2 | null = null;
       let sdfGizmos: readonly Gizmo[] = [];
+      const sdf2View = mode === "sdf2" ? new Sdf2View(canvas) : null;
 
       function gizmos(): readonly Gizmo[] {
         return mode === "geom" ? (frame?.gizmos ?? []) : sdfGizmos;
@@ -462,9 +463,17 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       }
 
       function render(quiet = false): void {
-        resizeCanvas(canvas);
-        const { w, h } = cssSize(canvas);
-        const ctx2d = canvas.getContext("2d");
+        if (mode === "geom") {
+          resizeCanvas(canvas);
+        } else if (sdf2View) {
+          sdf2View.setCamera(cam);
+          if (sdf) sdf2View.setSdf(sdf);
+          sdf2View.resize();
+          resizeCanvas(sdf2View.overlay);
+        }
+        const overlay = mode === "sdf2" && sdf2View ? sdf2View.overlay : canvas;
+        const { w, h } = cssSize(overlay);
+        const ctx2d = overlay.getContext("2d");
         if (!ctx2d) return;
         if (mode === "geom") {
           drawFrame(
@@ -479,9 +488,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             activeGizmo(),
           );
         } else {
-          ctx2d.fillStyle = "#12141c";
-          ctx2d.fillRect(0, 0, w, h);
-          if (sdf) fillSdf2(ctx2d, w, h, cam, sdf);
+          ctx2d.clearRect(0, 0, w, h);
           drawAxes(ctx2d, w, h, cam);
           drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
         }
@@ -726,7 +733,10 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerCancel);
       canvas.addEventListener("wheel", onWheel, { passive: false });
-      const unobserve = observePaneResize(canvas, () => render(true));
+      const unobserve = observePaneResize(canvas, () => {
+        sdf2View?.resize();
+        render(true);
+      });
 
       function rerunFrame(): void {
         clearWidgetOverrides(sceneId);
@@ -790,6 +800,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           canvas.removeEventListener("pointercancel", onPointerCancel);
           canvas.removeEventListener("wheel", onWheel);
           unobserve();
+          sdf2View?.dispose();
           clearWidgetOverrides(sceneId);
         },
       };

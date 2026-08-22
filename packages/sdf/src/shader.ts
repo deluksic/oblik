@@ -111,3 +111,38 @@ void main() {
 }
 `;
 }
+
+export function sdf2FragSource(uniformDecls: string, expr: string): string {
+  return /* glsl */ `
+precision highp float;
+uniform vec3 uCam;
+uniform vec2 uRes;
+${uniformDecls}
+
+float sdCircle(vec2 p, float r) { return length(p) - r; }
+
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / max(k, 1e-6), 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float map(vec2 q) {
+  return ${expr};
+}
+
+void main() {
+  vec2 q;
+  q.x = uCam.x + (gl_FragCoord.x - uRes.x * 0.5) / uCam.z;
+  q.y = uCam.y + (uRes.y * 0.5 - gl_FragCoord.y) / uCam.z;
+  float d = map(q);
+  float lip = 1.5 / uCam.z;
+  vec3 bg = vec3(0.071, 0.078, 0.110);
+  vec3 inside = vec3(0.769, 0.722, 0.659);
+  vec3 coral = vec3(0.910, 0.529, 0.416);
+  vec3 col = bg;
+  if (d < 0.0) col = inside;
+  else if (d < lip) col = coral;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+}
