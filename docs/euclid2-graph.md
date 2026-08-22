@@ -1,5 +1,7 @@
 # euclid2 graph
 
+Worked example (offset, intersections, where intent diverges): [euclid2-worked.md](./euclid2-worked.md).
+
 Disk is the graph the tool writes. The **call-site annotator** (today: `injectSceneSites` in the Vite pre-transform) rewrites constructor calls in the **module that runs**. Disk is unchanged.
 
 Annotator-owned fields live under `__annotations__`, not mixed into user options (`label`, `{ editable: false }`, …). If that key is already present, **overwrite it** and warn.
