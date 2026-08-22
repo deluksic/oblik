@@ -20,6 +20,7 @@ import { peekFile, quantize, renderSnippet } from "./inspect";
 import {
   commitGizmoIfChanged,
   observePaneResize,
+  pruneSelection,
   scenePeekPath,
   setPaneStatus,
   showEmptyInspect,
@@ -27,6 +28,7 @@ import {
   subscribeHotReload,
   warmPeek,
   type InspectPush,
+  type Selection,
 } from "./pane";
 
 type FieldSceneMod = {
@@ -105,6 +107,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       let error: string | null = null;
       let hoverGizmo: Gizmo3 | null = null;
       let drag: { site: string; start: number[]; gizmo: Gizmo3 } | null = null;
+      let selected: Selection | null = null;
 
       // space-only
       const space = mode === "space" ? new SpaceView(canvas) : null;
@@ -112,8 +115,6 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       let frame: Frame3 | null = null;
       let lastGood: Frame3 | null = null;
       let hoverId: string | null = null;
-      let selectedId: string | null = null;
-      let selectedGeom: Geom3 | null = null;
 
       // field-only
       const fieldView = mode === "field" ? new SdfView(canvas) : null;
@@ -142,49 +143,79 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           error = err instanceof Error ? err.message : String(err);
           if (mode === "space") frame = lastGood;
         }
-        if (mode === "space") {
-          if (selectedId && !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)) {
-            selectedId = null;
-            selectedGeom = null;
-          }
+        selected = pruneSelection(
+          selected,
+          (frame?.drawables ?? []).map((d) => d.geom.id),
+          gizmos().map((g) => g.site),
+        );
+      }
+
+      function activeGizmo(): string | null {
+        return (
+          drag?.site ??
+          hoverGizmo?.site ??
+          (selected?.target === "gizmo" ? selected.site : null)
+        );
+      }
+
+      function selectedGeomId(): string | null {
+        return selected?.target === "geom" ? selected.id : null;
+      }
+
+      function focused():
+        | { target: "gizmo"; gizmo: Gizmo3 }
+        | { target: "geom"; geom: Geom3 }
+        | null {
+        if (hoverGizmo) return { target: "gizmo", gizmo: hoverGizmo };
+        if (hoverId) {
+          const geom = frame?.drawables.find((d) => d.geom.id === hoverId)?.geom;
+          if (geom) return { target: "geom", geom };
         }
+        if (selected?.target === "gizmo") {
+          const site = selected.site;
+          const gizmo = gizmos().find((g) => g.site === site);
+          if (gizmo) return { target: "gizmo", gizmo };
+        }
+        if (selected?.target === "geom") {
+          const id = selected.id;
+          const geom = frame?.drawables.find((d) => d.geom.id === id)?.geom;
+          if (geom) return { target: "geom", geom };
+        }
+        return null;
       }
 
       async function updateInspect(): Promise<void> {
-        if (hoverGizmo) {
-          const meta =
+        const f = focused();
+        if (!f) {
+          if (mode === "field") {
+            showEmptyInspect(
+              pushInspect,
+              "Nothing selected",
+              "Click a handle to keep it in the sidebar. The field itself is not pickable.",
+              `<code class="empty">No surface identity in this view.</code>`,
+            );
+            return;
+          }
+          showEmptyInspect(
+            pushInspect,
+            "Nothing selected",
+            hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · click a handle or a surface"),
+            `<code class="empty">Select something to see the creation site.</code>`,
+          );
+          return;
+        }
+        if (f.target === "gizmo") {
+          await showWidgetInspect(
+            pushInspect,
+            peekCache,
+            f.gizmo,
             mode === "space"
               ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
-              : "The field has no provenance. Widget values live in this scene file.";
-          showWidgetInspect(
-            pushInspect,
-            hoverGizmo.kind,
-            hoverGizmo.site,
-            hoverGizmo.at.file,
-            meta,
+              : "The field has no provenance. Widget values live in this scene file.",
           );
           return;
         }
-        if (mode === "field") {
-          showEmptyInspect(
-            pushInspect,
-            "Nothing selected",
-            "The field itself is not pickable. Drag a handle, or edit a 2D pane.",
-            `<code class="empty">No surface identity in this view.</code>`,
-          );
-          return;
-        }
-        const g =
-          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))?.geom ?? selectedGeom;
-        if (!g) {
-          showEmptyInspect(
-            pushInspect,
-            "Nothing selected",
-            hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · glider writes this file"),
-            `<code class="empty">Select geometry to see the creation site.</code>`,
-          );
-          return;
-        }
+        const g = f.geom;
         pushInspect({
           crumb: breadcrumb(g.path),
           meta: `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
@@ -206,12 +237,12 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             frame?.drawables ?? [],
             frame?.gizmos ?? [],
             hoverId,
-            selectedId,
-            drag?.site ?? hoverGizmo?.site ?? null,
+            selectedGeomId(),
+            activeGizmo(),
           );
         } else {
           if (sdf) fieldView!.setSdf(sdf);
-          fieldView!.syncGizmos(fieldGizmos, drag?.site ?? hoverGizmo?.site ?? null);
+          fieldView!.syncGizmos(fieldGizmos, activeGizmo());
         }
         if (quiet && !error) return;
         const fallback =
@@ -228,6 +259,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         if (e.button !== 0) return;
         const h = view.hitTest(e.clientX, e.clientY);
         if (h?.target === "gizmo") {
+          selected = { target: "gizmo", site: h.gizmo.site };
           view.controls.enabled = false;
           drag = {
             site: h.gizmo.site,
@@ -241,17 +273,13 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           return;
         }
         if (mode === "space" && h?.target === "geom") {
-          selectedId = h.geom.id;
-          selectedGeom = h.geom;
+          selected = { target: "geom", id: h.geom.id };
           peekCache.delete(h.geom.provenance.file);
           sync();
           return;
         }
-        if (mode === "space") {
-          selectedId = null;
-          selectedGeom = null;
-          sync();
-        }
+        selected = null;
+        sync();
       }
 
       function onPointerMove(e: PointerEvent): void {
@@ -271,6 +299,14 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           canvas.style.cursor = nextG ? "grab" : nextId ? "pointer" : "crosshair";
           sync();
         }
+      }
+
+      function onPointerLeave(): void {
+        if (drag) return;
+        if (!hoverGizmo && !hoverId) return;
+        hoverGizmo = null;
+        hoverId = null;
+        sync();
       }
 
       async function onPointerUp(): Promise<void> {
@@ -296,6 +332,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
 
       canvas.addEventListener("pointerdown", onPointerDown);
       canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerleave", onPointerLeave);
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerCancel);
       const unobserve = observePaneResize(canvas, () => view.resize());
@@ -342,6 +379,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           unsubHelper();
           canvas.removeEventListener("pointerdown", onPointerDown);
           canvas.removeEventListener("pointermove", onPointerMove);
+          canvas.removeEventListener("pointerleave", onPointerLeave);
           canvas.removeEventListener("pointerup", onPointerUp);
           canvas.removeEventListener("pointercancel", onPointerCancel);
           unobserve();

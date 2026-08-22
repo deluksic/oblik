@@ -1,6 +1,6 @@
 import type { InspectPatch } from "@design-scenes/shell";
 
-import { commitWidget, peekFile } from "./inspect";
+import { commitWidget, peekFile, renderSnippet } from "./inspect";
 
 export function scenePeekPath(sceneFile: string): string {
   return `apps/paper/src/scenes/${sceneFile}`;
@@ -35,17 +35,48 @@ export function eventPos(canvas: HTMLCanvasElement, e: PointerEvent): { x: numbe
 
 export type InspectPush = (patch: InspectPatch) => void;
 
-export function showWidgetInspect(
+/**
+ * Sticky canvas pick. Hover is ephemeral; this is what the sidebar keeps.
+ *
+ * Geom vs gizmo stays an *evaluation* split (libraries stay gizmo-free;
+ * handles are declared editors). Pick already unifies them — `hitTest`
+ * returns one target — so anything hoverable is selectable.
+ */
+export type Selection =
+  | { target: "geom"; id: string }
+  | { target: "gizmo"; site: string };
+
+export function pruneSelection(
+  selected: Selection | null,
+  geomIds: Iterable<string>,
+  gizmoSites: Iterable<string>,
+): Selection | null {
+  if (!selected) return null;
+  if (selected.target === "geom") {
+    for (const id of geomIds) if (id === selected.id) return selected;
+    return null;
+  }
+  for (const site of gizmoSites) if (site === selected.site) return selected;
+  return null;
+}
+
+export async function showWidgetInspect(
   push: InspectPush,
-  kind: string,
-  site: string,
-  writeFile: string,
+  peekCache: Map<string, string>,
+  g: { kind: string; site: string; at: { file: string; line: number; column: number } },
   meta: string,
-): void {
+): Promise<void> {
+  let sourceHtml = `<code class="empty">Could not read ${g.at.file}.</code>`;
+  try {
+    const text = await peekFile(peekCache, g.at.file);
+    sourceHtml = renderSnippet(text, g.at.line);
+  } catch (err) {
+    sourceHtml = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
+  }
   push({
-    crumb: `widget ${kind} ${site} · writes ${writeFile}`,
+    crumb: `widget ${g.kind} ${g.site} · writes ${g.at.file}`,
     meta,
-    sourceHtml: `<code class="empty">Widget values are the numeric arguments of edit* in ${writeFile}.</code>`,
+    sourceHtml,
   });
 }
 

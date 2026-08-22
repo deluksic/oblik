@@ -67,6 +67,7 @@ import {
   cssSize,
   eventPos,
   observePaneResize,
+  pruneSelection,
   scenePeekPath,
   setPaneStatus,
   showEmptyInspect,
@@ -74,6 +75,7 @@ import {
   subscribeHotReload,
   warmPeek,
   type InspectPush,
+  type Selection,
 } from "./pane";
 
 type Sdf2SceneMod = {
@@ -191,13 +193,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let lastHover: import("./tools/session").SessionHover | null = null;
       let ghost: Vec2 | null = null;
       let cursor: string | null = null;
+      let selected: Selection | null = null;
 
       // geom-only
       let frame: Frame | null = null;
       let lastGood: Frame | null = null;
       let hoverId: string | null = null;
-      let selectedId: string | null = null;
-      let selectedGeom: Geom | null = null;
 
       // sdf2-only
       let sdf: Sdf2 | null = null;
@@ -228,106 +229,93 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           error = err instanceof Error ? err.message : String(err);
           if (mode === "geom") frame = lastGood;
         }
-        if (mode === "geom") {
-          if (selectedId && !(frame?.drawables.some((d) => d.geom.id === selectedId) ?? false)) {
-            selectedId = null;
-            selectedGeom = null;
-          }
-        }
+        selected = pruneSelection(
+          selected,
+          (frame?.drawables ?? []).map((d) => d.geom.id),
+          gizmos().map((g) => g.site),
+        );
         publishWidgetOverrides(sceneId);
         if (propagate) ctx.onLiveChange();
       }
 
       function activeGizmo(): string | null {
-        return drag?.site ?? hoverGizmo?.site ?? null;
+        return (
+          drag?.site ??
+          hoverGizmo?.site ??
+          (selected?.target === "gizmo" ? selected.site : null)
+        );
       }
 
-      function currentTarget(): {
-        title: string;
-        id?: string;
-        file?: string;
-        line?: number;
-        column?: number;
-      } | null {
-        if (hoverGizmo) {
-          return {
-            title: `widget ${hoverGizmo.kind} ${hoverGizmo.site} · writes ${hoverGizmo.at.file}`,
-          };
+      function selectedGeomId(): string | null {
+        return selected?.target === "geom" ? selected.id : null;
+      }
+
+      function focused():
+        | { target: "gizmo"; gizmo: Gizmo }
+        | { target: "geom"; geom: Geom }
+        | null {
+        if (hoverGizmo) return { target: "gizmo", gizmo: hoverGizmo };
+        if (hoverId) {
+          const geom = frame?.drawables.find((d) => d.geom.id === hoverId)?.geom;
+          if (geom) return { target: "geom", geom };
         }
-        if (mode !== "geom") return null;
-        const g =
-          frame?.drawables.find((d) => d.geom.id === (hoverId ?? selectedId))?.geom ?? selectedGeom;
-        if (!g) return null;
-        return {
-          title: breadcrumb(g.path),
-          id: g.id,
-          file: g.provenance.file,
-          line: g.provenance.line,
-          column: g.provenance.column,
-        };
+        if (selected?.target === "gizmo") {
+          const site = selected.site;
+          const gizmo = gizmos().find((g) => g.site === site);
+          if (gizmo) return { target: "gizmo", gizmo };
+        }
+        if (selected?.target === "geom") {
+          const id = selected.id;
+          const geom = frame?.drawables.find((d) => d.geom.id === id)?.geom;
+          if (geom) return { target: "geom", geom };
+        }
+        return null;
       }
 
       async function updateInspect(): Promise<void> {
-        if (mode === "sdf2") {
-          if (hoverGizmo) {
-            showWidgetInspect(
+        const f = focused();
+        if (!f) {
+          if (mode === "sdf2") {
+            showEmptyInspect(
               pushInspect,
-              hoverGizmo.kind,
-              hoverGizmo.site,
-              hoverGizmo.at.file,
-              "Handles are scene widgets. The filled blob is the 2D SDF.",
+              "Nothing selected",
+              "Click a centre or radius to keep it in the sidebar. The field itself is not pickable.",
+              `<code class="empty">No surface identity in this view.</code>`,
             );
             return;
           }
           showEmptyInspect(
             pushInspect,
             "Nothing selected",
-            "Drag a centre or radius. This field is swept in 3D around each rim.",
-            `<code class="empty">No surface identity in this view.</code>`,
+            hintOf(sceneMod, "Hover or click geometry or a handle. Numbers live in the scene file."),
+            `<code class="empty">Select something to see the creation site.</code>`,
           );
           return;
         }
-        const t = currentTarget();
-        if (!t) {
-          showEmptyInspect(
+        if (f.target === "gizmo") {
+          await showWidgetInspect(
             pushInspect,
-            "Nothing selected",
-            hintOf(sceneMod, "Hover geometry or a handle. Numbers live in the scene file."),
-            `<code class="empty">Select geometry to see the creation site.</code>`,
+            peekCache,
+            f.gizmo,
+            mode === "sdf2"
+              ? "Handles are scene widgets. The filled blob is the 2D SDF."
+              : "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.",
           );
           return;
         }
+        const g = f.geom;
         pushInspect({
-          crumb: t.title,
-          meta:
-            t.file == null || t.line == null
-              ? hoverGizmo
-                ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
-                : "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
-              : t.id
-                ? `${t.id} · ${t.file}:${t.line}:${t.column ?? 0}`
-                : `${t.file}:${t.line}:${t.column ?? 0}`,
+          crumb: breadcrumb(g.path),
+          meta: `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
           sourceHtml: await (async () => {
-            if (t.file == null || t.line == null) {
-              if (hoverGizmo) {
-                try {
-                  const text = await peekFile(peekCache, hoverGizmo.at.file);
-                  return renderSnippet(text, hoverGizmo.at.line);
-                } catch (err) {
-                  return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-                }
-              }
-              return `<code class="empty">Widget values are the numeric arguments of edit* in the source file.</code>`;
-            }
             try {
-              const text = await peekFile(peekCache, t.file);
-              return renderSnippet(text, t.line);
+              const text = await peekFile(peekCache, g.provenance.file);
+              return renderSnippet(text, g.provenance.line);
             } catch (err) {
               return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
             }
           })(),
         });
-        return;
       }
 
       function statusHint(): string {
@@ -484,7 +472,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             frame?.drawables ?? [],
             frame?.gizmos ?? [],
             hoverId,
-            selectedId,
+            selectedGeomId(),
             activeGizmo(),
           );
         } else {
@@ -617,6 +605,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         if (h?.target === "gizmo") {
+          selected = { target: "gizmo", site: h.gizmo.site };
           drag = {
             site: h.gizmo.site,
             start: gizmoValues(h.gizmo),
@@ -629,16 +618,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         if (mode === "geom" && h?.target === "geom") {
-          selectedId = h.drawable.geom.id;
-          selectedGeom = h.drawable.geom;
+          selected = { target: "geom", id: h.drawable.geom.id };
           peekCache.delete(h.drawable.geom.provenance.file);
           render();
           return;
         }
-        if (mode === "geom") {
-          selectedId = null;
-          selectedGeom = null;
-        }
+        selected = null;
         pan = { x: p.x, y: p.y, camX: cam.x, camY: cam.y };
         canvas.setPointerCapture(e.pointerId);
         render();
@@ -695,6 +680,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function onPointerLeave(): void {
         if (pan || drag) return;
         cursor = null;
+        if (hoverGizmo || hoverId) {
+          hoverGizmo = null;
+          hoverId = null;
+          render();
+          return;
+        }
         flushStatus();
       }
 
