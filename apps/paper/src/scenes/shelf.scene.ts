@@ -16,20 +16,17 @@ export const hint =
 export const camera = { x: 3, y: 1.5, scale: 52 };
 
 export function scene() {
-  const A = point(-0.39, 0.24);
-  const B = point(8.98, 3.23);
+  const A = point(0, 0);
+  const B = point(6, 0.4);
   const ground = line(A, B);
   const shelf = offsetLine(ground, 1.8);
-  const reach = circle(A, 1.95);
+  const reach = circle(A, 2.5);
   const P = circleLineIntersection(reach, shelf.line, +1);
   segment(A, P);
-  const lamp = point(5.04, 4.85);
+  const lamp = point(2.2, 3.1);
   const beam = circle(lamp, dist(lamp, P));
   const Q = circleLineIntersection(beam, ground, +1);
   line(P, Q);
   const cellar = offsetLine(ground, -shelf.distance);
   void cellar;
-  const p = point(-4.18, 5.24);
-  const ln = line(p, lamp);
-  const ln2 = line(p, A);
 }

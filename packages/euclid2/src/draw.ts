@@ -46,6 +46,7 @@ export function drawFrame(
   drawGrid(ctx, cssW, cssH, cam);
 
   for (const d of drawables) {
+    if (d.geom.editable) continue;
     const id = d.geom.id;
     const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
     const width = id === selectedId || id === hoverId ? 2.4 : 1.5;

@@ -430,7 +430,7 @@ export function editOffsetFromLine(geom: LineLike, d: number, site?: SiteOpts): 
   const located = siteFrom(site);
   const o = readOverride(located?.site);
   const dd = o?.[0] ?? d;
-  const off = offsetLine(geom, dd);
+  const off = withoutDraw(() => offsetLine(geom, dd));
   if (!silent && located) {
     gizmos.push({
       kind: "offset",
