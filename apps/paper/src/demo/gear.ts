@@ -113,7 +113,7 @@ export function meshMateRotation(z1: number, z2: number, rot1: number): number {
 }
 
 /** Involute spur: one closed outline polyline, pitch + bore, pitch marker. */
-export function drawSpurGear(opts: SpurGearOpts): Geom {
+export function drawSpurGear(opts: SpurGearOpts): Geom[] {
   const pitchR = Math.max(0.4, Math.abs(opts.pitchRadius));
   const rot = opts.rotation ?? 0;
   const c = opts.center;
@@ -124,11 +124,12 @@ export function drawSpurGear(opts: SpurGearOpts): Geom {
     const last = ring[ring.length - 1]!;
     if (dist(first, last) >= 1e-8) ring.push({ x: first.x, y: first.y });
   }
-  return group(() => [
-    group(() => [circle(c, pitchR), circle(c, bore)]),
-    group(() => [polyline(ring)]),
-    group(() => [segment(c, at(polar(pitchR, 0), c, rot))]),
-  ]);
+  return [
+    circle(c, pitchR),
+    circle(c, bore),
+    polyline(ring),
+    segment(c, at(polar(pitchR, 0), c, rot)),
+  ];
 }
 
 export function gearModule(pitchRadius: number, teeth: number): number {

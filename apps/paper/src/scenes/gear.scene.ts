@@ -68,14 +68,14 @@ export function scene() {
   return [
     segment(g.pinion, g.wheel),
     lineOfAction(g.pinion, g.pitch1, g.alpha, g.pitch1 + g.pitch2 * 0.35),
-    drawSpurGear({
+    ...drawSpurGear({
       center: g.pinion,
       teeth: g.z1,
       pitchRadius: g.pitch1,
       pressureAngle: g.alpha,
       rotation: g.rot1,
     }),
-    drawSpurGear({
+    ...drawSpurGear({
       center: g.wheel,
       teeth: g.z2,
       pitchRadius: g.pitch2,
