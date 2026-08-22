@@ -43,7 +43,7 @@ apps/
 
 ## Widget writes
 
-Each `edit*` CallExpression is one write target, identified at compile time by **file + line:column** baked onto the call (`{ file, at }` in compiled JS; disk unchanged). A loop that calls `editDistanceToPoint(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal `edit*` count.
+Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `{ file, at }` — and should splice `{ editable: true }` when DOF args are numeric literals — onto the module that runs; disk unchanged. A loop that calls `editDistanceToPoint(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal `edit*` count.
 
 Shared parameters can live in a helper next to catalog scenes (e.g. `plate-layout.ts`). Dragging a plate handle writes that helper; mill’s thickness glider writes `mill.scene.ts`.
 

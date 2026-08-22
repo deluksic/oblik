@@ -1,41 +1,38 @@
 # euclid2 graph
 
-One constructor per object. TypeScript types are the object (`Circle`, `Point`, `number`). Literal vs computed is not a TS distinction (`2.4` and `dist(c, q)` are both `number`), so **potential vs actual** editability is AST + scene context.
+Disk is the graph the tool writes. The **call-site annotator** (today: `injectSceneSites` in the Vite pre-transform) rewrites constructor calls in the **module that runs**. Disk is unchanged.
+
+It already splices `{ file, at: [line, column] }`. It should also splice `{ editable: true }` when that call’s DOF slots are numeric literals.
 
 ```
-circle(c, 2.4, { edit: true })     // actual: radius handle, write the 2.4
-circle(c, 2.4)                     // potential only: free param, no handle
-circle(c, dist(c, q))              // determined: never a radius handle
-point(1.2, 0.4, { edit: true })
-offsetLine(L, 1.2, { edit: true }) // OffsetLine <: Line; .d is DOF
+// disk                                      // after annotator
+circle(c, 2.4)                            →  circle(c, 2.4, { file, at, editable: true })
+circle(c, dist(c, q))                     →  circle(c, dist(c, q), { file, at })
+point(1.2, 0.4)                           →  point(1.2, 0.4, { file, at, editable: true })
+offsetLine(L, 1.2)                        →  offsetLine(L, 1.2, { file, at, editable: true })
 ```
 
-`{ edit: true }` = this scene actually edits the call’s numeric literals. Strip it → object stays, handle gone. Tool writes the flag because it knows which graph it just built.
+`editable: true` is not something the user is meant to maintain. If they type it onto a computation, the annotator does **not** emit it (literals only). If they type `{ editable: false }` next to a literal, honor that (frozen constant).
 
-```
-circle(c, dist(c, q), { edit: true })   // reject: not potentially editable
-```
-
-`{ draw: false }` hides the stroke; type unchanged.
+Not the HMR path (`hot.accept`, swallow widget writes). Same pass on first load and on save.
 
 ```
 OffsetLine = Line & { d: number; base: LineLike }
 ```
 
+`{ draw: false }` hides the stroke; type unchanged.
+
 ## Potential vs actual
 
-| radius arg | graph | handle in owning scene |
+| radius arg | graph | `editable` from annotator |
 | --- | --- | --- |
-| `dist(c, q)` / any call or imported value | determined | never |
-| numeric literal | **potential** (free param) | only if `{ edit: true }` |
-| name bound to a scene literal | potential at that binding | only if that site is actual |
-| library `circle(c, 3)` / other scene | potential in *their* source | never here |
+| `dist(c, q)` / call / imported | determined | omit |
+| numeric literal | potential | `true`, unless disk says `editable: false` |
+| name bound to a scene literal | potential at that binding | not at this call (nothing to write here) |
 
-**Potential:** this slot is not determined by other nodes (a literal, or a scene-owned name whose initializer is). Write-back has a number to rewrite.
+TS types do not distinguish `2.4` from `dist(c, q)`. The annotator does.
 
-**Actual:** this scene shows a handle. Same graph can be actual in the owner scene and not in a consumer (`withoutWidgets` / import).
-
-TS cannot reject `{ edit: true }` + `dist(...)`. Scene check: actual ⇒ potential (DOF args are numeric literals, including `-1.2`). On failure: diagnostic, no handle, do not snapshot into a literal. Optional fix: strip the flag.
+Handles only where `editable: true` landed **and** this scene owns the site (not a silent consumer).
 
 ## Objects
 
@@ -55,12 +52,12 @@ circleCircleIntersection(a: Circle, b: Circle, k: Branch): Point | null
 
 Projections: `.center` `.radius` `.d` `.x` `.y`. Slot of `T` takes a `T` or writes a projection.
 
-## Tools write
+## Tools write (disk)
 
-| tool | slots | source |
+| tool | slots | disk |
 | --- | --- | --- |
-| Point | `<Point>` | `point(x, y, { edit: true })` / reuse / `lineIntersection` / `circleLineIntersection(..., +1)` |
-| Circle | `<Point>`, `<number \| Point>` | `circle(c, 2.4, { edit: true })` or `circle(c, dist(c, q))` |
+| Point | `<Point>` | `point(x, y)` / reuse / `lineIntersection` / `circleLineIntersection(..., +1)` |
+| Circle | `<Point>`, `<number \| Point>` | `circle(c, 2.4)` or `circle(c, dist(c, q))` |
 | Line | `<Point>`, `<Point>` | `line(a, b)` |
 | Segment | `<Point>`, `<Point>` | `segment(a, b)` |
-| Offset | `<LineLike>`, `<number>` | `offsetLine(L, 1.2, { edit: true })` |
+| Offset | `<LineLike>`, `<number>` | `offsetLine(L, 1.2)` |
