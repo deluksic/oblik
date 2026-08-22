@@ -11,7 +11,7 @@ export const EDITOR_COMMANDS: CommandSpec[] = [
   {
     id: "distance",
     title: "Distance",
-    hint: "Point or line, then a length (ring or dashed parallel).",
+    hint: "Point or line, then a length (ring or parallel).",
   },
 ];
 
@@ -161,7 +161,7 @@ export function commandPreview(tool: EditorTool | null): CommandPreview | null {
       previewHtml: fn("circle", [center, distance]),
       acceptNumber: Boolean(tool.center),
       hint: tool.center
-        ? "Type a radius and Enter, click the canvas, or pick a dashed ring."
+        ? "Type a radius and Enter, click the canvas, or pick a ring."
         : "Click a point handle or empty paper for the center.",
     };
   }
@@ -251,19 +251,16 @@ function drawInfiniteThrough(
   h: number,
   origin: Vec2,
   dir: Vec2,
-  dashed: boolean,
 ): void {
   const span = Math.max(w, h) / cam.scale + Math.hypot(cam.x, cam.y) + 20;
   const a = { x: origin.x - dir.x * span, y: origin.y - dir.y * span };
   const b = { x: origin.x + dir.x * span, y: origin.y + dir.y * span };
   const sa = worldToScreen(cam, a, w, h);
   const sb = worldToScreen(cam, b, w, h);
-  if (dashed) ctx.setLineDash([8, 6]);
   ctx.beginPath();
   ctx.moveTo(sa.x, sa.y);
   ctx.lineTo(sb.x, sb.y);
   ctx.stroke();
-  if (dashed) ctx.setLineDash([]);
 }
 
 export function drawEditorGhost(
@@ -318,12 +315,10 @@ export function drawEditorGhost(
             ? radiusBetween(origin, cursor)
             : 0.2);
       const c = worldToScreen(cam, origin, w, h);
-      ctx.setLineDash([5, 5]);
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.arc(c.x, c.y, r * cam.scale, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
       ctx.fill();
@@ -349,7 +344,6 @@ export function drawEditorGhost(
       ctx.beginPath();
       ctx.arc(c.x, c.y, r * cam.scale, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
       ctx.globalAlpha = 0.85;
@@ -392,7 +386,7 @@ export function drawEditorGhost(
     const end = snap ?? cursor;
     if (a && end) {
       const dir = norm(sub(end, a));
-      drawInfiniteThrough(ctx, cam, w, h, a, dir, false);
+      drawInfiniteThrough(ctx, cam, w, h, a, dir);
       ctx.globalAlpha = 0.85;
       const sa = worldToScreen(cam, a, w, h);
       ctx.beginPath();
@@ -449,9 +443,9 @@ export function drawEditorGhost(
         const offOrigin = add(line.origin, mul(perp(line.dir), d));
         ctx.globalAlpha = 0.72;
         ctx.lineWidth = 2;
-        drawInfiniteThrough(ctx, cam, w, h, offOrigin, line.dir, false);
+        drawInfiniteThrough(ctx, cam, w, h, offOrigin, line.dir);
       }
-      drawInfiniteThrough(ctx, cam, w, h, line.origin, line.dir, false);
+      drawInfiniteThrough(ctx, cam, w, h, line.origin, line.dir);
       ctx.globalAlpha = 0.85;
       const s = worldToScreen(cam, line.origin, w, h);
       ctx.beginPath();

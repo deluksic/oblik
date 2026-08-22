@@ -645,7 +645,7 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
     return {
       previewHtml: fn("editDistanceToPoint", [pointLabel(session.from.point, "<point>", true), dSlot]),
       acceptNumber: !session.lengthReuse,
-      hint: "Type a radius and Enter, click to measure, or reuse a dashed ring.",
+      hint: "Type a radius and Enter, click to measure, or reuse a ring.",
     };
   }
   const lineLabel =

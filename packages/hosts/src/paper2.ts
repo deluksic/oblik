@@ -277,7 +277,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           showEmptyInspect(
             pushInspect,
             "Nothing selected",
-            "Drag a centre or dashed radius. This field is swept in 3D around each rim.",
+            "Drag a centre or radius. This field is swept in 3D around each rim.",
             `<code class="empty">No surface identity in this view.</code>`,
           );
           return;

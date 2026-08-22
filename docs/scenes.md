@@ -42,11 +42,9 @@ Layout files must not import pane modules. Live drag still updates the other pan
 
 | On screen         | Meaning                                          | Writes     |
 | ----------------- | ------------------------------------------------ | ---------- |
-| Solid stroke      | Geometry (`line`, `circle`, `segment`, `drawPlate`, SDF fill) | nothing |
-| Filled dot        | Point widget (`editPoint` / glider)              | literals   |
-| Dashed ring       | Distance widget (`editDistanceToPoint`)          | `d`        |
-| Arrow             | Vector widget (`editVector`)                     | `dx`, `dy` |
-| HUD slider        | Number widget (`editNumber`)                     | `n`        |
+| Cream stroke      | Geometry (`line`, `circle`, `segment`, `drawPlate`, SDF fill) | nothing |
+| Coral             | Editable handle (point, radius, offset, vector, …) | literals |
+| HUD slider        | Number widget (`editNumber` / `slider`)          | `n`        |
 | Hover / select    | Pick highlight                                   | nothing    |
 
 ## Space palette
@@ -79,8 +77,8 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [?scene=beam](http://127.0.0.1:43117/?scene=beam)               | One truss. `group()` namespaces **paths** (`group[0] › line[2]`). The roof uses the middle ring’s `r1`.                                                                                                                         |
 | [?scene=flat](http://127.0.0.1:43117/?scene=flat)               | Two trusses, no group. Pick identity is still unique (`id` is a UUID). Paths are global counters; provenance may share a library line.                                                                                          |
-| [?scene=shared](http://127.0.0.1:43117/?scene=shared)           | One `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag the dashed circle: everything follows in real time; one literal is written on release.                                                                    |
-| [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `editPoint`. A `for` calls `editDistanceToPoint(p, 0.4)` and `circle(p, r)`. Five dashed rings, one `0.4`. Drag any ring: all five follow; pointer-up rewrites that single literal.             |
+| [?scene=shared](http://127.0.0.1:43117/?scene=shared)           | One `editDistanceToPoint` feeds all three rings and `hubRadius`. Drag a ring: everything follows in real time; one literal is written on release.                                                                    |
+| [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `editPoint`. A `for` calls `editDistanceToPoint(p, 0.4)` and `circle(p, r)`. Five rings, one `0.4`. Drag any ring: all five follow; pointer-up rewrites that single literal.             |
 | [?scene=plate](http://127.0.0.1:43117/?scene=plate)             | Milled plate: stock, four corner bolts (one **editVector** inset mirrored to all corners; shared **drill Ø** helpers), polar array, pocket fillets on **editPointOnLine** bisectors, slot (**editPointOnSegment** on top edge). |
 | [?scene=nest](http://127.0.0.1:43117/?scene=nest)               | Print grid. `withoutWidgets(plateLayout)` instanced in a nest; columns / rows / gap are titled sliders. Polar-array **count steps by column**.                                                                                  |
 | [?scene=relative](http://127.0.0.1:43117/?scene=relative)       | Offset handle. Left `editPoint` writes position; `editVector` writes `dx`/`dy`; the second centre is derived.                                                                                                                   |

@@ -424,7 +424,7 @@ export function editAngle(origin: Vec2, degrees: number, opts?: AngleEditOpts): 
 
 /**
  * Signed offset distance from a segment or infinite line.
- * Gizmo is a dashed overlay along the offset line.
+ * Gizmo is an overlay along the offset line.
  */
 export function editOffsetFromLine(geom: LineLike, d: number, site?: SiteOpts): number {
   const located = siteFrom(site);

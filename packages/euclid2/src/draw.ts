@@ -234,17 +234,13 @@ function drawGizmo(
       pathSeg(ctx, cam, w, h, tail, head);
       ctx.strokeStyle = `${COL.gizmo}99`;
       ctx.lineWidth = 1.25;
-      ctx.setLineDash([12, 7]);
       ctx.stroke();
-      ctx.setLineDash([]);
     }
   } else if (g.kind === "distance") {
     const c = worldToScreen(cam, g.origin, w, h);
     ctx.beginPath();
     ctx.arc(c.x, c.y, Math.abs(g.d) * cam.scale, 0, Math.PI * 2);
-    ctx.setLineDash([5, 5]);
     ctx.stroke();
-    ctx.setLineDash([]);
   } else if (g.kind === "angle") {
     const rad = (g.deg * Math.PI) / 180;
     const tip = {
@@ -277,11 +273,9 @@ function drawGizmo(
     ctx.stroke();
   } else if (g.kind === "offset") {
     pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
-    ctx.strokeStyle = active ? "#fff3e6" : `${COL.gizmo}cc`;
+    ctx.strokeStyle = active ? "#fff3e6" : COL.gizmo;
     ctx.lineWidth = active ? 2.2 : 1.6;
-    ctx.setLineDash([6, 5]);
     ctx.stroke();
-    ctx.setLineDash([]);
   }
 }
 
