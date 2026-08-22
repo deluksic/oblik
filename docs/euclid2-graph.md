@@ -1,105 +1,99 @@
 # euclid2 calls
 
-Types: `Point <: Vec2`, `number`, `Line`, `Segment`, `Circle`, `LineLike = Line | Segment`, `Branch = +1 | -1`.
-Widget 2nd args that write back must be **numeric literals**. `site?` omitted below.
+A constructor returns **one object** with a **principal type**. Other uses are **projections** (fields, or subtype of the principal geom). Slots bind a type `T` by taking a `T` or by writing a projection (`k.radius`, not a hidden coerce). Gizmos are UI for that object / its DOF field — never a third kind of value.
 
-## Free values (gizmo)
+`edit*` = principal geom + writable literal field(s). Same principal type as the non-edit constructor; DOF is provenance, not a second type. `withoutDraw` hides the stroke; it does not change the type.
+
+Widget literals must be numeric. `site?` omitted. Types: `Point <: Vec2`, `LineLike = Line | Segment`, `Branch = +1 | -1`.
+
+```
+OffsetLine = Line & { d: number; base: LineLike }
+```
+
+## Objects
 
 ```
 editPoint(x: number, y: number): Point
-editDistanceToPoint(origin: Point, d: number): number      // ring; value is d, independent of any other point
-editOffsetFromLine(line: LineLike, d: number): number      // dashed parallel; value is signed d
-editPointOnSegment(seg: Segment, t: number): Point         // t ∈ [0,1]
-editPointOnLine(line: LineLike, s: number): Point          // today: (origin, dir, s)
-editNumber(n: number, opts): number
-editAngle(origin: Point, degrees: number): number          // returns radians
-editVector(origin: Point, dx: number, dy: number): Vec2
+  .x .y
+
+editCircle(center: Point, radius: number): Circle          // replaces circle+editDistanceToPoint
+  .center: Point
+  .radius: number                                          // DOF
+
+editOffsetLine(base: LineLike, d: number): OffsetLine      // replaces editOffsetFromLine+offsetLine
+  <: Line
+  .d: number                                               // DOF
+  .base: LineLike
+
+editPointOnSegment(seg: Segment, t: number): Point
+  . /* Point */  t is DOF, not a projection others need
+
+editPointOnLine(line: LineLike, s: number): Point
+
+circle(center: Point, radius: number): Circle              // no DOF; radius may be dist(...)
+line(a: Point, b: Point): Line
+segment(a: Point, b: Point): Segment
+offsetLine(base: LineLike, d: number): Line                // derived parallel, no .d unless we return OffsetLine
 ```
 
-## Derived values (no gizmo)
+## Derived (still objects / numbers)
 
 ```
 dist(a: Point, b: Point): number
-distToLine(p: Point, line: LineLike): number               // today: (p, origin, dir)
+distToLine(p: Point, line: LineLike): number
 lineIntersection(a: LineLike, b: LineLike): Point | null
-circleLineIntersection(c: Circle, l: LineLike, k: Branch): Point | null   // missing
-circleCircleIntersection(a: Circle, b: Circle, k: Branch): Point | null   // missing
+circleLineIntersection(c: Circle, l: LineLike, k: Branch): Point | null
+circleCircleIntersection(a: Circle, b: Circle, k: Branch): Point | null
 ```
 
-## Strokes
+## Projections a slot may write
 
-```
-segment(a: Point, b: Point): Segment
-line(a: Point, b: Point): Line
-circle(center: Point, radius: number): Circle
-offsetLine(line: LineLike, d: number): Line                // today withoutDraw — silent
-point(x: number, y: number): Point                         // drawn dot; tools use editPoint (silent) instead
-```
+| slot `T` | pick | emit |
+| --- | --- | --- |
+| Point | empty | `editPoint(x, y)` |
+| Point | named Point | reuse |
+| Point | L∩L | `lineIntersection(l1, l2)` |
+| Point | C∩L | `circleLineIntersection(c, l, +1)` |
+| Point | Circle center | `k.center` |
+| LineLike | Line / Segment / OffsetLine | reuse (OffsetLine <: Line) |
+| number | type / click empty | literal on the `edit*` being built |
+| number | Circle radius handle | `k.radius` |
+| number | OffsetLine | `off.d` |
+| number | Point `q` (when a Point origin `c` is already bound) | `dist(c, q)` |
+
+No `editDistanceToPoint`: a free length at `c` **is** `editCircle(c, r)`. The ring is that Circle — `circleLineIntersection` can use it.
+
+No parallel `editOffsetFromLine` / `offsetLine` pair: a free parallel **is** `editOffsetLine(L, d)`. Intersect `off`; reuse `off.d`.
 
 ## ≡
 
 ```
-circle(c, r)                         ≡  circleRadius(c, r)           // r: number from anywhere
-circle(c, dist(c, q))                ≡  circlePointToPoint(c, q)
-line(a, b)                          ≡  linePointToPoint(a, b)
-segment(a, b)                       ≡  segmentPointToPoint(a, b)
-circle(c, editDistanceToPoint(c, r)) ≡  free-radius circle           // analog:
-offsetLine(L, editOffsetFromLine(L, d)) ≡ free parallel line
+editCircle(c, r).radius          ≡  (old) editDistanceToPoint(c, r)
+editCircle(c, r)                 ≡  (old) circle(c, editDistanceToPoint(c, r))
+circle(c, dist(c, q))            ≡  circlePointToPoint(c, q)
+editOffsetLine(L, d)             ≡  (old) offsetLine(L, editOffsetFromLine(L, d))
+editOffsetLine(L, d).d           ≡  (old) editOffsetFromLine(L, d)
+line(a, b)                       ≡  linePointToPoint(a, b)
 ```
-
-Sugar names `circleRadius` / `circlePointToPoint` are not extra math. Keep `circle` + `dist`.
 
 ## ≠
 
 ```
-editDistanceToPoint(c, r): number    ≠  circle(c, r): Circle
-editDistanceToPoint(c, r)            ≠  dist(c, q)
-circle(c, editDistanceToPoint(c, r)) ≠  circle(c, dist(c, q))        // free r vs through q
-editOffsetFromLine(L, d): number     ≠  offsetLine(L, d): Line
-distToLine(p, L): number             ≠  editOffsetFromLine(L, d): number   // measured vs free
-lineIntersection(l1, l2)             ≠  editPoint(x, y) at the hit
-circle(c, editDistanceToPoint(c, dist(c, q)))  // illegal: dist(...) is not a writable literal
+editCircle(c, r)                 ≠  circle(c, dist(c, q))     // DOF radius vs through q
+circle(c, r).radius              ≠  editCircle(c, r).radius  // unmarked literal is not a handle
+distToLine(p, L)                 ≠  editOffsetLine(L, d).d    // measured vs free
+lineIntersection(l1, l2)         ≠  editPoint at the hit
+editCircle(c, dist(c, q))        // illegal write site
 ```
 
-## Tools → writes
+## Tools
 
-**Point** — one slot `<Point>`:
+| tool | slots | write |
+| --- | --- | --- |
+| Point | `<Point>` | introductions in the table |
+| Circle | `<Point>`, `<number \| Point>` | `editCircle(c, 2.4)` or `circle(c, dist(c, q))` |
+| Line | `<Point>`, `<Point>` | `line(a, b)` |
+| Segment | `<Point>`, `<Point>` | `segment(a, b)` |
+| Offset | `<LineLike>`, `<number>` | `editOffsetLine(L, 1.2)` |
 
-| pick | emit |
-| --- | --- |
-| empty | `const p = editPoint(x, y)` |
-| named | reuse |
-| L∩L | `const x = lineIntersection(l1, l2)` |
-| C∩L | `const x = circleLineIntersection(c, l, +1)` |
-
-**Circle** — `<Point>` then `<number | Point>`:
-
-```
-const c = <Point>
-const r = editDistanceToPoint(c, 2.4)   // type / click empty
-circle(c, r)
-
-const c = <Point>
-circle(c, dist(c, q))                   // pick point q
-```
-
-**Line** / **Segment** — `<Point>`, `<Point>`:
-
-```
-line(a, b)
-segment(a, b)
-```
-
-**Distance** (optional, no stroke) — `<Point \| LineLike>` then `<number>`:
-
-```
-const r = editDistanceToPoint(c, 2.4)
-const d = editOffsetFromLine(L, 1.2)
-```
-
-**Parallel** (drawn) — same Length slot, plus stroke:
-
-```
-const d = editOffsetFromLine(L, 1.2)
-offsetLine(L, d)
-```
+`withoutDraw(() => editCircle(c, r))` if a length is needed with no stroke — same type, hidden draw. Do not add a second combinator for that.
