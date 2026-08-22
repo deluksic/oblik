@@ -48,6 +48,9 @@ Flex/grid children need `min-height: 0` and a defined row height:
 - `#viewport` / `.viewport` — flex column, `overflow: hidden`
 - `.viewportGrid` — `flex: 1; min-height: 0`
 - `.pane` — `height: 100%; display: flex; flex-direction: column`
+- `.view` — flex column, `flex: 1; min-height: 0`
+- `.canvas` — `flex: 1; min-height: 0`
+- `.status` — reserved `flex: 0 0 1.85rem` at the bottom of the pane (always present; error only restyles it)
 
 Pane **must** have module classes applied via `class={[styles.pane, …]}` or flex layout breaks silently.
 
@@ -64,7 +67,7 @@ export type InspectState = {
 export type InspectPatch = Partial<InspectState>;
 ```
 
-Hosts call `ctx.onInspect?.(patch)`. Shell merges into a signal; only the focused pane's patches apply.
+Hosts call `ctx.onInspect?.(patch)`. Shell merges into a per-pane signal. The focused pane's patch feeds Identity in the inspect column. **Status and error render in a reserved strip at the bottom of that pane** — not a global banner — so a throw in one view does not shift the workspace or other canvases.
 
 `packages/hosts/src/pane.ts` helpers take `InspectPush` instead of DOM elements:
 

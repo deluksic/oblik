@@ -27,6 +27,8 @@ export type PaneProps = {
   focused: boolean;
   paletteMode: PaletteMode;
   commandBar: CommandBarState | null;
+  status: string;
+  error: string | null;
   onFocus: () => void;
   onPickCommand: (id: string) => void;
   onClosePicker: () => void;
@@ -102,7 +104,7 @@ export function Pane(props: PaneProps) {
       <p class={styles.label}>
         {props.mount.entry.view} · {props.mount.entry.file}
       </p>
-      <div class={styles.view}>
+      <div class={[styles.view, { [styles.viewError]: props.error != null }]}>
         <canvas
           ref={setCanvas}
           class={styles.canvas}
@@ -131,6 +133,12 @@ export function Pane(props: PaneProps) {
             </Show>
           </Loading>
         </Errored>
+        <p
+          class={[styles.status, { [styles.statusError]: props.error != null }]}
+          role={props.error ? "alert" : "status"}
+        >
+          {props.error ?? (props.status.trim() === "" ? "\u00a0" : props.status)}
+        </p>
       </div>
     </section>
   );

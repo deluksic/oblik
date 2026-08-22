@@ -32,6 +32,7 @@ export type ViewportProps = {
   focusedId: string | null;
   paletteMode: PaletteMode;
   commandBar: CommandBarState | null;
+  inspectByPane: () => Record<string, InspectPatch>;
   onWelcomeCreated: (id: string, entry: SceneEntry) => void | Promise<void>;
   onFocusPane: (id: string) => void;
   onPickCommand: (id: string) => void;
@@ -52,6 +53,7 @@ type LayoutPaneProps = {
   focusedId: string | null;
   paletteMode: PaletteMode;
   commandBar: CommandBarState | null;
+  inspectByPane: () => Record<string, InspectPatch>;
   onFocusPane: (id: string) => void;
   onPickCommand: (id: string) => void;
   onClosePicker: () => void;
@@ -81,6 +83,8 @@ function LayoutPane(props: LayoutPaneProps) {
         focused={props.focusedId === props.id}
         paletteMode={props.focusedId === props.id ? props.paletteMode : "closed"}
         commandBar={props.focusedId === props.id ? props.commandBar : null}
+        status={props.inspectByPane()[props.id]?.status ?? ""}
+        error={props.inspectByPane()[props.id]?.error ?? null}
         onFocus={() => props.onFocusPane(props.id)}
         onPickCommand={props.onPickCommand}
         onClosePicker={props.onClosePicker}
@@ -120,6 +124,7 @@ export function Viewport(props: ViewportProps) {
                 focusedId={props.focusedId}
                 paletteMode={props.paletteMode}
                 commandBar={props.commandBar}
+                inspectByPane={props.inspectByPane}
                 onFocusPane={props.onFocusPane}
                 onPickCommand={props.onPickCommand}
                 onClosePicker={props.onClosePicker}

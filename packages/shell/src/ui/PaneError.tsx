@@ -10,7 +10,9 @@ export function PaneError(props: PaneErrorProps) {
   return (
     <section class={styles.pane} style={{ "grid-area": props.id }} data-scene={props.id}>
       <p class={styles.label}>{props.label}</p>
-      <p class={styles.error}>{props.message}</p>
+      <div class={styles.view}>
+        <p class={styles.error}>{props.message}</p>
+      </div>
     </section>
   );
 }

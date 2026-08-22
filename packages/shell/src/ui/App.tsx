@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import { paneIdsFromAreas, stackedAreas } from "@/layout/grid";
 import type {
@@ -309,11 +309,7 @@ export function App(props: WorkspaceProps) {
         <p class="kicker">Prototype 3</p>
         <h1>{title()}</h1>
         <Nav scenes={props.scenes} activeId={sceneId()} onSelect={selectScene} />
-        <p id="status">{inspect().status}</p>
       </header>
-      <Show when={inspect().error}>
-        <p id="error">{inspect().error}</p>
-      </Show>
       <div id="workspace">
         <Viewport
           sceneId={sceneId()}
@@ -327,6 +323,7 @@ export function App(props: WorkspaceProps) {
           focusedId={focusedId()}
           paletteMode={paletteMode()}
           commandBar={commandBar()}
+          inspectByPane={inspectByPane}
           onWelcomeCreated={onWelcomeCreated}
           onFocusPane={focusPane}
           onPickCommand={pickCommand}
