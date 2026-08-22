@@ -14,7 +14,6 @@ const COL = {
   hover: "#f0c14a",
   selected: "#7ec8e3",
   gizmo: "#e8876a",
-  gizmoFill: "#e8876a",
 };
 
 export function resizeCanvas(canvas: HTMLCanvasElement): void {
@@ -39,7 +38,8 @@ export function drawFrame(
   gizmos: readonly Gizmo[],
   hoverId: string | null,
   selectedId: string | null,
-  activeGizmo: string | null,
+  hoverGizmo: string | null,
+  selectedGizmo: string | null,
 ): void {
   ctx.clearRect(0, 0, cssW, cssH);
   ctx.fillStyle = COL.bg;
@@ -56,8 +56,7 @@ export function drawFrame(
 
   for (const g of gizmos) {
     if (g.kind === "number") continue;
-    const active = g.site === activeGizmo;
-    drawGizmo(ctx, cam, cssW, cssH, g, active);
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
   }
 }
 
@@ -68,11 +67,12 @@ export function drawGizmoOverlay(
   cssH: number,
   cam: Camera,
   gizmos: readonly Gizmo[],
-  activeGizmo: string | null,
+  hoverGizmo: string | null,
+  selectedGizmo: string | null,
 ): void {
   for (const g of gizmos) {
     if (g.kind === "number") continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, g.site === activeGizmo);
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
   }
 }
 
@@ -82,9 +82,20 @@ export function drawNumberHud(
   cssW: number,
   cssH: number,
   gizmos: readonly Gizmo[],
-  activeGizmo: string | null,
+  hoverGizmo: string | null,
+  selectedGizmo: string | null,
 ): void {
-  drawNumberSliders(ctx, cssW, cssH, gizmos, activeGizmo);
+  drawNumberSliders(ctx, cssW, cssH, gizmos, hoverGizmo, selectedGizmo);
+}
+
+function gizmoInk(
+  site: string,
+  hover: string | null,
+  selected: string | null,
+): { color: string; hot: boolean } {
+  if (site === selected) return { color: COL.selected, hot: true };
+  if (site === hover) return { color: COL.hover, hot: true };
+  return { color: COL.gizmo, hot: false };
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera): void {
@@ -199,12 +210,12 @@ function drawGizmo(
   w: number,
   h: number,
   g: Gizmo,
-  active: boolean,
+  ink: { color: string; hot: boolean },
 ): void {
-  const stroke = active ? "#fff3e6" : COL.gizmo;
-  ctx.lineWidth = active ? 2.4 : 1.6;
-  ctx.strokeStyle = stroke;
-  ctx.fillStyle = active ? stroke : COL.gizmoFill;
+  const { color, hot } = ink;
+  ctx.lineWidth = hot ? 2.4 : 1.6;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
 
   if (g.kind === "point" || g.kind === "glider" || g.kind === "lineGlider") {
     const p =
@@ -221,7 +232,7 @@ function drawGizmo(
             };
     const s = worldToScreen(cam, p, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, active ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
@@ -266,7 +277,7 @@ function drawGizmo(
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, active ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
@@ -277,15 +288,15 @@ function drawGizmo(
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, active ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
     ctx.stroke();
   } else if (g.kind === "offset") {
     pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
-    ctx.strokeStyle = active ? "#fff3e6" : COL.gizmo;
-    ctx.lineWidth = active ? 2.2 : 1.6;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = hot ? 2.2 : 1.6;
     ctx.stroke();
   }
 }
@@ -295,14 +306,15 @@ function drawNumberSliders(
   cssW: number,
   cssH: number,
   gizmos: readonly Gizmo[],
-  activeGizmo: string | null,
+  hoverGizmo: string | null,
+  selectedGizmo: string | null,
 ): void {
   for (const L of layoutNumberSliders(gizmos, cssW, cssH)) {
-    const active = L.gizmo.site === activeGizmo;
+    const ink = gizmoInk(L.gizmo.site, hoverGizmo, selectedGizmo);
     const { x, y, w, h } = L.panel;
     ctx.save();
-    ctx.fillStyle = active ? "#1c222c" : "#151922";
-    ctx.strokeStyle = active ? COL.gizmo : COL.axis;
+    ctx.fillStyle = ink.hot ? "#1c222c" : "#151922";
+    ctx.strokeStyle = ink.hot ? ink.color : COL.axis;
     ctx.lineWidth = 1;
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {
@@ -344,9 +356,9 @@ function drawNumberSliders(
     }
     ctx.fill();
 
-    ctx.fillStyle = active ? "#fff3e6" : COL.gizmoFill;
+    ctx.fillStyle = ink.color;
     ctx.beginPath();
-    ctx.arc(L.knobX, L.knobY, active ? 8 : 7, 0, Math.PI * 2);
+    ctx.arc(L.knobX, L.knobY, ink.hot ? 8 : 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;

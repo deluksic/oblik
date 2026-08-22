@@ -150,12 +150,12 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         );
       }
 
-      function activeGizmo(): string | null {
-        return (
-          drag?.site ??
-          hoverGizmo?.site ??
-          (selected?.target === "gizmo" ? selected.site : null)
-        );
+      function hoverGizmoSite(): string | null {
+        return drag?.site ?? hoverGizmo?.site ?? null;
+      }
+
+      function selectedGizmoSite(): string | null {
+        return selected?.target === "gizmo" ? selected.site : null;
       }
 
       function selectedGeomId(): string | null {
@@ -238,11 +238,12 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             frame?.gizmos ?? [],
             hoverId,
             selectedGeomId(),
-            activeGizmo(),
+            hoverGizmoSite(),
+            selectedGizmoSite(),
           );
         } else {
           if (sdf) fieldView!.setSdf(sdf);
-          fieldView!.syncGizmos(fieldGizmos, activeGizmo());
+          fieldView!.syncGizmos(fieldGizmos, hoverGizmoSite(), selectedGizmoSite());
         }
         if (quiet && !error) return;
         const fallback =

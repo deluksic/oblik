@@ -113,7 +113,8 @@ export class SpaceView {
     gizmos: readonly Gizmo3[],
     hoverId: string | null,
     selectedId: string | null,
-    activeGizmo: string | null,
+    hoverGizmo: string | null,
+    selectedGizmo: string | null,
   ): void {
     this.clearGroup(this.content);
     this.clearGroup(this.gizmos);
@@ -129,8 +130,7 @@ export class SpaceView {
     }
 
     for (const gizmo of gizmos) {
-      const active = gizmo.site === activeGizmo;
-      const obj = meshGizmo(gizmo, active);
+      const obj = meshGizmo(gizmo, gizmoEmphasis(gizmo.site, hoverGizmo, selectedGizmo));
       obj.userData.gizmo = gizmo;
       this.gizmos.add(obj);
     }
@@ -334,12 +334,24 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
   return group;
 }
 
-function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
+function gizmoEmphasis(
+  site: string,
+  hover: string | null,
+  selected: string | null,
+): "selected" | "hover" | null {
+  if (site === selected) return "selected";
+  if (site === hover) return "hover";
+  return null;
+}
+
+function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Object3D {
   const group = new THREE.Group();
-  const color = active ? 0xfff3e6 : COL.gizmo;
+  const color =
+    emphasis === "selected" ? COL.selected : emphasis === "hover" ? COL.hover : COL.gizmo;
+  const hot = emphasis != null;
   const mat = new THREE.MeshLambertMaterial({ color });
   if (g.kind === "point3") {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
     s.position.set(g.x, g.y, g.z);
     group.add(s);
   } else if (g.kind === "glider3") {
@@ -348,7 +360,7 @@ function meshGizmo(g: Gizmo3, active: boolean): THREE.Object3D {
       y: g.a.y + (g.b.y - g.a.y) * g.t,
       z: g.a.z + (g.b.z - g.a.z) * g.t,
     };
-    const s = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
     s.position.set(p.x, p.y, p.z);
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),

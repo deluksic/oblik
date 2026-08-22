@@ -238,12 +238,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         if (propagate) ctx.onLiveChange();
       }
 
-      function activeGizmo(): string | null {
-        return (
-          drag?.site ??
-          hoverGizmo?.site ??
-          (selected?.target === "gizmo" ? selected.site : null)
-        );
+      function hoverGizmoSite(): string | null {
+        return drag?.site ?? hoverGizmo?.site ?? null;
+      }
+
+      function selectedGizmoSite(): string | null {
+        return selected?.target === "gizmo" ? selected.site : null;
       }
 
       function selectedGeomId(): string | null {
@@ -473,12 +473,13 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             frame?.gizmos ?? [],
             hoverId,
             selectedGeomId(),
-            activeGizmo(),
+            hoverGizmoSite(),
+            selectedGizmoSite(),
           );
         } else {
           ctx2d.clearRect(0, 0, w, h);
           drawAxes(ctx2d, w, h, cam);
-          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, activeGizmo());
+          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, hoverGizmoSite(), selectedGizmoSite());
         }
         if (session) {
           const view = sessionGhostView(session, lastHover, ghost);
@@ -489,7 +490,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           w,
           h,
           mode === "geom" ? (frame?.gizmos ?? []) : sdfGizmos,
-          activeGizmo(),
+          hoverGizmoSite(),
+          selectedGizmoSite(),
         );
         if (quiet && !error) {
           if (session) syncCommandBar();
