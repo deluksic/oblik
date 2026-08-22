@@ -3,7 +3,8 @@
 - [Intent](./intent.md) — programs, pure libraries, declared editors
 - [Layout](./layout.md) — packages, import rules, identity, widget write-back
 - [Scenes](./scenes.md) — catalog, layouts, marks, Space palette
-- [euclid2 graph](./euclid2-graph.md) — **current:** Desmos-style 2D; tools emit a computation graph (free vs derived, values vs strokes)
+- [euclid2 graph](./euclid2-graph.md) — 2D constructors, annotator, potential vs actual
+- [euclid2 worked example](./euclid2-worked.md) — shelf / reach / beam; where the graph fails intent
 
 Prototypes (charter + what we learned):
 
