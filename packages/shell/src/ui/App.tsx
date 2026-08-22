@@ -306,7 +306,7 @@ export function App(props: WorkspaceProps) {
   return (
     <>
       <header>
-        <p class="kicker">Prototype 3</p>
+        <p class="kicker">Prototype 5</p>
         <h1>{title()}</h1>
         <Nav scenes={props.scenes} activeId={sceneId()} onSelect={selectScene} />
       </header>
