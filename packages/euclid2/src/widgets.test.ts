@@ -220,3 +220,23 @@ test("paired offset shares site; overlay moves both sides together", () => {
   expect(shelf.line.origin.y).toBeCloseTo(2.2);
   expect(cellar.line.origin.y).toBeCloseTo(-2.2);
 });
+
+test("nested angle helpers keep distinct caller frames", () => {
+  const site = { __annotations__: { file: F, at: [20, 1] as [number, number], editable: true } };
+  function doorOpen(hinge: { x: number; y: number }) {
+    return angle(hinge, 60, { radius: 1, ...site });
+  }
+  function floorPlanLayout() {
+    doorOpen({ x: 0, y: 0 });
+    doorOpen({ x: 2, y: 0 });
+  }
+  beginWidgetFrame("doors");
+  floorPlanLayout();
+  const gs = getGizmos().filter((g) => g.kind === "angle");
+  expect(gs).toHaveLength(2);
+  const names = (g: (typeof gs)[0]) => (g.stack ?? []).map((f) => f.name);
+  expect(names(gs[0]!)).toContain("doorOpen");
+  expect(names(gs[0]!)).toContain("floorPlanLayout");
+  const caller = (g: (typeof gs)[0]) => g.stack?.find((f) => f.name === "floorPlanLayout");
+  expect(caller(gs[0]!)?.line).not.toBe(caller(gs[1]!)?.line);
+});

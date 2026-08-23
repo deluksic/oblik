@@ -39,7 +39,7 @@ apps/
 - `path` — `segment[12]`. Display index this frame, not identity.
 - `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.
 
-Inspect shows that stack so two `doorLeaf()` doors are distinguishable by the `drawFloorPlan` / `scene` frames that called them. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames.
+Inspect shows that stack so two `doorLeaf()` doors are distinguishable by the `drawFloorPlan` / `scene` frames that called them. Widget handles (`angle`, `slider`, `vector`, …) capture the same user stack, so three `doorOpen()` hinges are distinguishable by the layout lines that called them. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames.
 
 ## Catalogs
 

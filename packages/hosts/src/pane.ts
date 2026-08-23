@@ -1,6 +1,6 @@
 import type { InspectPatch } from "@design-scenes/shell";
 
-import { commitWidget, peekFile, renderSnippet } from "./inspect";
+import { commitWidget, mapStack, peekFile, pinConstructorSite, renderStackSnippets, stackLabel } from "./inspect";
 
 export function scenePeekPath(sceneFile: string): string {
   return `apps/paper/src/scenes/${sceneFile}`;
@@ -70,20 +70,23 @@ export function pruneSelection(
 export async function showWidgetInspect(
   push: InspectPush,
   peekCache: Map<string, string>,
-  g: { kind: string; site: string; at: { file: string; line: number; column: number } },
+  g: {
+    kind: string;
+    site: string;
+    at: { file: string; line: number; column: number };
+    stack?: { file: string; line: number; column: number; name?: string }[];
+  },
   meta: string,
 ): Promise<void> {
-  let sourceHtml = `<code class="empty">Could not read ${g.at.file}.</code>`;
-  try {
-    const text = await peekFile(peekCache, g.at.file);
-    sourceHtml = renderSnippet(text, g.at.line);
-  } catch (err) {
-    sourceHtml = `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-  }
+  const raw =
+    g.stack && g.stack.length > 0
+      ? g.stack
+      : [{ file: g.at.file, line: g.at.line, column: g.at.column }];
+  const stack = pinConstructorSite(await mapStack(raw), g.at);
   push({
-    crumb: `widget ${g.kind} ${g.site} · writes ${g.at.file}`,
-    meta,
-    sourceHtml,
+    crumb: `widget ${g.kind}`,
+    meta: `${g.site} · ${stackLabel(stack) || meta}`,
+    sourceHtml: await renderStackSnippets(stack, peekCache),
   });
 }
 

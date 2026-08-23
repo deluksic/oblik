@@ -1,8 +1,10 @@
 import {
+  captureUserStack,
   point,
   setGeomLiveReader,
   withoutDraw,
   isFiniteVec,
+  type CallSite,
   type Drawable,
   type Point,
   type Segment,
@@ -24,7 +26,7 @@ export type SiteOpts = {
 
 export type GizmoAt = { file: string; line: number; column: number };
 
-type Located = { site: string; at: GizmoAt };
+type Located = { site: string; at: GizmoAt; stack?: CallSite[] };
 
 export type PointGizmo = Located & {
   kind: "point";
@@ -144,6 +146,7 @@ function siteFrom(opts?: SiteOpts): Located | null {
   return {
     site: `${file}:${line}:${column}`,
     at: { file, line, column },
+    stack: captureUserStack(),
   };
 }
 
@@ -208,10 +211,12 @@ export function getGizmos(): readonly Gizmo[] {
   return gizmos.slice();
 }
 
-function locatedFromGeomSite(site: { file: string; line: number; column: number }): Located {
+function locatedFromGeom(geom: Drawable["geom"]): Located | null {
+  if (!geom.site) return null;
   return {
-    site: `${site.file}:${site.line}:${site.column}`,
-    at: { file: site.file, line: site.line, column: site.column },
+    site: `${geom.site.file}:${geom.site.line}:${geom.site.column}`,
+    at: { file: geom.site.file, line: geom.site.line, column: geom.site.column },
+    stack: geom.provenance.stack,
   };
 }
 
@@ -264,8 +269,8 @@ export function gizmosFromDrawables(drawables: readonly Drawable[]): Gizmo[] {
   const out: Gizmo[] = [];
   for (const d of drawables) {
     const g = d.geom;
-    if (!g.site) continue;
-    const located = locatedFromGeomSite(g.site);
+    const located = locatedFromGeom(g);
+    if (!located) continue;
     const giz = gizmoForEditableGeom(g, located, readOverride(located.site));
     if (giz) out.push(giz);
   }

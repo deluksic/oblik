@@ -1,4 +1,4 @@
-import { lerp3, point3 as makePoint3, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
+import { captureUserStack, lerp3, point3 as makePoint3, type CallSite, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
 
 export type SiteOpts3 = {
   file?: string;
@@ -13,7 +13,7 @@ export type SiteOpts3 = {
 
 export type GizmoAt3 = { file: string; line: number; column: number };
 
-type Located = { site: string; at: GizmoAt3 };
+type Located = { site: string; at: GizmoAt3; stack?: CallSite[] };
 
 export type Point3Gizmo = Located & {
   kind: "point3";
@@ -51,6 +51,7 @@ function siteFrom(opts?: SiteOpts3): Located | null {
   return {
     site: `${file}:${line}:${column}`,
     at: { file, line, column },
+    stack: captureUserStack(),
   };
 }
 

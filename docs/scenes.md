@@ -63,7 +63,7 @@ euclid2:
 
 sdf2: Point + Distance only. Point writes `point(x, y)`; Distance writes `circle` / `offsetLine`. Coral rings come from annotated constructors (sdf2 collects drawables even though it does not stroke cream geometry).
 
-`scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). A return value is still flattened for scenes that list geometry. Inspect provenance is the **user call stack** (demo helpers and `scene`), not a grouping API.
+`scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). A return value is still flattened for scenes that list geometry. Inspect provenance is the **user call stack** (demo helpers and `scene`) for both cream strokes and coral handles, not a grouping API.
 
 Inserts add statements inside `scene()` (before an existing `return`, or at the end of a void body). A handle declared in `plateLayout()` (outside `scene()`) is refused.
 
