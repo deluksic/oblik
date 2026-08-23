@@ -3,7 +3,7 @@ import { circle, point, segment } from "@design-scenes/geom";
 
 import { assembleBeam } from "../demo/beam";
 
-export const title = "Grouped";
+export const title = "Truss";
 export const sceneFile = "beam.scene.ts";
 
 export function scene() {

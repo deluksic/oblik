@@ -533,24 +533,13 @@ export function resolveLineBindingName(
   return infinite?.name ?? null;
 }
 
-function groupReturnElements(fn: ts.FunctionDeclaration): ts.ArrayLiteralExpression | null {
+function arrayReturnElements(fn: ts.FunctionDeclaration): ts.ArrayLiteralExpression | null {
   const body = fn.body;
   if (!body) return null;
   const last = body.statements[body.statements.length - 1];
   if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
   const retExpr = last.expression;
-  if (
-    !ts.isCallExpression(retExpr) ||
-    !ts.isIdentifier(retExpr.expression) ||
-    retExpr.expression.text !== "group"
-  ) {
-    return null;
-  }
-  const arrow = retExpr.arguments[0];
-  if (!arrow || !ts.isArrowFunction(arrow) || !ts.isArrayLiteralExpression(arrow.body)) {
-    return null;
-  }
-  return arrow.body;
+  return ts.isArrayLiteralExpression(retExpr) ? retExpr : null;
 }
 
 function sceneLineFromCall(
@@ -575,7 +564,7 @@ function sceneLineFromCall(
   };
 }
 
-/** Inline `segment(...)` / `line(...)` in `group(() => [...])` return. */
+/** Inline `segment(...)` / `line(...)` in `return [...]`. */
 export function inlineSceneLineNear(
   source: string,
   drawableKind: "segment" | "line",
@@ -584,7 +573,7 @@ export function inlineSceneLineNear(
 ): { element: ts.Expression; kind: "segment" | "line" } | null {
   const sf = parse(source);
   const fn = findSceneFunction(sf);
-  const arr = fn ? groupReturnElements(fn) : null;
+  const arr = fn ? arrayReturnElements(fn) : null;
   if (!arr) return null;
   for (const el of arr.elements) {
     if (ts.isIdentifier(el)) continue;
@@ -599,13 +588,13 @@ export function inlineSceneLineNear(
   return null;
 }
 
-function replaceGroupElementByText(
+function replaceArrayElementByText(
   source: string,
   fn: ts.FunctionDeclaration,
   exprText: string,
   replacement: string,
 ): string | null {
-  const arr = groupReturnElements(fn);
+  const arr = arrayReturnElements(fn);
   if (!arr) return null;
   const sf = fn.getSourceFile();
   for (const el of arr.elements) {
@@ -643,7 +632,7 @@ function promoteInlineElement(
   let next = insertSceneStatements(source, fn, [`const ${name} = ${exprText};`]);
   const fn2 = findSceneFunction(parse(next));
   if (!fn2) throw new Error("no scene()");
-  const replaced = replaceGroupElementByText(next, fn2, exprText, name);
+  const replaced = replaceArrayElementByText(next, fn2, exprText, name);
   if (!replaced) {
     throw new Error("That geometry has no construction site in scene().");
   }

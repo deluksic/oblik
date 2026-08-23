@@ -62,6 +62,24 @@
   white-space: pre;
 }
 
+.source :global(.stack-frame) {
+  padding: 0.35rem 0 0.55rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.source :global(.stack-frame:last-child) {
+  border-bottom: none;
+}
+
+.source :global(.frame-label) {
+  padding: 0.45rem 0.6rem 0.2rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 @media (max-width: 800px) {
   .inspect {
     border-left: none;

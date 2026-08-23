@@ -1,7 +1,6 @@
 import {
   add,
   circle,
-  group,
   segment,
   mul,
   polyline,
@@ -24,7 +23,7 @@ export type PlateOpts = {
   boltCircle?: { center: Vec2; radius: number; count: number; holeR: number };
 };
 
-/** Polar hole pattern. Loop is the provenance stress: every hole shares one call site. */
+/** Polar hole pattern. Loop iterations share a stack (same helper line). */
 export function boltCircle(center: Vec2, radius: number, count: number, holeR: number): Hole[] {
   const n = Math.max(3, Math.round(count));
   const out: Hole[] = [];
@@ -85,7 +84,7 @@ export function withRingCount(opts: PlateOpts, count: number): PlateOpts {
 export function drawPlateNest(
   master: PlateOpts,
   grid: { cols: number; rows: number; gap: number; countStep?: number },
-): Geom {
+): Geom[] {
   const cols = Math.max(1, Math.round(grid.cols));
   const rows = Math.max(1, Math.round(grid.rows));
   const gap = Math.max(0.05, grid.gap);
@@ -100,19 +99,17 @@ export function drawPlateNest(
   const y0 = -totalH / 2 - master.stock.min.y;
   const baseN = master.boltCircle?.count ?? 3;
 
-  return group(() => {
-    const cells: Geom[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const cell = withRingCount(
-          translatePlate(master, x0 + c * pitchX, y0 + r * pitchY),
-          baseN + c * step,
-        );
-        cells.push(drawPlate(cell));
-      }
+  const cells: Geom[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = withRingCount(
+        translatePlate(master, x0 + c * pitchX, y0 + r * pitchY),
+        baseN + c * step,
+      );
+      cells.push(...drawPlate(cell));
     }
-    return cells;
-  });
+  }
+  return cells;
 }
 
 function rectOutline(min: Vec2, max: Vec2): Geom {
@@ -184,38 +181,23 @@ function buildPlateParts(opts: PlateOpts): Geom[] {
     parts.push(...crossAt(hole.center, hole.radius * 0.55));
   }
 
+  const bc = opts.boltCircle;
+  if (bc) {
+    parts.push(circle(bc.center, Math.abs(bc.radius)));
+  }
+
   parts.push(...pocketWithFillets(opts.pocket.min, opts.pocket.max, opts.pocket.filletR));
   parts.push(...slotCut(opts.slot.center, opts.slot.length, opts.slot.width));
 
   return parts;
 }
 
-/** Stock, holes, pocket, slot — grouped for breadcrumb namespaces. */
-export function drawPlate(opts: PlateOpts): Geom {
-  const { min, max } = opts.stock;
-  return group(() => {
-    const stock = rectOutline(min, max);
-    const holes = group(() => {
-      const out: Geom[] = [];
-      for (const hole of opts.holes) {
-        out.push(circle(hole.center, Math.abs(hole.radius)));
-        out.push(...crossAt(hole.center, hole.radius * 0.55));
-      }
-      const bc = opts.boltCircle;
-      if (bc) {
-        out.push(circle(bc.center, Math.abs(bc.radius)));
-      }
-      return out;
-    });
-    const pocket = group(() =>
-      pocketWithFillets(opts.pocket.min, opts.pocket.max, opts.pocket.filletR),
-    );
-    const slot = group(() => slotCut(opts.slot.center, opts.slot.length, opts.slot.width));
-    return [stock, holes, pocket, slot];
-  });
+/** Stock, holes, pocket, slot. */
+export function drawPlate(opts: PlateOpts): Geom[] {
+  return buildPlateParts(opts);
 }
 
-/** Ungrouped — for comparing flat paths / duplicate local indices. */
+/** Same as drawPlate — kept for the flat comparison scene. */
 export function drawPlateFlat(opts: PlateOpts): Geom[] {
   return buildPlateParts(opts);
 }

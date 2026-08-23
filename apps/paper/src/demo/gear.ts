@@ -4,7 +4,6 @@ import {
   circle,
   dist,
   extrude,
-  group,
   segment,
   polar,
   polyline,
@@ -237,10 +236,10 @@ export function drawHelicalGear(opts: SpurGearOpts & { height: number; helixAngl
   });
 }
 
-export function drawHelicalPair(layout: GearLayout, height: number): Geom {
+export function drawHelicalPair(layout: GearLayout, height: number): Geom[] {
   const h = Math.max(0.35, height);
   const beta = (layout.helixDeg * Math.PI) / 180;
-  return group(() => [
+  return [
     drawHelicalGear({
       center: layout.pinion,
       teeth: layout.z1,
@@ -259,5 +258,5 @@ export function drawHelicalPair(layout: GearLayout, height: number): Geom {
       height: h,
       helixAngle: -beta,
     }),
-  ]);
+  ];
 }

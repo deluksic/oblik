@@ -16,7 +16,7 @@ import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
-import { peekFile, quantize, renderSnippet } from "./inspect";
+import { quantize, renderStackSnippets, stackLabel } from "./inspect";
 import {
   commitGizmoIfChanged,
   movedPastClick,
@@ -208,7 +208,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · click a handle or a surface"),
-            `<code class="empty">Select something to see the creation site.</code>`,
+            `<code class="empty">Select something to see the call stack.</code>`,
           );
           return;
         }
@@ -224,17 +224,11 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           return;
         }
         const g = f.geom;
+        const stack = g.provenance.stack ?? [];
         pushInspect({
           crumb: breadcrumb(g.path),
-          meta: `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
-          sourceHtml: await (async () => {
-            try {
-              const text = await peekFile(peekCache, g.provenance.file);
-              return renderSnippet(text, g.provenance.line);
-            } catch (err) {
-              return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-            }
-          })(),
+          meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
+          sourceHtml: await renderStackSnippets(stack, peekCache),
         });
       }
 

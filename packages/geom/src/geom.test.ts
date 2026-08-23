@@ -10,6 +10,7 @@ import {
   offsetLine,
   perpendicularLine,
   point,
+  segment,
   signedDist,
 } from "./index";
 
@@ -83,4 +84,34 @@ test("perpendicularLine passes through point and is normal to carrier", () => {
   expect(Math.abs(perpLn.direction.x)).toBeLessThan(1e-9);
   expect(Math.abs(Math.abs(perpLn.direction.y) - 1)).toBeLessThan(1e-9);
   expect(Math.abs(signedDist(p, perpLn))).toBeLessThan(1e-9);
+});
+
+test("nested helpers appear on provenance.stack, innermost first", () => {
+  function doorLeaf() {
+    return segment(point(0, 0), point(1, 0));
+  }
+  function drawFloorPlan() {
+    return doorLeaf();
+  }
+  beginGeomFrame();
+  const leaf = drawFloorPlan();
+  const names = leaf.provenance.stack.map((f) => f.name).filter(Boolean);
+  expect(names[0]).toBe("doorLeaf");
+  expect(names).toContain("drawFloorPlan");
+});
+
+test("two doorLeaf calls from different lines keep distinct caller frames", () => {
+  function doorLeaf() {
+    return segment(point(0, 0), point(1, 0));
+  }
+  function drawFloorPlan() {
+    const a = doorLeaf();
+    const b = doorLeaf();
+    return [a, b] as const;
+  }
+  beginGeomFrame();
+  const [a, b] = drawFloorPlan();
+  const caller = (g: { provenance: { stack: { name?: string; line: number }[] } }) =>
+    g.provenance.stack.find((f) => f.name === "drawFloorPlan");
+  expect(caller(a)?.line).not.toBe(caller(b)?.line);
 });

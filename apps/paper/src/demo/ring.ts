@@ -1,7 +1,6 @@
 import {
   add,
   circle,
-  group,
   segment,
   polyline,
   wrapBand,
@@ -65,20 +64,20 @@ export function unrolledOutline(opts: RingOpts): Vec2[] {
   return pts;
 }
 
-export function drawUnrolled(opts: RingOpts): Geom {
+export function drawUnrolled(opts: RingOpts): Geom[] {
   const o = opts.origin;
   const circ = circumference(opts.innerR);
   const outline = unrolledOutline(opts);
-  return group(() => [
+  return [
     polyline(outline),
     segment(o, add(o, vec(0, topZ(0, circ, opts.shank, opts.signet)))),
     segment(add(o, vec(circ, 0)), add(o, vec(circ, topZ(circ, circ, opts.shank, opts.signet)))),
-  ]);
+  ];
 }
 
-export function drawRingPlan(center: Vec2, innerR: number, gauge: number): Geom {
+export function drawRingPlan(center: Vec2, innerR: number, gauge: number): Geom[] {
   const r = Math.max(0.4, innerR);
-  return group(() => [circle(center, r), circle(center, r + Math.max(0.15, gauge))]);
+  return [circle(center, r), circle(center, r + Math.max(0.15, gauge))];
 }
 
 export function drawRing3(opts: RingOpts): Geom {

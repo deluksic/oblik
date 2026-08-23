@@ -1,4 +1,4 @@
-import { box3, circle3, cylinder3, group, segment3, type Geom, type Vec3 } from "@design-scenes/geom";
+import { box3, circle3, cylinder3, segment3, type Geom, type Vec3 } from "@design-scenes/geom";
 
 import type { PlateOpts } from "./plate";
 
@@ -85,33 +85,26 @@ function slotCut(opts: MillOpts["slot"], zTop: number): Geom[] {
 }
 
 /** Z-up mill block: stock, through holes, pocket, edge slot. */
-export function drawMill(opts: MillOpts): Geom {
+export function drawMill(opts: MillOpts): Geom[] {
   const zTop = Math.max(opts.stock.min.z, opts.stock.max.z);
-  return group(() => [
-    group(() => [stockBox(opts.stock.min, opts.stock.max)]),
-    group(() => {
-      const parts = holeSet(opts.stock, opts.holes);
-      const bc = opts.boltCircle;
-      if (bc) {
-        const z1 = Math.max(opts.stock.min.z, opts.stock.max.z);
-        parts.push(circle3({ x: bc.x, y: bc.y, z: z1 }, bc.radius, { x: 0, y: 0, z: 1 }));
-      }
-      return parts;
-    }),
-    group(() => {
-      const p = opts.pocket;
-      const parts: Geom[] = [box3(p.min, p.max)];
-      const r = p.filletR ?? 0;
-      if (r > 0) {
-        const z = Math.max(p.min.z, p.max.z);
-        const n = { x: 0, y: 0, z: 1 };
-        parts.push(circle3({ x: p.min.x + r, y: p.min.y + r, z }, r, n));
-        parts.push(circle3({ x: p.max.x - r, y: p.min.y + r, z }, r, n));
-        parts.push(circle3({ x: p.max.x - r, y: p.max.y - r, z }, r, n));
-        parts.push(circle3({ x: p.min.x + r, y: p.max.y - r, z }, r, n));
-      }
-      return parts;
-    }),
-    group(() => slotCut(opts.slot, zTop)),
-  ]);
+  const parts: Geom[] = [stockBox(opts.stock.min, opts.stock.max)];
+  parts.push(...holeSet(opts.stock, opts.holes));
+  const bc = opts.boltCircle;
+  if (bc) {
+    const z1 = Math.max(opts.stock.min.z, opts.stock.max.z);
+    parts.push(circle3({ x: bc.x, y: bc.y, z: z1 }, bc.radius, { x: 0, y: 0, z: 1 }));
+  }
+  const p = opts.pocket;
+  parts.push(box3(p.min, p.max));
+  const r = p.filletR ?? 0;
+  if (r > 0) {
+    const z = Math.max(p.min.z, p.max.z);
+    const n = { x: 0, y: 0, z: 1 };
+    parts.push(circle3({ x: p.min.x + r, y: p.min.y + r, z }, r, n));
+    parts.push(circle3({ x: p.max.x - r, y: p.min.y + r, z }, r, n));
+    parts.push(circle3({ x: p.max.x - r, y: p.max.y - r, z }, r, n));
+    parts.push(circle3({ x: p.min.x + r, y: p.max.y - r, z }, r, n));
+  }
+  parts.push(...slotCut(opts.slot, zTop));
+  return parts;
 }

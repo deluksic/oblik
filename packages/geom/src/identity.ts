@@ -1,10 +1,11 @@
-import { captureCallSite } from "./provenance";
+import { captureUserStack, type CallSite } from "./provenance";
 
-export type Provenance = {
-  file: string;
-  line: number;
-  column: number;
+export type { CallSite };
+
+export type Provenance = CallSite & {
   createdBy: string;
+  /** User frames, innermost (the helper that called the constructor) first. */
+  stack: CallSite[];
 };
 
 export type GeomSite = { file: string; line: number; column: number };
@@ -62,9 +63,8 @@ export function geomLiveValues(site: GeomSite | undefined): number[] | undefined
 export type Base = {
   /** Opaque pick identity — unique per geometric value this frame. */
   id: string;
-  /** Human breadcrumb (group[0]/line[2]); groups namespace this, not id. */
+  /** Display index this frame (`segment[12]`). Not identity; pick uses `id`. */
   path: string;
-  parentId: string | null;
   provenance: Provenance;
   /** Stable construction site when the call-site annotator injected `__annotations__`. */
   site?: GeomSite;
@@ -73,8 +73,6 @@ export type Base = {
 };
 
 const pathCounts = new Map<string, number>();
-let currentParentPath: string | null = null;
-let currentParentId: string | null = null;
 let constructDepth = 0;
 let drawSilent = 0;
 const frameGeoms: unknown[] = [];
@@ -96,8 +94,6 @@ const DRAWN_KINDS = new Set([
 
 export function beginGeomFrame(): void {
   pathCounts.clear();
-  currentParentPath = null;
-  currentParentId = null;
   constructDepth = 0;
   frameGeoms.length = 0;
 }
@@ -135,57 +131,33 @@ export function takeFrameGeoms(): unknown[] {
   return frameGeoms.slice();
 }
 
-function nextPathLocal(kind: string): string {
-  const key = `${currentParentPath ?? ""}::${kind}`;
-  const n = pathCounts.get(key) ?? 0;
-  pathCounts.set(key, n + 1);
+function nextPath(kind: string): string {
+  const n = pathCounts.get(kind) ?? 0;
+  pathCounts.set(kind, n + 1);
   return `${kind}[${n}]`;
 }
 
-function makePath(local: string): string {
-  return currentParentPath ? `${currentParentPath}/${local}` : local;
-}
-
-function captureProvenance(createdBy: string): Provenance {
-  const site = captureCallSite();
-  return { ...site, createdBy };
+function captureProvenance(createdBy: string, site?: GeomSite): Provenance {
+  const stack = captureUserStack();
+  const leaf = stack[0] ?? { file: "unknown", line: 0, column: 0 };
+  const loc = site ?? leaf;
+  return {
+    file: loc.file,
+    line: loc.line,
+    column: loc.column,
+    createdBy,
+    stack: stack.length > 0 ? stack : [leaf],
+  };
 }
 
 export function makeBase(kind: string, createdBy: string, site?: GeomSite, editable?: boolean): Base {
-  const local = nextPathLocal(kind);
   return {
     id: crypto.randomUUID(),
-    path: makePath(local),
-    parentId: currentParentId,
-    provenance: site ? { ...site, createdBy } : captureProvenance(createdBy),
+    path: nextPath(kind),
+    provenance: captureProvenance(createdBy, site),
     site,
     editable,
   };
-}
-
-export type Group = Base & { kind: "group"; children: unknown[] };
-
-/** Optional path namespace. Does not affect pick identity. */
-export function group<T>(fn: () => T[] | void): Group {
-  const local = nextPathLocal("group");
-  const path = makePath(local);
-  const id = crypto.randomUUID();
-  const node: Group = {
-    id,
-    path,
-    parentId: currentParentId,
-    provenance: captureProvenance("group"),
-    kind: "group",
-    children: [],
-  };
-  const prevPath = currentParentPath;
-  const prevId = currentParentId;
-  currentParentPath = path;
-  currentParentId = id;
-  node.children = fn() ?? [];
-  currentParentPath = prevPath;
-  currentParentId = prevId;
-  return node;
 }
 
 export function breadcrumb(path: string): string {

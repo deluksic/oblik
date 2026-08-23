@@ -12,7 +12,7 @@ export function Inspect(props: InspectProps) {
       <p class={styles.kicker}>Identity</p>
       <h2 class={styles.crumb}>{props.state.crumb}</h2>
       <p class={styles.meta}>{props.state.meta}</p>
-      <p class={styles.kicker}>Creation site</p>
+      <p class={styles.kicker}>Call stack</p>
       <div class={styles.source} innerHTML={props.state.sourceHtml} />
     </aside>
   );

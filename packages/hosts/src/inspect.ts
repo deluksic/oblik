@@ -28,6 +28,49 @@ export function renderSnippet(text: string, line: number): string {
   return chunks.join("");
 }
 
+export type StackFrame = {
+  file: string;
+  line: number;
+  column: number;
+  name?: string;
+};
+
+export function stackLabel(frames: readonly StackFrame[]): string {
+  if (frames.length === 0) return "";
+  return frames
+    .map((f) => {
+      const who = f.name ?? f.file.split("/").pop() ?? f.file;
+      return `${who} ${f.file}:${f.line}`;
+    })
+    .join(" ← ");
+}
+
+/** Innermost helper first; callers follow so nested reuse is visible. */
+export async function renderStackSnippets(
+  frames: readonly StackFrame[],
+  cache: Map<string, string>,
+): Promise<string> {
+  if (frames.length === 0) {
+    return `<code class="empty">No user stack frames.</code>`;
+  }
+  const parts: string[] = [];
+  for (const f of frames) {
+    const who = f.name ? escapeHtml(f.name) : "call";
+    const loc = escapeHtml(`${f.file}:${f.line}:${f.column}`);
+    let body: string;
+    try {
+      const text = await peekFile(cache, f.file);
+      body = renderSnippet(text, f.line);
+    } catch (err) {
+      body = `<code class="empty">${escapeHtml(err instanceof Error ? err.message : String(err))}</code>`;
+    }
+    parts.push(
+      `<div class="stack-frame"><div class="frame-label">${who} · ${loc}</div>${body}</div>`,
+    );
+  }
+  return parts.join("");
+}
+
 export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {
   const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
   const cached = cache.get(key);

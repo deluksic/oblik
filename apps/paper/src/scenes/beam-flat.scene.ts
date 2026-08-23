@@ -7,7 +7,7 @@ export const id = "flat";
 export const title = "Flat";
 export const sceneFile = "beam-flat.scene.ts";
 
-/** Two trusses, no group — each handle is its own unrolled constructor. */
+/** Two trusses — each handle is its own unrolled constructor. */
 export function scene() {
   const aTop = point(-4.88, 2.49);
   const bTop = point(5.89, 1.09);

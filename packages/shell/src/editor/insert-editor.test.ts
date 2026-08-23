@@ -196,20 +196,20 @@ test("distanceOriginName reads the first argument", () => {
   expect(distanceOriginName(hello, at(hello, 1))).toBe("c");
 });
 
-test("point insert before grouped return does not rebind __scene", () => {
-  const src = `import { circle, group } from "@design-scenes/geom";
+test("point insert before array return does not rebind __scene", () => {
+  const src = `import { circle } from "@design-scenes/geom";
 import { point } from "@design-scenes/geom";
 
 export function scene() {
   const a = point(0, 0);
   const __scene = circle(a, 1);
-  return group(() => [__scene, circle(a, 1)]);
+  return [__scene, circle(a, 1)];
 }
 `;
   const next = insertEditors(src, [{ kind: "point", x: -1, y: 2 }]);
   expect(next.match(/const __scene = /g)?.length).toBe(1);
   expect(next).toMatch(/^  const p = point\(-1, 2\);$/m);
-  expect(next).toMatch(/^  return group\(\(\) => \[__scene, circle\(a, 1\)\]\);$/m);
+  expect(next).toMatch(/^  return \[__scene, circle\(a, 1\)\];$/m);
 });
 
 test("namedScenePointNear matches a derived point()", () => {
@@ -260,15 +260,15 @@ export function scene() {
   expect(evalSceneLines(src, env).map((l) => l.name)).toEqual(["h", "v"]);
 });
 
-test("promoteInlineLineBinding hoists group-return segment to const", () => {
-  const src = `import { circle, group, segment } from "@design-scenes/geom";
+test("promoteInlineLineBinding hoists array-return segment to const", () => {
+  const src = `import { circle, segment } from "@design-scenes/geom";
 
 export function scene() {
   const c = point(0, 0);
   const p = point(5, 0);
   const r = circle(c, 1);
   const __scene = circle(c, r);
-  return group(() => [__scene, segment(c, p)]);
+  return [__scene, segment(c, p)];
 }
 `;
   const env = new Map([
@@ -280,11 +280,11 @@ export function scene() {
   const promoted = promoteInlineLineBinding(src, match, env);
   expect(promoted?.name).toBe("s");
   expect(promoted?.source).toMatch(/const s = segment\(c, p\);/);
-  expect(promoted?.source).toMatch(/return group\(\(\) => \[__scene, s\]\);/);
+  expect(promoted?.source).toMatch(/return \[__scene, s\];/);
 });
 
 test("promoteInlineLineBinding works for rect edges with derived point() corners", () => {
-  const src = `import { circle, group, segment, point } from "@design-scenes/geom";
+  const src = `import { circle, segment, point } from "@design-scenes/geom";
 
 export function scene() {
   const c = point(0, 0);
@@ -296,7 +296,7 @@ export function scene() {
   const tl = point(bl.x, tr.y);
   const br = point(tr.x, bl.y);
   const p2 = point(0.02, 2.95);
-  return group(() => [__scene, segment(c, p), segment(bl, tl), segment(tl, tr), segment(tr, br), segment(br, bl), segment(c, p2)]);
+  return [__scene, segment(c, p), segment(bl, tl), segment(tl, tr), segment(tr, br), segment(br, bl), segment(c, p2)];
 }
 `;
   const known = [
@@ -319,31 +319,31 @@ export function scene() {
   expect(promoted?.name).toBe("s");
 });
 
-test("bindLineAt hoists inline segment at injected construction site", () => {
-  const src = `import { group, segment } from "@design-scenes/geom";
+test("bindLineAt hoists inline line at injected construction site", () => {
+  const src = `import { line } from "@design-scenes/geom";
 import { point } from "@design-scenes/geom";
 
 export function scene() {
   const c = point(0, 0);
   const p = point(5, 0);
-  return group(() => [segment(c, p)]);
+  return [line(c, p)];
 }
 `;
   const injected = injectSceneSites(src, "apps/paper/src/scenes/plate.scene.ts");
   const m = injected.match(
-    /segment\(c, p, \{ __annotations__: \{ file: .+, at: \[(\d+), (\d+)\], editable: false \} \}/,
+    /line\(c, p, \{ __annotations__: \{ file: .+, at: \[(\d+), (\d+)\], editable: false \} \}/,
   );
   expect(m).toBeTruthy();
   const bound = bindLineAt(src, { line: Number(m![1]), column: Number(m![2]) });
-  expect(bound?.name).toBe("s");
-  expect(bound?.source).toMatch(/const s = segment\(c, p\);/);
+  expect(bound?.name).toBe("l");
+  expect(bound?.source).toMatch(/const l = line\(c, p\);/);
   const next = applyScenePatch(src, {
     hoistAt: [{ line: Number(m![1]), column: Number(m![2]) }],
     imports: { "@design-scenes/geom": ["offsetLine"] },
-    statements: ["const off = offsetLine(s, 1.2);"],
+    statements: ["const off = offsetLine(l, 1.2);"],
   });
-  expect(next).toMatch(/const s = segment\(c, p\);/);
-  expect(next).toMatch(/const off = offsetLine\(s, 1\.2\);/);
+  expect(next).toMatch(/const l = line\(c, p\);/);
+  expect(next).toMatch(/const off = offsetLine\(l, 1\.2\);/);
 });
 
 test("bindLineAt hoists a line() statement in a void scene", () => {

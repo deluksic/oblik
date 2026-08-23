@@ -1,4 +1,4 @@
-import { circle, group, type Circle, point, line, signedDist, offsetLine, dist } from "@design-scenes/geom";
+import { circle, point, line, signedDist, offsetLine, dist } from "@design-scenes/geom";
 
 export const title = "Shared loop";
 export const sceneFile = "shared-loop.scene.ts";
@@ -11,20 +11,18 @@ export const camera = { x: 0, y: 0, scale: 48 };
  */
 export function scene() {
   const o = point(0, -0.03);
-  const rings: Circle[] = [];
   for (let i = 0; i < 5; i++) {
     const ang = (i / 5) * Math.PI * 2;
     const p = {
       x: o.x + Math.cos(ang) * 2.2,
       y: o.y + Math.sin(ang) * 2.2,
     };
-    rings.push(circle(p, 1));
+    circle(p, 1);
   }
   const p2 = point(3.37, 3.63);
   const ln = line(o, p2);
   const p3 = point(2.45, 4.84);
-  const off = offsetLine(ln, signedDist(p3, ln));
-  const k = circle(o, 1);
-  const k2 = circle(o, dist(o, p2));
-  return group(() => rings);
+  offsetLine(ln, signedDist(p3, ln));
+  circle(o, 1);
+  circle(o, dist(o, p2));
 }

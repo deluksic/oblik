@@ -36,10 +36,10 @@ apps/
 ## Identity
 
 - `id` — UUID, pick/hover/highlight only. Regenerated every frame.
-- `path` — `group[0]/line[2]`. Optional. `group()` namespaces the path for humans.
-- `provenance` — first stack frame outside geom/euclid2/shell.
+- `path` — `segment[12]`. Display index this frame, not identity.
+- `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.
 
-`group()` is a folder in the breadcrumb. Picking works without it.
+Inspect shows that stack so two `doorLeaf()` doors are distinguishable by the `drawFloorPlan` / `scene` frames that called them. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames.
 
 ## Catalogs
 

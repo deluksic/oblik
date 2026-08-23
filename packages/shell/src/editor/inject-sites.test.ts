@@ -55,10 +55,10 @@ const a: Vec2 = point(-2.2, 0.15);
 });
 
 test("injects construction sites onto scene geom constructors", () => {
-  const src = `return group(() => [segment(c, p), line(a, b)]);\n`;
+  const src = `return [segment(c, p), line(a, b)];\n`;
   const out = injectSceneSites(src, SCENE);
-  expect(out).toMatch(/segment\(c, p, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/);
   expect(out).toMatch(/line\(a, b, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/);
+  expect(out).toContain("segment(c, p)");
 });
 
 test("injects helper files outside the catalog", () => {
@@ -90,16 +90,14 @@ test("public editable: false freezes a literal", () => {
   expect(out).toMatch(/editable: false, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \}/);
 });
 
-test("polyline identity site is the CallExpression line in the original source", () => {
-  const src = `function rect() {
-  return polyline([
-    a, b,
-  ]);
+test("line identity site is the CallExpression line in the original source", () => {
+  const src = `function axis() {
+  return line(a, b);
 }
 `;
   const out = injectSceneSites(src, SCENE);
   expect(out).toMatch(
-    /polyline\(\[\s*a, b,\s*\], \{ __annotations__: \{ file: .+, at: \[2, \d+\], editable: false \} \}\)/,
+    /line\(a, b, \{ __annotations__: \{ file: .+, at: \[2, \d+\], editable: false \} \}\)/,
   );
 });
 

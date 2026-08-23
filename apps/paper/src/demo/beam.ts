@@ -1,7 +1,6 @@
 import {
   add,
   circle,
-  group,
   lerp,
   segment,
   mul,
@@ -47,12 +46,12 @@ function buildBeamParts(opts: {
   return parts;
 }
 
-/** Same shapes as assembleBeam, without a group path prefix. */
+/** Same shapes as assembleBeam. */
 export function assembleBeamFlat(opts: { span: Segment; rings: Ring[]; hubRadius?: number }): Geom[] {
   return buildBeamParts(opts);
 }
 
-/** Span, roof, circles, ticks — paths namespaced under group[0]. */
-export function assembleBeam(opts: { span: Segment; rings: Ring[]; hubRadius?: number }): Geom {
-  return group(() => buildBeamParts(opts));
+/** Span, roof, circles, ticks. */
+export function assembleBeam(opts: { span: Segment; rings: Ring[]; hubRadius?: number }): Geom[] {
+  return buildBeamParts(opts);
 }

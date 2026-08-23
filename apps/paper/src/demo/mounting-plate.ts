@@ -1,6 +1,5 @@
 import {
   circle,
-  group,
   line,
   lineIntersection,
   offsetLine,
@@ -69,7 +68,7 @@ export function drawMountingPlate(opts: MountingPlateCorners): Geom[] {
 export function drawMountingPlatePair(
   master: MountingPlateCorners,
   secondOrigin: Vec2,
-): Geom {
+): Geom[] {
   const dx = secondOrigin.x - master.origin.x;
   const dy = secondOrigin.y - master.origin.y;
   const second: MountingPlateCorners = {
@@ -78,7 +77,7 @@ export function drawMountingPlatePair(
     inset: master.inset,
     holeR: master.holeR,
   };
-  return group(() => [...drawMountingPlate(master), ...drawMountingPlate(second)]);
+  return [...drawMountingPlate(master), ...drawMountingPlate(second)];
 }
 
 /** Center of an axis-aligned rectangle from two diagonal corners. */

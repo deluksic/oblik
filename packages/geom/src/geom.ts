@@ -8,7 +8,6 @@ import {
   takeFrameGeoms,
   type Base,
   type GeomSiteOpts,
-  type Group,
 } from "./identity";
 import {
   add,
@@ -49,7 +48,7 @@ export type Arc = Base & {
 export type Polyline = Base & { kind: "polyline"; points: Point[] };
 
 export type Geom2 = Point | Segment | Line | Circle | Arc | Polyline;
-export type Geom = Geom2 | Geom3 | Group;
+export type Geom = Geom2 | Geom3;
 
 export type LineLike = Segment | Line;
 
@@ -290,10 +289,6 @@ export type Drawable =
 export type Drawable3 = { geom: Geom3 };
 
 function walk(g: Geom, visit2: (s: Geom2) => void, visit3: (s: Geom3) => void) {
-  if (g.kind === "group") {
-    for (const c of g.children) walk(c as Geom, visit2, visit3);
-    return;
-  }
   if (
     g.kind === "point3" ||
     g.kind === "segment3" ||
@@ -310,7 +305,11 @@ function walk(g: Geom, visit2: (s: Geom2) => void, visit3: (s: Geom3) => void) {
 
 export function flatten(geom: Geom | Geom[]): Drawable[] {
   const out: Drawable[] = [];
-  const visit = (g: Geom) =>
+  const visit = (g: Geom | Geom[]) => {
+    if (Array.isArray(g)) {
+      for (const x of g) visit(x);
+      return;
+    }
     walk(
       g,
       (s) => {
@@ -338,11 +337,8 @@ export function flatten(geom: Geom | Geom[]): Drawable[] {
       },
       () => {},
     );
-  if (Array.isArray(geom)) {
-    for (const g of geom) visit(g);
-  } else {
-    visit(geom);
-  }
+  };
+  visit(geom);
   return out;
 }
 
@@ -390,7 +386,11 @@ export function collectDrawables(returned?: Geom | Geom[] | void | null): Drawab
 
 export function flatten3(geom: Geom | Geom[]): Drawable3[] {
   const out: Drawable3[] = [];
-  const visit = (g: Geom) =>
+  const visit = (g: Geom | Geom[]) => {
+    if (Array.isArray(g)) {
+      for (const x of g) visit(x);
+      return;
+    }
     walk(
       g,
       () => {},
@@ -398,10 +398,7 @@ export function flatten3(geom: Geom | Geom[]): Drawable3[] {
         out.push({ geom: s });
       },
     );
-  if (Array.isArray(geom)) {
-    for (const g of geom) visit(g);
-  } else {
-    visit(geom);
-  }
+  };
+  visit(geom);
   return out;
 }

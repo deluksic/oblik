@@ -48,7 +48,7 @@ import {
 
 import { paletteCommands } from "./tools/catalog";
 import { drawGhost, sessionGhostView } from "./tools/ghost";
-import { commitScenePatch, formatWorldCursor, peekFile, quantize, renderSnippet } from "./inspect";
+import { commitScenePatch, formatWorldCursor, quantize, renderStackSnippets, stackLabel } from "./inspect";
 import {
   advanceSessionField,
   commitSession,
@@ -300,7 +300,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "Hover or click geometry or a handle. Numbers live in the scene file."),
-            `<code class="empty">Select something to see the creation site.</code>`,
+            `<code class="empty">Select something to see the call stack.</code>`,
           );
           return;
         }
@@ -316,17 +316,11 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         const g = f.geom;
+        const stack = g.provenance.stack ?? [];
         pushInspect({
           crumb: breadcrumb(g.path),
-          meta: `${g.id} · ${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
-          sourceHtml: await (async () => {
-            try {
-              const text = await peekFile(peekCache, g.provenance.file);
-              return renderSnippet(text, g.provenance.line);
-            } catch (err) {
-              return `<code class="empty">${err instanceof Error ? err.message : String(err)}</code>`;
-            }
-          })(),
+          meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
+          sourceHtml: await renderStackSnippets(stack, peekCache),
         });
       }
 
