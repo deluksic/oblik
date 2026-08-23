@@ -45,6 +45,37 @@ export function stackLabel(frames: readonly StackFrame[]): string {
     .join(" ← ");
 }
 
+/**
+ * Error.stack is numbered against Vite's transformed JS. Map back to disk
+ * through the module source map before highlighting.
+ */
+export async function mapStack(frames: readonly StackFrame[]): Promise<StackFrame[]> {
+  if (frames.length === 0) return [];
+  try {
+    const res = await fetch("/__map-stack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frames }),
+    });
+    if (!res.ok) return frames.map((f) => ({ ...f }));
+    const body = (await res.json()) as { frames?: StackFrame[] };
+    return Array.isArray(body.frames) ? body.frames : frames.map((f) => ({ ...f }));
+  } catch {
+    return frames.map((f) => ({ ...f }));
+  }
+}
+
+/** Constructor CallExpression from `__annotations__` is disk-accurate. */
+export function pinConstructorSite(
+  frames: readonly StackFrame[],
+  site?: { file: string; line: number; column: number },
+): StackFrame[] {
+  if (!site || frames.length === 0) return frames.map((f) => ({ ...f }));
+  const next = frames.map((f) => ({ ...f }));
+  next[0] = { ...next[0]!, file: site.file, line: site.line, column: site.column };
+  return next;
+}
+
 /** Innermost helper first; callers follow so nested reuse is visible. */
 export async function renderStackSnippets(
   frames: readonly StackFrame[],

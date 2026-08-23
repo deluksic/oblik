@@ -16,7 +16,7 @@ import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
-import { quantize, renderStackSnippets, stackLabel } from "./inspect";
+import { mapStack, pinConstructorSite, quantize, renderStackSnippets, stackLabel } from "./inspect";
 import {
   commitGizmoIfChanged,
   movedPastClick,
@@ -224,7 +224,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           return;
         }
         const g = f.geom;
-        const stack = g.provenance.stack ?? [];
+        const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
           crumb: breadcrumb(g.path),
           meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,

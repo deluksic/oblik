@@ -11,6 +11,7 @@ import { applyScenePatch, type ScenePatch, type SourceAt } from "../editor/inser
 import { patchWidgetAt } from "../editor/patch-widget.ts";
 import { SCENE_HELPER_HMR_EVENT } from "../hmr/scene-hmr.ts";
 import { isSceneId } from "../layout/grid.ts";
+import { remapStackFrames, type StackLoc } from "./map-stack.ts";
 import type { SceneEntry } from "../types.ts";
 
 const VIRTUAL_CATALOG = "virtual:scene-catalog";
@@ -237,6 +238,7 @@ function parseScenePatch(raw: Record<string, unknown>): ScenePatch | string {
 export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
+  const appRoot = path.dirname(path.dirname(sceneDir));
   let vite: ViteDevServer | undefined;
   let lastCatalog = "";
   const widgetWrites = new Map<string, string>();
@@ -391,6 +393,33 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 return;
               }
               sendText(res, fs.readFileSync(abs, "utf8"));
+              return;
+            }
+
+            if (url === "/__map-stack" && req.method === "POST") {
+              const raw = JSON.parse(await readBody(req)) as { frames?: unknown };
+              const frames = Array.isArray(raw.frames) ? raw.frames : [];
+              const locs: StackLoc[] = [];
+              for (const f of frames) {
+                if (!f || typeof f !== "object") continue;
+                const rec = f as Record<string, unknown>;
+                if (typeof rec.file !== "string" || typeof rec.line !== "number" || typeof rec.column !== "number") {
+                  continue;
+                }
+                locs.push({
+                  file: rec.file,
+                  line: rec.line,
+                  column: rec.column,
+                  ...(typeof rec.name === "string" ? { name: rec.name } : {}),
+                });
+              }
+              if (!vite) {
+                json(res, 200, { frames: locs });
+                return;
+              }
+              json(res, 200, {
+                frames: await remapStackFrames(vite, locs, workspaceRoot, appRoot),
+              });
               return;
             }
           } catch (err) {

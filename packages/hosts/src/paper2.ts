@@ -48,7 +48,15 @@ import {
 
 import { paletteCommands } from "./tools/catalog";
 import { drawGhost, sessionGhostView } from "./tools/ghost";
-import { commitScenePatch, formatWorldCursor, quantize, renderStackSnippets, stackLabel } from "./inspect";
+import {
+  commitScenePatch,
+  formatWorldCursor,
+  mapStack,
+  pinConstructorSite,
+  quantize,
+  renderStackSnippets,
+  stackLabel,
+} from "./inspect";
 import {
   advanceSessionField,
   commitSession,
@@ -316,7 +324,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           return;
         }
         const g = f.geom;
-        const stack = g.provenance.stack ?? [];
+        const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
           crumb: breadcrumb(g.path),
           meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
