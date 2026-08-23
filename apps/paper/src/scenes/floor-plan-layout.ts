@@ -3,9 +3,7 @@ import { circle, offsetLine, point, segment, type Vec2 } from "@design-scenes/ge
 
 import type { FloorPlanOpts } from "../demo/floor-plan";
 
-/** One offset call site — positive distance; mirror picks the other side. */
-const innerWall = (edge: ReturnType<typeof segment>, d: number, mirror = false) =>
-  offsetLine(edge, d, { mirror });
+/** One angle call site — every door shares the same open sweep. */
 const doorOpen = (hinge: Vec2, closed: number, width: number, mirror = false) =>
   angle(hinge, 60, { radius: width, from: closed, mirror });
 
@@ -38,9 +36,9 @@ export function floorPlanLayout(): FloorPlanOpts {
   const west = segment(min, { x: min.x, y: max.y });
   const east = segment({ x: max.x, y: min.y }, max);
 
-  const kitchenPart = innerWall(south, 2.7);
-  const bedroomPart = innerWall(west, 6.69, true);
-  const bathPart = innerWall(east, 2.89);
+  const kitchenPart = offsetLine(south, 2.7);
+  const bedroomPart = offsetLine(west, 6.69, { mirror: true });
+  const bathPart = offsetLine(east, 2.89);
 
   const kY = kitchenPart.line.origin.y;
   const bedX = bedroomPart.line.origin.x;
