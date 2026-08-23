@@ -204,3 +204,19 @@ test("offset mirror gizmo keeps stored literal, line on opposite side", () => {
   const mirrored = offsets.find((g) => g.kind === "offset" && g.mirror);
   expect(mirrored?.kind).toBe("offset");
 });
+
+test("paired offset shares site; overlay moves both sides together", () => {
+  const off = { __annotations__: { file: F, at: [8, 1] as [number, number], editable: true } };
+  beginGeomFrame();
+  beginWidgetFrame("pair");
+  const ground = line(point(0, 0), point(4, 0));
+  offsetLine(ground, 1.8, off);
+  offsetLine(ground, 1.8, { ...off, mirror: true });
+  setWidgetOverride(`${F}:8:1`, [2.2], "pair");
+  beginGeomFrame();
+  beginWidgetFrame("pair");
+  const shelf = offsetLine(ground, 1.8, off);
+  const cellar = offsetLine(ground, 1.8, { ...off, mirror: true });
+  expect(shelf.line.origin.y).toBeCloseTo(2.2);
+  expect(cellar.line.origin.y).toBeCloseTo(-2.2);
+});

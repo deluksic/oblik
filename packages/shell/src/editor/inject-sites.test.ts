@@ -118,3 +118,14 @@ test("slider options keep the value editable", () => {
     /slider\(1\.8, \{ label: "reach", min: 0, max: 4, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: true \} \}\)/,
   );
 });
+
+test("paired offset helper keeps offsetLine distance editable", () => {
+  const src = `const pairedOffset = (base, mirror = false) => offsetLine(base, 1.76, { mirror });
+const shelf = pairedOffset(ground);
+pairedOffset(ground, true);
+`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(
+    /offsetLine\(base, 1\.76, \{ mirror, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: true \} \}\)/,
+  );
+});

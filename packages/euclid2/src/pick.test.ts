@@ -42,3 +42,17 @@ test("offset still hits when the pointer is away from the point", () => {
   const hit = hitTest({ x: 160, y: 100 }, cam, W, H, [off], collectDrawables());
   expect(hit).toEqual({ target: "gizmo", gizmo: off });
 });
+
+test("mirrored offset line is hittable on the opposite side", () => {
+  const mirrored: Gizmo = {
+    kind: "offset",
+    site: "f.ts:3:1",
+    at: { file: "f.ts", line: 3, column: 1 },
+    origin: { x: 0, y: -1.8 },
+    direction: { x: 1, y: 0 },
+    d: 1.8,
+    mirror: true,
+  };
+  const hit = hitTest({ x: 200, y: 190 }, cam, W, H, [mirrored], []);
+  expect(hit).toEqual({ target: "gizmo", gizmo: mirrored });
+});
