@@ -201,7 +201,6 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       let closed = false;
       let hoverGizmo: Gizmo | null = null;
       let drag: {
-        site: string;
         start: number[];
         gizmo: Gizmo;
         x: number;
@@ -252,18 +251,18 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         selected = pruneSelection(
           selected,
           (frame?.drawables ?? []).map((d) => d.geom.id),
-          gizmos().map((g) => g.site),
+          gizmos().map((g) => g.id),
         );
         publishWidgetOverrides(sceneId);
         if (propagate) ctx.onLiveChange();
       }
 
       function hoverGizmoSite(): string | null {
-        return drag?.site ?? hoverGizmo?.site ?? null;
+        return drag?.gizmo.site ?? hoverGizmo?.site ?? null;
       }
 
-      function selectedGizmoSite(): string | null {
-        return selected?.target === "gizmo" ? selected.site : null;
+      function selectedGizmoId(): string | null {
+        return selected?.target === "gizmo" ? selected.id : null;
       }
 
       function selectedGeomId(): string | null {
@@ -280,8 +279,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           if (geom) return { target: "geom", geom };
         }
         if (selected?.target === "gizmo") {
-          const site = selected.site;
-          const gizmo = gizmos().find((g) => g.site === site);
+          const id = selected.id;
+          const gizmo = gizmos().find((g) => g.id === id);
           if (gizmo) return { target: "gizmo", gizmo };
         }
         if (selected?.target === "geom") {
@@ -488,12 +487,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             hoverId,
             selectedGeomId(),
             hoverGizmoSite(),
-            selectedGizmoSite(),
+            selectedGizmoId(),
           );
         } else {
           ctx2d.clearRect(0, 0, w, h);
           drawAxes(ctx2d, w, h, cam);
-          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, hoverGizmoSite(), selectedGizmoSite());
+          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, hoverGizmoSite(), selectedGizmoId());
         }
         if (session) {
           const view = sessionGhostView(session, lastHover, ghost);
@@ -505,7 +504,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           h,
           mode === "geom" ? (frame?.gizmos ?? []) : sdfGizmos,
           hoverGizmoSite(),
-          selectedGizmoSite(),
+          selectedGizmoId(),
         );
         if (quiet && !error) {
           if (session) syncCommandBar();
@@ -622,7 +621,6 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         }
         if (h?.target === "gizmo") {
           drag = {
-            site: h.gizmo.site,
             start: gizmoValues(h.gizmo),
             gizmo: h.gizmo,
             x: p.x,
@@ -685,7 +683,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const nextId =
           mode === "geom" && hitResult?.target === "geom" ? hitResult.drawable.geom.id : null;
         const nextG = hitResult?.target === "gizmo" ? hitResult.gizmo : null;
-        if (nextId !== hoverId || nextG?.site !== hoverGizmo?.site) {
+        if (nextId !== hoverId || nextG?.id !== hoverGizmo?.id) {
           hoverId = nextId;
           hoverGizmo = nextG;
           canvas.style.cursor =
@@ -722,12 +720,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         if (!drag) return;
         const dragging = drag;
         drag = null;
+        selected = { target: "gizmo", id: dragging.gizmo.id };
         if (!dragging.moved) {
-          selected = { target: "gizmo", site: dragging.site };
           render();
           return;
         }
-        const g = gizmos().find((x) => x.site === dragging.site);
+        const g = gizmos().find((x) => x.id === dragging.gizmo.id);
         const now = g ? gizmoValues(g) : dragging.start;
         const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;

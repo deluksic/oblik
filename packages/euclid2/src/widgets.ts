@@ -26,7 +26,8 @@ export type SiteOpts = {
 
 export type GizmoAt = { file: string; line: number; column: number };
 
-type Located = { site: string; at: GizmoAt; stack?: CallSite[] };
+/** `site` is the write target (file:line:column). `id` is this handle this frame (`site#n`). */
+type Located = { site: string; id: string; at: GizmoAt; stack?: CallSite[] };
 
 export type PointGizmo = Located & {
   kind: "point";
@@ -118,6 +119,8 @@ export function gizmoIsPointLike(g: Gizmo): boolean {
 }
 
 const gizmos: Gizmo[] = [];
+/** Occurrence index per write site this frame — `id` is `${site}#${n}`. */
+const siteOccurrence = new Map<string, number>();
 /** Live write-back values, keyed by the 2D scene that owns them. */
 const overridesBySource = new Map<string, Map<string, number[]>>();
 /** Last published frame per source — for withoutWidgets in another scene. */
@@ -125,6 +128,17 @@ const importedBySource = new Map<string, Map<string, number[]>>();
 let silent = 0;
 let activeSource = "";
 let silentSource = "";
+
+function instanceId(site: string): string {
+  const n = siteOccurrence.get(site) ?? 0;
+  siteOccurrence.set(site, n + 1);
+  return `${site}#${n}`;
+}
+
+function locatedAt(file: string, line: number, column: number, stack?: CallSite[]): Located {
+  const site = `${file}:${line}:${column}`;
+  return { site, id: instanceId(site), at: { file, line, column }, stack };
+}
 
 function overridesOf(source: string): Map<string, number[]> {
   let bag = overridesBySource.get(source);
@@ -143,11 +157,7 @@ function siteFrom(opts?: SiteOpts): Located | null {
   const line = at[0];
   const column = at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
-  return {
-    site: `${file}:${line}:${column}`,
-    at: { file, line, column },
-    stack: captureUserStack(),
-  };
+  return locatedAt(file, line, column, captureUserStack());
 }
 
 function readOverride(site: string | undefined): number[] | undefined {
@@ -159,6 +169,7 @@ function readOverride(site: string | undefined): number[] | undefined {
 export function beginWidgetFrame(source = ""): void {
   activeSource = source;
   gizmos.length = 0;
+  siteOccurrence.clear();
   setGeomLiveReader((site) => {
     const key = `${site.file}:${site.line}:${site.column}`;
     if (silent) return importedBySource.get(silentSource)?.get(key);
@@ -213,11 +224,7 @@ export function getGizmos(): readonly Gizmo[] {
 
 function locatedFromGeom(geom: Drawable["geom"]): Located | null {
   if (!geom.site) return null;
-  return {
-    site: `${geom.site.file}:${geom.site.line}:${geom.site.column}`,
-    at: { file: geom.site.file, line: geom.site.line, column: geom.site.column },
-    stack: geom.provenance.stack,
-  };
+  return locatedAt(geom.site.file, geom.site.line, geom.site.column, geom.provenance.stack);
 }
 
 /**

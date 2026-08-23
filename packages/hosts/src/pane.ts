@@ -51,19 +51,16 @@ export type InspectPush = (patch: InspectPatch) => void;
  */
 export type Selection =
   | { target: "geom"; id: string }
-  | { target: "gizmo"; site: string };
+  | { target: "gizmo"; id: string };
 
 export function pruneSelection(
   selected: Selection | null,
   geomIds: Iterable<string>,
-  gizmoSites: Iterable<string>,
+  gizmoIds: Iterable<string>,
 ): Selection | null {
   if (!selected) return null;
-  if (selected.target === "geom") {
-    for (const id of geomIds) if (id === selected.id) return selected;
-    return null;
-  }
-  for (const site of gizmoSites) if (site === selected.site) return selected;
+  const pool = selected.target === "geom" ? geomIds : gizmoIds;
+  for (const id of pool) if (id === selected.id) return selected;
   return null;
 }
 

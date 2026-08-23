@@ -30,6 +30,14 @@ test("five looped distances share site and overlay", () => {
   const rings = gizmos.filter((g) => g.kind === "distance");
   expect(rings).toHaveLength(5);
   expect(rings.every((g) => g.site === `${F}:4:5`)).toBe(true);
+  expect(new Set(rings.map((g) => g.id)).size).toBe(5);
+  expect(rings.map((g) => g.id)).toEqual([
+    `${F}:4:5#0`,
+    `${F}:4:5#1`,
+    `${F}:4:5#2`,
+    `${F}:4:5#3`,
+    `${F}:4:5#4`,
+  ]);
   expect(rings.every((g) => g.kind === "distance" && g.d === 0.4)).toBe(true);
 
   setWidgetOverride(`${F}:4:5`, [0.9], "loop");
@@ -234,9 +242,30 @@ test("nested angle helpers keep distinct caller frames", () => {
   floorPlanLayout();
   const gs = getGizmos().filter((g) => g.kind === "angle");
   expect(gs).toHaveLength(2);
+  expect(gs[0]!.site).toBe(gs[1]!.site);
+  expect(gs[0]!.id).toBe(`${gs[0]!.site}#0`);
+  expect(gs[1]!.id).toBe(`${gs[1]!.site}#1`);
   const names = (g: (typeof gs)[0]) => (g.stack ?? []).map((f) => f.name);
   expect(names(gs[0]!)).toContain("doorOpen");
   expect(names(gs[0]!)).toContain("floorPlanLayout");
   const caller = (g: (typeof gs)[0]) => g.stack?.find((f) => f.name === "floorPlanLayout");
   expect(caller(gs[0]!)?.line).not.toBe(caller(gs[1]!)?.line);
+});
+
+test("shared-site gizmos keep stable instance ids across re-evaluate", () => {
+  const site = { __annotations__: { file: F, at: [20, 1] as [number, number], editable: true } };
+  const layout = () => {
+    angle({ x: 0, y: 0 }, 60, { radius: 1, ...site });
+    angle({ x: 2, y: 0 }, 60, { radius: 1, ...site });
+  };
+  beginWidgetFrame("doors");
+  layout();
+  const first = getGizmos().filter((g) => g.kind === "angle");
+  beginWidgetFrame("doors");
+  layout();
+  const second = getGizmos().filter((g) => g.kind === "angle");
+  expect(second.map((g) => g.id)).toEqual(first.map((g) => g.id));
+  const pick = second[1]!;
+  expect(second.find((g) => g.id === pick.id)).toBe(pick);
+  expect(second.find((g) => g.site === pick.site)).toBe(second[0]);
 });

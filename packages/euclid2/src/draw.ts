@@ -39,8 +39,8 @@ export function drawFrame(
   gizmos: readonly Gizmo[],
   hoverId: string | null,
   selectedId: string | null,
-  hoverGizmo: string | null,
-  selectedGizmo: string | null,
+  hoverGizmoSite: string | null,
+  selectedGizmoId: string | null,
 ): void {
   ctx.clearRect(0, 0, cssW, cssH);
   ctx.fillStyle = COL.bg;
@@ -57,7 +57,7 @@ export function drawFrame(
 
   for (const g of gizmos) {
     if (g.kind === "number" || gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
   }
 
   for (const d of drawables) {
@@ -69,7 +69,7 @@ export function drawFrame(
 
   for (const g of gizmos) {
     if (!gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
   }
 }
 
@@ -80,16 +80,16 @@ export function drawGizmoOverlay(
   cssH: number,
   cam: Camera,
   gizmos: readonly Gizmo[],
-  hoverGizmo: string | null,
-  selectedGizmo: string | null,
+  hoverGizmoSite: string | null,
+  selectedGizmoId: string | null,
 ): void {
   for (const g of gizmos) {
     if (g.kind === "number" || gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
   }
   for (const g of gizmos) {
     if (!gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g.site, hoverGizmo, selectedGizmo));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
   }
 }
 
@@ -99,19 +99,20 @@ export function drawNumberHud(
   cssW: number,
   cssH: number,
   gizmos: readonly Gizmo[],
-  hoverGizmo: string | null,
-  selectedGizmo: string | null,
+  hoverGizmoSite: string | null,
+  selectedGizmoId: string | null,
 ): void {
-  drawNumberSliders(ctx, cssW, cssH, gizmos, hoverGizmo, selectedGizmo);
+  drawNumberSliders(ctx, cssW, cssH, gizmos, hoverGizmoSite, selectedGizmoId);
 }
 
+/** Hover lights every handle that shares a write site; selection is one instance. */
 function gizmoInk(
-  site: string,
-  hover: string | null,
-  selected: string | null,
+  g: { site: string; id: string },
+  hoverSite: string | null,
+  selectedId: string | null,
 ): { color: string; hot: boolean } {
-  if (site === selected) return { color: COL.selected, hot: true };
-  if (site === hover) return { color: COL.gizmoHot, hot: true };
+  if (g.id === selectedId) return { color: COL.selected, hot: true };
+  if (hoverSite && g.site === hoverSite) return { color: COL.gizmoHot, hot: true };
   return { color: COL.gizmo, hot: false };
 }
 
@@ -341,11 +342,11 @@ function drawNumberSliders(
   cssW: number,
   cssH: number,
   gizmos: readonly Gizmo[],
-  hoverGizmo: string | null,
-  selectedGizmo: string | null,
+  hoverGizmoSite: string | null,
+  selectedGizmoId: string | null,
 ): void {
   for (const L of layoutNumberSliders(gizmos, cssW, cssH)) {
-    const ink = gizmoInk(L.gizmo.site, hoverGizmo, selectedGizmo);
+    const ink = gizmoInk(L.gizmo, hoverGizmoSite, selectedGizmoId);
     const { x, y, w, h } = L.panel;
     ctx.save();
     ctx.fillStyle = ink.hot ? "#1c222c" : "#151922";

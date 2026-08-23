@@ -57,7 +57,7 @@ New writable constructor: one `CALL_SITES` row. New Space verb: one `TOOLS` row 
 
 ## Widget writes
 
-Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `__annotations__: { file, at, editable }` onto the module that runs; disk unchanged. If `__annotations__` is already on the call, overwrite and warn. A loop that calls `circle(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Gizmo count need not equal constructor count.
+Each editable CallExpression is one write target. The **call-site annotator** (`injectSceneSites`, Vite pre-transform) walks the AST and splices `__annotations__: { file, at, editable }` onto the module that runs; disk unchanged. If `__annotations__` is already on the call, overwrite and warn. A loop that calls `circle(p, 0.4)` five times is five gizmos and one `0.4` — drag any, commit once, all five follow (`?scene=shared-loop`). Hover may light every handle that shares that site; click-selection is per instance so inspect keeps that call’s stack. Gizmo count need not equal constructor count.
 
 Shared parameters can live in a helper next to catalog scenes (e.g. `plate-layout.ts`). Dragging a plate handle writes that helper; mill’s thickness glider writes `mill.scene.ts`.
 

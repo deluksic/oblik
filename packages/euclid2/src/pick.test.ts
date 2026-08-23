@@ -14,6 +14,7 @@ function offsetThroughOrigin(): Gizmo {
   return {
     kind: "offset",
     site: "f.ts:1:1",
+    id: "f.ts:1:1#0",
     at,
     origin: { x: 0, y: 0 },
     direction: { x: 1, y: 0 },
@@ -29,7 +30,7 @@ test("geom point wins over an offset line through it", () => {
 });
 
 test("point gizmo wins over an offset gizmo at the same place", () => {
-  const pt: Gizmo = { kind: "point", site: "f.ts:2:1", at, x: 0, y: 0 };
+  const pt: Gizmo = { kind: "point", site: "f.ts:2:1", id: "f.ts:2:1#0", at, x: 0, y: 0 };
   const hit = hitTest({ x: 100, y: 100 }, cam, W, H, [offsetThroughOrigin(), pt], []);
   expect(hit?.target).toBe("gizmo");
   if (hit?.target === "gizmo") expect(hit.gizmo).toEqual(pt);
@@ -47,6 +48,7 @@ test("mirrored offset line is hittable on the opposite side", () => {
   const mirrored: Gizmo = {
     kind: "offset",
     site: "f.ts:3:1",
+    id: "f.ts:3:1#0",
     at: { file: "f.ts", line: 3, column: 1 },
     origin: { x: 0, y: -1.8 },
     direction: { x: 1, y: 0 },

@@ -10,6 +10,7 @@ type Gizmo3 =
   | {
       kind: "point3";
       site: string;
+      id: string;
       at: { line: number; column: number };
       x: number;
       y: number;
@@ -18,6 +19,7 @@ type Gizmo3 =
   | {
       kind: "distance3";
       site: string;
+      id: string;
       at: { line: number; column: number };
       origin: Vec3;
       d: number;
@@ -25,6 +27,7 @@ type Gizmo3 =
   | {
       kind: "glider3";
       site: string;
+      id: string;
       at: { line: number; column: number };
       a: Vec3;
       b: Vec3;
@@ -182,12 +185,12 @@ export class SdfView {
 
   syncGizmos(
     gizmos: readonly Gizmo3[],
-    hoverGizmo: string | null,
-    selectedGizmo: string | null,
+    hoverGizmoSite: string | null,
+    selectedGizmoId: string | null,
   ): void {
     this.clearGroup(this.gizmos);
     for (const g of gizmos) {
-      const obj = meshGizmo(g, gizmoEmphasis(g.site, hoverGizmo, selectedGizmo));
+      const obj = meshGizmo(g, gizmoEmphasis(g, hoverGizmoSite, selectedGizmoId));
       obj.userData.gizmo = g;
       this.gizmos.add(obj);
     }
@@ -339,12 +342,12 @@ function findUserData(obj: THREE.Object3D, key: string): unknown {
 }
 
 function gizmoEmphasis(
-  site: string,
-  hover: string | null,
-  selected: string | null,
+  g: { site: string; id: string },
+  hoverSite: string | null,
+  selectedId: string | null,
 ): "selected" | "hover" | null {
-  if (site === selected) return "selected";
-  if (site === hover) return "hover";
+  if (g.id === selectedId) return "selected";
+  if (hoverSite && g.site === hoverSite) return "hover";
   return null;
 }
 

@@ -108,7 +108,6 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       let error: string | null = null;
       let hoverGizmo: Gizmo3 | null = null;
       let drag: {
-        site: string;
         start: number[];
         gizmo: Gizmo3;
         x: number;
@@ -154,16 +153,16 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         selected = pruneSelection(
           selected,
           (frame?.drawables ?? []).map((d) => d.geom.id),
-          gizmos().map((g) => g.site),
+          gizmos().map((g) => g.id),
         );
       }
 
       function hoverGizmoSite(): string | null {
-        return drag?.site ?? hoverGizmo?.site ?? null;
+        return drag?.gizmo.site ?? hoverGizmo?.site ?? null;
       }
 
-      function selectedGizmoSite(): string | null {
-        return selected?.target === "gizmo" ? selected.site : null;
+      function selectedGizmoId(): string | null {
+        return selected?.target === "gizmo" ? selected.id : null;
       }
 
       function selectedGeomId(): string | null {
@@ -180,8 +179,8 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           if (geom) return { target: "geom", geom };
         }
         if (selected?.target === "gizmo") {
-          const site = selected.site;
-          const gizmo = gizmos().find((g) => g.site === site);
+          const id = selected.id;
+          const gizmo = gizmos().find((g) => g.id === id);
           if (gizmo) return { target: "gizmo", gizmo };
         }
         if (selected?.target === "geom") {
@@ -241,11 +240,11 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             hoverId,
             selectedGeomId(),
             hoverGizmoSite(),
-            selectedGizmoSite(),
+            selectedGizmoId(),
           );
         } else {
           if (sdf) fieldView!.setSdf(sdf);
-          fieldView!.syncGizmos(fieldGizmos, hoverGizmoSite(), selectedGizmoSite());
+          fieldView!.syncGizmos(fieldGizmos, hoverGizmoSite(), selectedGizmoId());
         }
         if (quiet && !error) return;
         const fallback =
@@ -264,7 +263,6 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         if (h?.target === "gizmo") {
           view.controls.enabled = false;
           drag = {
-            site: h.gizmo.site,
             start: gizmoValues3(h.gizmo),
             gizmo: h.gizmo,
             x: e.clientX,
@@ -302,7 +300,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         const h = view.hitTest(e.clientX, e.clientY);
         const nextId = mode === "space" && h?.target === "geom" ? h.geom.id : null;
         const nextG = h?.target === "gizmo" ? h.gizmo : null;
-        if (nextId !== hoverId || nextG?.site !== hoverGizmo?.site) {
+        if (nextId !== hoverId || nextG?.id !== hoverGizmo?.id) {
           hoverId = nextId;
           hoverGizmo = nextG;
           canvas.style.cursor = nextG ? "grab" : nextId ? "pointer" : "crosshair";
@@ -326,12 +324,12 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         }
         const dragging = drag;
         drag = null;
+        selected = { target: "gizmo", id: dragging.gizmo.id };
         if (!dragging.moved) {
-          selected = { target: "gizmo", site: dragging.site };
           sync();
           return;
         }
-        const g = gizmos().find((x) => x.site === dragging.site);
+        const g = gizmos().find((x) => x.id === dragging.gizmo.id);
         const now = g ? gizmoValues3(g) : dragging.start;
         const err = await commitGizmoIfChanged(peekCache, dragging.start, g, now);
         if (err) error = err;

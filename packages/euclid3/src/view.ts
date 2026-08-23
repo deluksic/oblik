@@ -114,8 +114,8 @@ export class SpaceView {
     gizmos: readonly Gizmo3[],
     hoverId: string | null,
     selectedId: string | null,
-    hoverGizmo: string | null,
-    selectedGizmo: string | null,
+    hoverGizmoSite: string | null,
+    selectedGizmoId: string | null,
   ): void {
     this.clearGroup(this.content);
     this.clearGroup(this.gizmos);
@@ -131,7 +131,7 @@ export class SpaceView {
     }
 
     for (const gizmo of gizmos) {
-      const obj = meshGizmo(gizmo, gizmoEmphasis(gizmo.site, hoverGizmo, selectedGizmo));
+      const obj = meshGizmo(gizmo, gizmoEmphasis(gizmo, hoverGizmoSite, selectedGizmoId));
       obj.userData.gizmo = gizmo;
       this.gizmos.add(obj);
     }
@@ -336,12 +336,12 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
 }
 
 function gizmoEmphasis(
-  site: string,
-  hover: string | null,
-  selected: string | null,
+  g: { site: string; id: string },
+  hoverSite: string | null,
+  selectedId: string | null,
 ): "selected" | "hover" | null {
-  if (site === selected) return "selected";
-  if (site === hover) return "hover";
+  if (g.id === selectedId) return "selected";
+  if (hoverSite && g.site === hoverSite) return "hover";
   return null;
 }
 
