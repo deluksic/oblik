@@ -99,6 +99,7 @@ export type ToolSession = {
       lengthReuse?: { name: string; signed: boolean };
       typed?: string;
     }
+  | { verb: "perpendicular"; line?: LineBind; dir?: Vec2 }
   | {
       verb: "distance";
       from?: FromBind;
@@ -205,6 +206,7 @@ const EMPTY_SESSION: Record<ToolVerb, ToolSession> = {
   line: { verb: "line" },
   segment: { verb: "segment" },
   offset: { verb: "offset" },
+  perpendicular: { verb: "perpendicular" },
   slider: { verb: "slider", field: "value" },
   distance: { verb: "distance" },
 };
@@ -719,6 +721,23 @@ export function sessionPreview(session: ToolSession | null): CommandPreview | nu
       ),
     };
   }
+  if (session.verb === "perpendicular") {
+    const lineLabel = lineBindPreview(session.line);
+    const pt = slot("<point>", "", session.line ? "active" : "pending");
+    return {
+      previewHtml: asConst(session, fn("perpendicularLine", [lineLabel, pt])),
+      acceptNumber: naming,
+      draftKind: naming ? "ident" : "number",
+      ...previewMeta(
+        session,
+        naming
+          ? "Type a name. Tab back, then click a line."
+          : session.line
+            ? "Click a point on the perpendicular. Tab to name it."
+            : "Click a scene line or offset. Tab to name it.",
+      ),
+    };
+  }
   const lengthLabel =
     session.verb === "circle" ? "<radius>" : session.verb === "offset" ? "<distance>" : "<d>";
   const numberOpen =
@@ -836,6 +855,7 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
     session.verb === "point" ||
     session.verb === "line" ||
     session.verb === "segment" ||
+    session.verb === "perpendicular" ||
     session.verb === "slider" ||
     (session.verb === "circle" && !session.center)
   ) {
@@ -865,6 +885,9 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
     }
     const p = resolvePoint(ctx);
     if (p === "ignore") return { snap: null, ghost: "none", hoverId: null };
+    if (session.verb === "perpendicular" && !session.line) {
+      return { snap: null, ghost: "none", hoverId: null };
+    }
     return {
       snap: {
         kind: p.kind === "intersection" || p.kind === "circleLine" ? "intersection" : "point",
@@ -878,6 +901,33 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
 
   if (session.verb === "circle" && session.center) {
     return { snap: null, ghost: "ring", hoverId: null };
+  }
+
+  if (session.verb === "perpendicular" && session.line) {
+    const p = resolvePoint(ctx);
+    if (p === "ignore") return { snap: null, ghost: "none", hoverId: null };
+    return {
+      snap: {
+        kind: p.kind === "intersection" || p.kind === "circleLine" ? "intersection" : "point",
+        x: p.x,
+        y: p.y,
+      },
+      ghost: "point",
+      hoverId: null,
+    };
+  }
+
+  if (session.verb === "perpendicular" && !session.line) {
+    const hit = resolveLineOnly(ctx);
+    if (hit.kind === "line") {
+      const hoverId =
+        ctx.hit?.target === "geom" &&
+        (ctx.hit.drawable.geom.kind === "segment" || ctx.hit.drawable.geom.kind === "line")
+          ? ctx.hit.drawable.geom.id
+          : null;
+      return { snap: null, ghost: "none", hoverId };
+    }
+    return { snap: null, ghost: "none", hoverId: null };
   }
 
   if (session.verb === "offset" && session.from?.kind === "line") {
@@ -1066,6 +1116,45 @@ export function compilePoint(
 function samePoint(a: PointBind, b: PointBind): boolean {
   if (a.kind === "named" && b.kind === "named") return a.name === b.name;
   return Math.hypot(a.x - b.x, a.y - b.y) < 0.05;
+}
+
+function lineBindPreview(bind: LineBind | undefined, empty = "<line>"): string {
+  if (!bind) return slot(empty, "", "active");
+  if (bind.kind === "named") {
+    return filled(bind.field === "line" ? `${bind.name}.line` : bind.name);
+  }
+  if (bind.kind === "expr") return filled("offsetLine");
+  return slot(empty, "", "done");
+}
+
+function resolveLineOnly(ctx: PickCtx): DistanceFromHit {
+  const hit = resolveDistanceFrom(ctx);
+  if (hit.kind === "point" || hit.kind === "earlyLength" || hit.kind === "empty") {
+    return { kind: "empty" };
+  }
+  return hit;
+}
+
+export function compilePerpendicular(
+  src: string,
+  line: LineBind,
+  through: PointBind,
+  as?: string,
+): ScenePatch | { error: string } {
+  const sites = uniqueHoists([line, ...collectLines(through)]);
+  try {
+    const { src: working, map } = hoistNames(src, sites);
+    const statements: string[] = [];
+    const imports = { euclid: new Set<string>(), geom: new Set<string>() };
+    const lineE = lineText(line, map, imports);
+    const pe = pointExpr(working, statements, through, map, imports);
+    imports.geom.add("perpendicularLine");
+    const name = bindName(`${working}\n${statements.join("\n")}`, as, "perp");
+    statements.push(`const ${name} = perpendicularLine(${lineE}, ${pe});`);
+    return patchOf(sites, imports, statements);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export function compileLine(
@@ -1321,6 +1410,29 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       return { kind: "error", message: "Pick two different points." };
     }
     return commitOrError(session, compileSegment(src, session.a, p, asName(session)));
+  }
+
+  if (session.verb === "perpendicular") {
+    if (!session.line) {
+      const hit = resolveLineOnly(ctx);
+      if (hit.kind === "ignore") return { kind: "session", session };
+      if (hit.kind === "noSite") {
+        return {
+          kind: "error",
+          message: "That geometry has no construction site in scene() — library strokes cannot bind.",
+        };
+      }
+      if (hit.kind === "line") {
+        return {
+          kind: "session",
+          session: { ...session, line: hit.line, dir: hit.dir },
+        };
+      }
+      return { kind: "error", message: "Click a line for the perpendicular." };
+    }
+    const p = resolvePoint(ctx);
+    if (p === "ignore") return { kind: "session", session };
+    return commitOrError(session, compilePerpendicular(src, session.line, p, asName(session)));
   }
 
   if (session.verb === "slider") {

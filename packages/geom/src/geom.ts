@@ -179,6 +179,15 @@ export function offsetLine(geom: LineLike, signedD: number, site?: OffsetLineOpt
   return { line: offset, distance: d };
 }
 
+/** Infinite line through `through`, perpendicular to the carrier of `geom`. */
+export function perpendicularLine(geom: LineLike, through: Vec2, site?: GeomSiteOpts): Line {
+  return constructGeom(() => {
+    const { dir } = lineBasis(geom);
+    const pd = perp(dir);
+    return makeLine(through, add(through, pd), site);
+  });
+}
+
 function nanPoint(site?: GeomSiteOpts): Point {
   return point(Number.NaN, Number.NaN, site);
 }

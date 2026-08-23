@@ -8,6 +8,7 @@ import {
   line,
   lineIntersection,
   offsetLine,
+  perpendicularLine,
   point,
   signedDist,
 } from "./index";
@@ -72,4 +73,14 @@ test("offsetLine mirror uses same literal on the opposite side", () => {
   expect(mirrored.line.origin.y).toBeCloseTo(-1.8);
   expect(mirrored.distance).toBe(1.8);
   expect(mirrored.line.offsetMirror).toBe(true);
+});
+
+test("perpendicularLine passes through point and is normal to carrier", () => {
+  const ground = line(point(0, 0), point(4, 0));
+  const p = point(2, 1);
+  const perpLn = perpendicularLine(ground, p);
+  expect(perpLn.kind).toBe("line");
+  expect(Math.abs(perpLn.direction.x)).toBeLessThan(1e-9);
+  expect(Math.abs(Math.abs(perpLn.direction.y) - 1)).toBeLessThan(1e-9);
+  expect(Math.abs(signedDist(p, perpLn))).toBeLessThan(1e-9);
 });

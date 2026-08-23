@@ -151,6 +151,7 @@ export function namedSceneLineBindings(source: string): Map<string, SceneLineBin
       if (fnName === "segment") names.set(decl.name.text, "segment");
       else if (fnName === "line") names.set(decl.name.text, "line");
       else if (fnName === "offsetLine") names.set(decl.name.text, "offsetLine");
+      else if (fnName === "perpendicularLine") names.set(decl.name.text, "line");
     }
   }
   return names;
@@ -393,6 +394,21 @@ export function evalSceneLines(
           kind: "offsetLine",
           origin: basis.origin,
           dir: basis.dir,
+        });
+      } else if (fnName === "perpendicularLine") {
+        const baseName = lineArgName(call.arguments[0]);
+        const throughName = call.arguments[1] ? pointRef(call.arguments[1]) : null;
+        if (!baseName || !throughName) continue;
+        const base = env.get(baseName);
+        const through = resolvePointRef(throughName, pointEnv);
+        if (!base || !through) continue;
+        const pd = norm(perp(base.dir));
+        env.set(decl.name.text, { origin: through, dir: pd });
+        out.push({
+          name: decl.name.text,
+          kind: "line",
+          origin: through,
+          dir: pd,
         });
       }
     }
@@ -922,7 +938,7 @@ export type ScenePatch = {
   exprs?: string[];
 };
 
-const LINE_CALL_NAMES = new Set(["segment", "line", "offsetLine"]);
+const LINE_CALL_NAMES = new Set(["segment", "line", "offsetLine", "perpendicularLine"]);
 
 export function bindLineAt(
   source: string,

@@ -65,6 +65,15 @@ export function sessionGhostView(
         snapped,
       };
     }
+    if (session.verb === "perpendicular" && session.line && session.dir) {
+      if (!at) return { kind: "none" };
+      return {
+        kind: "line",
+        origin: at,
+        dir: norm(perp(session.dir)),
+        snapped,
+      };
+    }
     if (session.verb === "segment" && session.a) {
       if (!at) return { kind: "none" };
       return { kind: "segment", a: asVec(session.a), b: at, snapped };

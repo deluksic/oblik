@@ -129,3 +129,11 @@ pairedOffset(ground, true);
     /offsetLine\(base, 1\.76, \{ mirror, __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: true \} \}\)/,
   );
 });
+
+test("perpendicularLine has a construction site but no editable dof", () => {
+  const src = `const perpLn = perpendicularLine(ground, P);\n`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(
+    /perpendicularLine\(ground, P, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/,
+  );
+});

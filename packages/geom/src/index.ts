@@ -12,6 +12,7 @@ export {
   arc,
   offsetLine,
   offsetDisplayDist,
+  perpendicularLine,
   signedDist,
   lineIntersection,
   circleLineIntersection,

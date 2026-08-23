@@ -3,7 +3,15 @@ import type { CommandSpec } from "@design-scenes/shell";
 /** Space palettes. euclid2 is `geom`; sdf2 keeps the Point + Distance slice. */
 export type ToolPalette = "geom" | "sdf2";
 
-export type ToolVerb = "point" | "circle" | "line" | "segment" | "offset" | "slider" | "distance";
+export type ToolVerb =
+  | "point"
+  | "circle"
+  | "line"
+  | "segment"
+  | "offset"
+  | "perpendicular"
+  | "slider"
+  | "distance";
 
 /**
  * Space verbs. Palette membership and the number-bar flag live here.
@@ -54,6 +62,12 @@ export const TOOLS: readonly ToolSpec[] = [
     hint: "A line, then a distance or another length.",
     palettes: ["geom"],
     draft: true,
+  },
+  {
+    id: "perpendicular",
+    title: "Perpendicular",
+    hint: "A line, then a point — infinite perpendicular through the point.",
+    palettes: ["geom"],
   },
   {
     id: "slider",
