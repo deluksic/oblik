@@ -162,7 +162,8 @@ function applyDrag(
   } else if (g.kind === "offset") {
     const n = perp(g.direction);
     const delta = (world.x - g.origin.x) * n.x + (world.y - g.origin.y) * n.y;
-    setWidgetOverride(g.site, [quantize(g.d + delta)], sceneId);
+    const next = g.mirror ? g.d - delta : g.d + delta;
+    setWidgetOverride(g.site, [quantize(next)], sceneId);
   } else if (g.kind === "number") {
     setWidgetOverride(g.site, [numberValueFromPointer(g, screen.x, cssW, cssH, gizmos)], sceneId);
   }

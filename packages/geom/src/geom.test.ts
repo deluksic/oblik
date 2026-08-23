@@ -62,3 +62,14 @@ test("signedDist matches offsetLine", () => {
   const shelf = offsetLine(ground, signedDist(p, ground));
   expect(shelf.line.origin.y).toBeCloseTo(1.8);
 });
+
+test("offsetLine mirror uses same literal on the opposite side", () => {
+  beginGeomFrame();
+  const ground = line(point(0, 0), point(4, 0));
+  const forward = offsetLine(ground, 1.8);
+  const mirrored = offsetLine(ground, 1.8, { mirror: true });
+  expect(forward.line.origin.y).toBeCloseTo(1.8);
+  expect(mirrored.line.origin.y).toBeCloseTo(-1.8);
+  expect(mirrored.distance).toBe(1.8);
+  expect(mirrored.line.offsetMirror).toBe(true);
+});

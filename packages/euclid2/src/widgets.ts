@@ -88,7 +88,10 @@ export type OffsetGizmo = Located & {
   kind: "offset";
   origin: Vec2;
   direction: Vec2;
+  /** Stored literal, not mirrored. */
   d: number;
+  /** Same |d|, opposite side of the carrier. */
+  mirror?: boolean;
 };
 
 export type Gizmo =
@@ -249,6 +252,7 @@ export function gizmoForEditableGeom(
       origin: geom.origin,
       direction: geom.direction,
       d: dd,
+      mirror: geom.offsetMirror,
     };
   }
   return null;

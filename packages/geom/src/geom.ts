@@ -31,8 +31,10 @@ export type Line = Base & {
   kind: "line";
   origin: Point;
   direction: Vec2;
-  /** Present when this line was produced by `offsetLine`. */
+  /** Present when this line was produced by `offsetLine`. Stored literal, not mirrored. */
   offsetDistance?: number;
+  /** Same |offsetDistance|, opposite side of the carrier. */
+  offsetMirror?: boolean;
 };
 export type Circle = Base & { kind: "circle"; center: Point; radius: number };
 export type Arc = Base & {
@@ -88,7 +90,13 @@ export function line(a: Vec2, b: Vec2, site?: GeomSiteOpts): Line {
   return constructGeom(() => makeLine(a, b, site));
 }
 
-function makeLine(a: Vec2, b: Vec2, site?: GeomSiteOpts, offsetDistance?: number): Line {
+function makeLine(
+  a: Vec2,
+  b: Vec2,
+  site?: GeomSiteOpts,
+  offsetDistance?: number,
+  offsetMirror?: boolean,
+): Line {
   const dir = norm(sub(b, a));
   return {
     ...siteBase("line", "line", site),
@@ -96,6 +104,7 @@ function makeLine(a: Vec2, b: Vec2, site?: GeomSiteOpts, offsetDistance?: number
     origin: point(a.x, a.y),
     direction: dir,
     offsetDistance,
+    offsetMirror,
   };
 }
 
@@ -144,17 +153,29 @@ export function signedDist(p: Vec2, geom: LineLike): number {
   return signedDistToLine(p, origin, dir);
 }
 
+export type OffsetLineOpts = GeomSiteOpts & {
+  /** Same |distance|, offset to the opposite side of the carrier. */
+  mirror?: boolean;
+};
+
+/** Applied signed distance after optional mirror. */
+export function offsetDisplayDist(d: number, mirror = false): number {
+  return mirror ? -d : d;
+}
+
 /**
  * Parallel infinite line, offset by signed distance along the left normal.
- * Draws `.line`. Distance is the field tools copy in a Length slot.
+ * Draws `.line`. Distance is the stored literal (field tools copy in a Length slot).
  */
-export function offsetLine(geom: LineLike, signedD: number, site?: GeomSiteOpts): OffsetLine {
+export function offsetLine(geom: LineLike, signedD: number, site?: OffsetLineOpts): OffsetLine {
   const o = liveNums(site);
   const d = o?.[0] ?? signedD;
+  const mirror = site?.mirror ?? false;
+  const applied = offsetDisplayDist(d, mirror);
   const { origin, dir } = lineBasis(geom);
   const n = perp(dir);
-  const p = add(origin, mul(n, d));
-  const offset = constructGeom(() => makeLine(p, add(p, dir), site, d));
+  const p = add(origin, mul(n, applied));
+  const offset = constructGeom(() => makeLine(p, add(p, dir), site, d, mirror));
   return { line: offset, distance: d };
 }
 

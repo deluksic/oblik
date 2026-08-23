@@ -13,7 +13,7 @@ import {
   withoutWidgets,
   angle,
 } from "./widgets";
-import { beginGeomFrame, circle, collectDrawables, point } from "@design-scenes/geom";
+import { beginGeomFrame, circle, collectDrawables, line, offsetLine, point } from "@design-scenes/geom";
 
 const F = "apps/paper/src/scenes/plate-layout.ts";
 const pt = { __annotations__: { file: F, at: [1, 1] as [number, number], editable: true } };
@@ -186,4 +186,21 @@ test("angle mirror reflects world direction; same deg, opposite swing", () => {
   expect(forward).toBeCloseTo((159 * Math.PI) / 180, 6);
   expect(mirrored).toBeCloseTo((21 * Math.PI) / 180, 6);
   expect(forward + mirrored).toBeCloseTo(Math.PI, 6);
+});
+
+test("offset mirror gizmo keeps stored literal, line on opposite side", () => {
+  const off = { __annotations__: { file: F, at: [8, 1] as [number, number], editable: true } };
+  beginGeomFrame();
+  beginWidgetFrame("off");
+  const ground = line(point(0, 0), point(4, 0));
+  const shelf = offsetLine(ground, 1.8, off);
+  const cellar = offsetLine(ground, 1.8, { ...off, mirror: true });
+  expect(shelf.line.origin.y).toBeCloseTo(1.8);
+  expect(cellar.line.origin.y).toBeCloseTo(-1.8);
+  const gizmos = gizmosFromDrawables(collectDrawables());
+  const offsets = gizmos.filter((g) => g.kind === "offset");
+  expect(offsets).toHaveLength(2);
+  expect(offsets.every((g) => g.kind === "offset" && g.d === 1.8)).toBe(true);
+  const mirrored = offsets.find((g) => g.kind === "offset" && g.mirror);
+  expect(mirrored?.kind).toBe("offset");
 });
