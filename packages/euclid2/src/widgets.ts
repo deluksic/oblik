@@ -21,6 +21,7 @@ export type SiteOpts = {
   at?: [number, number];
   editable?: boolean;
   bind?: string;
+  style?: import("@design-scenes/geom").GeomStyle;
   __annotations__?: {
     file?: string;
     at?: [number, number];
@@ -32,7 +33,14 @@ export type SiteOpts = {
 export type GizmoAt = { file: string; line: number; column: number };
 
 /** `site` is the write target. `id` is `site#bind` or `site#k`. */
-type Located = { site: string; id: string; bind?: string; at: GizmoAt; stack?: CallSite[] };
+type Located = {
+  site: string;
+  id: string;
+  bind?: string;
+  at: GizmoAt;
+  stack?: CallSite[];
+  style?: import("@design-scenes/geom").GeomStyle;
+};
 
 export type PointGizmo = Located & {
   kind: "point";
@@ -132,10 +140,23 @@ let silent = 0;
 let activeSource = "";
 let silentSource = "";
 
-function locatedAt(file: string, line: number, column: number, stack?: CallSite[]): Located {
+function locatedAt(
+  file: string,
+  line: number,
+  column: number,
+  stack?: CallSite[],
+  style?: import("@design-scenes/geom").GeomStyle,
+): Located {
   const site = `${file}:${line}:${column}`;
   const bind = currentBind();
-  return { site, id: allocId(site, bind), ...(bind ? { bind } : {}), at: { file, line, column }, stack };
+  return {
+    site,
+    id: allocId(site, bind),
+    ...(bind ? { bind } : {}),
+    at: { file, line, column },
+    stack,
+    ...(style ? { style } : {}),
+  };
 }
 
 function overridesOf(source: string): Map<string, number[]> {
@@ -155,7 +176,7 @@ function siteFrom(opts?: SiteOpts): Located | null {
   const line = at[0];
   const column = at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
-  return locatedAt(file, line, column, captureUserStack());
+  return locatedAt(file, line, column, captureUserStack(), opts?.style);
 }
 
 function readOverride(site: string | undefined): number[] | undefined {
@@ -228,6 +249,7 @@ function locatedFromGeom(geom: Drawable["geom"]): Located | null {
     ...(geom.bind ? { bind: geom.bind } : {}),
     at: { file: geom.site.file, line: geom.site.line, column: geom.site.column },
     stack: geom.provenance.stack,
+    ...(geom.style ? { style: geom.style } : {}),
   };
 }
 

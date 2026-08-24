@@ -18,6 +18,15 @@ const COL = {
 
 export type Hit3 = { target: "gizmo"; gizmo: Gizmo3 } | { target: "geom"; geom: Geom3 };
 
+/** Overlay rest ink. Hover / select still win on color. */
+export type RestInk = {
+  color?: number;
+  pointScale?: number;
+  dashed?: boolean;
+};
+
+export type InkLookup3 = (id: string) => RestInk | undefined;
+
 export class SpaceView {
   readonly canvas: HTMLCanvasElement;
   readonly renderer: THREE.WebGLRenderer;
@@ -116,6 +125,7 @@ export class SpaceView {
     selectedId: string | null,
     hoverGizmoSite: string | null,
     selectedGizmoId: string | null,
+    inkOf?: InkLookup3,
   ): void {
     this.clearGroup(this.content);
     this.clearGroup(this.gizmos);
@@ -124,14 +134,15 @@ export class SpaceView {
     for (const d of drawables) {
       const g = d.geom;
       this.geomById.set(g.id, g);
-      const color = g.id === selectedId ? COL.selected : g.id === hoverId ? COL.hover : COL.geom;
-      const obj = meshFor(g, color, g.id === selectedId || g.id === hoverId);
+      const rest = inkOf?.(g.id);
+      const color = g.id === selectedId ? COL.selected : g.id === hoverId ? COL.hover : (rest?.color ?? COL.geom);
+      const obj = meshFor(g, color, g.id === selectedId || g.id === hoverId, rest);
       obj.userData.geomId = g.id;
       this.content.add(obj);
     }
 
     for (const gizmo of gizmos) {
-      const obj = meshGizmo(gizmo, gizmoEmphasis(gizmo, hoverGizmoSite, selectedGizmoId));
+      const obj = meshGizmo(gizmo, gizmoEmphasis(gizmo, hoverGizmoSite, selectedGizmoId), inkOf?.(gizmo.id));
       obj.userData.gizmo = gizmo;
       this.gizmos.add(obj);
     }
@@ -232,12 +243,20 @@ function findUserData(obj: THREE.Object3D, key: string): unknown {
   return undefined;
 }
 
-function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
+function meshFor(g: Geom3, color: number, highlight: boolean, rest?: RestInk): THREE.Object3D {
   const group = new THREE.Group();
-  const edgeMat = new THREE.LineBasicMaterial({
-    color,
-    linewidth: highlight ? 2 : 1,
-  });
+  const dashed = rest?.dashed === true;
+  const edgeMat = dashed
+    ? new THREE.LineDashedMaterial({ color, dashSize: 0.14, gapSize: 0.1 })
+    : new THREE.LineBasicMaterial({
+        color,
+        linewidth: highlight ? 2 : 1,
+      });
+
+  const stroke = (obj: THREE.Line | THREE.LineLoop | THREE.LineSegments) => {
+    if (dashed) obj.computeLineDistances();
+    group.add(obj);
+  };
 
   if (g.kind === "box3") {
     const sx = Math.abs(g.max.x - g.min.x);
@@ -257,7 +276,8 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
     mesh.position.set(cx, cy, cz);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box), edgeMat);
     edges.position.copy(mesh.position);
-    group.add(mesh, edges);
+    group.add(mesh);
+    stroke(edges);
   } else if (g.kind === "cylinder3") {
     const axis = new THREE.Vector3(
       g.top.x - g.bottom.x,
@@ -287,13 +307,14 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(cyl, 30), edgeMat);
     edges.quaternion.copy(mesh.quaternion);
     edges.position.copy(mesh.position);
-    group.add(mesh, edges);
+    group.add(mesh);
+    stroke(edges);
   } else if (g.kind === "segment3") {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),
       new THREE.Vector3(g.b.x, g.b.y, g.b.z),
     ]);
-    group.add(new THREE.Line(geo, edgeMat));
+    stroke(new THREE.Line(geo, edgeMat));
   } else if (g.kind === "circle3") {
     const pts: THREE.Vector3[] = [];
     const n = 48;
@@ -311,7 +332,7 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
         ),
       );
     }
-    group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), edgeMat));
+    stroke(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), edgeMat));
   } else if (g.kind === "mesh3") {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(g.positions, 3));
@@ -324,7 +345,7 @@ function meshFor(g: Geom3, color: number, highlight: boolean): THREE.Object3D {
     group.add(new THREE.Mesh(geo, fill));
   } else {
     const s = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 12, 10),
+      new THREE.SphereGeometry(0.08 * (rest?.pointScale ?? 1), 12, 10),
       new THREE.MeshLambertMaterial({ color }),
     );
     s.position.set(g.x, g.y, g.z);
@@ -345,14 +366,19 @@ function gizmoEmphasis(
   return null;
 }
 
-function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Object3D {
+function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null, rest?: RestInk): THREE.Object3D {
   const group = new THREE.Group();
   const color =
-    emphasis === "selected" ? COL.selected : emphasis === "hover" ? COL.gizmoHot : COL.gizmo;
+    emphasis === "selected"
+      ? COL.selected
+      : emphasis === "hover"
+        ? COL.gizmoHot
+        : (rest?.color ?? COL.gizmo);
   const hot = emphasis != null;
+  const r = (hot ? 0.16 : 0.13) * (rest?.pointScale ?? 1);
   const mat = new THREE.MeshLambertMaterial({ color });
   if (g.kind === "point3") {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
     s.position.set(g.x, g.y, g.z);
     group.add(s);
   } else if (g.kind === "glider3") {
@@ -361,7 +387,7 @@ function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Obje
       y: g.a.y + (g.b.y - g.a.y) * g.t,
       z: g.a.z + (g.b.z - g.a.z) * g.t,
     };
-    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
     s.position.set(p.x, p.y, p.z);
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),
@@ -371,7 +397,11 @@ function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Obje
       s,
       new THREE.Line(
         geo,
-        new THREE.LineBasicMaterial({ color: COL.gizmo, transparent: true, opacity: 0.45 }),
+        new THREE.LineBasicMaterial({
+          color: rest?.color ?? COL.gizmo,
+          transparent: true,
+          opacity: 0.45,
+        }),
       ),
     );
   } else {

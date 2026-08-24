@@ -17,6 +17,7 @@ import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
 import { mapStack, pinConstructorSite, quantize, renderStackSnippets, stackLabel } from "./inspect";
+import { drawInkFromStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
 import {
   commitGizmoIfChanged,
   movedPastClick,
@@ -169,6 +170,36 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         return selected?.target === "geom" ? selected.id : null;
       }
 
+      function restOf(id: string) {
+        const geom = frame?.drawables.find((d) => d.geom.id === id)?.geom;
+        if (geom) {
+          return restInkFromDraw(drawInkFromStyle(geom.style, styleChannelForKind(geom.kind)));
+        }
+        const gizmo = gizmos().find((g) => g.id === id);
+        if (!gizmo) return undefined;
+        const owner = frame?.drawables.find((d) => d.geom.id === gizmo.id)?.geom;
+        return restInkFromDraw(
+          drawInkFromStyle(owner?.style ?? gizmo.style, styleChannelForKind(gizmo.kind)),
+        );
+      }
+
+      function applyStyle(): void {
+        sync(true);
+        void updateInspect();
+      }
+
+      function styleExtras(
+        kind: string,
+        current: Parameters<typeof inspectStylePatch>[0],
+        at?: { file: string; line: number; column: number },
+        assign?: (style: Parameters<typeof inspectStylePatch>[0] | null) => void,
+      ) {
+        return inspectStylePatch(current, kind, at, (style) => {
+          assign?.(style);
+          applyStyle();
+        });
+      }
+
       function focused():
         | { target: "gizmo"; gizmo: Gizmo3 }
         | { target: "geom"; geom: Geom3 }
@@ -207,7 +238,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · click a handle or a surface"),
-            `<code class="empty">Select something to see the call stack.</code>`,
+            `<code class="empty">Select something to see where it comes from.</code>`,
           );
           return;
         }
@@ -219,6 +250,19 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             mode === "space"
               ? "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up."
               : "The field has no provenance. Widget values live in this scene file.",
+            styleExtras(
+              f.gizmo.kind,
+              frame?.drawables.find((d) => d.geom.id === f.gizmo.id)?.geom.style ?? f.gizmo.style,
+              f.gizmo.at,
+              (style) => {
+                const owner = frame?.drawables.find((d) => d.geom.id === f.gizmo.id)?.geom;
+                if (owner) {
+                  if (style) owner.style = style;
+                  else delete owner.style;
+                } else if (style) f.gizmo.style = style;
+                else delete f.gizmo.style;
+              },
+            ),
           );
           return;
         }
@@ -226,8 +270,12 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
           crumb: g.bind ?? g.kind,
-          meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
+          meta: stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
           sourceHtml: await renderStackSnippets(stack, peekCache),
+          ...styleExtras(g.kind, g.style, g.site, (style) => {
+            if (style) g.style = style;
+            else delete g.style;
+          }),
         });
       }
 
@@ -241,10 +289,11 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             selectedGeomId(),
             hoverGizmoSite(),
             selectedGizmoId(),
+            restOf,
           );
         } else {
           if (sdf) fieldView!.setSdf(sdf);
-          fieldView!.syncGizmos(fieldGizmos, hoverGizmoSite(), selectedGizmoId());
+          fieldView!.syncGizmos(fieldGizmos, hoverGizmoSite(), selectedGizmoId(), restOf);
         }
         if (quiet && !error) return;
         const fallback =

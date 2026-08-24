@@ -18,6 +18,38 @@ export type SceneEntry = {
   error?: string;
 };
 
+export type LineDash = "solid" | "dashed" | "dotted";
+
+export type LineStyle = {
+  color: string;
+  width: number;
+  dash: LineDash;
+};
+
+export type PointStyle = {
+  color: string;
+  size: number;
+};
+
+/** Constructor ink. Missing / null means the object uses the view default. */
+export type ObjectStyle = {
+  line?: LineStyle;
+  point?: PointStyle;
+};
+
+export type StyleChannel = "line" | "point";
+
+export const DEFAULT_LINE_STYLE: LineStyle = {
+  color: "#d7d2c4",
+  width: 1.5,
+  dash: "solid",
+};
+
+export const DEFAULT_POINT_STYLE: PointStyle = {
+  color: "#d7d2c4",
+  size: 3.5,
+};
+
 export type InspectState = {
   crumb: string;
   meta: string;
@@ -26,6 +58,11 @@ export type InspectState = {
   error: string | null;
   /** World cursor, shown on the right of the pane status strip. */
   cursor?: string | null;
+  /** Current constructor style; `null` is default ink. */
+  style?: ObjectStyle | null;
+  /** Which editor to show. `null` hides the style block. */
+  styleChannel?: StyleChannel | null;
+  onStyleChange?: (style: ObjectStyle | null) => void;
 };
 
 export type InspectPatch = Partial<InspectState>;

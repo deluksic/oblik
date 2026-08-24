@@ -14,5 +14,6 @@ export function commandBarSnapshotKey(state: CommandBarState | null): string {
 }
 
 export function inspectSnapshotKey(patch: Record<string, unknown>): string {
-  return JSON.stringify(patch);
+  const { onStyleChange: _cb, ...rest } = patch;
+  return JSON.stringify(rest);
 }

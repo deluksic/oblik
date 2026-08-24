@@ -75,6 +75,7 @@ export async function showWidgetInspect(
     stack?: { file: string; line: number; column: number; name?: string }[];
   },
   meta: string,
+  extras: InspectPatch = {},
 ): Promise<void> {
   const raw =
     g.stack && g.stack.length > 0
@@ -83,8 +84,9 @@ export async function showWidgetInspect(
   const stack = pinConstructorSite(await mapStack(raw), g.at);
   push({
     crumb: g.bind ?? g.kind,
-    meta: `${g.site} · ${stackLabel(stack) || meta}`,
+    meta: stackLabel(stack) || meta,
     sourceHtml: await renderStackSnippets(stack, peekCache),
+    ...extras,
   });
 }
 
@@ -94,7 +96,7 @@ export function showEmptyInspect(
   meta: string,
   sourceHtml: string,
 ): void {
-  push({ crumb, meta, sourceHtml });
+  push({ crumb, meta, sourceHtml, style: null, styleChannel: null, onStyleChange: undefined });
 }
 
 export function setPaneStatus(

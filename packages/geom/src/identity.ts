@@ -19,6 +19,25 @@ export type GeomAnnotations = {
   key?: string;
 };
 
+export type LineDash = "solid" | "dashed" | "dotted";
+
+export type LineStyle = {
+  color: string;
+  width: number;
+  dash: LineDash;
+};
+
+export type PointStyle = {
+  color: string;
+  size: number;
+};
+
+/** Constructor ink. Missing means the object uses the view default. */
+export type GeomStyle = {
+  line?: LineStyle;
+  point?: PointStyle;
+};
+
 export type GeomSiteOpts = {
   file?: string;
   at?: [number, number];
@@ -26,6 +45,7 @@ export type GeomSiteOpts = {
   bind?: string;
   /** Reserved; unused until loop disambiguation. */
   key?: string;
+  style?: GeomStyle;
   __annotations__?: GeomAnnotations;
 };
 
@@ -59,6 +79,13 @@ export function geomBindFromOpts(opts?: GeomSiteOpts): string | undefined {
   return bind && bind.length > 0 ? bind : undefined;
 }
 
+export function geomStyleFromOpts(opts?: GeomSiteOpts): GeomStyle | undefined {
+  const s = opts?.style;
+  if (!s || typeof s !== "object") return undefined;
+  if (!s.line && !s.point) return undefined;
+  return s;
+}
+
 export type GeomLiveReader = (site: GeomSite) => number[] | undefined;
 
 let liveReader: GeomLiveReader | null = null;
@@ -87,6 +114,8 @@ export type Base = {
   site?: GeomSite;
   /** True when this constructor owns numeric literals in source. */
   editable?: boolean;
+  /** Constructor ink from `{ style }` on the call. Omitted → view default. */
+  style?: GeomStyle;
 };
 
 const occurrence = new Map<string, number>();
@@ -212,6 +241,7 @@ export function makeBase(
   site?: GeomSite,
   editable?: boolean,
   bind?: string,
+  style?: GeomStyle,
 ): Base {
   const label = bind || currentBind();
   const origin = site ? `${site.file}:${site.line}:${site.column}` : kind;
@@ -221,5 +251,6 @@ export function makeBase(
     provenance: captureProvenance(createdBy, site),
     site,
     editable,
+    ...(style && (style.line || style.point) ? { style } : {}),
   };
 }

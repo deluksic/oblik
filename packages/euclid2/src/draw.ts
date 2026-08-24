@@ -1,4 +1,4 @@
-import { sweepCCW } from "@design-scenes/geom";
+import { sweepCCW, type Drawable, type Vec2 } from "@design-scenes/geom";
 
 import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
@@ -16,6 +16,17 @@ const COL = {
   gizmo: "#e8876a",
   gizmoHot: "#fff3e6",
 };
+
+/** Constructor ink. Rest color only; hover/select still win. */
+export type DrawInk = {
+  stroke?: string;
+  width?: number;
+  dash?: readonly number[];
+  fill?: string;
+  pointSize?: number;
+};
+
+export type InkLookup = (id: string) => DrawInk | undefined;
 
 export function resizeCanvas(canvas: HTMLCanvasElement): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -41,6 +52,7 @@ export function drawFrame(
   selectedId: string | null,
   hoverGizmoSite: string | null,
   selectedGizmoId: string | null,
+  inkOf?: InkLookup,
 ): void {
   ctx.clearRect(0, 0, cssW, cssH);
   ctx.fillStyle = COL.bg;
@@ -49,27 +61,24 @@ export function drawFrame(
 
   for (const d of drawables) {
     if (handleOwnsInk(d.geom) || d.geom.kind === "point") continue;
-    const id = d.geom.id;
-    const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
-    const width = id === selectedId || id === hoverId ? 2.4 : 1.5;
-    strokeGeom(ctx, cam, cssW, cssH, d, color, width);
+    const paint = geomPaint(d.geom.id, selectedId, hoverId, inkOf?.(d.geom.id));
+    strokeGeom(ctx, cam, cssW, cssH, d, paint);
   }
 
   for (const g of gizmos) {
     if (g.kind === "number" || gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoPaint(g, hoverGizmoSite, selectedGizmoId, inkOf?.(g.id)));
   }
 
   for (const d of drawables) {
     if (handleOwnsInk(d.geom) || d.geom.kind !== "point") continue;
-    const id = d.geom.id;
-    const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : COL.geom;
-    strokeGeom(ctx, cam, cssW, cssH, d, color, id === selectedId || id === hoverId ? 2.4 : 1.5);
+    const paint = geomPaint(d.geom.id, selectedId, hoverId, inkOf?.(d.geom.id));
+    strokeGeom(ctx, cam, cssW, cssH, d, paint);
   }
 
   for (const g of gizmos) {
     if (!gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoPaint(g, hoverGizmoSite, selectedGizmoId, inkOf?.(g.id)));
   }
 }
 
@@ -82,14 +91,15 @@ export function drawGizmoOverlay(
   gizmos: readonly Gizmo[],
   hoverGizmoSite: string | null,
   selectedGizmoId: string | null,
+  inkOf?: InkLookup,
 ): void {
   for (const g of gizmos) {
     if (g.kind === "number" || gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoPaint(g, hoverGizmoSite, selectedGizmoId, inkOf?.(g.id)));
   }
   for (const g of gizmos) {
     if (!gizmoIsPointLike(g)) continue;
-    drawGizmo(ctx, cam, cssW, cssH, g, gizmoInk(g, hoverGizmoSite, selectedGizmoId));
+    drawGizmo(ctx, cam, cssW, cssH, g, gizmoPaint(g, hoverGizmoSite, selectedGizmoId, inkOf?.(g.id)));
   }
 }
 
@@ -105,15 +115,55 @@ export function drawNumberHud(
   drawNumberSliders(ctx, cssW, cssH, gizmos, hoverGizmoSite, selectedGizmoId);
 }
 
+type StrokePaint = {
+  color: string;
+  width: number;
+  dash: readonly number[];
+  fill: string;
+  pointSize: number;
+  hot: boolean;
+};
+
+function geomPaint(
+  id: string,
+  selectedId: string | null,
+  hoverId: string | null,
+  ink?: DrawInk,
+): StrokePaint {
+  const hot = id === selectedId || id === hoverId;
+  const color = id === selectedId ? COL.selected : id === hoverId ? COL.hover : (ink?.stroke ?? COL.geom);
+  return {
+    color,
+    width: ink?.width ?? (hot ? 2.4 : 1.5),
+    dash: ink?.dash ?? [],
+    fill: ink?.fill ?? color,
+    pointSize: ink?.pointSize ?? 3.5,
+    hot,
+  };
+}
+
 /** Hover lights every handle that shares a write site; selection is one instance. */
-function gizmoInk(
+function gizmoPaint(
   g: { site: string; id: string },
   hoverSite: string | null,
   selectedId: string | null,
-): { color: string; hot: boolean } {
-  if (g.id === selectedId) return { color: COL.selected, hot: true };
-  if (hoverSite && g.site === hoverSite) return { color: COL.gizmoHot, hot: true };
-  return { color: COL.gizmo, hot: false };
+  ink?: DrawInk,
+): StrokePaint {
+  const hot = g.id === selectedId || (!!hoverSite && g.site === hoverSite);
+  const color =
+    g.id === selectedId
+      ? COL.selected
+      : hoverSite && g.site === hoverSite
+        ? COL.gizmoHot
+        : (ink?.stroke ?? COL.gizmo);
+  return {
+    color,
+    width: ink?.width ?? (hot ? 2.4 : 1.6),
+    dash: ink?.dash ?? [],
+    fill: ink?.fill ?? color,
+    pointSize: ink?.pointSize ?? (hot ? 7 : 6),
+    hot,
+  };
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera): void {
@@ -151,19 +201,19 @@ function strokeGeom(
   w: number,
   h: number,
   d: Drawable,
-  color: string,
-  lineWidth: number,
+  paint: StrokePaint,
 ): void {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = paint.color;
+  ctx.fillStyle = paint.fill;
+  ctx.lineWidth = paint.width;
+  ctx.setLineDash(paint.dash.length ? [...paint.dash] : []);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   const g = d.geom;
   if (g.kind === "point") {
     const s = worldToScreen(cam, g, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
     ctx.fill();
   } else if (g.kind === "segment") {
     pathSeg(ctx, cam, w, h, g.a, g.b);
@@ -191,6 +241,7 @@ function strokeGeom(
     });
     ctx.stroke();
   }
+  ctx.setLineDash([]);
 }
 
 function pathSeg(
@@ -228,12 +279,13 @@ function drawGizmo(
   w: number,
   h: number,
   g: Gizmo,
-  ink: { color: string; hot: boolean },
+  paint: StrokePaint,
 ): void {
-  const { color, hot } = ink;
-  ctx.lineWidth = hot ? 2.4 : 1.6;
+  const { color, hot } = paint;
+  ctx.lineWidth = paint.width;
   ctx.strokeStyle = color;
-  ctx.fillStyle = color;
+  ctx.fillStyle = paint.fill;
+  ctx.setLineDash(paint.dash.length ? [...paint.dash] : []);
 
   if (g.kind === "point" || g.kind === "glider" || g.kind === "lineGlider") {
     const p =
@@ -250,10 +302,11 @@ function drawGizmo(
             };
     const s = worldToScreen(cam, p, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.stroke();
     if (g.kind === "glider") {
       pathSeg(ctx, cam, w, h, g.a, g.b);
@@ -313,10 +366,11 @@ function drawGizmo(
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.stroke();
   } else if (g.kind === "vector") {
     const tip = { x: g.origin.x + g.dx, y: g.origin.y + g.dy };
@@ -324,10 +378,11 @@ function drawGizmo(
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.stroke();
   } else if (g.kind === "offset") {
     pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
@@ -346,7 +401,7 @@ function drawNumberSliders(
   selectedGizmoId: string | null,
 ): void {
   for (const L of layoutNumberSliders(gizmos, cssW, cssH)) {
-    const ink = gizmoInk(L.gizmo, hoverGizmoSite, selectedGizmoId);
+    const ink = gizmoPaint(L.gizmo, hoverGizmoSite, selectedGizmoId);
     const { x, y, w, h } = L.panel;
     ctx.save();
     ctx.fillStyle = ink.hot ? "#1c222c" : "#151922";

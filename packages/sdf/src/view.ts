@@ -187,10 +187,11 @@ export class SdfView {
     gizmos: readonly Gizmo3[],
     hoverGizmoSite: string | null,
     selectedGizmoId: string | null,
+    inkOf?: (id: string) => { color?: number; pointScale?: number } | undefined,
   ): void {
     this.clearGroup(this.gizmos);
     for (const g of gizmos) {
-      const obj = meshGizmo(g, gizmoEmphasis(g, hoverGizmoSite, selectedGizmoId));
+      const obj = meshGizmo(g, gizmoEmphasis(g, hoverGizmoSite, selectedGizmoId), inkOf?.(g.id));
       obj.userData.gizmo = g;
       this.gizmos.add(obj);
     }
@@ -351,14 +352,23 @@ function gizmoEmphasis(
   return null;
 }
 
-function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Object3D {
+function meshGizmo(
+  g: Gizmo3,
+  emphasis: "selected" | "hover" | null,
+  rest?: { color?: number; pointScale?: number },
+): THREE.Object3D {
   const group = new THREE.Group();
   const color =
-    emphasis === "selected" ? COL.selected : emphasis === "hover" ? COL.gizmoHot : COL.gizmo;
+    emphasis === "selected"
+      ? COL.selected
+      : emphasis === "hover"
+        ? COL.gizmoHot
+        : (rest?.color ?? COL.gizmo);
   const hot = emphasis != null;
+  const r = (hot ? 0.16 : 0.13) * (rest?.pointScale ?? 1);
   const mat = new THREE.MeshLambertMaterial({ color });
   if (g.kind === "point3") {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
     s.position.set(g.x, g.y, g.z);
     group.add(s);
   } else if (g.kind === "glider3") {
@@ -367,7 +377,7 @@ function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Obje
       y: g.a.y + (g.b.y - g.a.y) * g.t,
       z: g.a.z + (g.b.z - g.a.z) * g.t,
     };
-    const s = new THREE.Mesh(new THREE.SphereGeometry(hot ? 0.16 : 0.13, 16, 12), mat);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
     s.position.set(p.x, p.y, p.z);
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(g.a.x, g.a.y, g.a.z),
@@ -378,7 +388,7 @@ function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null): THREE.Obje
       new THREE.Line(
         geo,
         new THREE.LineBasicMaterial({
-          color: COL.gizmo,
+          color: rest?.color ?? COL.gizmo,
           transparent: true,
           opacity: 0.45,
         }),

@@ -115,3 +115,20 @@ test("two doorLeaf calls from different lines keep distinct caller frames", () =
     g.provenance.stack.find((f) => f.name === "drawFloorPlan");
   expect(caller(a)?.line).not.toBe(caller(b)?.line);
 });
+
+test("constructor style stamps onto the geom, not nested points", () => {
+  const style = { line: { color: "#e8876a", width: 2, dash: "dashed" as const } };
+  beginGeomFrame();
+  const s = segment(point(0, 0), point(1, 0), { style });
+  expect(s.style).toEqual(style);
+  expect(s.a.style).toBeUndefined();
+  expect(s.b.style).toBeUndefined();
+});
+
+test("missing style is omitted so the view default applies", () => {
+  beginGeomFrame();
+  const c = circle(point(0, 0), 1);
+  expect(c.style).toBeUndefined();
+  const p = point(1, 2, { style: { point: { color: "#e8876a", size: 5 } } });
+  expect(p.style).toEqual({ point: { color: "#e8876a", size: 5 } });
+});

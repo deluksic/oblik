@@ -58,7 +58,14 @@ test("injects construction sites onto scene geom constructors", () => {
   const src = `return [segment(c, p), line(a, b)];\n`;
   const out = injectSceneSites(src, SCENE);
   expect(out).toMatch(/line\(a, b, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/);
-  expect(out).toContain("segment(c, p)");
+  expect(out).toMatch(/segment\(c, p, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/);
+});
+
+test("keeps { style } when injecting __annotations__", () => {
+  const src = `segment(a, b, { style: { line: { color: "#e8876a", width: 2, dash: "dashed" } } });\n`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toMatch(/style: \{ line: \{ color: "#e8876a", width: 2, dash: "dashed" \} \}/);
+  expect(out).toMatch(/__annotations__/);
 });
 
 test("injects helper files outside the catalog", () => {

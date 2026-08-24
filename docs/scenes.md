@@ -63,7 +63,7 @@ euclid2:
 
 sdf2: Point + Distance only. Point writes `point(x, y)`; Distance writes `circle` / `offsetLine`. Coral rings come from annotated constructors (sdf2 collects drawables even though it does not stroke cream geometry).
 
-`scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). A return value is still flattened for scenes that list geometry. Inspect provenance is the **user call stack** (demo helpers and `scene`) for both cream strokes and coral handles, not a grouping API.
+`scene()` may be void. Geometry constructors register themselves when called (same idea as widgets). A return value is still flattened for scenes that list geometry. Inspect origin names the helper and file that built the object (demo helpers and `scene`) for both cream strokes and coral handles — not a grouping API. Style is stored on the constructor (`segment(a, b, { style })`) and written back from the sidebar.
 
 Inserts add statements inside `scene()` (before an existing `return`, or at the end of a void body). A handle declared in `plateLayout()` (outside `scene()`) is refused.
 
@@ -76,7 +76,7 @@ euclid3 and sdf field: Space reports no insert commands yet.
 | URL                                                             | What you get                                                                                                                                                                                                                    |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [?scene=beam](http://127.0.0.1:43117/?scene=beam)               | One truss. Pick ids are `site#bind` or `site#k`. The roof uses the middle ring’s `r1`.                                                                                                                         |
-| [?scene=flat](http://127.0.0.1:43117/?scene=flat)               | Two trusses. Pick identity is sticky (`site#bind` or `site#k`). The stack still names which helper produced a stroke.                          |
+| [?scene=flat](http://127.0.0.1:43117/?scene=flat)               | Two trusses. Pick identity is sticky (`site#bind` or `site#k`). Origin still names which helper produced a stroke.                          |
 | [?scene=shared](http://127.0.0.1:43117/?scene=shared)           | One `circle(p1, 1.33)` feeds all three rings and `hubRadius`. Drag a ring: everything follows in real time; one literal is written on release.                                                                    |
 | [?scene=shared-loop](http://127.0.0.1:43117/?scene=shared-loop) | Five derived origins around one `point`. A `for` calls `circle(p, 1)`. Five rings, one `1`. Drag any ring: all five follow; pointer-up rewrites that single literal.             |
 | [?scene=plate](http://127.0.0.1:43117/?scene=plate)             | Milled plate: stock, four corner bolts (one **vector** inset mirrored to all corners; shared **drill Ø** helpers), polar array, pocket fillets on **pointOnLine** bisectors, slot (**pointOnSegment** on top edge). |

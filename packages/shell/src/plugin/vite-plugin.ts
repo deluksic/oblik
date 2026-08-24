@@ -8,6 +8,7 @@ import { parseSceneSource } from "../catalog/catalog.ts";
 import { newSceneSource, titleFromId } from "../catalog/new-scene.ts";
 import { annotateCallSites } from "../editor/inject-sites.ts";
 import { applyScenePatch, type ScenePatch, type SourceAt } from "../editor/insert-editor.ts";
+import { parseObjectStyle, patchStyleAt } from "../editor/patch-style.ts";
 import { patchWidgetAt } from "../editor/patch-widget.ts";
 import { SCENE_HELPER_HMR_EVENT } from "../hmr/scene-hmr.ts";
 import { isSceneId } from "../layout/grid.ts";
@@ -307,6 +308,38 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               const source = fs.readFileSync(abs, "utf8");
               const patched = patchWidgetAt(source, line, column, values);
               rememberWidgetWrite(widgetWrites, abs, patched);
+              fs.writeFileSync(abs, patched);
+              json(res, 200, { ok: true });
+              return;
+            }
+
+            if (url === "/__write-style" && req.method === "POST") {
+              const raw = JSON.parse(await readBody(req)) as Record<string, unknown>;
+              const file = raw.file;
+              const line = raw.line;
+              const column = raw.column;
+              const parsed = parseObjectStyle(raw.style);
+
+              if (
+                typeof file !== "string" ||
+                typeof line !== "number" ||
+                typeof column !== "number" ||
+                parsed === undefined
+              ) {
+                json(res, 400, {
+                  ok: false,
+                  error: `invalid body: expected { file, line, column, style }; got keys [${Object.keys(raw).join(", ")}]`,
+                });
+                return;
+              }
+
+              const abs = resolveUnder(workspaceRoot, file);
+              if (!abs.endsWith(".ts") || abs.endsWith(".d.ts")) {
+                json(res, 400, { ok: false, error: "expected a .ts file path" });
+                return;
+              }
+              const source = fs.readFileSync(abs, "utf8");
+              const patched = patchStyleAt(source, line, column, parsed);
               fs.writeFileSync(abs, patched);
               json(res, 200, { ok: true });
               return;

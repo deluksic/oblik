@@ -40,7 +40,7 @@ apps/
 - `bind` — const name that owned the construction, when known.
 - `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.
 
-Inspect title is `bind ?? kind`. The stack is the identity display. There is no `path` / breadcrumb. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames. Unlabeled loop bodies share `site#k`.
+Inspect title is `bind ?? kind`. Origin in the sidebar is a short provenance note (which helper, which file), not a traceback. **Style** is a constructor option (`segment(a, b, { style })`), wins over the view default, and can always be cleared back to default (the `{ style }` bag is removed from the file). There is no `path` / breadcrumb. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames. Unlabeled loop bodies share `site#k`.
 
 ## Catalogs
 

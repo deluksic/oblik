@@ -56,6 +56,7 @@ import {
   renderStackSnippets,
   stackLabel,
 } from "./inspect";
+import { drawInkFromStyle, inspectStylePatch, styleChannelForKind } from "./style";
 import {
   advanceSessionField,
   commitSession,
@@ -231,6 +232,32 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         return mode === "geom" ? (frame?.drawables ?? []) : [];
       }
 
+      function inkOf(id: string) {
+        const geom = drawables().find((d) => d.geom.id === id)?.geom;
+        if (geom) return drawInkFromStyle(geom.style, styleChannelForKind(geom.kind));
+        const gizmo = gizmos().find((g) => g.id === id);
+        if (!gizmo) return undefined;
+        const owner = drawables().find((d) => d.geom.id === gizmo.id)?.geom;
+        return drawInkFromStyle(owner?.style ?? gizmo.style, styleChannelForKind(gizmo.kind));
+      }
+
+      function applyStyle(): void {
+        render(true);
+        void updateInspect();
+      }
+
+      function styleExtras(
+        kind: string,
+        current: Parameters<typeof inspectStylePatch>[0],
+        at?: { file: string; line: number; column: number },
+        assign?: (style: Parameters<typeof inspectStylePatch>[0] | null) => void,
+      ) {
+        return inspectStylePatch(current, kind, at, (style) => {
+          assign?.(style);
+          applyStyle();
+        });
+      }
+
       function evaluate(propagate = true): void {
         try {
           if (mode === "geom") {
@@ -306,7 +333,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "Hover or click geometry or a handle. Numbers live in the scene file."),
-            `<code class="empty">Select something to see the call stack.</code>`,
+            `<code class="empty">Select something to see where it comes from.</code>`,
           );
           return;
         }
@@ -318,6 +345,19 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             mode === "sdf2"
               ? "Handles are scene widgets. The filled blob is the 2D SDF."
               : "Handles are scene widgets. Numbers live in the scene file and are written on pointer-up.",
+            styleExtras(
+              f.gizmo.kind,
+              drawables().find((d) => d.geom.id === f.gizmo.id)?.geom.style ?? f.gizmo.style,
+              f.gizmo.at,
+              (style) => {
+                const owner = drawables().find((d) => d.geom.id === f.gizmo.id)?.geom;
+                if (owner) {
+                  if (style) owner.style = style;
+                  else delete owner.style;
+                } else if (style) f.gizmo.style = style;
+                else delete f.gizmo.style;
+              },
+            ),
           );
           return;
         }
@@ -325,8 +365,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
           crumb: g.bind ?? g.kind,
-          meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
+          meta: stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
           sourceHtml: await renderStackSnippets(stack, peekCache),
+          ...styleExtras(g.kind, g.style, g.site, (style) => {
+            if (style) g.style = style;
+            else delete g.style;
+          }),
         });
       }
 
@@ -487,11 +531,12 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             selectedGeomId(),
             hoverGizmoSite(),
             selectedGizmoId(),
+            inkOf,
           );
         } else {
           ctx2d.clearRect(0, 0, w, h);
           drawAxes(ctx2d, w, h, cam);
-          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, hoverGizmoSite(), selectedGizmoId());
+          drawGizmoOverlay(ctx2d, w, h, cam, sdfGizmos, hoverGizmoSite(), selectedGizmoId(), inkOf);
         }
         if (session) {
           const view = sessionGhostView(session, lastHover, ghost);

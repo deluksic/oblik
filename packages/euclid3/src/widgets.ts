@@ -5,6 +5,7 @@ export type SiteOpts3 = {
   at?: [number, number];
   editable?: boolean;
   bind?: string;
+  style?: import("@design-scenes/geom").GeomStyle;
   __annotations__?: {
     file?: string;
     at?: [number, number];
@@ -16,7 +17,7 @@ export type SiteOpts3 = {
 export type GizmoAt3 = { file: string; line: number; column: number };
 
 /** `site` is the write target. `id` is `site#bind` or `site#k`. */
-type Located = { site: string; id: string; bind?: string; at: GizmoAt3; stack?: CallSite[] };
+type Located = { site: string; id: string; bind?: string; at: GizmoAt3; stack?: CallSite[]; style?: import("@design-scenes/geom").GeomStyle };
 
 export type Point3Gizmo = Located & {
   kind: "point3";
@@ -59,6 +60,7 @@ function siteFrom(opts?: SiteOpts3): Located | null {
     ...(bind ? { bind } : {}),
     at: { file, line, column },
     stack: captureUserStack(),
+    ...(opts?.style ? { style: opts.style } : {}),
   };
 }
 
@@ -86,7 +88,7 @@ export function point3(x: number, y: number, z: number, site?: SiteOpts3): Point
   const py = o?.[1] ?? y;
   const pz = o?.[2] ?? z;
   if (located) gizmos.push({ kind: "point3", ...located, x: px, y: py, z: pz });
-  return makePoint3(px, py, pz);
+  return makePoint3(px, py, pz, site);
 }
 
 export function distance3(origin: Vec3, d: number, site?: SiteOpts3): number {

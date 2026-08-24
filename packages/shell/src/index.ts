@@ -4,6 +4,11 @@ export type {
   ViewKind,
   InspectState,
   InspectPatch,
+  LineDash,
+  LineStyle,
+  PointStyle,
+  ObjectStyle,
+  StyleChannel,
   PaneContext,
   PaneHandle,
   CommandSpec,
@@ -11,7 +16,7 @@ export type {
   SceneLoaderMap,
   ViewHost,
 } from "./types";
-export { VIEW_KINDS } from "./types";
+export { VIEW_KINDS, DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "./types";
 export { isSceneId, paneIdsFromAreas, stackedAreas } from "./layout/grid";
 export { startWorkspace, type WorkspaceProps } from "./workspace";
 export { createCatalogWorkspaceState, type CatalogWorkspaceState } from "./catalog-workspace";

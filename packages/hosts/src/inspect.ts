@@ -35,15 +35,27 @@ export type StackFrame = {
   name?: string;
 };
 
+function fileName(file: string): string {
+  return file.split("/").pop() ?? file;
+}
+
+function frameWho(f: StackFrame): string {
+  const named = f.name?.trim();
+  if (named) return named;
+  return fileName(f.file).replace(/\.(scene\.)?tsx?$/, "");
+}
+
+/** Short origin line for inspect meta — not a traceback. */
 export function stackLabel(frames: readonly StackFrame[]): string {
   if (frames.length === 0) return "";
-  return frames
-    .map((f) => {
-      const who = f.name ?? f.file.split("/").pop() ?? f.file;
-      return `${who} ${f.file}:${f.line}`;
-    })
-    .join(" ← ");
+  const leaf = frames[0]!;
+  const who = frameWho(leaf);
+  const file = fileName(leaf.file);
+  if (frames.length === 1) return `Built in ${file}`;
+  return `From ${who} in ${file}`;
 }
+
+export { stackLabel as originLabel };
 
 /**
  * Error.stack is numbered against Vite's transformed JS. Map back to disk
@@ -76,30 +88,56 @@ export function pinConstructorSite(
   return next;
 }
 
-/** Innermost helper first; callers follow so nested reuse is visible. */
+function renderQuote(text: string, line: number): string {
+  const lines = text.split("\n");
+  const i = line - 1;
+  const from = Math.max(0, i - 1);
+  const to = Math.min(lines.length, i + 2);
+  const chunks: string[] = [];
+  for (let n = from; n < to; n++) {
+    const current = n === i;
+    const body = escapeHtml(lines[n] ?? "");
+    chunks.push(
+      `<div class="${current ? "hl" : ""}"><span class="ln">${n + 1}</span><span class="tx">${body}</span></div>`,
+    );
+  }
+  return `<div class="quote">${chunks.join("")}</div>`;
+}
+
+/** Innermost helper first. Quote the construction; list callers as a path. */
 export async function renderStackSnippets(
   frames: readonly StackFrame[],
   cache: Map<string, string>,
 ): Promise<string> {
   if (frames.length === 0) {
-    return `<code class="empty">No user stack frames.</code>`;
+    return `<p class="empty">No source location for this object.</p>`;
   }
-  const parts: string[] = [];
-  for (const f of frames) {
-    const who = f.name ? escapeHtml(f.name) : "call";
-    const loc = escapeHtml(`${f.file}:${f.line}:${f.column}`);
-    let body: string;
-    try {
-      const text = await peekFile(cache, f.file);
-      body = renderSnippet(text, f.line);
-    } catch (err) {
-      body = `<code class="empty">${escapeHtml(err instanceof Error ? err.message : String(err))}</code>`;
-    }
-    parts.push(
-      `<div class="stack-frame"><div class="frame-label">${who} · ${loc}</div>${body}</div>`,
-    );
+  const leaf = frames[0]!;
+  const who = escapeHtml(frameWho(leaf));
+  const file = escapeHtml(fileName(leaf.file));
+  let quote = "";
+  try {
+    const text = await peekFile(cache, leaf.file);
+    quote = renderQuote(text, leaf.line);
+  } catch (err) {
+    quote = `<p class="empty">${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`;
   }
-  return parts.join("");
+  const callers = frames.slice(1);
+  const path =
+    callers.length === 0
+      ? ""
+      : `<ol class="origin-path">${callers
+          .map((f) => {
+            const step = escapeHtml(frameWho(f));
+            const loc = escapeHtml(`${fileName(f.file)}:${f.line}`);
+            return `<li><span class="origin-who">${step}</span><span class="origin-loc">${loc}</span></li>`;
+          })
+          .join("")}</ol>`;
+  const pathBlock =
+    callers.length === 0
+      ? ""
+      : `<p class="origin-kicker">Reached through</p>${path}`;
+  return `<div class="origin"><p class="origin-lead">Built by <strong>${who}</strong> in ${file}</p>${quote}${pathBlock}</div>`;
 }
 
 export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {
@@ -125,6 +163,27 @@ export async function commitWidget(
       line: at.line,
       column: at.column,
       values,
+    }),
+  });
+  const body = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok || !body.ok) {
+    return body.error ?? `write failed (${res.status})`;
+  }
+  return null;
+}
+
+export async function commitStyle(
+  at: { file: string; line: number; column: number },
+  style: import("@design-scenes/shell").ObjectStyle | null,
+): Promise<string | null> {
+  const res = await fetch("/__write-style", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      file: at.file,
+      line: at.line,
+      column: at.column,
+      style,
     }),
   });
   const body = (await res.json()) as { ok?: boolean; error?: string };

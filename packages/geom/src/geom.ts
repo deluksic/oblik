@@ -4,6 +4,7 @@ import {
   geomSiteFromOpts,
   geomEditableFromOpts,
   geomBindFromOpts,
+  geomStyleFromOpts,
   geomLiveValues,
   constructGeom,
   takeFrameGeoms,
@@ -65,6 +66,7 @@ function siteBase(kind: string, createdBy: string, opts?: GeomSiteOpts): Base {
     geomSiteFromOpts(opts),
     geomEditableFromOpts(opts),
     geomBindFromOpts(opts),
+    geomStyleFromOpts(opts),
   );
 }
 
@@ -127,9 +129,15 @@ export function circle(center: Vec2, radius: number, site?: GeomSiteOpts): Circl
   });
 }
 
-export function arc(center: Vec2, radius: number, a0: number, a1: number): Arc {
+export function arc(
+  center: Vec2,
+  radius: number,
+  a0: number,
+  a1: number,
+  site?: GeomSiteOpts,
+): Arc {
   return constructGeom(() => ({
-    ...siteBase("arc", "arc"),
+    ...siteBase("arc", "arc", site),
     kind: "arc",
     center: point(center.x, center.y),
     radius,
