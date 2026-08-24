@@ -95,16 +95,7 @@ function hitExtendedGizmo(
   height: number,
 ): boolean {
   if (g.kind === "offset") {
-    const span = 12;
-    const a = {
-      x: g.origin.x - g.direction.x * span,
-      y: g.origin.y - g.direction.y * span,
-    };
-    const b = {
-      x: g.origin.x + g.direction.x * span,
-      y: g.origin.y + g.direction.y * span,
-    };
-    return distToSegment(world, a, b) <= GEOM_PX / cam.scale;
+    return distToLine(world, g.origin, g.direction) <= GEOM_PX / cam.scale;
   }
   if (g.kind === "distance") {
     const radiusPx = Math.abs(g.d) * cam.scale;

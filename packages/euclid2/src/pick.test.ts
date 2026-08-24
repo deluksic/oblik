@@ -58,3 +58,9 @@ test("mirrored offset line is hittable on the opposite side", () => {
   const hit = hitTest({ x: 200, y: 190 }, cam, W, H, [mirrored], []);
   expect(hit).toEqual({ target: "gizmo", gizmo: mirrored });
 });
+
+test("offset gizmo is hittable far from its origin along the line", () => {
+  const off = offsetThroughOrigin();
+  const far = hitTest({ x: 1000, y: 100 }, cam, W, H, [off], []);
+  expect(far).toEqual({ target: "gizmo", gizmo: off });
+});
