@@ -16,7 +16,7 @@ import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
-import { mapStack, pinConstructorSite, quantize, renderStackSnippets, stackLabel } from "./inspect";
+import { mapStack, originFromStack, pinConstructorSite, quantize, stackLabel } from "./inspect";
 import { applyStyleAtSite, drawInkFromStyle, hasStoredStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
 import type { ObjectStyle } from "@design-scenes/shell";
 import {
@@ -199,11 +199,11 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
               ? f.gizmo.stack
               : [{ file: f.gizmo.at.file, line: f.gizmo.at.line, column: f.gizmo.at.column }];
           const stack = pinConstructorSite(await mapStack(raw), f.gizmo.at);
-          pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+          pushInspect({ origin: await originFromStack(stack, peekCache) });
           return;
         }
         const stack = pinConstructorSite(await mapStack(f.geom.provenance.stack ?? []), f.geom.site);
-        pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+          pushInspect({ origin: await originFromStack(stack, peekCache) });
       }
 
       function styleExtras(
@@ -253,7 +253,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
               pushInspect,
               "Nothing selected",
               "Click a handle to keep it in the sidebar. The field itself is not pickable.",
-              `<code class="empty">No surface identity in this view.</code>`,
+              "No surface identity in this view.",
             );
             return;
           }
@@ -261,7 +261,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "LMB orbit · RMB pan · wheel zoom · click a handle or a surface"),
-            `<code class="empty">Select something to see where it comes from.</code>`,
+            "Select something to see where it comes from.",
           );
           return;
         }
@@ -286,7 +286,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         pushInspect({
           crumb: g.bind ?? g.kind,
           meta: stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
-          sourceHtml: await renderStackSnippets(stack, peekCache),
+          origin: await originFromStack(stack, peekCache),
           ...styleExtras(g.kind, g.style, g.site),
         });
       }

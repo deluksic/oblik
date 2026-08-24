@@ -1,6 +1,6 @@
 import type { InspectPatch } from "@design-scenes/shell";
 
-import { commitWidget, mapStack, peekFile, pinConstructorSite, renderStackSnippets, stackLabel } from "./inspect";
+import { commitWidget, mapStack, originFromStack, peekFile, pinConstructorSite, stackLabel } from "./inspect";
 
 export function scenePeekPath(sceneFile: string): string {
   return `apps/paper/src/scenes/${sceneFile}`;
@@ -85,7 +85,7 @@ export async function showWidgetInspect(
   push({
     crumb: g.bind ?? g.kind,
     meta: stackLabel(stack) || meta,
-    sourceHtml: await renderStackSnippets(stack, peekCache),
+    origin: await originFromStack(stack, peekCache),
     ...extras,
   });
 }
@@ -94,9 +94,16 @@ export function showEmptyInspect(
   push: InspectPush,
   crumb: string,
   meta: string,
-  sourceHtml: string,
+  message: string,
 ): void {
-  push({ crumb, meta, sourceHtml, style: null, styleChannel: null, onStyleChange: undefined });
+  push({
+    crumb,
+    meta,
+    origin: { kind: "empty", message },
+    style: null,
+    styleChannel: null,
+    onStyleChange: undefined,
+  });
 }
 
 export function setPaneStatus(

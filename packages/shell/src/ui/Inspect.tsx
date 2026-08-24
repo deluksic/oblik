@@ -1,6 +1,6 @@
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 
-import type { InspectState, LineStyle, PointStyle } from "@/types";
+import type { InspectState, LineStyle, OriginView, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
 
 import styles from "./Inspect.module.css";
@@ -21,8 +21,50 @@ export function Inspect(props: InspectProps) {
         </Show>
         <p class={styles.kicker}>Origin</p>
       </div>
-      <div class={styles.source} innerHTML={props.state.sourceHtml} />
+      <OriginPane origin={props.state.origin} />
     </aside>
+  );
+}
+
+function OriginPane(props: { origin: OriginView }) {
+  const empty = () => props.origin.kind === "empty";
+  const who = () => (props.origin.kind === "origin" ? props.origin.who : "");
+  const file = () => (props.origin.kind === "origin" ? props.origin.file : "");
+  const quote = () => (props.origin.kind === "origin" ? props.origin.quote : []);
+  const callers = () => (props.origin.kind === "origin" ? props.origin.callers : []);
+  const message = () => (props.origin.kind === "empty" ? props.origin.message : "");
+  return (
+    <div class={styles.source}>
+      <p class={[styles.empty, { [styles.hidden]: !empty() }]}>{message()}</p>
+      <div class={[styles.origin, { [styles.hidden]: empty() }]}>
+        <p class={styles.originLead}>
+          Built by <strong>{who()}</strong> in {file()}
+        </p>
+        <div class={styles.quote}>
+          <For each={quote()}>
+            {(row) => (
+              <div class={{ [styles.hl]: row.current }}>
+                <span class={styles.ln}>{row.line}</span>
+                <span class={styles.tx}>{row.text}</span>
+              </div>
+            )}
+          </For>
+        </div>
+        <Show when={callers().length > 0}>
+          <p class={styles.originKicker}>Reached through</p>
+          <ol class={styles.originPath}>
+            <For each={callers()}>
+              {(c) => (
+                <li>
+                  <span class={styles.originWho}>{c.who}</span>
+                  <span class={styles.originLoc}>{c.loc}</span>
+                </li>
+              )}
+            </For>
+          </ol>
+        </Show>
+      </div>
+    </div>
   );
 }
 
@@ -81,7 +123,7 @@ function LineFields(props: {
         />
       </label>
       <label class={styles.field}>
-        <span>Width {(display().width ?? DEFAULT_LINE_STYLE.width).toFixed(1)}</span>
+        <span>Width {(display().width ?? 1.5).toFixed(1)}</span>
         <input
           type="range"
           min="0.75"
@@ -129,7 +171,7 @@ function PointFields(props: {
         />
       </label>
       <label class={styles.field}>
-        <span>Size {(display().size ?? DEFAULT_POINT_STYLE.size).toFixed(1)}</span>
+        <span>Size {(display().size ?? 3.5).toFixed(1)}</span>
         <input
           type="range"
           min="2"

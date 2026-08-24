@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { renderStackSnippets, stackLabel, type StackFrame } from "./inspect";
+import { originFromStack, stackLabel, type StackFrame } from "./inspect";
 
 const leaf: StackFrame = {
   file: "apps/paper/src/scenes/floor-plan.ts",
-  line: 12,
+  line: 2,
   column: 5,
   name: "doorOpen",
 };
@@ -32,22 +32,22 @@ describe("stackLabel", () => {
   });
 });
 
-describe("renderStackSnippets", () => {
+describe("originFromStack", () => {
   test("empty origin is a sentence, not a traceback", async () => {
-    const html = await renderStackSnippets([], new Map());
-    expect(html).toContain("No source location for this object.");
-    expect(html).not.toContain("stack-frame");
+    const origin = await originFromStack([], new Map());
+    expect(origin).toEqual({ kind: "empty", message: "No source location for this object." });
   });
 
   test("quotes the helper and lists how it was reached", async () => {
     const cache = new Map([
       ["apps/paper/src/scenes/floor-plan.ts", "const south = wallRun();\nconst door = doorOpen();\n"],
     ]);
-    const html = await renderStackSnippets([leaf, caller], cache);
-    expect(html).toContain("Built by");
-    expect(html).toContain("doorOpen");
-    expect(html).toContain("Reached through");
-    expect(html).toContain("origin-path");
-    expect(html).not.toContain("at ");
+    const origin = await originFromStack([leaf, caller], cache);
+    expect(origin.kind).toBe("origin");
+    if (origin.kind !== "origin") return;
+    expect(origin.who).toBe("doorOpen");
+    expect(origin.file).toBe("floor-plan.ts");
+    expect(origin.quote.some((row) => row.current && row.text.includes("doorOpen"))).toBe(true);
+    expect(origin.callers).toEqual([{ who: "scene", loc: "floor-plan.ts:80" }]);
   });
 });

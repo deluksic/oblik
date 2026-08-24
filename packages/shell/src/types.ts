@@ -50,10 +50,31 @@ export const DEFAULT_POINT_STYLE: PointStyle = {
   size: 3.5,
 };
 
+export type OriginQuoteLine = {
+  line: number;
+  text: string;
+  current: boolean;
+};
+
+export type OriginCaller = {
+  who: string;
+  loc: string;
+};
+
+export type OriginView =
+  | { kind: "empty"; message: string }
+  | {
+      kind: "origin";
+      who: string;
+      file: string;
+      quote: OriginQuoteLine[];
+      callers: OriginCaller[];
+    };
+
 export type InspectState = {
   crumb: string;
   meta: string;
-  sourceHtml: string;
+  origin: OriginView;
   status: string;
   error: string | null;
   /** World cursor, shown on the right of the pane status strip. */

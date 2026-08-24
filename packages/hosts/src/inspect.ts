@@ -88,56 +88,49 @@ export function pinConstructorSite(
   return next;
 }
 
-function renderQuote(text: string, line: number): string {
-  const lines = text.split("\n");
+function quoteLines(text: string, line: number): import("@design-scenes/shell").OriginQuoteLine[] {
+  const rows = text.split("\n");
   const i = line - 1;
   const from = Math.max(0, i - 1);
-  const to = Math.min(lines.length, i + 2);
-  const chunks: string[] = [];
+  const to = Math.min(rows.length, i + 2);
+  const out: import("@design-scenes/shell").OriginQuoteLine[] = [];
   for (let n = from; n < to; n++) {
-    const current = n === i;
-    const body = escapeHtml(lines[n] ?? "");
-    chunks.push(
-      `<div class="${current ? "hl" : ""}"><span class="ln">${n + 1}</span><span class="tx">${body}</span></div>`,
-    );
+    out.push({ line: n + 1, text: rows[n] ?? "", current: n === i });
   }
-  return `<div class="quote">${chunks.join("")}</div>`;
+  return out;
 }
 
 /** Innermost helper first. Quote the construction; list callers as a path. */
-export async function renderStackSnippets(
+export async function originFromStack(
   frames: readonly StackFrame[],
   cache: Map<string, string>,
-): Promise<string> {
+): Promise<import("@design-scenes/shell").OriginView> {
   if (frames.length === 0) {
-    return `<p class="empty">No source location for this object.</p>`;
+    return { kind: "empty", message: "No source location for this object." };
   }
   const leaf = frames[0]!;
-  const who = escapeHtml(frameWho(leaf));
-  const file = escapeHtml(fileName(leaf.file));
-  let quote = "";
+  const who = frameWho(leaf);
+  const file = fileName(leaf.file);
+  let quote: import("@design-scenes/shell").OriginQuoteLine[] = [];
   try {
     const text = await peekFile(cache, leaf.file);
-    quote = renderQuote(text, leaf.line);
+    quote = quoteLines(text, leaf.line);
   } catch (err) {
-    quote = `<p class="empty">${escapeHtml(err instanceof Error ? err.message : String(err))}</p>`;
+    return {
+      kind: "empty",
+      message: err instanceof Error ? err.message : String(err),
+    };
   }
-  const callers = frames.slice(1);
-  const path =
-    callers.length === 0
-      ? ""
-      : `<ol class="origin-path">${callers
-          .map((f) => {
-            const step = escapeHtml(frameWho(f));
-            const loc = escapeHtml(`${fileName(f.file)}:${f.line}`);
-            return `<li><span class="origin-who">${step}</span><span class="origin-loc">${loc}</span></li>`;
-          })
-          .join("")}</ol>`;
-  const pathBlock =
-    callers.length === 0
-      ? ""
-      : `<p class="origin-kicker">Reached through</p>${path}`;
-  return `<div class="origin"><p class="origin-lead">Built by <strong>${who}</strong> in ${file}</p>${quote}${pathBlock}</div>`;
+  return {
+    kind: "origin",
+    who,
+    file,
+    quote,
+    callers: frames.slice(1).map((f) => ({
+      who: frameWho(f),
+      loc: `${fileName(f.file)}:${f.line}`,
+    })),
+  };
 }
 
 export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {

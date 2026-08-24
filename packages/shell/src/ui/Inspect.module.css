@@ -103,36 +103,23 @@
   overflow: auto;
 }
 
-.source :global(.empty) {
-  display: block;
+.hidden {
+  display: none;
+}
+
+.empty {
+  margin: 0;
   padding: 0.8rem;
   color: var(--muted);
   white-space: pre-wrap;
 }
 
-.source :global(.ln) {
-  display: inline-block;
-  width: 2.6rem;
-  color: #5c6370;
-  user-select: none;
-}
-
-.source :global(.hl) {
-  background: #2a2418;
-  color: var(--warn);
-}
-
-.source :global(div) {
-  padding: 0 0.6rem;
-  white-space: pre;
-}
-
-.source :global(.origin) {
+.origin {
   padding: 0.55rem 0.7rem 0.7rem;
   font-family: system-ui, sans-serif;
 }
 
-.source :global(.origin-lead) {
+.originLead {
   margin: 0 0 0.45rem;
   font-size: 0.82rem;
   line-height: 1.4;
@@ -140,12 +127,11 @@
   color: var(--text);
 }
 
-.source :global(.origin-lead strong) {
+.originLead strong {
   font-weight: 650;
-  color: var(--text);
 }
 
-.source :global(.origin-kicker) {
+.originKicker {
   margin: 0.7rem 0 0.25rem;
   font-size: 0.68rem;
   letter-spacing: 0.06em;
@@ -154,7 +140,7 @@
   white-space: normal;
 }
 
-.source :global(.quote) {
+.quote {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 0.72rem;
   border: 1px solid var(--stroke);
@@ -164,11 +150,28 @@
   max-width: 100%;
 }
 
-.source :global(.quote div) {
+.quote div {
   padding: 0.15rem 0.45rem;
+  white-space: pre;
 }
 
-.source :global(.origin-path) {
+.ln {
+  display: inline-block;
+  width: 2.6rem;
+  color: #5c6370;
+  user-select: none;
+}
+
+.hl {
+  background: #2a2418;
+  color: var(--warn);
+}
+
+.tx {
+  white-space: pre;
+}
+
+.originPath {
   margin: 0;
   padding-left: 1.1rem;
   font-size: 0.78rem;
@@ -177,22 +180,18 @@
   color: var(--muted);
 }
 
-.source :global(.origin-path li) {
+.originPath li {
   margin: 0.15rem 0;
 }
 
-.source :global(.origin-who) {
+.originWho {
   color: var(--text);
 }
 
-.source :global(.origin-loc) {
+.originLoc {
   margin-left: 0.4rem;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 0.72rem;
-}
-
-.source :global(.stack-frame) {
-  display: none;
 }
 
 @media (max-width: 800px) {

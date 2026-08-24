@@ -51,9 +51,9 @@ import {
   commitScenePatch,
   formatWorldCursor,
   mapStack,
+  originFromStack,
   pinConstructorSite,
   quantize,
-  renderStackSnippets,
   stackLabel,
 } from "./inspect";
 import { drawInkFromStyle, applyStyleAtSite, hasStoredStyle, inspectStylePatch, styleChannelForKind } from "./style";
@@ -256,11 +256,11 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
               ? f.gizmo.stack
               : [{ file: f.gizmo.at.file, line: f.gizmo.at.line, column: f.gizmo.at.column }];
           const stack = pinConstructorSite(await mapStack(raw), f.gizmo.at);
-          pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+          pushInspect({ origin: await originFromStack(stack, peekCache) });
           return;
         }
         const stack = pinConstructorSite(await mapStack(f.geom.provenance.stack ?? []), f.geom.site);
-        pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+        pushInspect({ origin: await originFromStack(stack, peekCache) });
       }
 
       function styleExtras(
@@ -347,7 +347,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
               pushInspect,
               "Nothing selected",
               "Click a centre or radius to keep it in the sidebar. The field itself is not pickable.",
-              `<code class="empty">No surface identity in this view.</code>`,
+              "No surface identity in this view.",
             );
             return;
           }
@@ -355,7 +355,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
             pushInspect,
             "Nothing selected",
             hintOf(sceneMod, "Hover or click geometry or a handle. Numbers live in the scene file."),
-            `<code class="empty">Select something to see where it comes from.</code>`,
+            "Select something to see where it comes from.",
           );
           return;
         }
@@ -380,7 +380,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         pushInspect({
           crumb: g.bind ?? g.kind,
           meta: stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
-          sourceHtml: await renderStackSnippets(stack, peekCache),
+          origin: await originFromStack(stack, peekCache),
           ...styleExtras(g.kind, g.style, g.site),
         });
       }
