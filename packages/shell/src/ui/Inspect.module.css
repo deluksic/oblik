@@ -40,38 +40,128 @@
 
 .fields {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.7rem;
 }
 
-.field {
+.row {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: 0.55rem;
-  align-items: center;
-  font-size: 0.78rem;
+  gap: 0.32rem;
+}
+
+.rowLabel {
+  margin: 0;
+  font-size: 0.72rem;
   color: var(--muted);
 }
 
-.field input[type="color"] {
-  width: 2.4rem;
-  height: 1.6rem;
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+
+.chip {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--stroke);
-  background: transparent;
-  cursor: pointer;
-}
-
-.field input[type="range"] {
-  width: 100%;
-}
-
-.field select {
-  font: inherit;
-  color: var(--text);
+  border-radius: 5px;
   background: #10131a;
-  border: 1px solid var(--stroke);
-  border-radius: 4px;
-  padding: 0.2rem 0.35rem;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.chipGrow {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 2.4rem;
+  height: 2rem;
+}
+
+.chip:hover {
+  border-color: #4a5368;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chipSelected {
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+
+.chipSelected::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 9px 9px;
+  border-color: transparent transparent var(--accent) transparent;
+  pointer-events: none;
+}
+
+.swatch {
+  padding: 3px;
+}
+
+.swatchFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.swatchDefault {
+  background: #d7d2c4;
+  position: relative;
+}
+
+.swatchDefault::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.7px),
+    #171a22 calc(50% - 0.7px),
+    #171a22 calc(50% + 0.7px),
+    transparent calc(50% + 0.7px)
+  );
+}
+
+.swatchRainbow {
+  background: conic-gradient(from 180deg, #e24b4b, #e8876a, #e0c35a, #3caf73, #4a8fd9, #9b6bdb, #e24b4b);
+}
+
+.colorInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  height: 1.05rem;
+  pointer-events: none;
 }
 
 .reset {

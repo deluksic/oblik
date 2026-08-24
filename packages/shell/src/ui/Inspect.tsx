@@ -1,9 +1,24 @@
 import { For, Show } from "solid-js";
 
-import type { InspectState, LineStyle, OriginView, PointStyle } from "@/types";
-import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
+import type { InspectState, LineDash, LineStyle, OriginView, PointStyle } from "@/types";
 
 import styles from "./Inspect.module.css";
+import {
+  COLOR_PRESETS,
+  DASH_PRESETS,
+  LINE_WIDTH_PRESETS,
+  POINT_SIZE_PRESETS,
+  colorValueForPreset,
+  dashValueForPreset,
+  pickerHex,
+  selectedColorId,
+  selectedDash,
+  selectedLineWidthId,
+  selectedPointSizeId,
+  sizeValueForPreset,
+  widthValueForPreset,
+  type SizePresetId,
+} from "./style-presets";
 
 export type InspectProps = {
   state: InspectState;
@@ -111,46 +126,44 @@ function LineFields(props: {
   stored?: LineStyle;
   onChange: (line: LineStyle) => void;
 }) {
-  const display = () => ({ ...DEFAULT_LINE_STYLE, ...props.stored });
   return (
     <div class={styles.fields}>
-      <label class={styles.field}>
-        <span>Color</span>
-        <input
-          type="color"
-          value={display().color}
-          onInput={(e) => props.onChange({ ...props.stored, color: e.currentTarget.value })}
-        />
-      </label>
-      <label class={styles.field}>
-        <span>Width {(display().width ?? 1.5).toFixed(1)}</span>
-        <input
-          type="range"
-          min="0.75"
-          max="5"
-          step="0.25"
-          value={display().width ?? DEFAULT_LINE_STYLE.width}
-          onInput={(e) =>
-            props.onChange({ ...props.stored, width: Number(e.currentTarget.value) })
-          }
-        />
-      </label>
-      <label class={styles.field}>
-        <span>Stroke</span>
-        <select
-          value={display().dash ?? DEFAULT_LINE_STYLE.dash}
-          onChange={(e) =>
-            props.onChange({
-              ...props.stored,
-              dash: e.currentTarget.value as NonNullable<LineStyle["dash"]>,
-            })
-          }
-        >
-          <option value="solid">Solid</option>
-          <option value="dashed">Dashed</option>
-          <option value="dotted">Dotted</option>
-        </select>
-      </label>
+      <ColorRow
+        color={props.stored?.color}
+        onChange={(color) => props.onChange({ ...props.stored, color })}
+      />
+      <div class={styles.row}>
+        <p class={styles.rowLabel}>Width</p>
+        <div class={styles.chips} role="group" aria-label="Width">
+          <For each={LINE_WIDTH_PRESETS}>
+            {(preset) => (
+              <PreviewChip
+                label={preset.label}
+                selected={selectedLineWidthId(props.stored?.width) === preset.id}
+                onPick={() => props.onChange({ ...props.stored, width: widthValueForPreset(preset.id) })}
+              >
+                <LinePreview stroke={strokeForWidth(preset.id)} />
+              </PreviewChip>
+            )}
+          </For>
+        </div>
+      </div>
+      <div class={styles.row}>
+        <p class={styles.rowLabel}>Stroke</p>
+        <div class={styles.chips} role="group" aria-label="Stroke">
+          <For each={DASH_PRESETS}>
+            {(preset) => (
+              <PreviewChip
+                label={preset.label}
+                selected={selectedDash(props.stored?.dash) === preset.id}
+                onPick={() => props.onChange({ ...props.stored, dash: dashValueForPreset(preset.id) })}
+              >
+                <LinePreview stroke={2} dash={preset.id} />
+              </PreviewChip>
+            )}
+          </For>
+        </div>
+      </div>
     </div>
   );
 }
@@ -159,30 +172,143 @@ function PointFields(props: {
   stored?: PointStyle;
   onChange: (point: PointStyle) => void;
 }) {
-  const display = () => ({ ...DEFAULT_POINT_STYLE, ...props.stored });
   return (
     <div class={styles.fields}>
-      <label class={styles.field}>
-        <span>Color</span>
-        <input
-          type="color"
-          value={display().color}
-          onInput={(e) => props.onChange({ ...props.stored, color: e.currentTarget.value })}
-        />
-      </label>
-      <label class={styles.field}>
-        <span>Size {(display().size ?? 3.5).toFixed(1)}</span>
-        <input
-          type="range"
-          min="2"
-          max="12"
-          step="0.5"
-          value={display().size ?? DEFAULT_POINT_STYLE.size}
-          onInput={(e) =>
-            props.onChange({ ...props.stored, size: Number(e.currentTarget.value) })
-          }
-        />
-      </label>
+      <ColorRow
+        color={props.stored?.color}
+        onChange={(color) => props.onChange({ ...props.stored, color })}
+      />
+      <div class={styles.row}>
+        <p class={styles.rowLabel}>Size</p>
+        <div class={styles.chips} role="group" aria-label="Size">
+          <For each={POINT_SIZE_PRESETS}>
+            {(preset) => (
+              <PreviewChip
+                label={preset.label}
+                selected={selectedPointSizeId(props.stored?.size) === preset.id}
+                onPick={() => props.onChange({ ...props.stored, size: sizeValueForPreset(preset.id) })}
+              >
+                <svg class={styles.preview} viewBox="0 0 44 20" aria-hidden="true">
+                  <circle cx="22" cy="10" r={radiusForSize(preset.id)} fill="currentColor" />
+                </svg>
+              </PreviewChip>
+            )}
+          </For>
+        </div>
+      </div>
     </div>
   );
+}
+
+function ColorRow(props: {
+  color: string | undefined;
+  onChange: (color: string | undefined) => void;
+}) {
+  return (
+    <div class={styles.row}>
+      <p class={styles.rowLabel}>Color</p>
+      <div class={styles.chips} role="group" aria-label="Color">
+        <For each={COLOR_PRESETS}>
+          {(preset) => <ColorChip preset={preset} color={props.color} onPick={props.onChange} />}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function ColorChip(props: {
+  preset: (typeof COLOR_PRESETS)[number];
+  color: string | undefined;
+  onPick: (color: string | undefined) => void;
+}) {
+  const selected = () => selectedColorId(props.color) === props.preset.id;
+  const custom = () => selectedColorId(props.color) === "custom";
+  return (
+    <Show
+      when={props.preset.id === "custom"}
+      fallback={
+        <button
+          type="button"
+          title={props.preset.label}
+          aria-label={props.preset.label}
+          aria-pressed={selected() ? "true" : "false"}
+          class={[styles.chip, styles.swatch, { [styles.chipSelected]: selected() }]}
+          onClick={() => props.onPick(colorValueForPreset(props.preset.id))}
+        >
+          <span
+            class={[styles.swatchFill, { [styles.swatchDefault]: props.preset.id === "default" }]}
+            style={props.preset.hex ? { background: props.preset.hex } : undefined}
+          />
+        </button>
+      }
+    >
+      <label
+        title={props.preset.label}
+        class={[styles.chip, styles.swatch, { [styles.chipSelected]: selected() }]}
+      >
+        <span
+          class={[styles.swatchFill, { [styles.swatchRainbow]: !custom() }]}
+          style={custom() ? { background: pickerHex(props.color) } : undefined}
+        />
+        <input
+          type="color"
+          class={styles.colorInput}
+          aria-label="Custom color"
+          value={pickerHex(props.color)}
+          onInput={(e) => props.onPick(e.currentTarget.value)}
+        />
+      </label>
+    </Show>
+  );
+}
+
+function PreviewChip(props: {
+  label: string;
+  selected: boolean;
+  onPick: () => void;
+  children: import("solid-js").Element;
+}) {
+  return (
+    <button
+      type="button"
+      title={props.label}
+      aria-label={props.label}
+      aria-pressed={props.selected ? "true" : "false"}
+      class={[styles.chip, styles.chipGrow, { [styles.chipSelected]: props.selected }]}
+      onClick={() => props.onPick()}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+function LinePreview(props: { stroke: number; dash?: LineDash }) {
+  const dasharray = () =>
+    props.dash === "dashed" ? "7 5" : props.dash === "dotted" ? "0.1 4.5" : undefined;
+  return (
+    <svg class={styles.preview} viewBox="0 0 44 20" aria-hidden="true">
+      <line
+        x1="6"
+        y1="10"
+        x2="38"
+        y2="10"
+        stroke="currentColor"
+        stroke-width={props.stroke}
+        stroke-linecap="round"
+        stroke-dasharray={dasharray()}
+      />
+    </svg>
+  );
+}
+
+function strokeForWidth(id: SizePresetId): number {
+  if (id === "small") return 1.2;
+  if (id === "wide") return 4;
+  return 2.25;
+}
+
+function radiusForSize(id: SizePresetId): number {
+  if (id === "small") return 2.2;
+  if (id === "wide") return 5.4;
+  return 3.4;
 }
