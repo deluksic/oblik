@@ -1,0 +1,49 @@
+.paper {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  background: #0e1016;
+  overflow: hidden;
+  touch-action: none;
+  cursor: default;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stroke {
+  fill: none;
+  stroke: #d7d2c4;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+
+.handle {
+  fill: #e8876a;
+  stroke: #0e1016;
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.handle:hover {
+  fill: #fff3e6;
+}
+
+.hot {
+  stroke: #7ec8e3;
+}

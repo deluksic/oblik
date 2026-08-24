@@ -57,7 +57,7 @@ GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs t
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current 2D charter: [prototypes/5.md](./prototypes/5.md).
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current charter: [prototypes/6.md](./prototypes/6.md) (P5 paper app still runs).
 
 Packages and rules: [layout.md](./layout.md). Catalog and palette: [scenes.md](./scenes.md).
 

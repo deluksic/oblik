@@ -1,0 +1,19 @@
+{
+  "name": "oblik-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 43127 --strictPort"
+  },
+  "dependencies": {
+    "oblik": "workspace:*",
+    "solid-js": "2.0.0-rc.0",
+    "@solidjs/web": "2.0.0-rc.0"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.31",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}

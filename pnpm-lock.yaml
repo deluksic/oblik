@@ -18,6 +18,28 @@ importers:
         specifier: ~6.0.2
         version: 6.0.3
 
+  apps/demo:
+    dependencies:
+      '@solidjs/web':
+        specifier: 2.0.0-rc.0
+        version: 2.0.0-rc.0(solid-js@2.0.0-rc.0)
+      oblik:
+        specifier: workspace:*
+        version: link:../../packages/oblik
+      solid-js:
+        specifier: 2.0.0-rc.0
+        version: 2.0.0-rc.0
+    devDependencies:
+      '@solidjs/vite-plugin':
+        specifier: 3.0.0-next.31
+        version: 3.0.0-next.31(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)(vite@8.2.2(@types/node@24.13.3))
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.2(@types/node@24.13.3)
+
   apps/paper:
     dependencies:
       '@design-scenes/euclid2':
@@ -99,6 +121,34 @@ importers:
       '@solidjs/vite-plugin':
         specifier: 3.0.0-next.31
         version: 3.0.0-next.31(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.1))(solid-js@2.0.0-rc.1)(vite@8.2.2(@types/node@24.13.3))
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3))
+
+  packages/oblik:
+    dependencies:
+      '@solidjs/web':
+        specifier: 2.0.0-rc.0
+        version: 2.0.0-rc.0(solid-js@2.0.0-rc.0)
+      magic-string:
+        specifier: ^0.30.17
+        version: 0.30.21
+      solid-js:
+        specifier: 2.0.0-rc.0
+        version: 2.0.0-rc.0
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      valibot:
+        specifier: ^1.1.0
+        version: 1.4.2(typescript@6.0.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.2(@types/node@24.13.3)
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3))
@@ -1078,6 +1128,14 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  valibot@1.4.2:
+    resolution: {integrity: sha512-gjdCvJ6d3RyHAneqxMYMW9QMCwYMb3jpOO0IyHZV1bnRHFBHrX3VkIILt5XYR0WhwHiH7Mty8ovuPZ/O3gamrg==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   validate-html-nesting@1.2.4:
     resolution: {integrity: sha512-doQi7e8EJ2OWneSG1aZpJluS6A49aZM0+EICXWKm1i6WvqTLmq0tpUcImc4KTWG50mORO0C4YDBtOCSYvElftw==}
 
@@ -1547,6 +1605,21 @@ snapshots:
 
   '@solidjs/signals@2.0.0-rc.1': {}
 
+  '@solidjs/vite-plugin@3.0.0-next.31(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)(vite@8.2.2(@types/node@24.13.3))':
+    dependencies:
+      '@ampproject/remapping': 2.3.0
+      '@babel/core': 7.29.7
+      '@dom-expressions/compiler': 0.50.0-next.43
+      '@solidjs/web': 2.0.0-rc.0(solid-js@2.0.0-rc.0)
+      '@types/babel__core': 7.20.5
+      babel-preset-solid: 2.0.0-rc.1(@babel/core@7.29.7)(solid-js@2.0.0-rc.0)
+      merge-anything: 5.1.7
+      solid-js: 2.0.0-rc.0
+      vite: 8.2.2(@types/node@24.13.3)
+      vitefu: 1.1.3(vite@8.2.2(@types/node@24.13.3))
+    transitivePeerDependencies:
+      - supports-color
+
   '@solidjs/vite-plugin@3.0.0-next.31(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.1))(solid-js@2.0.0-rc.1)(vite@8.2.2(@types/node@24.13.3))':
     dependencies:
       '@ampproject/remapping': 2.3.0
@@ -1674,6 +1747,13 @@ snapshots:
   '@webgpu/types@0.1.72': {}
 
   assertion-error@2.0.1: {}
+
+  babel-preset-solid@2.0.0-rc.1(@babel/core@7.29.7)(solid-js@2.0.0-rc.0):
+    dependencies:
+      '@babel/core': 7.29.7
+      '@dom-expressions/babel-plugin-jsx': 0.50.0-next.43(@babel/core@7.29.7)
+    optionalDependencies:
+      solid-js: 2.0.0-rc.0
 
   babel-preset-solid@2.0.0-rc.1(@babel/core@7.29.7)(solid-js@2.0.0-rc.1):
     dependencies:
@@ -1952,6 +2032,10 @@ snapshots:
       browserslist: 4.28.8
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  valibot@1.4.2(typescript@6.0.3):
+    optionalDependencies:
+      typescript: 6.0.3
 
   validate-html-nesting@1.2.4: {}
 

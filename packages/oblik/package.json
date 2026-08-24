@@ -1,0 +1,29 @@
+{
+  "name": "oblik",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./euclid2": "./src/euclid2/View.tsx",
+    "./plugin": "./src/source/vite-plugin.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.0",
+    "solid-js": "2.0.0-rc.0",
+    "magic-string": "^0.30.17",
+    "typescript": "~6.0.2",
+    "valibot": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
+  },
+  "peerDependencies": {
+    "vite": "^8.2.0"
+  }
+}

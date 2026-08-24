@@ -1,0 +1,52 @@
+import { describe, expect, test } from "vitest";
+
+import { siteOf } from "./site";
+import { circle, point, segment } from "./constructors";
+import { defineScene } from "./scene";
+import { evaluate } from "./evaluate";
+import { analyze } from "../source/analyze";
+
+describe("evaluate", () => {
+  test("segment is one trace, not endpoint points", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const a = point(0, 0, "a");
+        const b = point(1, 0, "b");
+        return segment(a, b, "s");
+      },
+    });
+    const annotations = analyze(
+      `const a = point(0, 0, "a");\nconst b = point(1, 0, "b");\nsegment(a, b, "s");\n`,
+    );
+    const { trace } = evaluate(scene, { annotations });
+    expect(trace.map((n) => n.kind)).toEqual(["point", "point", "segment"]);
+    expect(trace.filter((n) => n.kind === "point")).toHaveLength(2);
+  });
+
+  test("draft overrides circle radius", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        return circle(A, 2.5, "c");
+      },
+    });
+    const annotations = analyze(`const A = point(0, 0, "a");\ncircle(A, 2.5, "c");\n`);
+    const { trace } = evaluate(scene, {
+      annotations,
+      draft: new Map([["c", [4]]]),
+    });
+    const c = trace.find((n) => n.id === "c");
+    expect(c?.value.kind).toBe("circle");
+    if (c?.value.kind === "circle") expect(c.value.radius).toBe(4);
+  });
+
+  test("circle carries $site dof on the function", () => {
+    expect(siteOf(circle)?.dof).toEqual([1]);
+    expect(siteOf(point)?.dof).toEqual([0, 1]);
+    expect(siteOf(segment)?.dof).toEqual([]);
+  });
+});
