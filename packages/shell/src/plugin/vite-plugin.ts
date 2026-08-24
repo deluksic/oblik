@@ -189,6 +189,28 @@ function rememberedWrite(writes: Map<string, string>, file: string): string | un
   return undefined;
 }
 
+function readPatchSource(writes: Map<string, string>, abs: string): string {
+  return rememberedWrite(writes, abs) ?? fs.readFileSync(abs, "utf8");
+}
+
+function forgetWidgetWrite(writes: Map<string, string>, file: string): void {
+  for (const key of fileAliases(file)) writes.delete(key);
+}
+
+function runSerialized<T>(tails: Map<string, Promise<void>>, abs: string, work: () => T): Promise<T> {
+  const run = () => Promise.resolve().then(work);
+  const prev = tails.get(abs) ?? Promise.resolve();
+  const next = prev.then(run, run);
+  tails.set(
+    abs,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return next;
+}
+
 function parseSourceAt(raw: unknown): SourceAt | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -243,6 +265,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
   let vite: ViteDevServer | undefined;
   let lastCatalog = "";
   const widgetWrites = new Map<string, string>();
+  const fileWriteTail = new Map<string, Promise<void>>();
 
   function catalogChanged(): boolean {
     const next = catalogFingerprint(sceneDir);
@@ -305,10 +328,12 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 json(res, 400, { ok: false, error: "expected a .ts file path" });
                 return;
               }
-              const source = fs.readFileSync(abs, "utf8");
-              const patched = patchWidgetAt(source, line, column, values);
-              rememberWidgetWrite(widgetWrites, abs, patched);
-              fs.writeFileSync(abs, patched);
+              await runSerialized(fileWriteTail, abs, () => {
+                const source = readPatchSource(widgetWrites, abs);
+                const patched = patchWidgetAt(source, line, column, values);
+                rememberWidgetWrite(widgetWrites, abs, patched);
+                fs.writeFileSync(abs, patched);
+              });
               json(res, 200, { ok: true });
               return;
             }
@@ -338,9 +363,12 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 json(res, 400, { ok: false, error: "expected a .ts file path" });
                 return;
               }
-              const source = fs.readFileSync(abs, "utf8");
-              const patched = patchStyleAt(source, line, column, parsed);
-              fs.writeFileSync(abs, patched);
+              await runSerialized(fileWriteTail, abs, () => {
+                const source = readPatchSource(widgetWrites, abs);
+                const patched = patchStyleAt(source, line, column, parsed);
+                fs.writeFileSync(abs, patched);
+                forgetWidgetWrite(widgetWrites, abs);
+              });
               json(res, 200, { ok: true });
               return;
             }
@@ -368,9 +396,12 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 });
                 return;
               }
-              const source = fs.readFileSync(abs, "utf8");
               try {
-                fs.writeFileSync(abs, applyScenePatch(source, parsed));
+                await runSerialized(fileWriteTail, abs, () => {
+                  const source = readPatchSource(widgetWrites, abs);
+                  fs.writeFileSync(abs, applyScenePatch(source, parsed));
+                  forgetWidgetWrite(widgetWrites, abs);
+                });
               } catch (err) {
                 json(res, 400, {
                   ok: false,
@@ -378,7 +409,6 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 });
                 return;
               }
-              for (const key of fileAliases(abs)) widgetWrites.delete(key);
               if (vite) hotReloadSceneFile(vite, abs);
               json(res, 200, { ok: true });
               return;

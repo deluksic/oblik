@@ -158,7 +158,9 @@
   font-size: 0.72rem;
   border: 1px solid var(--stroke);
   border-radius: 4px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
 }
 
 .source :global(.quote div) {

@@ -56,7 +56,7 @@ import {
   renderStackSnippets,
   stackLabel,
 } from "./inspect";
-import { drawInkFromStyle, inspectStylePatch, styleChannelForKind } from "./style";
+import { drawInkFromStyle, applyStyleAtSite, inspectStylePatch, styleChannelForKind } from "./style";
 import {
   advanceSessionField,
   commitSession,
@@ -250,10 +250,9 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         kind: string,
         current: Parameters<typeof inspectStylePatch>[0],
         at?: { file: string; line: number; column: number },
-        assign?: (style: Parameters<typeof inspectStylePatch>[0] | null) => void,
       ) {
         return inspectStylePatch(current, kind, at, (style) => {
-          assign?.(style);
+          if (at) applyStyleAtSite(at, style, drawables(), gizmos());
           applyStyle();
         });
       }
@@ -349,14 +348,6 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
               f.gizmo.kind,
               drawables().find((d) => d.geom.id === f.gizmo.id)?.geom.style ?? f.gizmo.style,
               f.gizmo.at,
-              (style) => {
-                const owner = drawables().find((d) => d.geom.id === f.gizmo.id)?.geom;
-                if (owner) {
-                  if (style) owner.style = style;
-                  else delete owner.style;
-                } else if (style) f.gizmo.style = style;
-                else delete f.gizmo.style;
-              },
             ),
           );
           return;
@@ -367,10 +358,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           crumb: g.bind ?? g.kind,
           meta: stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`,
           sourceHtml: await renderStackSnippets(stack, peekCache),
-          ...styleExtras(g.kind, g.style, g.site, (style) => {
-            if (style) g.style = style;
-            else delete g.style;
-          }),
+          ...styleExtras(g.kind, g.style, g.site),
         });
       }
 

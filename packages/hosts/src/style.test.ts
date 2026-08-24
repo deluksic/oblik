@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  applyStyleAtSite,
   drawInkFromStyle,
   parseHex,
   restInkFromDraw,
+  siteKey,
   styleChannelForKind,
 } from "./style";
 
@@ -44,6 +46,34 @@ describe("drawInkFromStyle", () => {
   test("missing style is undefined so the view default wins", () => {
     expect(drawInkFromStyle(undefined, "line")).toBeUndefined();
     expect(drawInkFromStyle({}, "line")).toBeUndefined();
+  });
+});
+
+describe("siteKey / applyStyleAtSite", () => {
+  const at = { file: "apps/paper/src/scenes/loop.ts", line: 4, column: 3 };
+
+  test("siteKey is file:line:column", () => {
+    expect(siteKey(at)).toBe("apps/paper/src/scenes/loop.ts:4:3");
+    expect(siteKey(undefined)).toBeNull();
+  });
+
+  test("style applies to every drawable and gizmo at the site", () => {
+    const a = { geom: { site: at, style: undefined as { line?: { color: string } } | undefined } };
+    const b = { geom: { site: at } };
+    const c = { geom: { site: { file: at.file, line: 9, column: 1 } } };
+    const g1 = { at, style: undefined as { line?: { color: string } } | undefined };
+    const g2 = { at: { file: at.file, line: 9, column: 1 } };
+    const style = { line: { color: "#e8876a", width: 2, dash: "dashed" as const } };
+    applyStyleAtSite(at, style, [a, b, c], [g1, g2]);
+    expect(a.geom.style).toEqual(style);
+    expect(b.geom.style).toEqual(style);
+    expect(c.geom.style).toBeUndefined();
+    expect(g1.style).toEqual(style);
+    expect(g2.style).toBeUndefined();
+    applyStyleAtSite(at, null, [a, b], [g1]);
+    expect(a.geom.style).toBeUndefined();
+    expect(b.geom.style).toBeUndefined();
+    expect(g1.style).toBeUndefined();
   });
 });
 

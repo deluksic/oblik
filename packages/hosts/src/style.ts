@@ -88,6 +88,40 @@ export function restInkFromDraw(ink: DrawInk | undefined): RestInk | undefined {
   };
 }
 
+export type StyleSite = { file: string; line: number; column: number };
+
+export function siteKey(at: StyleSite | undefined): string | null {
+  if (!at) return null;
+  return `${at.file}:${at.line}:${at.column}`;
+}
+
+type StyledGeom = { site?: StyleSite; style?: ObjectStyle };
+type StyledGizmo = { at: StyleSite; style?: ObjectStyle };
+
+/** Live-apply constructor ink to every drawable/gizmo that shares the write site. */
+export function applyStyleAtSite(
+  at: StyleSite,
+  style: ObjectStyle | null,
+  drawables: readonly { geom: StyledGeom }[],
+  gizmos: readonly StyledGizmo[],
+): void {
+  const key = siteKey(at);
+  if (!key) return;
+  for (const d of drawables) {
+    const s = d.geom.site;
+    if (s && siteKey(s) === key) {
+      if (style) d.geom.style = style;
+      else delete d.geom.style;
+    }
+  }
+  for (const g of gizmos) {
+    if (siteKey(g.at) === key) {
+      if (style) g.style = style;
+      else delete g.style;
+    }
+  }
+}
+
 export function inspectStylePatch(
   current: ObjectStyle | undefined,
   kind: string,
