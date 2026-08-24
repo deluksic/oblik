@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 
 import {
   colorValueForPreset,
+  dashPattern,
   dashValueForPreset,
   mergeLineStyle,
   mergePointStyle,
@@ -44,6 +45,14 @@ test("solid dash is the omitted default", () => {
   expect(selectedDash("dotted")).toBe("dotted");
   expect(dashValueForPreset("solid")).toBeUndefined();
   expect(dashValueForPreset("dashed")).toBe("dashed");
+});
+
+test("dash pattern scales gaps faster on wide strokes", () => {
+  expect(dashPattern("dashed")).toEqual([8, 6]);
+  const wide = dashPattern("dashed", 3.5);
+  expect(wide[0]).toBeGreaterThan(8);
+  expect(wide[1]).toBeGreaterThan(wide[0]);
+  expect(wide[1] / wide[0]).toBeGreaterThan(6 / 8);
 });
 
 test("named presets always write explicit width and size", () => {

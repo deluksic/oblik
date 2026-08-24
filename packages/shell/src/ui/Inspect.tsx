@@ -9,6 +9,7 @@ import {
   LINE_WIDTH_PRESETS,
   POINT_SIZE_PRESETS,
   colorValueForPreset,
+  dashPattern,
   dashValueForPreset,
   mergeLineStyle,
   mergePointStyle,
@@ -288,8 +289,10 @@ function PreviewChip(props: {
 }
 
 function LinePreview(props: { stroke: number; dash?: LineDash }) {
-  const dasharray = () =>
-    props.dash === "dashed" ? "7 5" : props.dash === "dotted" ? "0.1 4.5" : undefined;
+  const dasharray = () => {
+    if (!props.dash || props.dash === "solid") return undefined;
+    return dashPattern(props.dash, props.stroke).join(" ");
+  };
   return (
     <svg class={styles.preview} viewBox="0 0 44 20" aria-hidden="true">
       <line

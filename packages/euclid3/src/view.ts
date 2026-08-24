@@ -23,6 +23,8 @@ export type RestInk = {
   color?: number;
   pointScale?: number;
   dashed?: boolean;
+  dashSize?: number;
+  gapSize?: number;
 };
 
 export type InkLookup3 = (id: string) => RestInk | undefined;
@@ -247,7 +249,11 @@ function meshFor(g: Geom3, color: number, highlight: boolean, rest?: RestInk): T
   const group = new THREE.Group();
   const dashed = rest?.dashed === true;
   const edgeMat = dashed
-    ? new THREE.LineDashedMaterial({ color, dashSize: 0.14, gapSize: 0.1 })
+    ? new THREE.LineDashedMaterial({
+        color,
+        dashSize: rest?.dashSize ?? 0.14,
+        gapSize: rest?.gapSize ?? 0.1,
+      })
     : new THREE.LineBasicMaterial({
         color,
         linewidth: highlight ? 2 : 1,

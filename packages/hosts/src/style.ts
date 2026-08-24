@@ -1,4 +1,5 @@
-import type { InspectPatch, LineDash, ObjectStyle, StyleChannel } from "@design-scenes/shell";
+import type { InspectPatch, ObjectStyle, StyleChannel } from "@design-scenes/shell";
+import { dashPattern } from "@design-scenes/shell/dash";
 
 import { commitStyle } from "./inspect";
 
@@ -8,12 +9,6 @@ export type DrawInk = {
   dash?: number[];
   fill?: string;
   pointSize?: number;
-};
-
-const DASH: Record<LineDash, number[]> = {
-  solid: [],
-  dashed: [8, 6],
-  dotted: [2.5, 4],
 };
 
 const POINT_KINDS = new Set([
@@ -45,10 +40,6 @@ export function styleChannelForKind(kind: string): StyleChannel | null {
   return null;
 }
 
-export function dashPattern(dash: LineDash | undefined): number[] {
-  return DASH[dash ?? "solid"];
-}
-
 export function hasStoredStyle(style: ObjectStyle | null | undefined): boolean {
   if (!style) return false;
   const line = style.line;
@@ -64,7 +55,7 @@ function drawLineInk(line: ObjectStyle["line"]): DrawInk | undefined {
   const ink: DrawInk = {};
   if (line.color != null) ink.stroke = line.color;
   if (line.width != null) ink.width = line.width;
-  if (line.dash != null) ink.dash = dashPattern(line.dash);
+  if (line.dash != null) ink.dash = dashPattern(line.dash, line.width ?? 1.5);
   return Object.keys(ink).length > 0 ? ink : undefined;
 }
 
@@ -91,7 +82,11 @@ export type RestInk = {
   color?: number;
   pointScale?: number;
   dashed?: boolean;
+  dashSize?: number;
+  gapSize?: number;
 };
+
+const REST_DASH_REF = { dash: 8, gap: 6, dashSize: 0.14, gapSize: 0.1 };
 
 export function parseHex(hex: string): number | undefined {
   const s = hex.trim().replace(/^#/, "");
@@ -103,11 +98,16 @@ export function parseHex(hex: string): number | undefined {
 
 export function restInkFromDraw(ink: DrawInk | undefined): RestInk | undefined {
   if (!ink) return undefined;
-  return {
+  const rest: RestInk = {
     color: ink.stroke ? parseHex(ink.stroke) : undefined,
     pointScale: ink.pointSize != null ? ink.pointSize / 3.5 : undefined,
     dashed: !!(ink.dash && ink.dash.length > 0),
   };
+  if (ink.dash && ink.dash.length >= 2) {
+    rest.dashSize = REST_DASH_REF.dashSize * (ink.dash[0] / REST_DASH_REF.dash);
+    rest.gapSize = REST_DASH_REF.gapSize * (ink.dash[1] / REST_DASH_REF.gap);
+  }
+  return rest;
 }
 
 export type StyleSite = { file: string; line: number; column: number };

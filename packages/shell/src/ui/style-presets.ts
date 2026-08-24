@@ -35,6 +35,8 @@ export const DASH_PRESETS: readonly { id: LineDash; label: string }[] = [
   { id: "dotted", label: "Dotted" },
 ];
 
+export { dashPattern } from "../dash";
+
 export const DEFAULT_SWATCH = DEFAULT_LINE_STYLE.color ?? "#d7d2c4";
 
 export function normalizeHex(hex: string | undefined): string | undefined {

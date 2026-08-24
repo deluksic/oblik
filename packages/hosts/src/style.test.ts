@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import { dashPattern } from "@design-scenes/shell/dash";
+
 import {
   applyStyleAtSite,
   applyStyleOverlays,
@@ -41,9 +43,13 @@ describe("drawInkFromStyle", () => {
     expect(drawInkFromStyle({ line: { color: "#ff8844", width: 2.5, dash: "dashed" } }, "line")).toEqual({
       stroke: "#ff8844",
       width: 2.5,
-      dash: [8, 6],
+      dash: dashPattern("dashed", 2.5),
     });
-    expect(drawInkFromStyle({ line: { dash: "dashed" } }, "line")).toEqual({ dash: [8, 6] });
+    expect(drawInkFromStyle({ line: { dash: "dashed" } }, "line")).toEqual({ dash: dashPattern("dashed") });
+    expect(drawInkFromStyle({ line: { width: 3.5, dash: "dashed" } }, "line")).toEqual({
+      width: 3.5,
+      dash: dashPattern("dashed", 3.5),
+    });
   });
 
   test("point style maps only the fields that were set", () => {
@@ -116,5 +122,14 @@ describe("parseHex / restInkFromDraw", () => {
     expect(rest?.color).toBe(0x112233);
     expect(rest?.dashed).toBe(true);
     expect(rest?.pointScale).toBeCloseTo(2);
+    expect(rest?.dashSize).toBeCloseTo(0.035);
+    expect(rest?.gapSize).toBeCloseTo(0.0667, 3);
+  });
+
+  test("wide dashed ink scales 3D dash and gap", () => {
+    const ink = { stroke: "#112233", width: 3.5, dash: dashPattern("dashed", 3.5) };
+    const rest = restInkFromDraw(ink);
+    expect(rest?.dashSize).toBeGreaterThan(0.14);
+    expect(rest?.gapSize).toBeGreaterThan(rest!.dashSize!);
   });
 });
