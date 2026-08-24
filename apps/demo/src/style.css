@@ -38,6 +38,15 @@ body,
   font-size: 0.82rem;
 }
 
+.status {
+  color: var(--accent) !important;
+}
+
+.err {
+  margin: 1rem;
+  color: #e8876a;
+}
+
 .kicker {
   margin: 0 0 0.15rem;
   text-transform: uppercase;

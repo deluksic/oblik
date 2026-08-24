@@ -21,6 +21,5 @@ export {
 export { stamp } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { convergeDraft } from "./source/converge";
-export { oblikPlugin } from "./source/vite-plugin";
 export type { Camera2 } from "./euclid2/camera";
 export * from "./geom";

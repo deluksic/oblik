@@ -3,7 +3,9 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM"],
     "jsx": "preserve",
-    "jsxImportSource": "@solidjs/web"
+    "jsxImportSource": "@solidjs/web",
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

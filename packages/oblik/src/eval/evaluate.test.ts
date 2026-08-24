@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { siteOf } from "./site";
 import { circle, point, segment } from "./constructors";
 import { defineScene } from "./scene";
-import { evaluate } from "./evaluate";
+import { emit, evaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
 
 describe("evaluate", () => {
@@ -42,6 +42,26 @@ describe("evaluate", () => {
     const c = trace.find((n) => n.id === "c");
     expect(c?.value.kind).toBe("circle");
     if (c?.value.kind === "circle") expect(c.value.radius).toBe(4);
+  });
+
+  test("nested evaluate does not leak tape; emit re-emits the same id", () => {
+    const inner = defineScene({
+      kind: "euclid2",
+      title: "inner",
+      build() {
+        return point(1, 2, "p");
+      },
+    });
+    const outer = defineScene({
+      kind: "euclid2",
+      title: "outer",
+      build() {
+        emit(evaluate(inner).value);
+      },
+    });
+    const { trace } = evaluate(outer);
+    expect(trace).toHaveLength(1);
+    expect(trace[0]?.id).toBe("p");
   });
 
   test("circle carries $site dof on the function", () => {

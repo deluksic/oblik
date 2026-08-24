@@ -1,9 +1,8 @@
-import { createMemo, createSignal } from "solid-js";
+import { Errored, createMemo, createSignal } from "solid-js";
 import { render } from "@solidjs/web";
 
-import { convergeDraft, evaluate, type Draft } from "oblik";
+import { convergeDraft, evaluate, type Camera2, type Draft } from "oblik";
 import { Euclid2View } from "oblik/euclid2";
-import type { Camera2 } from "oblik";
 
 import scene from "./scenes/shelf.ts";
 import annotations from "virtual:oblik-annotations?file=apps/demo/src/scenes/shelf.ts";
@@ -20,7 +19,6 @@ function App() {
     import.meta.hot.accept("./scenes/shelf.ts", (m) => {
       if (!m?.default) return;
       setMod(m.default);
-      setCamera((c) => c);
     });
     import.meta.hot.accept("virtual:oblik-annotations?file=apps/demo/src/scenes/shelf.ts", (m) => {
       if (!m?.default) return;
@@ -43,12 +41,18 @@ function App() {
 
   async function commit(id: string, values: number[]) {
     mergeDraft(id, values);
-    await fetch("/__oblik-patch", {
+    const res = await fetch("/__oblik-patch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file: FILE, id, target: "literal", values }),
     });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `patch failed (${res.status})`);
+    }
   }
+
+  const draftIds = createMemo(() => [...draft().keys()]);
 
   return (
     <div class="shell">
@@ -56,16 +60,21 @@ function App() {
         <p class="kicker">oblik</p>
         <h1>{mod().title}</h1>
         <p>{mod().hint}</p>
+        <p class="status">
+          {draftIds().length > 0
+            ? `Draft ${draftIds().join(", ")} until the file matches.`
+            : "File matches the view."}
+        </p>
       </header>
-      <Euclid2View
-        trace={world().trace}
-        annotations={anno()}
-        camera={camera()}
-        draft={draft()}
-        onCamera={setCamera}
-        onDraft={mergeDraft}
-        onCommit={(id, values) => void commit(id, values)}
-      />
+      <Errored fallback={(err) => <p class="err">{String(err())}</p>}>
+        <Euclid2View
+          trace={world().trace}
+          camera={camera()}
+          onCamera={setCamera}
+          onDraft={mergeDraft}
+          onCommit={(id, values) => void commit(id, values)}
+        />
+      </Errored>
     </div>
   );
 }

@@ -7,12 +7,28 @@
   overflow: hidden;
   touch-action: none;
   cursor: default;
+  user-select: none;
 }
 
 .svg {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.grabbing {
+  cursor: grabbing;
+}
+
+.gridLine {
+  fill: none;
+  stroke: #1d2230;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.axis {
+  stroke: #3a4156;
 }
 
 .stroke {
@@ -40,10 +56,27 @@
   cursor: grab;
 }
 
+.handleHot,
 .handle:hover {
   fill: #fff3e6;
 }
 
 .hot {
   stroke: #7ec8e3;
+}
+
+.point {
+  fill: #d7d2c4;
+  stroke: #0e1016;
+  stroke-width: 1.5;
+}
+
+.hotFill {
+  fill: #7ec8e3;
+}
+
+.label {
+  fill: #9a9488;
+  font-family: system-ui, sans-serif;
+  pointer-events: none;
 }
