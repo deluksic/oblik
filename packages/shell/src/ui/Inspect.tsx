@@ -1,4 +1,4 @@
-import { createEffect, onSettled, Show } from "solid-js";
+import { createEffect, Show } from "solid-js";
 
 import type { InspectState, LineStyle, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
@@ -13,14 +13,17 @@ export function Inspect(props: InspectProps) {
   let asideEl: HTMLElement | undefined;
   const scroll = { top: 0, left: 0 };
 
-  createEffect(() => {
-    props.state.sourceHtml;
-    onSettled(() => {
-      if (!asideEl) return;
-      asideEl.scrollTop = scroll.top;
-      asideEl.scrollLeft = scroll.left;
-    });
-  });
+  createEffect(
+    () => props.state.sourceHtml,
+    (_html, prevHtml) => {
+      if (prevHtml === undefined) return;
+      queueMicrotask(() => {
+        if (!asideEl) return;
+        asideEl.scrollTop = scroll.top;
+        asideEl.scrollLeft = scroll.left;
+      });
+    },
+  );
 
   return (
     <aside
