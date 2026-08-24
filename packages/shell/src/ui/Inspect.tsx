@@ -38,8 +38,8 @@ export function Inspect(props: InspectProps) {
         <Show when={props.state.styleChannel}>
           <StylePanel state={props.state} />
         </Show>
-        <p class={styles.kicker}>Origin</p>
       </div>
+      <p class={styles.kicker}>Origin</p>
       <OriginPane origin={props.state.origin} />
     </aside>
   );
@@ -47,42 +47,43 @@ export function Inspect(props: InspectProps) {
 
 function OriginPane(props: { origin: OriginView }) {
   const empty = () => props.origin.kind === "empty";
-  const who = () => (props.origin.kind === "origin" ? props.origin.who : "");
-  const file = () => (props.origin.kind === "origin" ? props.origin.file : "");
-  const quote = () => (props.origin.kind === "origin" ? props.origin.quote : []);
-  const callers = () => (props.origin.kind === "origin" ? props.origin.callers : []);
+  const frames = () => (props.origin.kind === "origin" ? props.origin.frames : []);
   const message = () => (props.origin.kind === "empty" ? props.origin.message : "");
   return (
-    <div class={styles.source}>
-      <p class={[styles.empty, { [styles.hidden]: !empty() }]}>{message()}</p>
-      <div class={[styles.origin, { [styles.hidden]: empty() }]}>
-        <p class={styles.originLead}>
-          Built by <strong>{who()}</strong> in {file()}
-        </p>
-        <div class={styles.quote}>
-          <For each={quote()}>
-            {(row) => (
-              <div class={{ [styles.hl]: row.current }}>
-                <span class={styles.ln}>{row.line}</span>
-                <span class={styles.tx}>{row.text}</span>
-              </div>
-            )}
-          </For>
-        </div>
-        <Show when={callers().length > 0}>
-          <p class={styles.originKicker}>Reached through</p>
-          <ol class={styles.originPath}>
-            <For each={callers()}>
-              {(c) => (
-                <li>
-                  <span class={styles.originWho}>{c.who}</span>
-                  <span class={styles.originLoc}>{c.loc}</span>
-                </li>
-              )}
-            </For>
-          </ol>
-        </Show>
+    <div class={styles.originList}>
+      <p class={[styles.emptyOrigin, { [styles.hidden]: !empty() }]}>{message()}</p>
+      <For each={frames()}>
+        {(frame) => (
+          <div class={styles.originBox}>
+            <p class={styles.originFile}>{frame.file}</p>
+            <div class={styles.quote}>
+              <For each={frame.lines}>{(row) => <OriginLine row={row} />}</For>
+            </div>
+          </div>
+        )}
+      </For>
+    </div>
+  );
+}
+
+function OriginLine(props: { row: import("@/types").OriginDisplayLine }) {
+  if (props.row.kind === "ellipsis") {
+    return (
+      <div class={styles.gapRow}>
+        <span class={styles.ln} />
+        <span class={styles.tx}>...</span>
       </div>
+    );
+  }
+  return (
+    <div
+      class={{
+        [styles.hl]: props.row.kind === "code" && props.row.current,
+        [styles.headerRow]: props.row.kind === "header",
+      }}
+    >
+      <span class={styles.ln}>{props.row.line}</span>
+      <span class={styles.tx}>{props.row.text}</span>
     </div>
   );
 }

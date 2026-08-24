@@ -181,60 +181,46 @@
   cursor: default;
 }
 
-.source {
+.originList {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow: auto;
+}
+
+.originBox {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   line-height: 1.45;
   background: #10131a;
   border: 1px solid var(--stroke);
   border-radius: 6px;
-  overflow: auto;
+  overflow-x: auto;
+}
+
+.originFile {
+  margin: 0;
+  padding: 0.35rem 0.55rem 0.28rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.emptyOrigin {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
 }
 
 .hidden {
   display: none;
 }
 
-.empty {
-  margin: 0;
-  padding: 0.8rem;
-  color: var(--muted);
-  white-space: pre-wrap;
-}
-
-.origin {
-  padding: 0.55rem 0.7rem 0.7rem;
-  font-family: system-ui, sans-serif;
-}
-
-.originLead {
-  margin: 0 0 0.45rem;
-  font-size: 0.82rem;
-  line-height: 1.4;
-  white-space: normal;
-  color: var(--text);
-}
-
-.originLead strong {
-  font-weight: 650;
-}
-
-.originKicker {
-  margin: 0.7rem 0 0.25rem;
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
-  white-space: normal;
-}
-
 .quote {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
-  border: 1px solid var(--stroke);
-  border-radius: 4px;
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
@@ -243,6 +229,14 @@
 .quote div {
   padding: 0.15rem 0.45rem;
   white-space: pre;
+}
+
+.headerRow {
+  color: var(--muted);
+}
+
+.gapRow {
+  color: #5c6370;
 }
 
 .ln {
@@ -259,29 +253,6 @@
 
 .tx {
   white-space: pre;
-}
-
-.originPath {
-  margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  white-space: normal;
-  color: var(--muted);
-}
-
-.originPath li {
-  margin: 0.15rem 0;
-}
-
-.originWho {
-  color: var(--text);
-}
-
-.originLoc {
-  margin-left: 0.4rem;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
 }
 
 @media (max-width: 800px) {

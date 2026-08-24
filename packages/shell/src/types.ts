@@ -50,26 +50,33 @@ export const DEFAULT_POINT_STYLE: PointStyle = {
   size: 3.5,
 };
 
-export type OriginQuoteLine = {
+export type OriginCodeLine = {
+  kind: "code";
   line: number;
   text: string;
   current: boolean;
 };
 
-export type OriginCaller = {
-  who: string;
-  loc: string;
+export type OriginHeaderLine = {
+  kind: "header";
+  line: number;
+  text: string;
+};
+
+export type OriginEllipsisLine = {
+  kind: "ellipsis";
+};
+
+export type OriginDisplayLine = OriginCodeLine | OriginHeaderLine | OriginEllipsisLine;
+
+export type OriginFrame = {
+  file: string;
+  lines: OriginDisplayLine[];
 };
 
 export type OriginView =
   | { kind: "empty"; message: string }
-  | {
-      kind: "origin";
-      who: string;
-      file: string;
-      quote: OriginQuoteLine[];
-      callers: OriginCaller[];
-    };
+  | { kind: "origin"; frames: OriginFrame[] };
 
 export type InspectState = {
   crumb: string;

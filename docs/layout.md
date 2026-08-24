@@ -40,7 +40,7 @@ apps/
 - `bind` — const name that owned the construction, when known.
 - `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.
 
-Inspect title is `bind ?? kind`. Origin in the sidebar is a short provenance note (which helper, which file), not a traceback. **Style** is a constructor option (`segment(a, b, { style })`), wins over the view default, and can always be cleared back to default (the `{ style }` bag is removed from the file). There is no `path` / breadcrumb. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames. Unlabeled loop bodies share `site#k`.
+Inspect title is `bind ?? kind`. Origin in the sidebar is a stack of source boxes (function header, gap, then lines around each site), innermost first — not a prose summary or traceback. **Style** is a constructor option (`segment(a, b, { style })`), wins over the view default, and can always be cleared back to default (the `{ style }` bag is removed from the file). There is no `path` / breadcrumb. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames. Unlabeled loop bodies share `site#k`.
 
 ## Catalogs
 
@@ -70,6 +70,8 @@ A 3D scene can reuse a 2D scene’s values with `withoutWidgets(() => …, sourc
 
 ## HMR
 
-Widget pointer-up patches numeric literals. The Vite plugin swallows HMR when the file still matches the last widget write, so cameras stay put.
+Widget pointer-up and inspect style writes patch the scene file. The Vite plugin remembers the last self-write and swallows HMR while disk still matches, so cameras stay put and an older module cannot flash back over a newer chip click.
+
+The pane also keeps a style overlay keyed by constructor site. Every `evaluate()` restamps it, so a helper hot-reload or a widget drag cannot briefly restore the previous stroke. True HMR (an IDE save, or Space insert) clears that overlay and loads the module from disk.
 
 A real save (or Space insert) hot-swaps the scene module. The Vite plugin appends a `hot.accept` onto `scene-loaders.ts` for every `./scenes/*.scene.ts` path and side-effect-imports every `scenes/*.ts` helper (not `*.scene.ts`). Helper saves also HMR the importing `*.scene.ts` files (so panes get a fresh `scene()`), then `notifyHelperHot()` re-runs open frames. **Authors never write `import.meta.hot` for layout helpers** — only `import { plateLayout } from "./plate-layout.ts"`.

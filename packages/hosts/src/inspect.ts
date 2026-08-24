@@ -90,19 +90,69 @@ export function pinConstructorSite(
   return next;
 }
 
-function quoteLines(text: string, line: number): import("@design-scenes/shell").OriginQuoteLine[] {
+function quoteLines(text: string, line: number): import("@design-scenes/shell").OriginCodeLine[] {
   const rows = text.split("\n");
   const i = line - 1;
   const from = Math.max(0, i - 1);
   const to = Math.min(rows.length, i + 2);
-  const out: import("@design-scenes/shell").OriginQuoteLine[] = [];
+  const out: import("@design-scenes/shell").OriginCodeLine[] = [];
   for (let n = from; n < to; n++) {
-    out.push({ line: n + 1, text: rows[n] ?? "", current: n === i });
+    out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === i });
   }
   return out;
 }
 
-/** Innermost helper first. Quote the construction; list callers as a path. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Row index of the function that contains `line` (1-based), when we can find it. */
+export function findFunctionHeaderRow(rows: readonly string[], line: number, name?: string): number | null {
+  const target = line - 1;
+  for (let n = target; n >= 0; n--) {
+    const text = rows[n] ?? "";
+    if (name) {
+      const patterns = [
+        new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\b`),
+        new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${escapeRegExp(name)}\\b`),
+        new RegExp(`\\b${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\()`),
+      ];
+      if (patterns.some((re) => re.test(text))) return n;
+      continue;
+    }
+    if (/^\s*export\s+(?:async\s+)?function\s+\w+/.test(text)) return n;
+    if (/^\s*(?:async\s+)?function\s+\w+/.test(text)) return n;
+    if (/^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/.test(text) && /=>|function/.test(text)) return n;
+  }
+  return null;
+}
+
+export function buildOriginFrameLines(
+  text: string,
+  line: number,
+  name?: string,
+): import("@design-scenes/shell").OriginDisplayLine[] {
+  const rows = text.split("\n");
+  const target = line - 1;
+  const headerIdx = findFunctionHeaderRow(rows, line, name);
+  const from = Math.max(0, target - 1);
+  const to = Math.min(rows.length, target + 2);
+  const out: import("@design-scenes/shell").OriginDisplayLine[] = [];
+
+  if (headerIdx != null) {
+    out.push({ kind: "header", line: headerIdx + 1, text: rows[headerIdx] ?? "" });
+    if (from > headerIdx + 1) out.push({ kind: "ellipsis" });
+  }
+
+  for (let n = from; n < to; n++) {
+    if (headerIdx != null && n === headerIdx) continue;
+    out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === target });
+  }
+
+  return out.length > 0 ? out : quoteLines(text, line);
+}
+
+/** Innermost helper first. Each frame is a code box: function header, gap, then site lines. */
 export async function originFromStack(
   frames: readonly StackFrame[],
   cache: Map<string, string>,
@@ -110,29 +160,24 @@ export async function originFromStack(
   if (frames.length === 0) {
     return { kind: "empty", message: "No source location for this object." };
   }
-  const leaf = frames[0]!;
-  const who = frameWho(leaf);
-  const file = fileName(leaf.file);
-  let quote: import("@design-scenes/shell").OriginQuoteLine[] = [];
-  try {
-    const text = await peekFile(cache, leaf.file);
-    quote = quoteLines(text, leaf.line);
-  } catch (err) {
-    return {
-      kind: "empty",
-      message: err instanceof Error ? err.message : String(err),
-    };
+
+  const originFrames: import("@design-scenes/shell").OriginFrame[] = [];
+  for (const frame of frames) {
+    try {
+      const text = await peekFile(cache, frame.file);
+      originFrames.push({
+        file: fileName(frame.file),
+        lines: buildOriginFrameLines(text, frame.line, frame.name),
+      });
+    } catch (err) {
+      return {
+        kind: "empty",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
-  return {
-    kind: "origin",
-    who,
-    file,
-    quote,
-    callers: frames.slice(1).map((f) => ({
-      who: frameWho(f),
-      loc: `${fileName(f.file)}:${f.line}`,
-    })),
-  };
+
+  return { kind: "origin", frames: originFrames };
 }
 
 export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {

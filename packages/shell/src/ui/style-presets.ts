@@ -49,7 +49,7 @@ export function dashPattern(dash: LineDash | undefined, width = DEFAULT_LINE_STY
   if (Math.abs(width - ref) < 1e-6) return [...base];
 
   const scale = width / ref;
-  const gapBoost = scale > 1 ? scale : 1;
+  const gapBoost = scale > 1 ? Math.sqrt(scale) : 1;
   return base.map((seg, i) => {
     const scaled = seg * scale;
     return i % 2 === 1 ? scaled * gapBoost : scaled;
