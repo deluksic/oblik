@@ -366,8 +366,8 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
               await runSerialized(fileWriteTail, abs, () => {
                 const source = readPatchSource(widgetWrites, abs);
                 const patched = patchStyleAt(source, line, column, parsed);
+                rememberWidgetWrite(widgetWrites, abs, patched);
                 fs.writeFileSync(abs, patched);
-                forgetWidgetWrite(widgetWrites, abs);
               });
               json(res, 200, { ok: true });
               return;
@@ -455,7 +455,7 @@ export function sceneDevPlugin(opts: SceneDevOptions): Plugin {
                 json(res, 404, { ok: false, error: "not found" });
                 return;
               }
-              sendText(res, fs.readFileSync(abs, "utf8"));
+              sendText(res, readPatchSource(widgetWrites, abs));
               return;
             }
 

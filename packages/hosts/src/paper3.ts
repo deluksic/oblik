@@ -17,7 +17,7 @@ import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
 import { mapStack, originFromStack, pinConstructorSite, quantize, stackLabel } from "./inspect";
-import { applyStyleAtSite, drawInkFromStyle, hasStoredStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
+import { applyStyleAtSite, applyStyleOverlays, clearStyleOverlaysForFile, drawInkFromStyle, hasStoredStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
 import type { ObjectStyle } from "@design-scenes/shell";
 import {
   commitGizmoIfChanged,
@@ -157,6 +157,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
           (frame?.drawables ?? []).map((d) => d.geom.id),
           gizmos().map((g) => g.id),
         );
+        applyStyleOverlays(frame?.drawables ?? [], gizmos());
       }
 
       function hoverGizmoSite(): string | null {
@@ -419,6 +420,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
       function onHotReload(next: Record<string, unknown>): void {
         sceneMod = next;
         peekCache.clear();
+        clearStyleOverlaysForFile(peekPath);
         void warmPeek(peekCache, peekPath, () => {
           if (closed) return;
           rerunFrame();

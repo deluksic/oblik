@@ -120,8 +120,35 @@ export function siteKey(at: StyleSite | undefined): string | null {
 type StyledGeom = { site?: StyleSite; style?: ObjectStyle };
 type StyledGizmo = { at: StyleSite; style?: ObjectStyle };
 
-/** Live-apply constructor ink to every drawable/gizmo that shares the write site. */
-export function applyStyleAtSite(
+const styleOverlays = new Map<string, { at: StyleSite; style: ObjectStyle | null }>();
+
+export function rememberStyleOverlay(at: StyleSite, style: ObjectStyle | null): void {
+  const key = siteKey(at);
+  if (!key) return;
+  styleOverlays.set(key, { at, style });
+}
+
+export function applyStyleOverlays(
+  drawables: readonly { geom: StyledGeom }[],
+  gizmos: readonly StyledGizmo[],
+): void {
+  for (const rec of styleOverlays.values()) {
+    paintStyleAtSite(rec.at, rec.style, drawables, gizmos);
+  }
+}
+
+export function clearStyleOverlaysForFile(file: string): void {
+  const norm = file.replace(/\\/g, "/");
+  const base = norm.split("/").pop() ?? norm;
+  for (const [key, rec] of [...styleOverlays]) {
+    const f = rec.at.file.replace(/\\/g, "/");
+    if (f === norm || f === base || f.endsWith(`/${base}`) || f.endsWith(`/${norm}`)) {
+      styleOverlays.delete(key);
+    }
+  }
+}
+
+function paintStyleAtSite(
   at: StyleSite,
   style: ObjectStyle | null,
   drawables: readonly { geom: StyledGeom }[],
@@ -142,6 +169,17 @@ export function applyStyleAtSite(
       else delete g.style;
     }
   }
+}
+
+/** Live-apply constructor ink to every drawable/gizmo that shares the write site. */
+export function applyStyleAtSite(
+  at: StyleSite,
+  style: ObjectStyle | null,
+  drawables: readonly { geom: StyledGeom }[],
+  gizmos: readonly StyledGizmo[],
+): void {
+  rememberStyleOverlay(at, style);
+  paintStyleAtSite(at, style, drawables, gizmos);
 }
 
 export function inspectStylePatch(

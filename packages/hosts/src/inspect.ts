@@ -1,3 +1,5 @@
+import { enqueueLatest, writeSlot } from "./write-queue";
+
 export function quantize(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -148,6 +150,13 @@ export async function commitWidget(
   at: { file: string; line: number; column: number },
   values: number[],
 ): Promise<string | null> {
+  return enqueueLatest(at.file, writeSlot(at, "widget"), values, (next) => postWidget(at, next));
+}
+
+async function postWidget(
+  at: { file: string; line: number; column: number },
+  values: number[],
+): Promise<string | null> {
   const res = await fetch("/__write-widget", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -166,6 +175,13 @@ export async function commitWidget(
 }
 
 export async function commitStyle(
+  at: { file: string; line: number; column: number },
+  style: import("@design-scenes/shell").ObjectStyle | null,
+): Promise<string | null> {
+  return enqueueLatest(at.file, writeSlot(at, "style"), style, (next) => postStyle(at, next));
+}
+
+async function postStyle(
   at: { file: string; line: number; column: number },
   style: import("@design-scenes/shell").ObjectStyle | null,
 ): Promise<string | null> {

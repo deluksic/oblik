@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   applyStyleAtSite,
+  applyStyleOverlays,
   drawInkFromStyle,
   hasStoredStyle,
   parseHex,
@@ -92,6 +93,14 @@ describe("siteKey / applyStyleAtSite", () => {
     expect(a.geom.style).toBeUndefined();
     expect(b.geom.style).toBeUndefined();
     expect(g1.style).toBeUndefined();
+  });
+
+  test("overlays restamp style after a fresh evaluate", () => {
+    const first = { geom: { site: at } };
+    applyStyleAtSite(at, { line: { width: 3.5 } }, [first], []);
+    const again = { geom: { site: at } };
+    applyStyleOverlays([again], []);
+    expect(again.geom.style).toEqual({ line: { width: 3.5 } });
   });
 });
 

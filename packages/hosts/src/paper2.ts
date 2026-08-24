@@ -56,7 +56,7 @@ import {
   quantize,
   stackLabel,
 } from "./inspect";
-import { drawInkFromStyle, applyStyleAtSite, hasStoredStyle, inspectStylePatch, styleChannelForKind } from "./style";
+import { drawInkFromStyle, applyStyleAtSite, applyStyleOverlays, clearStyleOverlaysForFile, hasStoredStyle, inspectStylePatch, styleChannelForKind } from "./style";
 import {
   advanceSessionField,
   commitSession,
@@ -302,6 +302,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
           gizmos().map((g) => g.id),
         );
         publishWidgetOverrides(sceneId);
+        applyStyleOverlays(drawables(), gizmos());
         if (propagate) ctx.onLiveChange();
       }
 
@@ -821,6 +822,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
       function onHotReload(next: Record<string, unknown>): void {
         sceneMod = next;
         peekCache.clear();
+        clearStyleOverlaysForFile(peekPath);
         void warmPeek(peekCache, peekPath, () => {
           if (closed) return;
           rerunFrame();
