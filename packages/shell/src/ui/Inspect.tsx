@@ -10,6 +10,8 @@ import {
   POINT_SIZE_PRESETS,
   colorValueForPreset,
   dashValueForPreset,
+  mergeLineStyle,
+  mergePointStyle,
   pickerHex,
   selectedColorId,
   selectedDash,
@@ -17,6 +19,7 @@ import {
   selectedPointSizeId,
   sizeValueForPreset,
   widthValueForPreset,
+  withStyleChannel,
   type SizePresetId,
 } from "./style-presets";
 
@@ -95,20 +98,24 @@ function hasStoredStyle(style: InspectState["style"]): boolean {
 
 function StylePanel(props: { state: InspectState }) {
   const channel = () => props.state.styleChannel;
+  const showLine = () => channel() === "line" || channel() === "both";
+  const showPoint = () => channel() === "point" || channel() === "both";
+  const applyLine = (patch: Partial<LineStyle>) => {
+    const line = mergeLineStyle(props.state.style?.line, patch);
+    props.state.onStyleChange?.(withStyleChannel(props.state.style, "line", line));
+  };
+  const applyPoint = (patch: Partial<PointStyle>) => {
+    const point = mergePointStyle(props.state.style?.point, patch);
+    props.state.onStyleChange?.(withStyleChannel(props.state.style, "point", point));
+  };
   return (
     <div class={styles.style}>
       <p class={styles.kicker}>Style</p>
-      <Show when={channel() === "line"}>
-        <LineFields
-          stored={props.state.style?.line}
-          onChange={(line) => props.state.onStyleChange?.({ ...props.state.style, line })}
-        />
+      <Show when={showLine()}>
+        <LineFields stored={props.state.style?.line} onChange={applyLine} />
       </Show>
-      <Show when={channel() === "point"}>
-        <PointFields
-          stored={props.state.style?.point}
-          onChange={(point) => props.state.onStyleChange?.({ ...props.state.style, point })}
-        />
+      <Show when={showPoint()}>
+        <PointFields stored={props.state.style?.point} onChange={applyPoint} />
       </Show>
       <button
         type="button"
@@ -116,7 +123,7 @@ function StylePanel(props: { state: InspectState }) {
         disabled={!hasStoredStyle(props.state.style)}
         onClick={() => props.state.onStyleChange?.(null)}
       >
-        Use default
+        Use defaults
       </button>
     </div>
   );
@@ -124,13 +131,13 @@ function StylePanel(props: { state: InspectState }) {
 
 function LineFields(props: {
   stored?: LineStyle;
-  onChange: (line: LineStyle) => void;
+  onChange: (patch: Partial<LineStyle>) => void;
 }) {
   return (
     <div class={styles.fields}>
       <ColorRow
         color={props.stored?.color}
-        onChange={(color) => props.onChange({ ...props.stored, color })}
+        onChange={(color) => props.onChange({ color })}
       />
       <div class={styles.row}>
         <p class={styles.rowLabel}>Width</p>
@@ -140,7 +147,7 @@ function LineFields(props: {
               <PreviewChip
                 label={preset.label}
                 selected={selectedLineWidthId(props.stored?.width) === preset.id}
-                onPick={() => props.onChange({ ...props.stored, width: widthValueForPreset(preset.id) })}
+                onPick={() => props.onChange({ width: widthValueForPreset(preset.id) })}
               >
                 <LinePreview stroke={strokeForWidth(preset.id)} />
               </PreviewChip>
@@ -156,7 +163,7 @@ function LineFields(props: {
               <PreviewChip
                 label={preset.label}
                 selected={selectedDash(props.stored?.dash) === preset.id}
-                onPick={() => props.onChange({ ...props.stored, dash: dashValueForPreset(preset.id) })}
+                onPick={() => props.onChange({ dash: dashValueForPreset(preset.id) })}
               >
                 <LinePreview stroke={2} dash={preset.id} />
               </PreviewChip>
@@ -170,13 +177,13 @@ function LineFields(props: {
 
 function PointFields(props: {
   stored?: PointStyle;
-  onChange: (point: PointStyle) => void;
+  onChange: (patch: Partial<PointStyle>) => void;
 }) {
   return (
     <div class={styles.fields}>
       <ColorRow
         color={props.stored?.color}
-        onChange={(color) => props.onChange({ ...props.stored, color })}
+        onChange={(color) => props.onChange({ color })}
       />
       <div class={styles.row}>
         <p class={styles.rowLabel}>Size</p>
@@ -186,7 +193,7 @@ function PointFields(props: {
               <PreviewChip
                 label={preset.label}
                 selected={selectedPointSizeId(props.stored?.size) === preset.id}
-                onPick={() => props.onChange({ ...props.stored, size: sizeValueForPreset(preset.id) })}
+                onPick={() => props.onChange({ size: sizeValueForPreset(preset.id) })}
               >
                 <svg class={styles.preview} viewBox="0 0 44 20" aria-hidden="true">
                   <circle cx="22" cy="10" r={radiusForSize(preset.id)} fill="currentColor" />

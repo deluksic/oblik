@@ -346,11 +346,13 @@ function drawGizmo(
       y: g.origin.y + Math.sin(rad) * g.radius,
     };
     pathSeg(ctx, cam, w, h, g.origin, ref);
-    ctx.strokeStyle = `${COL.gizmo}66`;
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = `${color}66`;
+    ctx.lineWidth = Math.max(1, paint.width * 0.75);
+    ctx.setLineDash([]);
     ctx.stroke();
     ctx.strokeStyle = color;
-    ctx.lineWidth = hot ? 2.4 : 1.6;
+    ctx.lineWidth = paint.width;
+    ctx.setLineDash(paint.dash.length ? [...paint.dash] : []);
     pathSeg(ctx, cam, w, h, g.origin, tip);
     ctx.stroke();
     const c = worldToScreen(cam, g.origin, w, h);
@@ -387,7 +389,8 @@ function drawGizmo(
   } else if (g.kind === "offset") {
     pathInfiniteLine(ctx, cam, w, h, g.origin, g.direction);
     ctx.strokeStyle = color;
-    ctx.lineWidth = hot ? 2.2 : 1.6;
+    ctx.lineWidth = paint.width;
+    ctx.setLineDash(paint.dash.length ? [...paint.dash] : []);
     ctx.stroke();
   }
 }

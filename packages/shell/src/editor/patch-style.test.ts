@@ -47,6 +47,9 @@ test("writes only the fields that were set", () => {
   expect(patchStyleAt(src, loc.line, loc.column, { line: { dash: "dashed" } })).toBe(
     `segment(a, b, { style: { line: { dash: "dashed" } } });\n`,
   );
+  expect(patchStyleAt(src, loc.line, loc.column, { line: { width: 1.5 } })).toBe(
+    `segment(a, b, { style: { line: { width: 1.5 } } });\n`,
+  );
 });
 
 test("adds style to an existing options bag and keeps other keys", () => {

@@ -1,4 +1,4 @@
-import type { LineDash } from "@/types";
+import type { LineDash, LineStyle, ObjectStyle, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
 
 export type ColorPresetId = "default" | "red" | "blue" | "green" | "orange" | "custom";
@@ -77,14 +77,64 @@ export function colorValueForPreset(id: ColorPresetId): string | undefined {
   return COLOR_PRESETS.find((preset) => preset.id === id)?.hex;
 }
 
-export function widthValueForPreset(id: SizePresetId): number | undefined {
-  if (id === "normal") return undefined;
-  return LINE_WIDTH_PRESETS.find((preset) => preset.id === id)?.width;
+export function widthValueForPreset(id: SizePresetId): number {
+  return LINE_WIDTH_PRESETS.find((preset) => preset.id === id)?.width ?? DEFAULT_LINE_STYLE.width ?? 1.5;
 }
 
-export function sizeValueForPreset(id: SizePresetId): number | undefined {
-  if (id === "normal") return undefined;
-  return POINT_SIZE_PRESETS.find((preset) => preset.id === id)?.size;
+export function sizeValueForPreset(id: SizePresetId): number {
+  return POINT_SIZE_PRESETS.find((preset) => preset.id === id)?.size ?? DEFAULT_POINT_STYLE.size ?? 3.5;
+}
+
+function isEmptyLine(line: LineStyle | undefined): boolean {
+  return !line || (line.color == null && line.width == null && line.dash == null);
+}
+
+function isEmptyPoint(point: PointStyle | undefined): boolean {
+  return !point || (point.color == null && point.size == null);
+}
+
+export function mergeLineStyle(stored: LineStyle | undefined, patch: Partial<LineStyle>): LineStyle | undefined {
+  const next: LineStyle = { ...(stored ?? {}) };
+  for (const key of ["color", "width", "dash"] as const) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  return isEmptyLine(next) ? undefined : next;
+}
+
+export function mergePointStyle(stored: PointStyle | undefined, patch: Partial<PointStyle>): PointStyle | undefined {
+  const next: PointStyle = { ...(stored ?? {}) };
+  for (const key of ["color", "size"] as const) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  return isEmptyPoint(next) ? undefined : next;
+}
+
+export function withStyleChannel(
+  current: ObjectStyle | null | undefined,
+  channel: "line",
+  value: LineStyle | undefined,
+): ObjectStyle | null;
+export function withStyleChannel(
+  current: ObjectStyle | null | undefined,
+  channel: "point",
+  value: PointStyle | undefined,
+): ObjectStyle | null;
+export function withStyleChannel(
+  current: ObjectStyle | null | undefined,
+  channel: "line" | "point",
+  value: LineStyle | PointStyle | undefined,
+): ObjectStyle | null {
+  const next: ObjectStyle = { ...(current ?? {}) };
+  if (value === undefined) delete next[channel];
+  else next[channel] = value;
+  if (isEmptyLine(next.line) && isEmptyPoint(next.point)) return null;
+  return next;
 }
 
 export function dashValueForPreset(id: LineDash): LineDash | undefined {

@@ -40,6 +40,7 @@ const LINE_KINDS = new Set([
 ]);
 
 export function styleChannelForKind(kind: string): StyleChannel | null {
+  if (kind === "angle") return "both";
   if (POINT_KINDS.has(kind)) return "point";
   if (LINE_KINDS.has(kind)) return "line";
   return null;
@@ -59,24 +60,36 @@ export function hasStoredStyle(style: ObjectStyle | null | undefined): boolean {
   );
 }
 
+function drawLineInk(line: ObjectStyle["line"]): DrawInk | undefined {
+  if (!line) return undefined;
+  const ink: DrawInk = {};
+  if (line.color != null) ink.stroke = line.color;
+  if (line.width != null) ink.width = line.width;
+  if (line.dash != null) ink.dash = dashPattern(line.dash);
+  return Object.keys(ink).length > 0 ? ink : undefined;
+}
+
+function drawPointInk(point: ObjectStyle["point"]): DrawInk | undefined {
+  if (!point) return undefined;
+  const ink: DrawInk = {};
+  if (point.color != null) {
+    ink.fill = point.color;
+    ink.stroke = point.color;
+  }
+  if (point.size != null) ink.pointSize = point.size;
+  return Object.keys(ink).length > 0 ? ink : undefined;
+}
+
 export function drawInkFromStyle(style: ObjectStyle | undefined, channel: StyleChannel | null): DrawInk | undefined {
   if (!style || !channel) return undefined;
-  if (channel === "point" && style.point) {
-    const ink: DrawInk = {};
-    if (style.point.color != null) {
-      ink.fill = style.point.color;
-      ink.stroke = style.point.color;
-    }
-    if (style.point.size != null) ink.pointSize = style.point.size;
-    return Object.keys(ink).length > 0 ? ink : undefined;
+  if (channel === "both") {
+    const line = drawLineInk(style.line);
+    const point = drawPointInk(style.point);
+    if (!line && !point) return undefined;
+    return { ...line, ...point };
   }
-  if (channel === "line" && style.line) {
-    const ink: DrawInk = {};
-    if (style.line.color != null) ink.stroke = style.line.color;
-    if (style.line.width != null) ink.width = style.line.width;
-    if (style.line.dash != null) ink.dash = dashPattern(style.line.dash);
-    return Object.keys(ink).length > 0 ? ink : undefined;
-  }
+  if (channel === "point") return drawPointInk(style.point);
+  if (channel === "line") return drawLineInk(style.line);
   return undefined;
 }
 

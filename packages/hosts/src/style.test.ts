@@ -22,7 +22,12 @@ describe("styleChannelForKind", () => {
     expect(styleChannelForKind("segment")).toBe("line");
     expect(styleChannelForKind("circle")).toBe("line");
     expect(styleChannelForKind("distance")).toBe("line");
+    expect(styleChannelForKind("offset")).toBe("line");
     expect(styleChannelForKind("circle3")).toBe("line");
+  });
+
+  test("angle uses both line and point ink", () => {
+    expect(styleChannelForKind("angle")).toBe("both");
   });
 
   test("number gizmos have no style channel", () => {
@@ -52,6 +57,16 @@ describe("drawInkFromStyle", () => {
   test("missing style is undefined so the view default wins", () => {
     expect(drawInkFromStyle(undefined, "line")).toBeUndefined();
     expect(drawInkFromStyle({}, "line")).toBeUndefined();
+  });
+
+  test("both channel merges line width and point size", () => {
+    expect(
+      drawInkFromStyle({ line: { width: 3.5, dash: "dashed" }, point: { size: 6 } }, "both"),
+    ).toEqual({
+      width: 3.5,
+      dash: [8, 6],
+      pointSize: 6,
+    });
   });
 });
 

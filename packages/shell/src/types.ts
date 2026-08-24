@@ -37,7 +37,7 @@ export type ObjectStyle = {
   point?: PointStyle;
 };
 
-export type StyleChannel = "line" | "point";
+export type StyleChannel = "line" | "point" | "both";
 
 export const DEFAULT_LINE_STYLE: LineStyle = {
   color: "#d7d2c4",

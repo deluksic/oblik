@@ -3,6 +3,8 @@ import { expect, test } from "vitest";
 import {
   colorValueForPreset,
   dashValueForPreset,
+  mergeLineStyle,
+  mergePointStyle,
   normalizeHex,
   pickerHex,
   selectedColorId,
@@ -11,6 +13,7 @@ import {
   selectedPointSizeId,
   sizeValueForPreset,
   widthValueForPreset,
+  withStyleChannel,
 } from "./style-presets";
 
 test("normalizeHex expands short colors", () => {
@@ -43,13 +46,32 @@ test("solid dash is the omitted default", () => {
   expect(dashValueForPreset("dashed")).toBe("dashed");
 });
 
-test("named presets omit default fields", () => {
+test("named presets always write explicit width and size", () => {
   expect(colorValueForPreset("default")).toBeUndefined();
   expect(colorValueForPreset("blue")).toBe("#4a8fd9");
-  expect(widthValueForPreset("normal")).toBeUndefined();
+  expect(widthValueForPreset("normal")).toBe(1.5);
   expect(widthValueForPreset("small")).toBe(0.75);
-  expect(sizeValueForPreset("normal")).toBeUndefined();
+  expect(sizeValueForPreset("normal")).toBe(3.5);
   expect(sizeValueForPreset("wide")).toBe(7);
   expect(pickerHex(undefined)).toBe("#d7d2c4");
   expect(pickerHex("#abc")).toBe("#aabbcc");
+});
+
+test("merge helpers drop cleared fields but keep the rest", () => {
+  expect(mergeLineStyle({ color: "#e24b4b", width: 3.5 }, { width: 1.5 })).toEqual({
+    color: "#e24b4b",
+    width: 1.5,
+  });
+  expect(mergeLineStyle({ color: "#e24b4b" }, { color: undefined })).toBeUndefined();
+  expect(
+    withStyleChannel({ line: { width: 2 }, point: { size: 5 } }, "line", { width: 1.5 }),
+  ).toEqual({
+    line: { width: 1.5 },
+    point: { size: 5 },
+  });
+  expect(withStyleChannel({ line: { width: 2 } }, "line", undefined)).toBeNull();
+  expect(mergePointStyle({ color: "#fff", size: 7 }, { size: 3.5 })).toEqual({
+    color: "#fff",
+    size: 3.5,
+  });
 });
