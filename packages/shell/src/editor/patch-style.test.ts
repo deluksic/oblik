@@ -41,6 +41,14 @@ test("appends { style } when the call has no options bag", () => {
   );
 });
 
+test("writes only the fields that were set", () => {
+  const src = `segment(a, b);\n`;
+  const loc = at(src, "segment");
+  expect(patchStyleAt(src, loc.line, loc.column, { line: { dash: "dashed" } })).toBe(
+    `segment(a, b, { style: { line: { dash: "dashed" } } });\n`,
+  );
+});
+
 test("adds style to an existing options bag and keeps other keys", () => {
   const src = `offsetLine(ground, 1.8, { mirror: true });\n`;
   const loc = at(src, "offsetLine");
@@ -52,8 +60,8 @@ test("adds style to an existing options bag and keeps other keys", () => {
 test("replaces an existing style object", () => {
   const src = `circle(c, 40, { style: { line: { color: "#fff", width: 1, dash: "solid" } } });\n`;
   const loc = at(src, "circle");
-  expect(patchStyleAt(src, loc.line, loc.column, { line: lineStyle })).toBe(
-    `circle(c, 40, { style: { line: { color: "#e8876a", width: 2, dash: "dashed" } } });\n`,
+  expect(patchStyleAt(src, loc.line, loc.column, { line: { dash: "dotted" } })).toBe(
+    `circle(c, 40, { style: { line: { dash: "dotted" } } });\n`,
   );
 });
 
@@ -69,10 +77,13 @@ test("removing style keeps { mirror }", () => {
   expect(patchStyleAt(src, loc.line, loc.column, null)).toBe(`offsetLine(ground, 1.8, { mirror: true });\n`);
 });
 
-test("point style writes the point channel", () => {
+test("point style writes only the point channel fields that were set", () => {
   const src = `point(1, 2);\n`;
   const loc = at(src, "point");
   expect(patchStyleAt(src, loc.line, loc.column, { point: pointStyle })).toBe(
     `point(1, 2, { style: { point: { color: "#e8876a", size: 5 } } });\n`,
+  );
+  expect(patchStyleAt(src, loc.line, loc.column, { point: { size: 6 } })).toBe(
+    `point(1, 2, { style: { point: { size: 6 } } });\n`,
   );
 });

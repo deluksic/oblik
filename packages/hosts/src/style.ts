@@ -49,17 +49,33 @@ export function dashPattern(dash: LineDash | undefined): number[] {
   return DASH[dash ?? "solid"];
 }
 
+export function hasStoredStyle(style: ObjectStyle | null | undefined): boolean {
+  if (!style) return false;
+  const line = style.line;
+  const point = style.point;
+  return !!(
+    (line && (line.color != null || line.width != null || line.dash != null)) ||
+    (point && (point.color != null || point.size != null))
+  );
+}
+
 export function drawInkFromStyle(style: ObjectStyle | undefined, channel: StyleChannel | null): DrawInk | undefined {
   if (!style || !channel) return undefined;
   if (channel === "point" && style.point) {
-    return { fill: style.point.color, stroke: style.point.color, pointSize: style.point.size };
+    const ink: DrawInk = {};
+    if (style.point.color != null) {
+      ink.fill = style.point.color;
+      ink.stroke = style.point.color;
+    }
+    if (style.point.size != null) ink.pointSize = style.point.size;
+    return Object.keys(ink).length > 0 ? ink : undefined;
   }
   if (channel === "line" && style.line) {
-    return {
-      stroke: style.line.color,
-      width: style.line.width,
-      dash: dashPattern(style.line.dash),
-    };
+    const ink: DrawInk = {};
+    if (style.line.color != null) ink.stroke = style.line.color;
+    if (style.line.width != null) ink.width = style.line.width;
+    if (style.line.dash != null) ink.dash = dashPattern(style.line.dash);
+    return Object.keys(ink).length > 0 ? ink : undefined;
   }
   return undefined;
 }
@@ -110,13 +126,13 @@ export function applyStyleAtSite(
   for (const d of drawables) {
     const s = d.geom.site;
     if (s && siteKey(s) === key) {
-      if (style) d.geom.style = style;
+      if (style && hasStoredStyle(style)) d.geom.style = style;
       else delete d.geom.style;
     }
   }
   for (const g of gizmos) {
     if (siteKey(g.at) === key) {
-      if (style) g.style = style;
+      if (style && hasStoredStyle(style)) g.style = style;
       else delete g.style;
     }
   }
@@ -127,15 +143,20 @@ export function inspectStylePatch(
   kind: string,
   at: { file: string; line: number; column: number } | undefined,
   onApply: (style: ObjectStyle | null) => void,
+  onCommitted?: () => void | Promise<void>,
 ): InspectPatch {
   const styleChannel = styleChannelForKind(kind);
   if (!styleChannel) return { style: null, styleChannel: null, onStyleChange: undefined };
   return {
-    style: current && (current.line || current.point) ? current : null,
+    style: hasStoredStyle(current) ? current : null,
     styleChannel,
     onStyleChange: (style: ObjectStyle | null) => {
       onApply(style);
-      if (at) void commitStyle(at, style);
+      if (at) {
+        void commitStyle(at, style).then((err) => {
+          if (!err) void onCommitted?.();
+        });
+      }
     },
   };
 }

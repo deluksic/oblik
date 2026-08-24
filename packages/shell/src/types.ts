@@ -21,14 +21,14 @@ export type SceneEntry = {
 export type LineDash = "solid" | "dashed" | "dotted";
 
 export type LineStyle = {
-  color: string;
-  width: number;
-  dash: LineDash;
+  color?: string;
+  width?: number;
+  dash?: LineDash;
 };
 
 export type PointStyle = {
-  color: string;
-  size: number;
+  color?: string;
+  size?: number;
 };
 
 /** Constructor ink. Missing / null means the object uses the view default. */

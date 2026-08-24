@@ -34,7 +34,7 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 import { Sdf2View, type Sdf2 } from "@design-scenes/sdf";
-import type { PaneHandle, ViewHost } from "@design-scenes/shell";
+import type { ObjectStyle, PaneHandle, ViewHost } from "@design-scenes/shell";
 import {
   commandBarSnapshotKey,
   evalDerivedScenePoints,
@@ -56,7 +56,7 @@ import {
   renderStackSnippets,
   stackLabel,
 } from "./inspect";
-import { drawInkFromStyle, applyStyleAtSite, inspectStylePatch, styleChannelForKind } from "./style";
+import { drawInkFromStyle, applyStyleAtSite, hasStoredStyle, inspectStylePatch, styleChannelForKind } from "./style";
 import {
   advanceSessionField,
   commitSession,
@@ -241,9 +241,26 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         return drawInkFromStyle(owner?.style ?? gizmo.style, styleChannelForKind(gizmo.kind));
       }
 
-      function applyStyle(): void {
+      function applyStyleLive(style: ObjectStyle | null): void {
         render(true);
-        void updateInspect();
+        pushInspect({ style: hasStoredStyle(style) ? style : null });
+      }
+
+      async function refreshInspectOrigin(at: { file: string; line: number; column: number }): Promise<void> {
+        peekCache.delete(at.file);
+        const f = focused();
+        if (!f) return;
+        if (f.target === "gizmo") {
+          const raw =
+            f.gizmo.stack && f.gizmo.stack.length > 0
+              ? f.gizmo.stack
+              : [{ file: f.gizmo.at.file, line: f.gizmo.at.line, column: f.gizmo.at.column }];
+          const stack = pinConstructorSite(await mapStack(raw), f.gizmo.at);
+          pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+          return;
+        }
+        const stack = pinConstructorSite(await mapStack(f.geom.provenance.stack ?? []), f.geom.site);
+        pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
       }
 
       function styleExtras(
@@ -251,10 +268,16 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         current: Parameters<typeof inspectStylePatch>[0],
         at?: { file: string; line: number; column: number },
       ) {
-        return inspectStylePatch(current, kind, at, (style) => {
-          if (at) applyStyleAtSite(at, style, drawables(), gizmos());
-          applyStyle();
-        });
+        return inspectStylePatch(
+          current,
+          kind,
+          at,
+          (style) => {
+            if (at) applyStyleAtSite(at, style, drawables(), gizmos());
+            applyStyleLive(style);
+          },
+          at ? () => refreshInspectOrigin(at) : undefined,
+        );
       }
 
       function evaluate(propagate = true): void {

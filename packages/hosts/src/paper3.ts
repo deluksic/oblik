@@ -17,7 +17,8 @@ import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
 
 import { mapStack, pinConstructorSite, quantize, renderStackSnippets, stackLabel } from "./inspect";
-import { applyStyleAtSite, drawInkFromStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
+import { applyStyleAtSite, drawInkFromStyle, hasStoredStyle, inspectStylePatch, restInkFromDraw, styleChannelForKind } from "./style";
+import type { ObjectStyle } from "@design-scenes/shell";
 import {
   commitGizmoIfChanged,
   movedPastClick,
@@ -183,9 +184,26 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         );
       }
 
-      function applyStyle(): void {
+      function applyStyleLive(style: ObjectStyle | null): void {
         sync(true);
-        void updateInspect();
+        pushInspect({ style: hasStoredStyle(style) ? style : null });
+      }
+
+      async function refreshInspectOrigin(at: { file: string; line: number; column: number }): Promise<void> {
+        peekCache.delete(at.file);
+        const f = focused();
+        if (!f) return;
+        if (f.target === "gizmo") {
+          const raw =
+            f.gizmo.stack && f.gizmo.stack.length > 0
+              ? f.gizmo.stack
+              : [{ file: f.gizmo.at.file, line: f.gizmo.at.line, column: f.gizmo.at.column }];
+          const stack = pinConstructorSite(await mapStack(raw), f.gizmo.at);
+          pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
+          return;
+        }
+        const stack = pinConstructorSite(await mapStack(f.geom.provenance.stack ?? []), f.geom.site);
+        pushInspect({ sourceHtml: await renderStackSnippets(stack, peekCache) });
       }
 
       function styleExtras(
@@ -193,10 +211,16 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         current: Parameters<typeof inspectStylePatch>[0],
         at?: { file: string; line: number; column: number },
       ) {
-        return inspectStylePatch(current, kind, at, (style) => {
-          if (at) applyStyleAtSite(at, style, frame?.drawables ?? [], gizmos());
-          applyStyle();
-        });
+        return inspectStylePatch(
+          current,
+          kind,
+          at,
+          (style) => {
+            if (at) applyStyleAtSite(at, style, frame?.drawables ?? [], gizmos());
+            applyStyleLive(style);
+          },
+          at ? () => refreshInspectOrigin(at) : undefined,
+        );
       }
 
       function focused():

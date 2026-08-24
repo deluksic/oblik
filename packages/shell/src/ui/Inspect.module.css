@@ -32,13 +32,6 @@
   margin: 0 0 1.1rem;
 }
 
-.styleHint {
-  margin: 0 0 0.55rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
 .fields {
   display: grid;
   gap: 0.45rem;

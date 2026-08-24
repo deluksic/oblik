@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { createEffect, onSettled, Show } from "solid-js";
 
 import type { InspectState, LineStyle, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
@@ -10,8 +10,27 @@ export type InspectProps = {
 };
 
 export function Inspect(props: InspectProps) {
+  let asideEl: HTMLElement | undefined;
+  const scroll = { top: 0, left: 0 };
+
+  createEffect(() => {
+    props.state.sourceHtml;
+    onSettled(() => {
+      if (!asideEl) return;
+      asideEl.scrollTop = scroll.top;
+      asideEl.scrollLeft = scroll.left;
+    });
+  });
+
   return (
-    <aside class={styles.inspect}>
+    <aside
+      ref={asideEl}
+      class={styles.inspect}
+      onScroll={(e) => {
+        scroll.top = e.currentTarget.scrollTop;
+        scroll.left = e.currentTarget.scrollLeft;
+      }}
+    >
       <p class={styles.kicker}>Identity</p>
       <h2 class={styles.crumb}>{props.state.crumb}</h2>
       <p class={styles.meta}>{props.state.meta}</p>
@@ -24,31 +43,37 @@ export function Inspect(props: InspectProps) {
   );
 }
 
+function hasStoredStyle(style: InspectState["style"]): boolean {
+  if (!style) return false;
+  const line = style.line;
+  const point = style.point;
+  return !!(
+    (line && (line.color != null || line.width != null || line.dash != null)) ||
+    (point && (point.color != null || point.size != null))
+  );
+}
+
 function StylePanel(props: { state: InspectState }) {
   const channel = () => props.state.styleChannel;
-  const styled = () => props.state.style != null;
   return (
     <div class={styles.style}>
       <p class={styles.kicker}>Style</p>
-      <p class={styles.styleHint}>
-        {styled() ? "Stored on this constructor in the scene file." : "Using the view default. Change a value to write { style } on the constructor."}
-      </p>
       <Show when={channel() === "line"}>
         <LineFields
-          line={props.state.style?.line ?? DEFAULT_LINE_STYLE}
+          stored={props.state.style?.line}
           onChange={(line) => props.state.onStyleChange?.({ ...props.state.style, line })}
         />
       </Show>
       <Show when={channel() === "point"}>
         <PointFields
-          point={props.state.style?.point ?? DEFAULT_POINT_STYLE}
+          stored={props.state.style?.point}
           onChange={(point) => props.state.onStyleChange?.({ ...props.state.style, point })}
         />
       </Show>
       <button
         type="button"
         class={styles.reset}
-        disabled={!styled()}
+        disabled={!hasStoredStyle(props.state.style)}
         onClick={() => props.state.onStyleChange?.(null)}
       >
         Use default
@@ -57,34 +82,43 @@ function StylePanel(props: { state: InspectState }) {
   );
 }
 
-function LineFields(props: { line: LineStyle; onChange: (line: LineStyle) => void }) {
+function LineFields(props: {
+  stored?: LineStyle;
+  onChange: (line: LineStyle) => void;
+}) {
+  const display = () => ({ ...DEFAULT_LINE_STYLE, ...props.stored });
   return (
     <div class={styles.fields}>
       <label class={styles.field}>
         <span>Color</span>
         <input
           type="color"
-          value={props.line.color}
-          onInput={(e) => props.onChange({ ...props.line, color: e.currentTarget.value })}
+          value={display().color}
+          onInput={(e) => props.onChange({ ...props.stored, color: e.currentTarget.value })}
         />
       </label>
       <label class={styles.field}>
-        <span>Width {props.line.width.toFixed(1)}</span>
+        <span>Width {(display().width ?? DEFAULT_LINE_STYLE.width).toFixed(1)}</span>
         <input
           type="range"
           min="0.75"
           max="5"
           step="0.25"
-          value={props.line.width}
-          onInput={(e) => props.onChange({ ...props.line, width: Number(e.currentTarget.value) })}
+          value={display().width ?? DEFAULT_LINE_STYLE.width}
+          onInput={(e) =>
+            props.onChange({ ...props.stored, width: Number(e.currentTarget.value) })
+          }
         />
       </label>
       <label class={styles.field}>
         <span>Stroke</span>
         <select
-          value={props.line.dash}
+          value={display().dash ?? DEFAULT_LINE_STYLE.dash}
           onChange={(e) =>
-            props.onChange({ ...props.line, dash: e.currentTarget.value as LineStyle["dash"] })
+            props.onChange({
+              ...props.stored,
+              dash: e.currentTarget.value as NonNullable<LineStyle["dash"]>,
+            })
           }
         >
           <option value="solid">Solid</option>
@@ -96,26 +130,32 @@ function LineFields(props: { line: LineStyle; onChange: (line: LineStyle) => voi
   );
 }
 
-function PointFields(props: { point: PointStyle; onChange: (point: PointStyle) => void }) {
+function PointFields(props: {
+  stored?: PointStyle;
+  onChange: (point: PointStyle) => void;
+}) {
+  const display = () => ({ ...DEFAULT_POINT_STYLE, ...props.stored });
   return (
     <div class={styles.fields}>
       <label class={styles.field}>
         <span>Color</span>
         <input
           type="color"
-          value={props.point.color}
-          onInput={(e) => props.onChange({ ...props.point, color: e.currentTarget.value })}
+          value={display().color}
+          onInput={(e) => props.onChange({ ...props.stored, color: e.currentTarget.value })}
         />
       </label>
       <label class={styles.field}>
-        <span>Size {props.point.size.toFixed(1)}</span>
+        <span>Size {(display().size ?? DEFAULT_POINT_STYLE.size).toFixed(1)}</span>
         <input
           type="range"
           min="2"
           max="12"
           step="0.5"
-          value={props.point.size}
-          onInput={(e) => props.onChange({ ...props.point, size: Number(e.currentTarget.value) })}
+          value={display().size ?? DEFAULT_POINT_STYLE.size}
+          onInput={(e) =>
+            props.onChange({ ...props.stored, size: Number(e.currentTarget.value) })
+          }
         />
       </label>
     </div>

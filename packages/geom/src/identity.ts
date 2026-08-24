@@ -22,14 +22,14 @@ export type GeomAnnotations = {
 export type LineDash = "solid" | "dashed" | "dotted";
 
 export type LineStyle = {
-  color: string;
-  width: number;
-  dash: LineDash;
+  color?: string;
+  width?: number;
+  dash?: LineDash;
 };
 
 export type PointStyle = {
-  color: string;
-  size: number;
+  color?: string;
+  size?: number;
 };
 
 /** Constructor ink. Missing means the object uses the view default. */
@@ -82,8 +82,18 @@ export function geomBindFromOpts(opts?: GeomSiteOpts): string | undefined {
 export function geomStyleFromOpts(opts?: GeomSiteOpts): GeomStyle | undefined {
   const s = opts?.style;
   if (!s || typeof s !== "object") return undefined;
-  if (!s.line && !s.point) return undefined;
+  if (!hasStoredStyle(s)) return undefined;
   return s;
+}
+
+export function hasStoredStyle(style: GeomStyle | null | undefined): boolean {
+  if (!style) return false;
+  const line = style.line;
+  const point = style.point;
+  return !!(
+    (line && (line.color != null || line.width != null || line.dash != null)) ||
+    (point && (point.color != null || point.size != null))
+  );
 }
 
 export type GeomLiveReader = (site: GeomSite) => number[] | undefined;
@@ -251,6 +261,6 @@ export function makeBase(
     provenance: captureProvenance(createdBy, site),
     site,
     editable,
-    ...(style && (style.line || style.point) ? { style } : {}),
+    ...(style && hasStoredStyle(style) ? { style } : {}),
   };
 }

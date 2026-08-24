@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   applyStyleAtSite,
   drawInkFromStyle,
+  hasStoredStyle,
   parseHex,
   restInkFromDraw,
   siteKey,
@@ -30,17 +31,22 @@ describe("styleChannelForKind", () => {
 });
 
 describe("drawInkFromStyle", () => {
-  test("line style maps dash and width", () => {
-    const ink = drawInkFromStyle(
-      { line: { color: "#ff8844", width: 2.5, dash: "dashed" } },
-      "line",
-    );
-    expect(ink).toEqual({ stroke: "#ff8844", width: 2.5, dash: [8, 6] });
+  test("line style maps only the fields that were set", () => {
+    expect(drawInkFromStyle({ line: { color: "#ff8844", width: 2.5, dash: "dashed" } }, "line")).toEqual({
+      stroke: "#ff8844",
+      width: 2.5,
+      dash: [8, 6],
+    });
+    expect(drawInkFromStyle({ line: { dash: "dashed" } }, "line")).toEqual({ dash: [8, 6] });
   });
 
-  test("point style maps fill and size", () => {
-    const ink = drawInkFromStyle({ point: { color: "#44aaff", size: 6 } }, "point");
-    expect(ink).toEqual({ fill: "#44aaff", stroke: "#44aaff", pointSize: 6 });
+  test("point style maps only the fields that were set", () => {
+    expect(drawInkFromStyle({ point: { color: "#44aaff", size: 6 } }, "point")).toEqual({
+      fill: "#44aaff",
+      stroke: "#44aaff",
+      pointSize: 6,
+    });
+    expect(drawInkFromStyle({ point: { size: 6 } }, "point")).toEqual({ pointSize: 6 });
   });
 
   test("missing style is undefined so the view default wins", () => {
