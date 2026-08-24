@@ -1,9 +1,15 @@
 .inspect {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-left: 1px solid var(--stroke);
   background: var(--panel);
   padding: 1rem 1rem 1.2rem;
-  overflow: auto;
-  min-height: 0;
+  overflow: hidden;
+}
+
+.head {
+  flex: 0 0 auto;
 }
 
 .kicker {
@@ -86,6 +92,8 @@
 }
 
 .source {
+  flex: 1 1 auto;
+  min-height: 0;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.45;

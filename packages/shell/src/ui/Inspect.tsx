@@ -1,4 +1,4 @@
-import { createEffect, Show } from "solid-js";
+import { Show } from "solid-js";
 
 import type { InspectState, LineStyle, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
@@ -10,37 +10,17 @@ export type InspectProps = {
 };
 
 export function Inspect(props: InspectProps) {
-  let asideEl: HTMLElement | undefined;
-  const scroll = { top: 0, left: 0 };
-
-  createEffect(
-    () => props.state.sourceHtml,
-    (_html, prevHtml) => {
-      if (prevHtml === undefined) return;
-      queueMicrotask(() => {
-        if (!asideEl) return;
-        asideEl.scrollTop = scroll.top;
-        asideEl.scrollLeft = scroll.left;
-      });
-    },
-  );
-
   return (
-    <aside
-      ref={asideEl}
-      class={styles.inspect}
-      onScroll={(e) => {
-        scroll.top = e.currentTarget.scrollTop;
-        scroll.left = e.currentTarget.scrollLeft;
-      }}
-    >
-      <p class={styles.kicker}>Identity</p>
-      <h2 class={styles.crumb}>{props.state.crumb}</h2>
-      <p class={styles.meta}>{props.state.meta}</p>
-      <Show when={props.state.styleChannel}>
-        <StylePanel state={props.state} />
-      </Show>
-      <p class={styles.kicker}>Origin</p>
+    <aside class={styles.inspect}>
+      <div class={styles.head}>
+        <p class={styles.kicker}>Identity</p>
+        <h2 class={styles.crumb}>{props.state.crumb}</h2>
+        <p class={styles.meta}>{props.state.meta}</p>
+        <Show when={props.state.styleChannel}>
+          <StylePanel state={props.state} />
+        </Show>
+        <p class={styles.kicker}>Origin</p>
+      </div>
       <div class={styles.source} innerHTML={props.state.sourceHtml} />
     </aside>
   );
