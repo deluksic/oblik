@@ -40,7 +40,6 @@ const LINE_KINDS = new Set([
 ]);
 
 export function styleChannelForKind(kind: string): StyleChannel | null {
-  if (kind === "angle") return "both";
   if (POINT_KINDS.has(kind)) return "point";
   if (LINE_KINDS.has(kind)) return "line";
   return null;
@@ -82,12 +81,6 @@ function drawPointInk(point: ObjectStyle["point"]): DrawInk | undefined {
 
 export function drawInkFromStyle(style: ObjectStyle | undefined, channel: StyleChannel | null): DrawInk | undefined {
   if (!style || !channel) return undefined;
-  if (channel === "both") {
-    const line = drawLineInk(style.line);
-    const point = drawPointInk(style.point);
-    if (!line && !point) return undefined;
-    return { ...line, ...point };
-  }
   if (channel === "point") return drawPointInk(style.point);
   if (channel === "line") return drawLineInk(style.line);
   return undefined;

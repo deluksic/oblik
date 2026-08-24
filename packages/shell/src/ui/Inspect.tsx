@@ -98,8 +98,6 @@ function hasStoredStyle(style: InspectState["style"]): boolean {
 
 function StylePanel(props: { state: InspectState }) {
   const channel = () => props.state.styleChannel;
-  const showLine = () => channel() === "line" || channel() === "both";
-  const showPoint = () => channel() === "point" || channel() === "both";
   const applyLine = (patch: Partial<LineStyle>) => {
     const line = mergeLineStyle(props.state.style?.line, patch);
     props.state.onStyleChange?.(withStyleChannel(props.state.style, "line", line));
@@ -111,10 +109,10 @@ function StylePanel(props: { state: InspectState }) {
   return (
     <div class={styles.style}>
       <p class={styles.kicker}>Style</p>
-      <Show when={showLine()}>
+      <Show when={channel() === "line"}>
         <LineFields stored={props.state.style?.line} onChange={applyLine} />
       </Show>
-      <Show when={showPoint()}>
+      <Show when={channel() === "point"}>
         <PointFields stored={props.state.style?.point} onChange={applyPoint} />
       </Show>
       <button

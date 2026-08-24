@@ -26,8 +26,8 @@ describe("styleChannelForKind", () => {
     expect(styleChannelForKind("circle3")).toBe("line");
   });
 
-  test("angle uses both line and point ink", () => {
-    expect(styleChannelForKind("angle")).toBe("both");
+  test("angle uses line ink like other measurement gizmos", () => {
+    expect(styleChannelForKind("angle")).toBe("line");
   });
 
   test("number gizmos have no style channel", () => {
@@ -59,13 +59,10 @@ describe("drawInkFromStyle", () => {
     expect(drawInkFromStyle({}, "line")).toBeUndefined();
   });
 
-  test("both channel merges line width and point size", () => {
-    expect(
-      drawInkFromStyle({ line: { width: 3.5, dash: "dashed" }, point: { size: 6 } }, "both"),
-    ).toEqual({
-      width: 3.5,
-      dash: [8, 6],
-      pointSize: 6,
+  test("line color is available for gizmo fills via stroke", () => {
+    expect(drawInkFromStyle({ line: { color: "#e24b4b", width: 2 } }, "line")).toEqual({
+      stroke: "#e24b4b",
+      width: 2,
     });
   });
 });

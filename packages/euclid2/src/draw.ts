@@ -367,8 +367,9 @@ function drawGizmo(
     );
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
