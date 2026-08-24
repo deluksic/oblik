@@ -14,12 +14,18 @@ export type GeomAnnotations = {
   file?: string;
   at?: [number, number];
   editable?: boolean;
+  bind?: string;
+  /** Reserved; unused until loop disambiguation. */
+  key?: string;
 };
 
 export type GeomSiteOpts = {
   file?: string;
   at?: [number, number];
   editable?: boolean;
+  bind?: string;
+  /** Reserved; unused until loop disambiguation. */
+  key?: string;
   __annotations__?: GeomAnnotations;
 };
 
@@ -30,6 +36,8 @@ function annotationsOf(opts?: GeomSiteOpts): GeomAnnotations | undefined {
     file: a?.file ?? opts.file,
     at: a?.at ?? opts.at,
     editable: a?.editable ?? opts.editable,
+    bind: a?.bind ?? opts.bind,
+    key: a?.key ?? opts.key,
   };
 }
 
@@ -44,6 +52,11 @@ export function geomSiteFromOpts(opts?: GeomSiteOpts): GeomSite | undefined {
 
 export function geomEditableFromOpts(opts?: GeomSiteOpts): boolean {
   return annotationsOf(opts)?.editable === true;
+}
+
+export function geomBindFromOpts(opts?: GeomSiteOpts): string | undefined {
+  const bind = annotationsOf(opts)?.bind;
+  return bind && bind.length > 0 ? bind : undefined;
 }
 
 export type GeomLiveReader = (site: GeomSite) => number[] | undefined;
@@ -61,18 +74,23 @@ export function geomLiveValues(site: GeomSite | undefined): number[] | undefined
 }
 
 export type Base = {
-  /** Opaque pick identity — unique per geometric value this frame. */
+  /**
+   * Sticky pick key this program shape.
+   * Annotated: `file:line:column#bind` or `file:line:column#k`.
+   * Unannotated: `kind#bind` or `kind#k`.
+   */
   id: string;
-  /** Display index this frame (`segment[12]`). Not identity; pick uses `id`. */
-  path: string;
+  /** Const binding that owned this construction, when known. */
+  bind?: string;
   provenance: Provenance;
-  /** Stable construction site when the call-site annotator injected `__annotations__`. */
+  /** Write target when the call-site annotator injected `__annotations__`. */
   site?: GeomSite;
   /** True when this constructor owns numeric literals in source. */
   editable?: boolean;
 };
 
-const pathCounts = new Map<string, number>();
+const occurrence = new Map<string, number>();
+const bindStack: string[] = [];
 let constructDepth = 0;
 let drawSilent = 0;
 const frameGeoms: unknown[] = [];
@@ -92,8 +110,49 @@ const DRAWN_KINDS = new Set([
   "mesh3",
 ]);
 
+export function resetIdentity(): void {
+  occurrence.clear();
+  bindStack.length = 0;
+}
+
+export function currentBind(): string | undefined {
+  return bindStack.at(-1);
+}
+
+/** Push a const name so nested constructors inherit it. Pair with `popBind`. */
+export function pushBind(name: string): void {
+  bindStack.push(name);
+}
+
+/** Pop the bind stack and return `value` (comma-operator form in the annotator). */
+export function popBind<T>(value: T): T {
+  bindStack.pop();
+  return value;
+}
+
+export function withBind<T>(name: string, fn: () => T): T {
+  pushBind(name);
+  try {
+    return fn();
+  } finally {
+    bindStack.pop();
+  }
+}
+
+/**
+ * Pick id for this evaluate. `bind` / the bind stack wins over occurrence.
+ * Occurrence is per `origin` (site string or kind) among unlabeled constructions.
+ */
+export function allocId(origin: string, bind?: string): string {
+  const label = bind || currentBind();
+  if (label) return `${origin}#${label}`;
+  const n = occurrence.get(origin) ?? 0;
+  occurrence.set(origin, n + 1);
+  return `${origin}#${n}`;
+}
+
 export function beginGeomFrame(): void {
-  pathCounts.clear();
+  resetIdentity();
   constructDepth = 0;
   frameGeoms.length = 0;
 }
@@ -131,12 +190,6 @@ export function takeFrameGeoms(): unknown[] {
   return frameGeoms.slice();
 }
 
-function nextPath(kind: string): string {
-  const n = pathCounts.get(kind) ?? 0;
-  pathCounts.set(kind, n + 1);
-  return `${kind}[${n}]`;
-}
-
 function captureProvenance(createdBy: string, site?: GeomSite): Provenance {
   const stack = captureUserStack();
   const leaf = stack[0] ?? { file: "unknown", line: 0, column: 0 };
@@ -150,16 +203,20 @@ function captureProvenance(createdBy: string, site?: GeomSite): Provenance {
   };
 }
 
-export function makeBase(kind: string, createdBy: string, site?: GeomSite, editable?: boolean): Base {
+export function makeBase(
+  kind: string,
+  createdBy: string,
+  site?: GeomSite,
+  editable?: boolean,
+  bind?: string,
+): Base {
+  const label = bind || currentBind();
+  const origin = site ? `${site.file}:${site.line}:${site.column}` : kind;
   return {
-    id: crypto.randomUUID(),
-    path: nextPath(kind),
+    id: allocId(origin, label),
+    ...(label ? { bind: label } : {}),
     provenance: captureProvenance(createdBy, site),
     site,
     editable,
   };
-}
-
-export function breadcrumb(path: string): string {
-  return path.replaceAll("/", " › ");
 }

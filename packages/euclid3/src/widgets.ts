@@ -1,20 +1,22 @@
-import { captureUserStack, lerp3, point3 as makePoint3, type CallSite, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
+import { allocId, captureUserStack, currentBind, lerp3, point3 as makePoint3, resetIdentity, type CallSite, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
 
 export type SiteOpts3 = {
   file?: string;
   at?: [number, number];
   editable?: boolean;
+  bind?: string;
   __annotations__?: {
     file?: string;
     at?: [number, number];
     editable?: boolean;
+    bind?: string;
   };
 };
 
 export type GizmoAt3 = { file: string; line: number; column: number };
 
-/** `site` is the write target. `id` is this handle this frame (`site#n`). */
-type Located = { site: string; id: string; at: GizmoAt3; stack?: CallSite[] };
+/** `site` is the write target. `id` is `site#bind` or `site#k`. */
+type Located = { site: string; id: string; bind?: string; at: GizmoAt3; stack?: CallSite[] };
 
 export type Point3Gizmo = Located & {
   kind: "point3";
@@ -40,13 +42,6 @@ export type Gizmo3 = Point3Gizmo | Distance3Gizmo | Glider3Gizmo;
 
 const gizmos: Gizmo3[] = [];
 const overrides = new Map<string, number[]>();
-const siteOccurrence = new Map<string, number>();
-
-function instanceId(site: string): string {
-  const n = siteOccurrence.get(site) ?? 0;
-  siteOccurrence.set(site, n + 1);
-  return `${site}#${n}`;
-}
 
 function siteFrom(opts?: SiteOpts3): Located | null {
   const nested = opts?.__annotations__;
@@ -57,9 +52,11 @@ function siteFrom(opts?: SiteOpts3): Located | null {
   const column = at[1];
   if (typeof line !== "number" || typeof column !== "number") return null;
   const site = `${file}:${line}:${column}`;
+  const bind = currentBind();
   return {
     site,
-    id: instanceId(site),
+    id: allocId(site, bind),
+    ...(bind ? { bind } : {}),
     at: { file, line, column },
     stack: captureUserStack(),
   };
@@ -67,7 +64,7 @@ function siteFrom(opts?: SiteOpts3): Located | null {
 
 export function beginWidgetFrame3(): void {
   gizmos.length = 0;
-  siteOccurrence.clear();
+  resetIdentity();
 }
 
 export function setWidgetOverride3(site: string, values: number[]): void {

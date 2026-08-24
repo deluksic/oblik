@@ -135,3 +135,24 @@ test("perpendicularLine has a construction site but no editable dof", () => {
     /perpendicularLine\(ground, P, \{ __annotations__: \{ file: .+, at: \[\d+, \d+\], editable: false \} \}\)/,
   );
 });
+
+test("wraps const name = ident(...) so nested constructors inherit bind", () => {
+  const src = `const entrySwing = doorOpen(hinge);\n`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).toContain(
+    `import { pushBind as __ds_pushBind, popBind as __ds_popBind } from "@design-scenes/geom";`,
+  );
+  expect(out).toContain(
+    `const entrySwing = (__ds_pushBind("entrySwing"), __ds_popBind(doorOpen(hinge)))`,
+  );
+});
+
+test("does not wrap method calls or let bindings", () => {
+  const src = `const hit = rooms.find((r) => r.id === id);
+let tmp = point(0, 0);
+`;
+  const out = injectSceneSites(src, SCENE);
+  expect(out).not.toContain(`__ds_pushBind("hit")`);
+  expect(out).not.toContain(`__ds_pushBind("tmp")`);
+  expect(out).toMatch(/point\(0, 0, \{ __annotations__/);
+});

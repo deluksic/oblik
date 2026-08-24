@@ -81,14 +81,74 @@ export type AnnotateResult = {
   map?: { mappings: string; names: string[]; sources: string[]; version: 3 };
 };
 
+function unwrapExpr(expr: ts.Expression): ts.Expression {
+  let e: ts.Expression = expr;
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAsExpression(e) ||
+    ts.isTypeAssertionExpression(e) ||
+    ts.isSatisfiesExpression(e)
+  ) {
+    e = e.expression;
+  }
+  return e;
+}
+
+function isConstStatementDecl(node: ts.VariableDeclaration): boolean {
+  const list = node.parent;
+  if (!ts.isVariableDeclarationList(list)) return false;
+  if (!(list.flags & ts.NodeFlags.Const)) return false;
+  return ts.isVariableStatement(list.parent);
+}
+
+function collectNamedCallInits(
+  sourceFile: ts.SourceFile,
+): { name: string; start: number; end: number }[] {
+  const out: { name: string; start: number; end: number }[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      isConstStatementDecl(node)
+    ) {
+      const name = node.name.text;
+      if (name.startsWith("__ds_")) {
+        ts.forEachChild(node, visit);
+        return;
+      }
+      const inner = unwrapExpr(node.initializer);
+      if (
+        ts.isCallExpression(inner) &&
+        ts.isIdentifier(inner.expression) &&
+        !inner.expression.text.startsWith("__ds_")
+      ) {
+        out.push({
+          name,
+          start: node.initializer.getStart(sourceFile),
+          end: node.initializer.getEnd(),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return out;
+}
+
+const BIND_IMPORT =
+  `import { pushBind as __ds_pushBind, popBind as __ds_popBind } from "@design-scenes/geom";\n`;
+
 /**
  * Inject `__annotations__: { file, at, editable }` onto constructors.
+ * Wrap `const name = call(...)` so nested constructors inherit `name` as bind.
  * Source on disk is unchanged. `at` is 1-based in this `source` text.
  */
 export function annotateCallSites(source: string, file: string, mapSource = file): AnnotateResult {
   const sf = parse(source);
   const calls = collectSiteCalls(sf);
-  if (calls.length === 0) return { code: source, warnings: [] };
+  const inits = collectNamedCallInits(sf);
+  if (calls.length === 0 && inits.length === 0) return { code: source, warnings: [] };
   const splices: { start: number; end: number; text: string }[] = [];
   const warnings: string[] = [];
   for (const call of calls) {
@@ -127,7 +187,22 @@ export function annotateCallSites(source: string, file: string, mapSource = file
       });
     }
   }
-  splices.sort((a, b) => b.start - a.start);
+  for (const init of inits) {
+    splices.push({
+      start: init.start,
+      end: init.start,
+      text: `(__ds_pushBind(${JSON.stringify(init.name)}), __ds_popBind(`,
+    });
+    splices.push({
+      start: init.end,
+      end: init.end,
+      text: `))`,
+    });
+  }
+  if (inits.length > 0 && !source.includes("__ds_pushBind")) {
+    splices.push({ start: 0, end: 0, text: BIND_IMPORT });
+  }
+  splices.sort((a, b) => b.start - a.start || b.end - a.end);
   const ms = new MagicString(source);
   for (const s of splices) {
     if (s.start === s.end) ms.appendLeft(s.start, s.text);

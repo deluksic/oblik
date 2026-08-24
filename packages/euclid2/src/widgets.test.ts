@@ -13,7 +13,7 @@ import {
   withoutWidgets,
   angle,
 } from "./widgets";
-import { beginGeomFrame, circle, collectDrawables, line, offsetLine, point } from "@design-scenes/geom";
+import { beginGeomFrame, circle, collectDrawables, line, offsetLine, point, withBind } from "@design-scenes/geom";
 
 const F = "apps/paper/src/scenes/plate-layout.ts";
 const pt = { __annotations__: { file: F, at: [1, 1] as [number, number], editable: true } };
@@ -250,6 +250,23 @@ test("nested angle helpers keep distinct caller frames", () => {
   expect(names(gs[0]!)).toContain("floorPlanLayout");
   const caller = (g: (typeof gs)[0]) => g.stack?.find((f) => f.name === "floorPlanLayout");
   expect(caller(gs[0]!)?.line).not.toBe(caller(gs[1]!)?.line);
+});
+
+test("withBind labels nested angles at a shared site", () => {
+  const site = { __annotations__: { file: F, at: [20, 1] as [number, number], editable: true } };
+  function doorOpen(hinge: { x: number; y: number }) {
+    return angle(hinge, 60, { radius: 1, ...site });
+  }
+  beginWidgetFrame("doors");
+  withBind("entrySwing", () => doorOpen({ x: 0, y: 0 }));
+  withBind("hallSwing", () => doorOpen({ x: 2, y: 0 }));
+  const gs = getGizmos().filter((g) => g.kind === "angle");
+  expect(gs).toHaveLength(2);
+  expect(gs[0]!.site).toBe(gs[1]!.site);
+  expect(gs[0]!.id).toBe(`${gs[0]!.site}#entrySwing`);
+  expect(gs[1]!.id).toBe(`${gs[1]!.site}#hallSwing`);
+  expect(gs[0]!.bind).toBe("entrySwing");
+  expect(gs[1]!.bind).toBe("hallSwing");
 });
 
 test("shared-site gizmos keep stable instance ids across re-evaluate", () => {

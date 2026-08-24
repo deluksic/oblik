@@ -25,7 +25,6 @@ import {
 } from "@design-scenes/euclid2";
 import {
   beginGeomFrame,
-  breadcrumb,
   collectDrawables,
   dist,
   perp,
@@ -325,7 +324,7 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         const g = f.geom;
         const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
-          crumb: breadcrumb(g.path),
+          crumb: g.bind ?? g.kind,
           meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
           sourceHtml: await renderStackSnippets(stack, peekCache),
         });
@@ -720,8 +719,8 @@ function createPaper2Host(mode: "geom" | "sdf2"): ViewHost {
         if (!drag) return;
         const dragging = drag;
         drag = null;
-        selected = { target: "gizmo", id: dragging.gizmo.id };
         if (!dragging.moved) {
+          selected = { target: "gizmo", id: dragging.gizmo.id };
           render();
           return;
         }

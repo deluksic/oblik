@@ -4,7 +4,7 @@ pnpm workspace. Libraries are packages. The paper preview is an app. Domain demo
 
 ```
 packages/
-  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude, wrapBand), UUID id, path, provenance
+  geom      @design-scenes/geom      vec, vec3, geom values (line, circle, arc, polyline, mesh3, extrude, wrapBand), sticky id, provenance
   euclid2   @design-scenes/euclid2   2D scene type: widgets, camera, pick, draw, run
   sdf       @design-scenes/sdf       field CSG (no identity), 2D profile + 3D compile, raymarch view
   euclid3   @design-scenes/euclid3   3D scene type: Three.js view, point3 / distance3 / pointOnSegment3
@@ -35,11 +35,12 @@ apps/
 
 ## Identity
 
-- `id` — UUID, pick/hover/highlight only. Regenerated every frame.
-- `path` — `segment[12]`. Display index this frame, not identity.
+- `id` — sticky pick key. Annotated constructors: `file:line:column#bind` when the call is `const bind = …`, otherwise `file:line:column#k`. Unannotated: `kind#bind` or `kind#k`. Survives re-evaluate if the program shape is unchanged. Renaming the const changes the id.
+- `site` — write target (`file` / `line` / `column`) from `__annotations__`. Shared on purpose: one literal, many instances. Hover may light every handle with that site; selection uses `id`.
+- `bind` — const name that owned the construction, when known.
 - `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.
 
-Inspect shows that stack so two `doorLeaf()` doors are distinguishable by the `drawFloorPlan` / `scene` frames that called them. Widget handles (`angle`, `slider`, `vector`, …) capture the same user stack, so three `doorOpen()` hinges are distinguishable by the layout lines that called them. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames.
+Inspect title is `bind ?? kind`. The stack is the identity display. There is no `path` / breadcrumb. There is no `group()` folder API. A loop that calls the same helper from one source line still shares a stack — iterations are not extra frames. Unlabeled loop bodies share `site#k`.
 
 ## Catalogs
 

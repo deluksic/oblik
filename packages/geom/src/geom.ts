@@ -3,6 +3,7 @@ import {
   makeBase,
   geomSiteFromOpts,
   geomEditableFromOpts,
+  geomBindFromOpts,
   geomLiveValues,
   constructGeom,
   takeFrameGeoms,
@@ -58,7 +59,13 @@ export type OffsetLine = { line: Line; distance: number };
 export type Branch = 1 | -1;
 
 function siteBase(kind: string, createdBy: string, opts?: GeomSiteOpts): Base {
-  return makeBase(kind, createdBy, geomSiteFromOpts(opts), geomEditableFromOpts(opts));
+  return makeBase(
+    kind,
+    createdBy,
+    geomSiteFromOpts(opts),
+    geomEditableFromOpts(opts),
+    geomBindFromOpts(opts),
+  );
 }
 
 function liveNums(opts?: GeomSiteOpts): number[] | undefined {

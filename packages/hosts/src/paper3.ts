@@ -11,7 +11,7 @@ import {
   type Gizmo3,
   type SceneModule3,
 } from "@design-scenes/euclid3";
-import { breadcrumb, type Geom3 } from "@design-scenes/geom";
+import { type Geom3 } from "@design-scenes/geom";
 import { SdfView, type Sdf } from "@design-scenes/sdf";
 import type { PaneHandle, ViewHost } from "@design-scenes/shell";
 import { subscribeHelperHot, subscribeSceneHot, inspectSnapshotKey } from "@design-scenes/shell";
@@ -225,7 +225,7 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         const g = f.geom;
         const stack = pinConstructorSite(await mapStack(g.provenance.stack ?? []), g.site);
         pushInspect({
-          crumb: breadcrumb(g.path),
+          crumb: g.bind ?? g.kind,
           meta: `${g.id} · ${stackLabel(stack) || `${g.provenance.file}:${g.provenance.line}:${g.provenance.column}`}`,
           sourceHtml: await renderStackSnippets(stack, peekCache),
         });
@@ -324,8 +324,8 @@ function createPaper3Host(mode: "space" | "field"): ViewHost {
         }
         const dragging = drag;
         drag = null;
-        selected = { target: "gizmo", id: dragging.gizmo.id };
         if (!dragging.moved) {
+          selected = { target: "gizmo", id: dragging.gizmo.id };
           sync();
           return;
         }

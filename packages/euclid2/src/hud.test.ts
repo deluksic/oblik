@@ -7,6 +7,7 @@ function num(n: number, site = "f.ts:1:1"): NumberGizmo {
   return {
     kind: "number",
     site,
+    id: `${site}#0`,
     at: { file: "f.ts", line: 1, column: 1 },
     n,
     label: "reach",

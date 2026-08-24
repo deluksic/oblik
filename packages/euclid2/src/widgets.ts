@@ -1,6 +1,9 @@
 import {
+  allocId,
   captureUserStack,
+  currentBind,
   point,
+  resetIdentity,
   setGeomLiveReader,
   withoutDraw,
   isFiniteVec,
@@ -17,17 +20,19 @@ export type SiteOpts = {
   file?: string;
   at?: [number, number];
   editable?: boolean;
+  bind?: string;
   __annotations__?: {
     file?: string;
     at?: [number, number];
     editable?: boolean;
+    bind?: string;
   };
 };
 
 export type GizmoAt = { file: string; line: number; column: number };
 
-/** `site` is the write target (file:line:column). `id` is this handle this frame (`site#n`). */
-type Located = { site: string; id: string; at: GizmoAt; stack?: CallSite[] };
+/** `site` is the write target. `id` is `site#bind` or `site#k`. */
+type Located = { site: string; id: string; bind?: string; at: GizmoAt; stack?: CallSite[] };
 
 export type PointGizmo = Located & {
   kind: "point";
@@ -119,8 +124,6 @@ export function gizmoIsPointLike(g: Gizmo): boolean {
 }
 
 const gizmos: Gizmo[] = [];
-/** Occurrence index per write site this frame — `id` is `${site}#${n}`. */
-const siteOccurrence = new Map<string, number>();
 /** Live write-back values, keyed by the 2D scene that owns them. */
 const overridesBySource = new Map<string, Map<string, number[]>>();
 /** Last published frame per source — for withoutWidgets in another scene. */
@@ -129,15 +132,10 @@ let silent = 0;
 let activeSource = "";
 let silentSource = "";
 
-function instanceId(site: string): string {
-  const n = siteOccurrence.get(site) ?? 0;
-  siteOccurrence.set(site, n + 1);
-  return `${site}#${n}`;
-}
-
 function locatedAt(file: string, line: number, column: number, stack?: CallSite[]): Located {
   const site = `${file}:${line}:${column}`;
-  return { site, id: instanceId(site), at: { file, line, column }, stack };
+  const bind = currentBind();
+  return { site, id: allocId(site, bind), ...(bind ? { bind } : {}), at: { file, line, column }, stack };
 }
 
 function overridesOf(source: string): Map<string, number[]> {
@@ -169,7 +167,7 @@ function readOverride(site: string | undefined): number[] | undefined {
 export function beginWidgetFrame(source = ""): void {
   activeSource = source;
   gizmos.length = 0;
-  siteOccurrence.clear();
+  resetIdentity();
   setGeomLiveReader((site) => {
     const key = `${site.file}:${site.line}:${site.column}`;
     if (silent) return importedBySource.get(silentSource)?.get(key);
@@ -224,7 +222,13 @@ export function getGizmos(): readonly Gizmo[] {
 
 function locatedFromGeom(geom: Drawable["geom"]): Located | null {
   if (!geom.site) return null;
-  return locatedAt(geom.site.file, geom.site.line, geom.site.column, geom.provenance.stack);
+  return {
+    site: `${geom.site.file}:${geom.site.line}:${geom.site.column}`,
+    id: geom.id,
+    ...(geom.bind ? { bind: geom.bind } : {}),
+    at: { file: geom.site.file, line: geom.site.line, column: geom.site.column },
+    stack: geom.provenance.stack,
+  };
 }
 
 /**

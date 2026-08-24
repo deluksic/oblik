@@ -69,6 +69,7 @@ export async function showWidgetInspect(
   peekCache: Map<string, string>,
   g: {
     kind: string;
+    bind?: string;
     site: string;
     at: { file: string; line: number; column: number };
     stack?: { file: string; line: number; column: number; name?: string }[];
@@ -81,7 +82,7 @@ export async function showWidgetInspect(
       : [{ file: g.at.file, line: g.at.line, column: g.at.column }];
   const stack = pinConstructorSite(await mapStack(raw), g.at);
   push({
-    crumb: `widget ${g.kind}`,
+    crumb: g.bind ?? g.kind,
     meta: `${g.site} · ${stackLabel(stack) || meta}`,
     sourceHtml: await renderStackSnippets(stack, peekCache),
   });
