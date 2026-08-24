@@ -35,7 +35,7 @@ apps/
 
 ## Identity
 
-- `id` — sticky pick key. Annotated constructors: `file:line:column#bind` when the call is `const bind = …`, otherwise `file:line:column#k`. Unannotated: `kind#bind` or `kind#k`. Survives re-evaluate if the program shape is unchanged. Renaming the const changes the id.
+- `id` — sticky pick key. Annotated constructors: `file:line:column#bind` when the call is `const bind = …`, otherwise `file:line:column#k`. Unannotated: `kind#bind` or `kind#k`. A second construction with the same bind at the same origin is `…#bind#1` so instanced outlines and gapped walls are not de-duplicated away. Survives re-evaluate if the program shape is unchanged. Renaming the const changes the id.
 - `site` — write target (`file` / `line` / `column`) from `__annotations__`. Shared on purpose: one literal, many instances. Hover may light every handle with that site; selection uses `id`.
 - `bind` — const name that owned the construction, when known.
 - `provenance` — user call stack (innermost helper first), captured from `Error.stack`. Infra frames (geom, euclid, shell, hosts) are skipped so nested demo helpers remain.

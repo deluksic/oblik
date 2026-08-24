@@ -7,7 +7,7 @@ import {
   resetIdentity,
   withBind,
 } from "./identity";
-import { circle, point } from "./geom";
+import { circle, collectDrawables, point, polyline, segment } from "./geom";
 
 test("unlabeled ids are origin#k and rematch across frames", () => {
   beginGeomFrame();
@@ -23,7 +23,7 @@ test("unlabeled ids are origin#k and rematch across frames", () => {
 test("bind replaces occurrence in the pick id", () => {
   resetIdentity();
   expect(allocId("apps/paper/src/s.ts:4:5", "shelf")).toBe("apps/paper/src/s.ts:4:5#shelf");
-  expect(allocId("apps/paper/src/s.ts:4:5", "shelf")).toBe("apps/paper/src/s.ts:4:5#shelf");
+  expect(allocId("apps/paper/src/s.ts:4:5", "shelf")).toBe("apps/paper/src/s.ts:4:5#shelf#1");
 });
 
 test("withBind labels nested constructors", () => {
@@ -51,6 +51,41 @@ test("annotated constructors under withBind use site#bind", () => {
   expect(a.id).toBe("f.ts:20:1#entrySwing");
   expect(b.id).toBe("f.ts:20:1#hallSwing");
   expect(a.bind).toBe("entrySwing");
+});
+
+test("same bind at one site keeps extra instances drawable", () => {
+  const site = { __annotations__: { file: "f.ts", at: [8, 1] as [number, number], editable: true } };
+  beginGeomFrame();
+  const parts = withBind("south", () => [
+    polyline(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      site,
+    ),
+    polyline(
+      [
+        { x: 2, y: 0 },
+        { x: 3, y: 0 },
+      ],
+      site,
+    ),
+  ]);
+  expect(parts[0]!.id).toBe("f.ts:8:1#south");
+  expect(parts[1]!.id).toBe("f.ts:8:1#south#1");
+  expect(collectDrawables(parts)).toHaveLength(2);
+});
+
+test("a named constructor called twice keeps both outlines", () => {
+  const site = { __annotations__: { file: "f.ts", at: [9, 1] as [number, number], editable: true } };
+  const bottom = () => withBind("bottom", () => segment({ x: 0, y: 0 }, { x: 1, y: 0 }, site));
+  beginGeomFrame();
+  const a = bottom();
+  const b = bottom();
+  expect(a.id).toBe("f.ts:9:1#bottom");
+  expect(b.id).toBe("f.ts:9:1#bottom#1");
+  expect(collectDrawables([a, b])).toHaveLength(2);
 });
 
 test("two unlabeled circles at the same site keep distinct ids", () => {

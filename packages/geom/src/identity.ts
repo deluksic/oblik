@@ -140,14 +140,17 @@ export function withBind<T>(name: string, fn: () => T): T {
 }
 
 /**
- * Pick id for this evaluate. `bind` / the bind stack wins over occurrence.
- * Occurrence is per `origin` (site string or kind) among unlabeled constructions.
+ * Pick id for this evaluate. A unique bind at an origin is `origin#bind`.
+ * A second construction with the same bind at the same origin (wall spans
+ * under `const south = wallRun(…)`, a helper called twice) keeps the bind
+ * and suffixes occurrence so `collectDrawables` does not drop the extra ink.
  */
 export function allocId(origin: string, bind?: string): string {
   const label = bind || currentBind();
-  if (label) return `${origin}#${label}`;
-  const n = occurrence.get(origin) ?? 0;
-  occurrence.set(origin, n + 1);
+  const key = label ? `${origin}#${label}` : origin;
+  const n = occurrence.get(key) ?? 0;
+  occurrence.set(key, n + 1);
+  if (label) return n === 0 ? key : `${key}#${n}`;
   return `${origin}#${n}`;
 }
 
