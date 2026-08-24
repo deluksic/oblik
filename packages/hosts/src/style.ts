@@ -1,5 +1,4 @@
-import type { InspectPatch, ObjectStyle, StyleChannel } from "@design-scenes/shell";
-import { dashPattern } from "@design-scenes/shell/dash";
+import { dashPattern, type InspectPatch, type ObjectStyle, type StyleChannel } from "@design-scenes/shell";
 
 import { commitStyle } from "./inspect";
 

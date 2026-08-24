@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { dashPattern } from "@design-scenes/shell/dash";
+import { dashPattern } from "@design-scenes/shell";
 
 import {
   applyStyleAtSite,
