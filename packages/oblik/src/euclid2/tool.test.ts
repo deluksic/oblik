@@ -424,21 +424,21 @@ describe("clickTool", () => {
     });
   });
 
-  test("line first click on a glider stores the constructor", () => {
+  test("line first click on ink stores a free point, not a glider", () => {
     const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
     const mid = clickTool(startTool("line"), { world: onGround.at, point: onGround });
     if (!("session" in mid) || mid.session.verb !== "line") throw new Error("expected session");
     expect(mid.session.a?.expr).toEqual({
       kind: "call",
-      name: "pointOnLine",
-      args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 2.2 }],
+      name: "point",
+      args: [{ kind: "num", value: 2.2 }, { kind: "num", value: 0 }],
     });
     const done = clickTool(mid.session, { world: namedA.at, point: namedA });
     expect(done).toMatchObject({
       insert: {
         from: "line",
         args: [
-          { kind: "call", name: "pointOnLine" },
+          { kind: "call", name: "point" },
           { kind: "ref", name: "A" },
         ],
       },
@@ -471,7 +471,7 @@ describe("clickTool", () => {
     });
   });
 
-  test("perpendicular line through a glider nests pointOnLine", () => {
+  test("perpendicular line through ink stores a free point, not a glider", () => {
     const ground = {
       kind: "line" as const,
       origin: { x: 0, y: 0 },
@@ -492,9 +492,45 @@ describe("clickTool", () => {
           { kind: "ref", name: "ground" },
           {
             kind: "call",
-            name: "pointOnLine",
-            args: [{ kind: "ref", name: "shelf" }, { kind: "num", value: 1.5 }],
+            name: "point",
+            args: [{ kind: "num", value: 1.5 }, { kind: "num", value: 1.8 }],
           },
+        ],
+      },
+    });
+  });
+
+  test("parallel line distance ignores a glider and reuses shelf.distance", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const shelfGeom = {
+      kind: "parallelLine" as const,
+      line: { kind: "line" as const, origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
+      distance: 1.76,
+    };
+    const session = {
+      verb: "parallelLine" as const,
+      focus: "typed" as const,
+      typed: "",
+      name: "",
+      carrierRef: "",
+      carrier: { expr: { kind: "ref" as const, name: "ground" }, geom: ground },
+    };
+    const onShelf: PlacePoint = { kind: "pointOnLine", bind: "shelf", s: 2, at: { x: 2, y: 1.76 } };
+    const done = clickTool(session, {
+      world: onShelf.at,
+      point: onShelf,
+      length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+    });
+    expect(done).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "member", object: "shelf", field: "distance" },
         ],
       },
     });

@@ -63,12 +63,24 @@ export function isConstructed(p: PlacePoint): p is Crossing | GliderPlace {
   return isCrossing(p) || isGliderPlace(p);
 }
 
-/** Named bound point, then crossing, then a glider on ink, else a free point at `world`. */
+/** Named point or crossing — not a free click and not a new glider. */
+export function isPinnedPoint(p: PlacePoint): boolean {
+  return p.kind === "ref" || isCrossing(p);
+}
+
+export type PlaceOpts = { allowGliders?: boolean };
+
+export function placeAllowsGliders(tool?: { verb: string } | null): boolean {
+  return tool?.verb === "point";
+}
+
+/** Named bound point, then crossing, then a glider on ink (if allowed), else a free point at `world`. */
 export function resolvePlacePoint(
   trace: readonly TraceNode[],
   world: Vec2,
   maxDist: number,
   gliderMaxDist = maxDist,
+  opts: PlaceOpts = {},
 ): PlacePoint {
   const named = snapBoundPoint(trace, world, maxDist);
   if (named) {
@@ -90,7 +102,7 @@ export function resolvePlacePoint(
     }
     return best.point;
   }
-  const glider = nearestGlider(trace, world, gliderMaxDist);
+  const glider = opts.allowGliders ? nearestGlider(trace, world, gliderMaxDist) : null;
   if (glider) return glider.point;
   return { kind: "free", at: { x: world.x, y: world.y } };
 }
@@ -105,8 +117,6 @@ function boundOf(
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
-/** Lines and segments host gliders; parallel offsets do not. */
-const GLIDER_CARRIER = new Set(["line", "segment"]);
 const CIRCLE = new Set(["circle"]);
 
 function asLineLike(n: TraceNode): LineLike | null {
@@ -127,7 +137,7 @@ function nearestGlider(
   maxDist: number,
 ): { point: GliderPlace; d: number } | null {
   let best: { point: GliderPlace; d: number } | null = null;
-  for (const n of boundOf(trace, GLIDER_CARRIER)) {
+  for (const n of boundOf(trace, LINE_LIKE)) {
     const geom = asLineLike(n);
     if (!geom) continue;
     const d = lineDist(world, geom);
@@ -159,12 +169,12 @@ function gliderOnLine(bind: string, geom: LineLike, world: Vec2): GliderPlace {
   return { kind: "pointOnLine", bind, s: g.s, at: { x: g.x, y: g.y } };
 }
 
-/** Project `world` onto a named line or segment. Parallel offsets are not glider hosts. */
+/** Project `world` onto a named line, segment, circle, or parallel offset. */
 export function gliderOnTraceNode(n: TraceNode, world: Vec2): GliderPlace | null {
   if (!n.bind) return null;
-  const v = n.value;
-  if (v.kind === "line" || v.kind === "segment") return gliderOnLine(n.bind, v, world);
-  if (v.kind !== "circle") return null;
+  const geom = asLineLike(n);
+  if (geom) return gliderOnLine(n.bind, geom, world);
+  if (n.value.kind !== "circle") return null;
   const circle = n.value as Circle;
   const { ux, uy } = circleUnitAt(circle, world);
   const g = pointOnCircleValue(circle, ux, uy);

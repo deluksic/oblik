@@ -3,7 +3,7 @@ import { lineBasis } from "../../geom/ops";
 import { add, perp } from "../../geom/vec";
 import { printExpr } from "../../source/expr";
 import { snapLineCarrier } from "../pick";
-import { asPoint, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
+import { asPoint, exprOfPlace, hoverBind, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { inSlot, nameField, previewName, refField, resolveCarrier, resolvePoint, withBind } from "./draft";
 import { scopeFromTrace } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
@@ -49,7 +49,7 @@ function throughLabel(session: PerpSession, scope: Scope, place: PlaceHit | null
   const t = throughOf(session, scope);
   if (t) return printExpr(t.expr);
   const p = place?.point;
-  if (p && p.kind !== "free") return printExpr(exprOfPlace(p));
+  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
   return "point";
 }
 
@@ -154,7 +154,7 @@ export const perpendicularLine: Tool<PerpSession> = {
       };
     }
     const p = place?.point ?? null;
-    if (p && p.kind !== "free" && !session.throughRef.trim()) {
+    if (p && isPinnedPoint(p) && !session.throughRef.trim()) {
       return {
         line: previewCall(
           "perpendicularLine",

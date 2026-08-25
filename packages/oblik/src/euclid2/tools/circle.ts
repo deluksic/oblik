@@ -1,5 +1,5 @@
 import { printExpr } from "../../source/expr";
-import { asPoint, dist, exprOfPlace, hoverPlace, previewCall, round, sameRef } from "./common";
+import { asPoint, dist, exprOfPlace, hoverPlace, isPinnedPoint, previewCall, round, sameRef } from "./common";
 import {
   attachLengthHit,
   lengthHover,
@@ -41,7 +41,7 @@ function centerOf(session: CircleSession, scope: Scope): Placed | undefined {
 function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope: Scope) {
   if (hit.length) return hit.length.expr;
   const bound = resolveLengthExpr(session, scope, { min: 0.05 });
-  if (hit.point.kind !== "free" && !sameRef(center.expr, hit.point)) {
+  if (isPinnedPoint(hit.point) && !sameRef(center.expr, hit.point)) {
     if (!bound || bound.kind === "num") {
       return { kind: "call" as const, name: "dist", args: [center.expr, exprOfPlace(hit.point)] };
     }
@@ -58,7 +58,7 @@ function centerLabel(session: CircleSession, scope: Scope, place: PlaceHit | nul
   const placed = centerOf(session, scope);
   if (placed) return printExpr(placed.expr);
   const p = place?.point;
-  if (p && p.kind !== "free") return printExpr(exprOfPlace(p));
+  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
   return "center";
 }
 
@@ -147,7 +147,7 @@ export const circle: Tool<CircleSession> = {
     const cTok = inSlot(session.focus === "center", centerLabel(session, scope, place));
     const center = centerOf(session, scope);
     if (!center) {
-      if (p && p.kind !== "free" && !session.centerRef.trim()) {
+      if (p && isPinnedPoint(p) && !session.centerRef.trim()) {
         return {
           line: previewCall("circle", [exprOfPlace(p)], scope.used, ([c]) => `circle(${inSlot(session.focus === "center", c)}, ${radius})`, name),
           hint: "Type a point name or click to set the center. Tab for radius or name.",
@@ -167,7 +167,7 @@ export const circle: Tool<CircleSession> = {
         hint: "Click to reuse that length. Tab to name it.",
       };
     }
-    if (p && p.kind !== "free" && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null && !place?.length) {
+    if (p && isPinnedPoint(p) && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null && !place?.length) {
       return {
         line: previewCall(
           "circle",

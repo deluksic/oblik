@@ -1,5 +1,5 @@
 import { printExpr } from "../../source/expr";
-import { asPoint, exprOfPlace, hoverPlace, previewCall } from "./common";
+import { asPoint, exprOfPlace, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
 import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
 
@@ -10,7 +10,7 @@ function label(ref: string, placed: Placed | undefined, fallback: string, place:
   if (ref.trim()) return ref.trim();
   if (placed) return printExpr(placed.expr);
   const p = place?.point;
-  if (p && p.kind !== "free") return printExpr(exprOfPlace(p));
+  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
   return fallback;
 }
 
@@ -81,22 +81,22 @@ export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPoi
       }
       if (a) {
         const p = place?.point ?? null;
-        if (p && p.kind !== "free" && !session.bRef.trim()) {
+        if (p && isPinnedPoint(p) && !session.bRef.trim()) {
           return {
             line: previewCall(spec.id, [a.expr, exprOfPlace(p)], scope.used, ([x, y]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${inSlot(session.focus === "b", y)})`, name),
-            hint: "Type a point name or click a point, a crossing, or a line. Tab to name it.",
+            hint: "Type a point name or click a named point or crossing. Tab to name it.",
           };
         }
         return {
           line: previewCall(spec.id, [a.expr], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
-          hint: "Type a point name or click a point, a crossing, or a line. Tab to name it.",
+          hint: "Type a point name or click a named point or crossing. Tab to name it.",
         };
       }
       const p = place?.point ?? null;
-      if (p && p.kind !== "free" && !session.aRef.trim()) {
+      if (p && isPinnedPoint(p) && !session.aRef.trim()) {
         return {
           line: previewCall(spec.id, [exprOfPlace(p)], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
-          hint: "Type a point name or click a point, a crossing, or a line.",
+          hint: "Type a point name or click a named point or crossing.",
         };
       }
       return { line: `const ${name} = ${spec.id}(${aTok}, ${bTok})`, hint: spec.hint };

@@ -20,8 +20,10 @@ export {
 export { snapBoundPoint, hitsNear, hitTest, traceKey, isFiniteTrace, movedPastClick, PICK_CLICK_PX, type SnapPoint } from "./pick";
 export {
   resolvePlacePoint,
+  placeAllowsGliders,
   placeSnapWorld,
   isCrossing,
+  isPinnedPoint,
   PLACE_SNAP_PX,
   type PlacePoint,
   type Crossing,

@@ -1,7 +1,7 @@
 import type { LineLike } from "../../geom";
 import { signedDist } from "../../geom/ops";
 import { snapLineCarrier } from "../pick";
-import { exprOfPlace, hoverBind, previewCall, round } from "./common";
+import { exprOfPlace, hoverBind, isPinnedPoint, previewCall, round } from "./common";
 import {
   attachLengthHit,
   lengthHover,
@@ -39,7 +39,7 @@ function distAt(hit: PlaceHit, geom: LineLike): number {
 function distExpr(session: ParallelSession, carrier: NonNullable<ReturnType<typeof carrierOf>>, hit: PlaceHit, scope: Scope) {
   if (hit.length) return hit.length.expr;
   const bound = resolveLengthExpr(session, scope);
-  if (hit.point.kind !== "free") {
+  if (isPinnedPoint(hit.point)) {
     if (!bound || bound.kind === "num") {
       return {
         kind: "call" as const,
@@ -165,7 +165,7 @@ export const parallelLine: Tool<ParallelSession> = {
         hint: "Click to reuse that length. Tab to name it.",
       };
     }
-    if (p && p.kind !== "free" && resolveLengthExpr(session, scope) == null && !place?.length) {
+    if (p && isPinnedPoint(p) && resolveLengthExpr(session, scope) == null && !place?.length) {
       return {
         line: previewCall(
           "parallelLine",

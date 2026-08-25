@@ -1,8 +1,10 @@
 import { printExpr, type Expr } from "../../source/expr";
 import { hoistIntersections, printHoist, takeBind } from "../../source/hoist";
-import { isConstructed, isGliderPlace, type PlacePoint } from "../place";
+import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { Vec2 } from "../pick";
 import type { InsertJob, PlaceHit, Placed } from "./types";
+
+export { isConstructed, isGliderPlace, isPinnedPoint };
 
 export function round(n: number): number {
   return Math.round(n * 100) / 100;
@@ -83,8 +85,12 @@ export function exprOfPlace(p: PlacePoint): Expr {
   };
 }
 
-export function asPoint(hit: PlaceHit): Placed {
+export function asPoint(hit: PlaceHit, opts?: { gliders?: boolean }): Placed {
   const p = hit.point;
+  if (isGliderPlace(p) && opts?.gliders !== true) {
+    const at = { x: round(p.at.x), y: round(p.at.y) };
+    return { expr: exprOfPlace({ kind: "free", at }), at };
+  }
   if (p.kind === "free") {
     const at = { x: round(p.at.x), y: round(p.at.y) };
     return { expr: exprOfPlace({ kind: "free", at }), at };

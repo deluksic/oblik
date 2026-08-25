@@ -5,7 +5,7 @@ import { lineBasis, signedDist } from "../../geom/ops";
 import { mul, perp, sub } from "../../geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick } from "../pick";
-import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeSnapWorld, resolvePlacePoint } from "../place";
+import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeAllowsGliders, placeSnapWorld, resolvePlacePoint } from "../place";
 import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
@@ -248,7 +248,8 @@ export function placeFromEvent(
 ): PlaceHit {
   const w = worldOf(e, el, camera, size);
   const snap = placeSnapWorld(camera.scale);
-  let point = resolvePlacePoint(trace, w, snap, gliderSnapWorld(camera.scale));
+  const allowGliders = placeAllowsGliders(tool);
+  let point = resolvePlacePoint(trace, w, snap, gliderSnapWorld(camera.scale), { allowGliders });
   const t = e.target;
   if (t instanceof Element && t.hasAttribute("data-handle")) {
     const id = t.getAttribute("data-handle")!;
@@ -262,7 +263,7 @@ export function placeFromEvent(
         at: { x: at.x, y: at.y },
       };
     }
-  } else if (t instanceof Element && point.kind !== "ref" && !isCrossing(point)) {
+  } else if (allowGliders && t instanceof Element && point.kind !== "ref" && !isCrossing(point)) {
     const ink = t.closest("[data-ink]");
     const id = ink?.getAttribute("data-ink");
     if (id) {

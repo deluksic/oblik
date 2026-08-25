@@ -160,7 +160,7 @@ describe("resolvePlacePoint", () => {
   });
 
   test("snaps to a glider on a line", () => {
-    const p = resolvePlacePoint([ground], { x: 2.2, y: 0.05 }, 0.3);
+    const p = resolvePlacePoint([ground], { x: 2.2, y: 0.05 }, 0.3, 0.3, { allowGliders: true });
     expect(p.kind).toBe("pointOnLine");
     if (p.kind !== "pointOnLine") return;
     expect(p.bind).toBe("ground");
@@ -170,7 +170,7 @@ describe("resolvePlacePoint", () => {
   });
 
   test("snaps to a glider on a circle", () => {
-    const p = resolvePlacePoint([reach], { x: 0, y: 2.05 }, 0.3);
+    const p = resolvePlacePoint([reach], { x: 0, y: 2.05 }, 0.3, 0.3, { allowGliders: true });
     expect(p.kind).toBe("pointOnCircle");
     if (p.kind !== "pointOnCircle") return;
     expect(p.bind).toBe("reach");
@@ -186,7 +186,7 @@ describe("resolvePlacePoint", () => {
       bind: "span",
       value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
     });
-    const p = resolvePlacePoint([span], { x: 3, y: 0.1 }, 0.3);
+    const p = resolvePlacePoint([span], { x: 3, y: 0.1 }, 0.3, 0.3, { allowGliders: true });
     expect(p.kind).toBe("pointOnSegment");
     if (p.kind !== "pointOnSegment") return;
     expect(p.bind).toBe("span");
@@ -203,7 +203,7 @@ describe("resolvePlacePoint", () => {
   test("glider snap can be looser than point/crossing snap", () => {
     const miss = resolvePlacePoint([ground], { x: 2, y: 0.4 }, 0.3);
     expect(miss.kind).toBe("free");
-    const p = resolvePlacePoint([ground], { x: 2, y: 0.4 }, 0.3, 0.5);
+    const p = resolvePlacePoint([ground], { x: 2, y: 0.4 }, 0.3, 0.5, { allowGliders: true });
     expect(p.kind).toBe("pointOnLine");
     if (p.kind !== "pointOnLine") return;
     expect(p.bind).toBe("ground");
@@ -218,9 +218,18 @@ describe("resolvePlacePoint", () => {
     expect(p.at.y).toBeCloseTo(0);
   });
 
-  test("does not place a glider on a parallel offset line", () => {
-    const p = resolvePlacePoint([shelf], { x: 2, y: 1.85 }, 0.3, 0.5);
+  test("skips gliders unless the Point tool asks for them", () => {
+    const p = resolvePlacePoint([ground], { x: 2.2, y: 0.05 }, 0.3, 0.5);
     expect(p.kind).toBe("free");
-    expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toBeNull();
+    expect(p.at.x).toBeCloseTo(2.2);
+    expect(p.at.y).toBeCloseTo(0.05);
+  });
+
+  test("places a glider on a parallel offset with allowGliders", () => {
+    const p = resolvePlacePoint([shelf], { x: 2, y: 1.85 }, 0.3, 0.5, { allowGliders: true });
+    expect(p.kind).toBe("pointOnLine");
+    if (p.kind !== "pointOnLine") return;
+    expect(p.bind).toBe("shelf");
+    expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toMatchObject({ kind: "pointOnLine", bind: "shelf" });
   });
 });
