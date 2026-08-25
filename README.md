@@ -25,7 +25,8 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `ap
 
 - Scene module: `export default defineScene({ kind, title, camera?, build })`.
 - Trailing call arg is the uuid: `circle(A, 2.5, "o_ab12")`.
-- `draft` is uncommitted literals; HMR clears an id only when source literals match.
+- `draft` is an override until the new module’s `build()` has run.
+- Space inserts Point / Circle / Line / Segment (`Expr` on the tape; snap to named points).
 - Euclid2 camera is a group transform over aspect-correct NDC `viewBox` (y-up via `scale(1,-1)`). Handles move by relative Δ.
 
 P5 paper notes (catalog, Space, layouts): [docs/scenes.md](./docs/scenes.md).

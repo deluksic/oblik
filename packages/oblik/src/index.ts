@@ -18,7 +18,9 @@ export {
   siteSpecs,
   type Annotation,
 } from "./source/analyze";
-export { stamp } from "./source/stamp";
+export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
+export { insertCall, type Insert } from "./source/insert";
+export { printExpr, type Expr } from "./source/expr";
 export type { Camera2 } from "./euclid2/camera";
 export * from "./geom";

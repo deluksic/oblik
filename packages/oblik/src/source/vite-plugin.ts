@@ -5,8 +5,9 @@ import path from "node:path";
 import type { Plugin } from "vite";
 
 import { analyze } from "./analyze";
+import { insertCall } from "./insert";
 import { patchLiterals } from "./patch";
-import { parseLiteralPatch } from "./schema";
+import { parseInsert, parseLiteralPatch } from "./schema";
 import { stamp } from "./stamp";
 
 const VIRTUAL_PREFIX = "virtual:oblik-annotations";
@@ -89,6 +90,30 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
               json(res, 400, { ok: false, error: "could not patch id" });
               return;
             }
+            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            json(res, 200, { ok: true });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-insert") {
+          let body: unknown;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { ok: false, error: "invalid json" });
+            return;
+          }
+          const job = parseInsert(body);
+          if (typeof job === "string") {
+            json(res, 400, { ok: false, error: job });
+            return;
+          }
+          try {
+            const abs = resolveUnder(workspaceRoot, job.file);
+            const src = fs.readFileSync(abs, "utf8");
+            const next = insertCall(src, job);
             await enqueue(abs, () => fs.writeFileSync(abs, next));
             json(res, 200, { ok: true });
           } catch (err) {

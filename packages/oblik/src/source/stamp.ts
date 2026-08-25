@@ -7,13 +7,13 @@ function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
 
-function randomId(): string {
+export function freshSiteId(): string {
   const bytes = new Uint8Array(5);
   crypto.getRandomValues(bytes);
   return `o_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function stamp(source: string, nextId: () => string = randomId): { source: string; added: string[] } {
+export function stamp(source: string, nextId: () => string = freshSiteId): { source: string; added: string[] } {
   const specs = siteSpecs();
   const sf = parse(source);
   const ms = new MagicString(source);

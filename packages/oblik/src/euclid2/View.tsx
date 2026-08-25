@@ -12,14 +12,20 @@ import {
   type Camera2,
   type PaneSize,
 } from "./camera";
+import { snapBoundPoint } from "./pick";
+import type { Ghost, PlaceHit } from "./tool";
 import styles from "./View.module.css";
 
 export type Euclid2ViewProps = {
   trace: TraceNode[];
   camera: Camera2;
+  placing?: boolean;
+  ghost?: Ghost | null;
   onCamera: (cam: Camera2) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
+  onPlace?: (hit: PlaceHit) => void;
+  onCursor?: (world: { x: number; y: number } | null) => void;
 };
 
 type Drag =
@@ -109,6 +115,21 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (e.button !== 0) return;
     const el = paneRef.current;
     if (!el) return;
+    if (props.placing) {
+      const w = worldOf(e);
+      const max = 16 / Math.max(8, props.camera.scale);
+      let snap = snapBoundPoint(props.trace, w, max);
+      const t = e.target;
+      if (t instanceof Element && t.hasAttribute("data-handle")) {
+        const id = t.getAttribute("data-handle")!;
+        const node = props.trace.find((n) => n.id === id);
+        if (node?.bind && node.value.kind === "point") {
+          snap = { id: node.id, bind: node.bind, at: { x: node.value.x, y: node.value.y } };
+        }
+      }
+      props.onPlace?.({ world: w, snap: snap ?? undefined });
+      return;
+    }
     el.setPointerCapture(e.pointerId);
     const t = e.target;
     if (t instanceof Element && t.hasAttribute("data-handle")) {
@@ -137,6 +158,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   function onPointerMove(e: PointerEvent) {
+    if (props.placing) {
+      props.onCursor?.(worldOf(e));
+    }
     if (!drag) return;
     if (drag.kind === "pan") {
       const cam = props.camera;
@@ -184,18 +208,22 @@ export function Euclid2View(props: Euclid2ViewProps) {
       ref={(el) => {
         paneRef.current = el;
       }}
-      class={[styles.paper, { [styles.grabbing]: grabbing() }]}
+      class={[styles.paper, { [styles.grabbing]: grabbing(), [styles.placing]: !!props.placing }]}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      onPointerLeave={() => setHover(null)}
+      onPointerLeave={() => {
+        setHover(null);
+        props.onCursor?.(null);
+      }}
     >
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={props.camera} size={size()} />
           <For each={ink()}>{(n) => <Stroke node={n} hot={hover() === n.id} camera={props.camera} size={size()} />}</For>
+          {props.ghost ? <GhostMark ghost={props.ghost} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
@@ -315,6 +343,26 @@ function Grid(props: { camera: Camera2; size: PaneSize }) {
         )}
       </For>
     </g>
+  );
+}
+
+function GhostMark(props: { ghost: Ghost }) {
+  const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : null));
+  const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : null));
+  const seg = createMemo(() =>
+    props.ghost.kind === "line" || props.ghost.kind === "segment" ? props.ghost : null,
+  );
+  return (
+    <>
+      {point() ? <circle class={styles.ghostPoint} cx={point()!.x} cy={point()!.y} r={0.08} /> : null}
+      {circle() ? (
+        <>
+          <circle class={styles.ghostPoint} cx={circle()!.center.x} cy={circle()!.center.y} r={0.08} />
+          <circle class={styles.ghost} cx={circle()!.center.x} cy={circle()!.center.y} r={circle()!.radius} />
+        </>
+      ) : null}
+      {seg() ? <line class={styles.ghost} x1={seg()!.a.x} y1={seg()!.a.y} x2={seg()!.b.x} y2={seg()!.b.y} /> : null}
+    </>
   );
 }
 
