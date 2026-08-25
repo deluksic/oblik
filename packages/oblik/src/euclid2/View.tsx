@@ -1,4 +1,4 @@
-import { For, createMemo, createSignal, onSettled } from "solid-js";
+import { For, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
 import type { TraceNode } from "../eval/context";
 import type { Circle, Line, OffsetLine, Point, Segment } from "../geom";
@@ -16,12 +16,13 @@ import { snapBoundPoint } from "./pick";
 import type { Ghost, PlaceHit } from "./tool";
 import styles from "./View.module.css";
 
+const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
+
 export type Euclid2ViewProps = {
   trace: TraceNode[];
-  camera: Camera2;
+  initialCamera?: Camera2;
   placing?: boolean;
   ghost?: Ghost | null;
-  onCamera: (cam: Camera2) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
   onPlace?: (hit: PlaceHit) => void;
@@ -70,10 +71,18 @@ function readPaneSize(el: Element): PaneSize | null {
 
 export function Euclid2View(props: Euclid2ViewProps) {
   const paneRef: { current: HTMLDivElement | null } = { current: null };
+  const [camera, setCamera] = createSignal<Camera2>(props.initialCamera ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [hover, setHover] = createSignal<string | null>(null);
   const [grabbing, setGrabbing] = createSignal(false);
   let drag: Drag | null = null;
+
+  createEffect(
+    () => props.initialCamera,
+    (cam) => {
+      if (cam) setCamera(cam);
+    },
+  );
 
   onSettled(() => {
     const el = paneRef.current;
@@ -88,10 +97,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
     return () => ro.disconnect();
   });
 
-  const k = createMemo(() => kWorldToNdc(props.camera, size()));
+  const k = createMemo(() => kWorldToNdc(camera(), size()));
   const vb = createMemo(() => viewBox(size()));
   const worldXf = createMemo(() => {
-    const cam = props.camera;
+    const cam = camera();
     const kk = k();
     return `scale(${kk} ${-kk}) translate(${-cam.x} ${-cam.y})`;
   });
@@ -100,15 +109,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const el = paneRef.current!;
     const rect = el.getBoundingClientRect();
     const ndc = clientToNdc({ x: e.clientX, y: e.clientY }, rect, size());
-    return ndcToWorld(ndc, props.camera, size());
+    return ndcToWorld(ndc, camera(), size());
   }
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
-    const cam = props.camera;
+    const cam = camera();
     const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
     const scale = Math.min(280, Math.max(8, cam.scale * factor));
-    props.onCamera({ ...cam, scale });
+    setCamera({ ...cam, scale });
   }
 
   function onPointerDown(e: PointerEvent) {
@@ -117,7 +126,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (!el) return;
     if (props.placing) {
       const w = worldOf(e);
-      const max = 16 / Math.max(8, props.camera.scale);
+      const max = 16 / Math.max(8, camera().scale);
       let snap = snapBoundPoint(props.trace, w, max);
       const t = e.target;
       if (t instanceof Element && t.hasAttribute("data-handle")) {
@@ -153,7 +162,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       setGrabbing(true);
       return;
     }
-    drag = { kind: "pan", x: e.clientX, y: e.clientY, camX: props.camera.x, camY: props.camera.y };
+    drag = { kind: "pan", x: e.clientX, y: e.clientY, camX: camera().x, camY: camera().y };
     setGrabbing(true);
   }
 
@@ -163,8 +172,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
     if (!drag) return;
     if (drag.kind === "pan") {
-      const cam = props.camera;
-      props.onCamera({
+      const cam = camera();
+      setCamera({
         ...cam,
         x: drag.camX - (e.clientX - drag.x) / cam.scale,
         y: drag.camY + (e.clientY - drag.y) / cam.scale,
@@ -221,21 +230,21 @@ export function Euclid2View(props: Euclid2ViewProps) {
     >
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
-          <Grid camera={props.camera} size={size()} />
-          <For each={ink()}>{(n) => <Stroke node={n} hot={hover() === n.id} camera={props.camera} size={size()} />}</For>
+          <Grid camera={camera()} size={size()} />
+          <For each={ink()}>{(n) => <Stroke node={n} hot={hover() === n.id} camera={camera()} size={size()} />}</For>
           {props.ghost ? <GhostMark ghost={props.ghost} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
         <For each={points()}>
-          {(n) => <PointMark node={n} size={size()} camera={props.camera} hot={hover() === n.id} />}
+          {(n) => <PointMark node={n} size={size()} camera={camera()} hot={hover() === n.id} />}
         </For>
         <For each={handles()}>
           {(n) => (
             <Handle
               node={n}
               size={size()}
-              camera={props.camera}
+              camera={camera()}
               hot={hover() === n.id}
               onEnter={() => setHover(n.id)}
               onLeave={() => setHover(null)}
