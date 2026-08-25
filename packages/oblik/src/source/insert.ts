@@ -117,12 +117,6 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
     ...hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() })),
     { bind, from: job.from, args, id: job.id ?? nextId() },
   ];
-  for (const s of statements) {
-    if (s.from !== "slider") continue;
-    const opts = s.args[1];
-    if (!opts || opts.kind !== "props") continue;
-    opts.props.label = { kind: "str", value: s.bind };
-  }
   const names = [
     ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),
   ];

@@ -7,7 +7,8 @@ const SLIDER = {
   id: "o_sl",
   occ: 0,
   kind: "slider",
-  value: { kind: "slider", n: 1.8, label: "reach", min: 0, max: 4, step: 0.05 },
+  value: { kind: "slider", n: 1.8, min: 0, max: 4, step: 0.05 },
+  bind: "reach",
   editable: true,
   stack: [],
 } as TraceNode;

@@ -252,7 +252,7 @@ describe("insertCall", () => {
     expect(next).toContain('const x = circleCircleIntersection(reach, lamp, 1, "o_x");');
   });
 
-  test("inserts a slider with options and label from the bind", () => {
+  test("inserts a slider with options", () => {
     const next = insertCall(
       src,
       {
@@ -272,7 +272,7 @@ describe("insertCall", () => {
         id: "o_sl",
       },
     );
-    expect(next).toContain('const reach = slider(1.8, { min: 0, max: 4, step: 0.05, label: "reach" }, "o_sl");');
+    expect(next).toContain('const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");');
     expect(next).toMatch(/import \{ point, slider \} from "oblik"/);
   });
 });

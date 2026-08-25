@@ -137,7 +137,6 @@ export function dist(a: Vec2, b: Vec2): number {
 }
 
 export type SliderOpts = {
-  label?: string;
   min?: number;
   max?: number;
   step?: number;
@@ -149,13 +148,13 @@ function snapEditNumber(raw: number, min: number, max: number, step: number): nu
   return Math.round((clamped - min) / step) * step + min;
 }
 
-function tracedSlider(n: number, meta: Omit<SliderValue, "kind">, id: string | undefined): number {
+function tracedSlider(n: number, meta: Omit<SliderValue, "kind" | "n">, id: string | undefined): number {
   const ctx = currentEval();
   if (!ctx || !id) return n;
   const occ = ctx.occ.get(id) ?? 0;
   ctx.occ.set(id, occ + 1);
   const anno = ctx.annotations.get(id);
-  const value: SliderValue = { kind: "slider", ...meta, n };
+  const value: SliderValue = { kind: "slider", n, ...meta };
   const node: TraceNode = {
     id,
     occ,
@@ -177,17 +176,7 @@ export const slider = mark((n: number, opts?: SliderOpts, id?: string): number =
   const max = opts?.max ?? Math.max(Math.abs(raw) * 2, 1, min + 1);
   const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
   const v = snapEditNumber(raw, min, max, step);
-  return tracedSlider(
-    v,
-    {
-      n: v,
-      label: opts?.label?.trim() || "value",
-      min,
-      max,
-      step,
-    },
-    id,
-  );
+  return tracedSlider(v, { min, max, step }, id);
 }, { dof: [0] });
 
 export const constructors = {

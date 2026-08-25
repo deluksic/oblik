@@ -6,7 +6,6 @@ import { $node } from "./site";
 export type SliderValue = {
   kind: "slider";
   n: number;
-  label: string;
   min: number;
   max: number;
   step: number;

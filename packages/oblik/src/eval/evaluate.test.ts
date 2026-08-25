@@ -76,20 +76,18 @@ describe("evaluate", () => {
       kind: "euclid2",
       title: "t",
       build() {
-        const reach = slider(1.8, { label: "reach", min: 0, max: 4, step: 0.05 }, "o_sl");
+        const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");
         return reach;
       },
     });
-    const annotations = analyze(
-      `const reach = slider(1.8, { label: "reach", min: 0, max: 4, step: 0.05 }, "o_sl");\n`,
-    );
+    const annotations = analyze(`const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");\n`);
     const { trace, value } = evaluate(scene, { annotations });
     expect(value).toBe(1.8);
     expect(trace).toHaveLength(1);
     expect(trace[0]?.kind).toBe("slider");
+    expect(trace[0]?.bind).toBe("reach");
     if (trace[0]?.value.kind === "slider") {
       expect(trace[0].value.n).toBe(1.8);
-      expect(trace[0].value.label).toBe("reach");
     }
   });
 });

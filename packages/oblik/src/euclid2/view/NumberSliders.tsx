@@ -32,7 +32,7 @@ export function NumberSliders(props: {
               rx={8}
             />
             <text class={styles.sliderLabel} x={14} y={18}>
-              {g.label}
+              {L.node.bind ?? "value"}
             </text>
             <text class={styles.sliderValue} x={L.panel.w - 14} y={18} text-anchor="end">
               {formatNum(g.n)}
