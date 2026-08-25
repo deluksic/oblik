@@ -5,6 +5,11 @@ declare module "*.module.css" {
   export default classes;
 }
 
+declare module "virtual:oblik-catalog" {
+  import type { OblikSceneEntry } from "oblik";
+  export const scenes: OblikSceneEntry[];
+}
+
 declare module "virtual:oblik-annotations?*" {
   import type { Annotation } from "oblik";
   const annotations: Record<string, Annotation>;

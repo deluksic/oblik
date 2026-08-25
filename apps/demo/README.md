@@ -1,10 +1,11 @@
 # oblik-demo
 
-Greenfield paper for Prototype 6. This app is scenes plus a Vite entry that mounts `oblik/host`. The host switches on `scene.kind` (`euclid2` today).
+Greenfield paper for Prototype 6. Scenes live in `src/scenes/`; the header picker lists them (like P5). URL: `?scene=<id>`.
 
 ```sh
 pnpm demo
 ```
 
-- `src/scenes/shelf.ts` — the scene
-- `src/main.tsx` — mount + HMR (`import.meta.hot.accept` has to live here; Vite accept is relative to the importer)
+- `src/scenes/*.ts` — scene modules (`defineScene`)
+- `src/scene-loaders.ts` — `import.meta.glob` for lazy load + HMR
+- `src/main.tsx` — mount + catalog HMR

@@ -2,16 +2,23 @@ import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 
 import { analyze } from "./analyze";
+import {
+  scanOblikCatalog,
+  sceneGlobKeys,
+  sceneLoadersAcceptTail,
+} from "./catalog";
 import { insertCall } from "./insert";
 import { patchLiterals } from "./patch";
 import { parseInsert, parseLiteralPatch } from "./schema";
 import { stamp } from "./stamp";
 
-const VIRTUAL_PREFIX = "virtual:oblik-annotations";
-const VIRTUAL_RESOLVED = "\0" + VIRTUAL_PREFIX;
+const VIRTUAL_ANN = "virtual:oblik-annotations";
+const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
+const VIRTUAL_CATALOG = "virtual:oblik-catalog";
+const VIRTUAL_CATALOG_RESOLVED = "\0" + VIRTUAL_CATALOG;
 
 export type OblikPluginOpts = {
   workspaceRoot: string;
@@ -46,10 +53,38 @@ function isSceneTs(sceneDir: string, file: string): boolean {
   return abs.startsWith(`${dir}/`) && abs.endsWith(".ts") && !abs.endsWith(".d.ts");
 }
 
+function isSceneLoadersModule(id: string): boolean {
+  return path.basename(id.split("?")[0] ?? id) === "scene-loaders.ts";
+}
+
+function catalogFingerprint(sceneDir: string, workspaceRoot: string): string {
+  return JSON.stringify(scanOblikCatalog(sceneDir, workspaceRoot));
+}
+
+function invalidateCatalog(server: ViteDevServer): void {
+  const mod = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+  if (mod) void server.reloadModule(mod);
+}
+
+function invalidateSceneLoaders(server: ViteDevServer): void {
+  for (const mod of server.moduleGraph.idToModuleMap.values()) {
+    const file = mod.file?.replace(/\\/g, "/") ?? "";
+    if (file.endsWith("/scene-loaders.ts")) void server.reloadModule(mod);
+  }
+}
+
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
   const writeTail = new Map<string, Promise<void>>();
+  let lastCatalog = "";
+
+  function catalogChanged(): boolean {
+    const next = catalogFingerprint(sceneDir, workspaceRoot);
+    if (next === lastCatalog) return false;
+    lastCatalog = next;
+    return true;
+  }
 
   function enqueue(abs: string, work: () => void): Promise<void> {
     const run = () => Promise.resolve().then(work);
@@ -68,6 +103,17 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   return {
     name: "oblik",
     configureServer(server) {
+      server.watcher.add(sceneDir);
+      const onSceneTree = (file: string) => {
+        if (!isSceneTs(sceneDir, file)) return;
+        if (catalogChanged()) {
+          invalidateCatalog(server);
+          invalidateSceneLoaders(server);
+        }
+      };
+      server.watcher.on("add", onSceneTree);
+      server.watcher.on("unlink", onSceneTree);
+
       server.middlewares.use(async (req, res, next) => {
         if (req.method === "POST" && req.url === "/__oblik-patch") {
           let body: unknown;
@@ -125,14 +171,22 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
       });
     },
     resolveId(id) {
-      if (id === VIRTUAL_PREFIX || id.startsWith(`${VIRTUAL_PREFIX}?`)) return VIRTUAL_RESOLVED + id.slice(VIRTUAL_PREFIX.length);
+      if (id === VIRTUAL_CATALOG) return VIRTUAL_CATALOG_RESOLVED;
+      if (id === VIRTUAL_ANN || id.startsWith(`${VIRTUAL_ANN}?`)) {
+        return VIRTUAL_ANN_RESOLVED + id.slice(VIRTUAL_ANN.length);
+      }
     },
     load(id) {
-      if (!id.startsWith(VIRTUAL_RESOLVED)) return;
+      if (id === VIRTUAL_CATALOG_RESOLVED) {
+        const scenes = scanOblikCatalog(sceneDir, workspaceRoot);
+        lastCatalog = JSON.stringify(scenes);
+        return `export const scenes = ${JSON.stringify(scenes)};\n`;
+      }
+      if (!id.startsWith(VIRTUAL_ANN_RESOLVED)) return;
       const q = id.includes("?") ? id.slice(id.indexOf("?") + 1) : "";
       const params = new URLSearchParams(q);
       const file = params.get("file");
-      if (!file) return "export default {}";
+      if (!file) return "export default {};\n";
       const abs = resolveUnder(workspaceRoot, file);
       const src = fs.readFileSync(abs, "utf8");
       const map = analyze(src, file.replace(/\\/g, "/"));
@@ -140,6 +194,10 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     },
     transform(code, id) {
       const file = id.split("?")[0] ?? id;
+      if (isSceneLoadersModule(id)) {
+        if (code.includes("__oblik_scene_hmr")) return null;
+        return { code: code + sceneLoadersAcceptTail(sceneGlobKeys(sceneDir)), map: null };
+      }
       if (!isSceneTs(sceneDir, file)) return null;
       const { source, added } = stamp(code);
       if (added.length > 0) {
@@ -148,10 +206,16 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
       }
       return { code: source, map: null };
     },
-    handleHotUpdate({ server }) {
+    handleHotUpdate(ctx) {
+      const server = ctx.server;
       for (const mod of server.moduleGraph.idToModuleMap.values()) {
-        if (mod.id?.startsWith(VIRTUAL_RESOLVED)) void server.reloadModule(mod);
+        if (mod.id?.startsWith(VIRTUAL_ANN_RESOLVED)) void server.reloadModule(mod);
       }
+      if (!isSceneTs(sceneDir, ctx.file)) return;
+      if (!catalogChanged()) return;
+      const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+      invalidateSceneLoaders(server);
+      return catalog ? [...ctx.modules, catalog] : ctx.modules;
     },
   };
 }
