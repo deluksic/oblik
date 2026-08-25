@@ -61,3 +61,33 @@
   color: var(--oblik-muted);
   font-size: 0.82rem;
 }
+
+.dupWarn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.55rem 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--oblik-accent) 55%, var(--oblik-line));
+  background: color-mix(in srgb, var(--oblik-accent) 14%, var(--oblik-raised));
+  color: var(--oblik-text);
+}
+
+.dupWarn p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.dupId {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--oblik-accent);
+}
+
+.dupSites {
+  margin: 0.25rem 0 0;
+  padding: 0 0 0 1.1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--oblik-cream);
+  line-height: 1.45;
+}

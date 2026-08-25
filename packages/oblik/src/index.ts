@@ -21,16 +21,12 @@ export {
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
-export {
-  analyze,
-  siteSpecs,
-  type Annotation,
-} from "./source/analyze";
+export { analyze, listAnnotationSites, siteSpecs, type Annotation } from "./source/analyze";
 export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, type Insert } from "./source/insert";
 export { printExpr, type Expr } from "./source/expr";
-export type { OblikSceneEntry } from "./source/catalog";
-export { sceneLoaderKey } from "./source/catalog";
+export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
+export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";
 export type { Camera2 } from "./euclid2/camera";
 export * from "./geom";

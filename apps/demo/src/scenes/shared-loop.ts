@@ -15,7 +15,7 @@ export default defineScene({
       };
       circle(p, 1, "o_ring");
     }
-    const p2 = point(3.37, 3.63, "o_p2");
+    const p2 = point(3.37, 3.63, "o_lp2");
     const ln = line(o, p2, "o_ln");
     const p3 = point(2.45, 4.84, "o_p3");
     parallelLine(ln, signedDist(p3, ln), "o_off");

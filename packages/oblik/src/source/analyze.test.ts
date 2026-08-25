@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { analyze } from "./analyze";
+import { analyze, listAnnotationSites } from "./analyze";
 import { patchLiterals } from "./patch";
 import { stamp } from "./stamp";
 
@@ -22,6 +22,13 @@ describe("analyze", () => {
     expect(map.get("o_aa")?.literals).toEqual([0, 0]);
     expect(map.get("o_bb")?.literals).toEqual([2.5]);
     expect(map.get("o_cc")?.editable).toBe(false);
+  });
+
+  test("lists every constructor site even when ids collide", () => {
+    const sites = listAnnotationSites(`point(0, 0, "o_a");\ncircle(A, 1, "o_a");\n`, "dup.ts");
+    expect(sites.map((s) => s.id)).toEqual(["o_a", "o_a"]);
+    expect(sites[0]?.line).toBe(1);
+    expect(sites[1]?.line).toBe(2);
   });
 });
 

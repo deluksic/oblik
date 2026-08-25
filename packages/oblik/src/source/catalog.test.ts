@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { parseOblikSceneSource, sceneLoadersModule } from "./catalog";
+import { findDuplicateIds, parseOblikSceneSource, scanAnnotationsBundle, sceneLoadersModule } from "./catalog";
+import { listUserAppSources } from "./user-source";
 
 const src = `import { point, defineScene } from "oblik";
 
@@ -40,5 +43,40 @@ describe("parseOblikSceneSource", () => {
     expect(mod).toContain("applyHotScenes");
     expect(mod).not.toContain("notifyHelperHot");
     expect(mod).not.toContain("import \"./layout/");
+  });
+});
+
+describe("findDuplicateIds", () => {
+  test("reports every constructor site that shares an id", () => {
+    expect(
+      findDuplicateIds([
+        { id: "o_c2", file: "apps/demo/src/layout/mounting-plate.ts", line: 25, column: 13 },
+        { id: "o_ok", file: "apps/demo/src/scenes/shelf.ts", line: 4, column: 1 },
+        { id: "o_c2", file: "apps/demo/src/scenes/truss.ts", line: 17, column: 15 },
+      ]),
+    ).toEqual([
+      {
+        id: "o_c2",
+        sites: [
+          { file: "apps/demo/src/layout/mounting-plate.ts", line: 25, column: 13 },
+          { file: "apps/demo/src/scenes/truss.ts", line: 17, column: 15 },
+        ],
+      },
+    ]);
+  });
+
+  test("a for-loop with one call site is not a collision", () => {
+    expect(
+      findDuplicateIds([{ id: "o_ring", file: "apps/demo/src/scenes/shared-loop.ts", line: 16, column: 7 }]),
+    ).toEqual([]);
+  });
+});
+
+describe("scanAnnotationsBundle", () => {
+  test("demo user sources have unique ids", () => {
+    const demo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../apps/demo");
+    const workspace = path.resolve(demo, "../..");
+    const { collisions } = scanAnnotationsBundle(listUserAppSources(demo), workspace);
+    expect(collisions).toEqual([]);
   });
 });

@@ -66,10 +66,11 @@ function bindName(call: ts.CallExpression): string | undefined {
   return undefined;
 }
 
-export function analyze(source: string, file = "scene.ts"): Map<string, Annotation> {
+/** Every constructor call with a trailing id — including collisions the Map would drop. */
+export function listAnnotationSites(source: string, file = "scene.ts"): Annotation[] {
   const specs = siteSpecs();
   const sf = parse(source, file);
-  const out = new Map<string, Annotation>();
+  const out: Annotation[] = [];
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
       const spec = specs.get(node.expression.text);
@@ -82,7 +83,7 @@ export function analyze(source: string, file = "scene.ts"): Map<string, Annotati
             ? spec.dof.map((i) => numericValue(args[i]!)).filter((n): n is number => n != null)
             : undefined;
           const bind = bindName(node);
-          out.set(id, {
+          out.push({
             id,
             editable,
             bind,
@@ -97,5 +98,11 @@ export function analyze(source: string, file = "scene.ts"): Map<string, Annotati
     ts.forEachChild(node, visit);
   };
   visit(sf);
+  return out;
+}
+
+export function analyze(source: string, file = "scene.ts"): Map<string, Annotation> {
+  const out = new Map<string, Annotation>();
+  for (const site of listAnnotationSites(source, file)) out.set(site.id, site);
   return out;
 }

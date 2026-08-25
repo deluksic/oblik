@@ -6,15 +6,15 @@ export default defineScene({
   hint: "Gliders on the span. Middle ring sets the roof. Drag a radius — posts follow that circle.",
   camera: { x: 0.3, y: 1.4, scale: 42 },
   build() {
-    const a = point(-3.87, 0.16, "o_a");
-    const b = point(4.41, -0.23, "o_b");
+    const a = point(-3.87, 0.16, "o_tr_a");
+    const b = point(4.41, -0.23, "o_tr_b");
     const span = segment(a, b, "o_span");
     const p0 = pointOnSegment(span, 0.25, "o_p0");
     const p1 = pointOnSegment(span, 0.48, "o_p1");
     const p2 = pointOnSegment(span, 0.75, "o_p2");
-    const c0 = circle(p0, 1.29, "o_c0");
-    const c1 = circle(p1, 1.86, "o_c1");
-    const c2 = circle(p2, 1.17, "o_c2");
+    const c0 = circle(p0, 1.29, "o_tr_c0");
+    const c1 = circle(p1, 1.86, "o_tr_c1");
+    const c2 = circle(p2, 1.17, "o_tr_c2");
     const normal = norm(perp(sub(b, a)));
     const peak = add(p1, mul(normal, c1.radius));
     segment(a, peak, "o_ra");

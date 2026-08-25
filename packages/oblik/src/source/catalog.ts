@@ -3,6 +3,8 @@ import path from "node:path";
 
 import * as ts from "typescript";
 
+import { listAnnotationSites, type Annotation } from "./analyze";
+
 export type OblikSceneEntry = {
   id: string;
   file: string;
@@ -139,16 +141,45 @@ export function mergeAnnotationBundle<T>(bundle: Record<string, Record<string, T
   return out;
 }
 
+export type DuplicateIdSite = {
+  file: string;
+  line: number;
+  column: number;
+};
+
+export type DuplicateId = {
+  id: string;
+  sites: DuplicateIdSite[];
+};
+
+/** Same trailing id on two constructor calls — invalid; ids are project-wide. */
+export function findDuplicateIds(
+  sites: readonly { id: string; file: string; line: number; column: number }[],
+): DuplicateId[] {
+  const groups = new Map<string, DuplicateIdSite[]>();
+  for (const s of sites) {
+    const list = groups.get(s.id) ?? [];
+    list.push({ file: s.file, line: s.line, column: s.column });
+    groups.set(s.id, list);
+  }
+  return [...groups.entries()]
+    .filter(([, hits]) => hits.length > 1)
+    .map(([id, hits]) => ({ id, sites: hits }))
+    .toSorted((a, b) => a.id.localeCompare(b.id));
+}
+
 export function scanAnnotationsBundle(
   files: readonly string[],
   workspaceRoot: string,
-  analyze: (source: string, file: string) => Map<string, unknown>,
-): Record<string, Record<string, unknown>> {
-  const out: Record<string, Record<string, unknown>> = {};
+): { byPath: Record<string, Record<string, Annotation>>; collisions: DuplicateId[] } {
+  const byPath: Record<string, Record<string, Annotation>> = {};
+  const all: Annotation[] = [];
   for (const abs of files) {
     const rel = path.relative(workspaceRoot, abs).replace(/\\/g, "/");
     const src = fs.readFileSync(abs, "utf8");
-    out[rel] = Object.fromEntries(analyze(src, rel));
+    const sites = listAnnotationSites(src, rel);
+    all.push(...sites);
+    byPath[rel] = Object.fromEntries(sites.map((s) => [s.id, s]));
   }
-  return out;
+  return { byPath, collisions: findDuplicateIds(all) };
 }

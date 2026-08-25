@@ -241,10 +241,10 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         return `export const scenes = ${JSON.stringify(scenes)};\n`;
       }
       if (id === VIRTUAL_ANN_BUNDLE_RESOLVED) {
-        const bundle = scanAnnotationsBundle(listUserAppSources(appRoot), workspaceRoot, (src, file) =>
-          analyze(src, file),
-        );
-        return `export const annotationsByPath = ${JSON.stringify(bundle)};\n`;
+        const { byPath, collisions } = scanAnnotationsBundle(listUserAppSources(appRoot), workspaceRoot);
+        return `export const annotationsByPath = ${JSON.stringify(byPath)};
+export const annotationCollisions = ${JSON.stringify(collisions)};
+`;
       }
       if (!id.startsWith(VIRTUAL_ANN_RESOLVED)) return;
       const q = id.includes("?") ? id.slice(id.indexOf("?") + 1) : "";

@@ -1,13 +1,19 @@
 import { render } from "@solidjs/web";
-import { createEffect, Errored, Loading, createMemo, createSignal, onCleanup } from "solid-js";
+import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import { sceneLoaderKey, mergeAnnotationBundle, type OblikSceneEntry } from "../source/catalog";
+import {
+  sceneLoaderKey,
+  mergeAnnotationBundle,
+  type DuplicateId,
+  type OblikSceneEntry,
+} from "../source/catalog";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
+import { originFileLabel } from "./selection-detail";
 
 import "../theme.css";
 import styles from "./Host.module.css";
@@ -20,6 +26,7 @@ export type OblikMount = {
   setScenes: (scenes: OblikSceneEntry[]) => void;
   setLoaders: (loaders: SceneLoaderMap) => void;
   setAnnotations: (annotations: AnnotationBundle) => void;
+  setCollisions: (collisions: DuplicateId[]) => void;
 };
 
 export type OblikMountOpts = {
@@ -27,6 +34,7 @@ export type OblikMountOpts = {
   scenes: OblikSceneEntry[];
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
+  collisions?: DuplicateId[];
 };
 
 function pickSceneId(scenes: OblikSceneEntry[]): string {
@@ -44,6 +52,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   const [scenes, setScenes] = createSignal(opts.scenes);
   const [loaders, setLoaders] = createSignal(opts.loaders);
   const [annotations, setAnnotations] = createSignal(opts.annotations);
+  const [collisions, setCollisions] = createSignal(opts.collisions ?? []);
 
   render(
     () => (
@@ -51,19 +60,21 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
         scenes={scenes()}
         loaders={loaders()}
         annotations={annotations()}
+        collisions={collisions()}
         initialSceneId={initialSceneId}
       />
     ),
     opts.el,
   );
 
-  return { setScenes, setLoaders, setAnnotations };
+  return { setScenes, setLoaders, setAnnotations, setCollisions };
 }
 
 function Host(props: {
   scenes: OblikSceneEntry[];
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
+  collisions: DuplicateId[];
   initialSceneId: string;
 }) {
   const [sceneId, setSceneId] = createSignal(props.initialSceneId);
@@ -150,6 +161,25 @@ function Host(props: {
           <p>{scene().hint}</p>
         </Loading>
       </header>
+      <For each={props.collisions}>
+        {(dup) => (
+          <div class={styles.dupWarn} role="alert">
+            <p>
+              Duplicate id <code class={styles.dupId}>{dup.id}</code> — ids must be unique across the
+              project.
+            </p>
+            <ul class={styles.dupSites}>
+              <For each={dup.sites}>
+                {(s) => (
+                  <li>
+                    {originFileLabel(s.file)}:{s.line}
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        )}
+      </For>
       <div class={styles.stage}>
         <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
           <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
