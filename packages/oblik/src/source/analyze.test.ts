@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 
 import { analyze } from "./analyze";
-import { convergeDraft } from "./converge";
 import { patchLiterals } from "./patch";
 import { stamp } from "./stamp";
 
@@ -46,17 +45,5 @@ describe("patchLiterals", () => {
   test("rewrites dof args for an id", () => {
     const next = patchLiterals(src, "o_bb", [3.1]);
     expect(next).toContain('circle(A, 3.1, "o_bb")');
-  });
-});
-
-describe("convergeDraft", () => {
-  test("drops ids whose source literals match", () => {
-    const draft = new Map([
-      ["o_aa", [0, 0]],
-      ["o_bb", [4]],
-    ]);
-    const next = convergeDraft(draft, analyze(src, "shelf.ts"));
-    expect(next.has("o_aa")).toBe(false);
-    expect(next.get("o_bb")).toEqual([4]);
   });
 });

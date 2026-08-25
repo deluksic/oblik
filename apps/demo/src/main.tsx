@@ -1,7 +1,7 @@
 import { Errored, createMemo, createSignal } from "solid-js";
 import { render } from "@solidjs/web";
 
-import { convergeDraft, evaluate, type Camera2, type Draft } from "oblik";
+import { evaluate, type Annotation, type Camera2, type Draft, type Euclid2Scene } from "oblik";
 import { Euclid2View } from "oblik/euclid2";
 
 import scene from "./scenes/shelf.ts";
@@ -9,23 +9,36 @@ import annotations from "virtual:oblik-annotations?file=apps/demo/src/scenes/she
 
 const FILE = "apps/demo/src/scenes/shelf.ts";
 
+type Session = {
+  setMod: (m: Euclid2Scene) => void;
+  setAnno: (a: Record<string, Annotation>) => void;
+  setDraft: (fn: (d: Draft) => Draft) => void;
+};
+
+const session: { current: Session | null } = { current: null };
+
+if (import.meta.hot) {
+  import.meta.hot.accept("./scenes/shelf.ts", (m) => {
+    const s = session.current;
+    if (!m?.default || !s) return;
+    const next = m.default as Euclid2Scene;
+    // Override stays unless this build actually produces a trace.
+    evaluate(next, { module: FILE });
+    s.setMod(next);
+    s.setDraft(() => new Map());
+  });
+  import.meta.hot.accept("virtual:oblik-annotations?file=apps/demo/src/scenes/shelf.ts", (m) => {
+    if (!m?.default || !session.current) return;
+    session.current.setAnno(m.default);
+  });
+}
+
 function App() {
   const [mod, setMod] = createSignal(scene);
   const [anno, setAnno] = createSignal(annotations);
   const [draft, setDraft] = createSignal<Draft>(new Map());
   const [camera, setCamera] = createSignal<Camera2>(scene.camera ?? { x: 0, y: 0, scale: 48 });
-
-  if (import.meta.hot) {
-    import.meta.hot.accept("./scenes/shelf.ts", (m) => {
-      if (!m?.default) return;
-      setMod(m.default);
-    });
-    import.meta.hot.accept("virtual:oblik-annotations?file=apps/demo/src/scenes/shelf.ts", (m) => {
-      if (!m?.default) return;
-      setAnno(m.default);
-      setDraft((d) => convergeDraft(d, m.default));
-    });
-  }
+  session.current = { setMod, setAnno, setDraft };
 
   const world = createMemo(() =>
     evaluate(mod(), { draft: draft(), annotations: anno(), module: FILE }),
@@ -61,9 +74,7 @@ function App() {
         <h1>{mod().title}</h1>
         <p>{mod().hint}</p>
         <p class="status">
-          {draftIds().length > 0
-            ? `Draft ${draftIds().join(", ")} until the file matches.`
-            : "File matches the view."}
+          {draftIds().length > 0 ? `Override ${draftIds().join(", ")} until the next build.` : "View is the last build."}
         </p>
       </header>
       <div class="stage">
