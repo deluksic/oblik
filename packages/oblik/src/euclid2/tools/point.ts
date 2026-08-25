@@ -63,7 +63,7 @@ export const point: Tool<PointSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as PointSession["focus"] }),
   hit(session, hit, ctx) {
     if (session.focus !== "x" && session.focus !== "y") return hit;
-    return attachLengthHit(hit, ctx, session);
+    return attachLengthHit(hit, ctx, { typed: session.focus === "x" ? session.x : session.y });
   },
   hover(session, hit, trace) {
     if (hit.length && (session.focus === "x" || session.focus === "y")) {

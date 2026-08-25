@@ -61,7 +61,15 @@ export const slider: Tool<SliderSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as SliderSession["focus"] }),
   hit(session, hit, ctx) {
     if (!NUMERIC_FOCUS.has(session.focus)) return hit;
-    return attachLengthHit(hit, ctx, session);
+    const typed =
+      session.focus === "value"
+        ? session.value
+        : session.focus === "min"
+          ? session.min
+          : session.focus === "max"
+            ? session.max
+            : session.step;
+    return attachLengthHit(hit, ctx, { typed });
   },
   click(session, hit, scope) {
     if (hit.length && NUMERIC_FOCUS.has(session.focus)) {

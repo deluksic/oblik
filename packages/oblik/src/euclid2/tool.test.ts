@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, commitTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
+import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -26,6 +26,25 @@ const cc: PlacePoint = {
   k: 1,
   at: { x: 1, y: Math.sqrt(3) },
 };
+
+describe("enrichHit", () => {
+  const ctx = {
+    trace: [],
+    camera: { x: 0, y: 0, scale: 48 },
+    size: { w: 800, h: 600 },
+    screen: { x: 10, y: 10 },
+  };
+
+  test("point hit does not throw when the session has no typed field", () => {
+    const hit = { world: { x: 1, y: 2 }, point: free(1, 2) };
+    expect(enrichHit(startTool("point"), hit, ctx)).toEqual(hit);
+  });
+
+  test("slider hit does not throw when the session has no typed field", () => {
+    const hit = { world: { x: 1, y: 2 }, point: free(1, 2) };
+    expect(enrichHit(startTool("slider"), hit, ctx)).toEqual(hit);
+  });
+});
 
 describe("clickTool", () => {
   test("point click inserts numeric literals", () => {
@@ -566,6 +585,13 @@ describe("clickTool", () => {
 });
 
 describe("ghostOf", () => {
+  test("rubber-bands a free point under the cursor", () => {
+    expect(ghostOf(startTool("point"), { world: { x: 1.2, y: -3 }, point: free(1.2, -3) })).toEqual({
+      kind: "point",
+      at: { x: 1.2, y: -3 },
+    });
+  });
+
   test("rubber-bands a circle after the center", () => {
     const g = ghostOf(
       { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },

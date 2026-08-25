@@ -10,8 +10,8 @@ import type { Field, PlaceCtx, PlaceHit, Scope } from "./types";
 
 export type LengthDraft = { typed: string; lengthPick?: Expr };
 
-export function lengthNegPending(raw: string): boolean {
-  return raw.trim() === "-";
+export function lengthNegPending(raw: string | undefined): boolean {
+  return (raw ?? "").trim() === "-";
 }
 
 export function wrapLengthNeg(expr: Expr, pending: boolean): Expr {
@@ -171,6 +171,10 @@ function lengthPickFromNode(
   return null;
 }
 
+function isDomElement(t: EventTarget | null | undefined): t is Element {
+  return typeof Element !== "undefined" && t instanceof Element;
+}
+
 export function attachLengthHit(
   hit: PlaceHit,
   ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target">,
@@ -178,7 +182,7 @@ export function attachLengthHit(
   accept: readonly LengthPickField[] = [],
 ): PlaceHit {
   if (hit.length) return hit;
-  const pending = lengthNegPending(draft.typed);
+  const pending = lengthNegPending(draft.typed ?? "");
   const scope = scopeFromTrace(ctx.trace);
   if (ctx.screen) {
     const slider = hitSlider(ctx.screen, sliderNodes(ctx.trace));
@@ -190,7 +194,7 @@ export function attachLengthHit(
   }
   let node: TraceNode | undefined;
   const target = ctx.target;
-  if (target instanceof Element) {
+  if (isDomElement(target)) {
     const inkEl = target.closest("[data-ink]");
     const id = inkEl?.getAttribute("data-ink");
     if (id) node = ctx.trace.find((n) => n.id === id && n.occ === 0) ?? ctx.trace.find((n) => n.id === id);
