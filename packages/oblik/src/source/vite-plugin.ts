@@ -13,6 +13,7 @@ import {
 } from "./catalog";
 import { insertCall } from "./insert";
 import { patchLiterals } from "./patch";
+import { resolveSceneFileAbs } from "./scene-path.server";
 import { parseInsert, parseLiteralPatch } from "./schema";
 import { stamp } from "./stamp";
 
@@ -184,7 +185,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             return;
           }
           try {
-            const abs = resolveUnder(workspaceRoot, file);
+            const abs = resolveSceneFileAbs(workspaceRoot, sceneDir, file);
             res.setHeader("Content-Type", "text/plain; charset=utf-8");
             res.end(fs.readFileSync(abs, "utf8"));
           } catch (err) {

@@ -35,6 +35,20 @@ describe("stackForNode", () => {
       { file: "apps/demo/src/scenes/shelf.ts", line: 10, column: 4 },
     ]);
   });
+
+  test("rewrites app-relative stack paths to the module path", () => {
+    const stack = stackForNode({
+      ...node,
+      stack: [
+        { file: "src/scenes/shelf.ts", line: 10, column: 4 },
+        { file: "src/scenes/shelf.ts", line: 12, column: 6, name: "build" },
+      ],
+    });
+    expect(stack).toHaveLength(2);
+    expect(stack.every((f) => f.file === "apps/demo/src/scenes/shelf.ts")).toBe(true);
+    expect(stack[0]).toMatchObject({ line: 10, column: 4 });
+    expect(stack[1]).toMatchObject({ line: 12, column: 6, name: "build" });
+  });
 });
 
 describe("pinConstructorSite", () => {

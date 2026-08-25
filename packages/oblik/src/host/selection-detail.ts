@@ -1,6 +1,7 @@
 import type { CallSite } from "../eval/stack";
 import { isUserSourcePath } from "../eval/stack";
 import type { TraceNode } from "../eval/context";
+import { normalizeSceneRelPath } from "../source/scene-path";
 
 export type OriginCodeLine = {
   kind: "code";
@@ -114,8 +115,12 @@ export function buildOriginFrameLines(text: string, line: number, name?: string)
     : [{ kind: "code", line, text: rows[target] ?? "", current: true }];
 }
 
-export async function peekFile(cache: Map<string, string>, file: string): Promise<string> {
-  const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
+export async function peekFile(
+  cache: Map<string, string>,
+  file: string,
+  module?: string,
+): Promise<string> {
+  const key = normalizeSceneRelPath(file, module);
   const cached = cache.get(key);
   if (cached != null) return cached;
   const res = await fetch(`/__peek?file=${encodeURIComponent(key)}`);
@@ -128,6 +133,7 @@ export async function peekFile(cache: Map<string, string>, file: string): Promis
 export async function originFromStack(
   frames: readonly CallSite[],
   cache: Map<string, string>,
+  module?: string,
 ): Promise<OriginView> {
   if (frames.length === 0) {
     return { kind: "empty", message: "No source location for this object." };
@@ -137,7 +143,7 @@ export async function originFromStack(
   for (const frame of frames) {
     if (!isUserSourcePath(frame.file)) continue;
     try {
-      const text = await peekFile(cache, frame.file);
+      const text = await peekFile(cache, frame.file, module);
       originFrames.push({
         file: fileName(frame.file),
         lines: buildOriginFrameLines(text, frame.line, frame.name),
@@ -162,7 +168,13 @@ export function stackForNode(node: TraceNode): CallSite[] {
     node.at && node.module
       ? { file: node.module, line: node.at.line, column: node.at.column }
       : undefined;
-  const fromStack = node.stack.filter((f) => isUserSourcePath(f.file));
+  const module = node.module?.replace(/^\/+/, "");
+  const fromStack = node.stack
+    .filter((f) => isUserSourcePath(f.file))
+    .map((f) => ({
+      ...f,
+      file: normalizeSceneRelPath(f.file, module),
+    }));
   if (site) return pinConstructorSite(fromStack, site);
   return fromStack;
 }
@@ -190,15 +202,10 @@ export async function selectionDetailForNode(
   node: TraceNode,
   cache: Map<string, string>,
 ): Promise<SelectionDetail> {
-  const stack = pinConstructorSite(
-    stackForNode(node),
-    node.at && node.module
-      ? { file: node.module, line: node.at.line, column: node.at.column }
-      : undefined,
-  );
+  const stack = stackForNode(node);
   return {
     crumb: selectionCrumb(node),
     meta: selectionMeta(node),
-    origin: await originFromStack(stack, cache),
+    origin: await originFromStack(stack, cache, node.module),
   };
 }
