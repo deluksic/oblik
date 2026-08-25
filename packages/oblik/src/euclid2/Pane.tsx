@@ -1,8 +1,11 @@
 import { createMemo, createSignal, onSettled } from "solid-js";
 
 import { evaluate, type Draft } from "../eval/evaluate";
+import type { TraceNode } from "../eval/context";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
+import { EMPTY_INSPECT, inspectForNode, type InspectState } from "../host/inspect";
+import { pickAmong, traceKey } from "./pick";
 import { Palette } from "./Palette";
 import {
   clickTool,
@@ -21,6 +24,7 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
+  onInspect?: (state: InspectState) => void;
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -30,10 +34,34 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(
     () => (props.scene, null),
   );
+  const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
+  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.scene, null));
+  const peekCache = new Map<string, string>();
 
   const world = createMemo(() =>
     evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
   );
+
+  const selectedNode = createMemo(() => {
+    const key = selectedKey();
+    if (!key) return null;
+    return world().trace.find((n) => traceKey(n) === key) ?? null;
+  });
+
+  onSettled(() => {
+    let cancelled = false;
+    const node = selectedNode();
+    if (!node) {
+      props.onInspect?.(EMPTY_INSPECT);
+      return;
+    }
+    void inspectForNode(node, peekCache).then((state) => {
+      if (!cancelled) props.onInspect?.(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   function mergeDraft(id: string, values: number[]) {
     setDraft((d) => {
@@ -78,6 +106,15 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     else setTool(next.session);
   }
 
+  function onPick(hits: TraceNode[]) {
+    if (hits.length === 0) {
+      setSelectedKey(null);
+      return;
+    }
+    const next = pickAmong(hits, selectedKey());
+    if (next) setSelectedKey(traceKey(next));
+  }
+
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing =
@@ -86,6 +123,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         e.preventDefault();
         if (picker()) setPicker(false);
         else if (tool()) setTool(null);
+        else if (selectedKey()) setSelectedKey(null);
         return;
       }
       if (typing) return;
@@ -111,7 +149,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     if (tool()) return "Space is placing. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
-    return "Space inserts. Drag handles write literals.";
+    return "Space inserts. Click to inspect. Drag handles write literals.";
   });
 
   return (
@@ -122,6 +160,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         initialCamera={props.scene.camera}
         placing={tool() != null}
         ghost={ghost()}
+        hoverId={hoverId()}
+        selectedKey={selectedKey()}
+        onHoverId={setHoverId}
+        onPick={onPick}
         onDraft={mergeDraft}
         onCommit={(id, values) => void commit(id, values)}
         onPlace={onPlace}

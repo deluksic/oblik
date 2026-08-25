@@ -13,5 +13,5 @@ export {
   type ToolId,
   type ToolSession,
 } from "./tool";
-export { snapBoundPoint, type SnapPoint } from "./pick";
+export { snapBoundPoint, hitsNear, hitTest, pickAmong, traceKey, traceKeyOf, movedPastClick, PICK_CLICK_PX, type SnapPoint } from "./pick";
 export type { Camera2 } from "./camera";

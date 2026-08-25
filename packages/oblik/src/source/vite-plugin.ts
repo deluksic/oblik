@@ -175,6 +175,24 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           }
           return;
         }
+        if (req.method === "GET" && req.url?.startsWith("/__peek?")) {
+          const url = new URL(req.url, "http://localhost");
+          const file = url.searchParams.get("file");
+          if (!file) {
+            res.statusCode = 400;
+            res.end("missing file");
+            return;
+          }
+          try {
+            const abs = resolveUnder(workspaceRoot, file);
+            res.setHeader("Content-Type", "text/plain; charset=utf-8");
+            res.end(fs.readFileSync(abs, "utf8"));
+          } catch (err) {
+            res.statusCode = 404;
+            res.end(err instanceof Error ? err.message : String(err));
+          }
+          return;
+        }
         next();
       });
     },

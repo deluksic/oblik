@@ -12,7 +12,7 @@ import {
   type Camera2,
   type PaneSize,
 } from "./camera";
-import { snapBoundPoint } from "./pick";
+import { snapBoundPoint, hitsNear, movedPastClick, traceKey } from "./pick";
 import type { Ghost, PlaceHit } from "./tool";
 
 import styles from "./View.module.css";
@@ -24,6 +24,10 @@ export type Euclid2ViewProps = {
   initialCamera?: Camera2;
   placing?: boolean;
   ghost?: Ghost | null;
+  hoverId?: string | null;
+  selectedKey?: string | null;
+  onHoverId?: (id: string | null) => void;
+  onPick?: (hits: TraceNode[]) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
   onPlace?: (hit: PlaceHit) => void;
@@ -54,6 +58,20 @@ type Drag =
       grabDist: number;
     };
 
+type PendingPick = {
+  hits: TraceNode[];
+  x: number;
+  y: number;
+};
+
+function isHot(node: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined): boolean {
+  return hoverId === node.id || traceKey(node) === selectedKey;
+}
+
+function isSelected(node: TraceNode, selectedKey: string | null | undefined): boolean {
+  return traceKey(node) === selectedKey;
+}
+
 function finite(n: TraceNode): boolean {
   const v = n.value;
   if (v.kind === "point") return Number.isFinite(v.x) && Number.isFinite(v.y);
@@ -77,9 +95,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
   });
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
-  const [hover, setHover] = createSignal<string | null>(null);
   const [grabbing, setGrabbing] = createSignal(false);
   let drag: Drag | null = null;
+  let pendingPick: PendingPick | null = null;
 
   onSettled(() => {
     const el = paneRef.current;
@@ -168,12 +186,28 @@ export function Euclid2View(props: Euclid2ViewProps) {
       return;
     }
     drag = { kind: "pan", x: e.clientX, y: e.clientY, camX: camera().x, camY: camera().y };
+    if (!props.placing) {
+      const w = worldOf(e);
+      const hits = hitsNear(props.trace, w, camera(), size());
+      pendingPick = hits.length > 0 ? { hits, x: e.clientX, y: e.clientY } : null;
+    } else {
+      pendingPick = null;
+    }
     setGrabbing(true);
+  }
+
+  function noteHover(e: PointerEvent) {
+    if (props.placing || drag) return;
+    const w = worldOf(e);
+    const hit = hitsNear(props.trace, w, camera(), size())[0];
+    props.onHoverId?.(hit?.id ?? null);
   }
 
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
       props.onCursor?.(worldOf(e));
+    } else {
+      noteHover(e);
     }
     if (!drag) return;
     if (drag.kind === "pan") {
@@ -199,9 +233,17 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function endDrag(e: PointerEvent) {
     const d = drag;
+    const pick = pendingPick;
     drag = null;
+    pendingPick = null;
     setGrabbing(false);
-    if (!d || d.kind === "pan") return;
+    if (d?.kind === "pan") {
+      if (!movedPastClick(d.x, d.y, e.clientX, e.clientY)) {
+        props.onPick?.(pick?.hits ?? []);
+      }
+      return;
+    }
+    if (!d) return;
     const w = worldOf(e);
     if (d.kind === "point") {
       props.onCommit(d.id, [
@@ -232,7 +274,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onPointerLeave={() => {
-        setHover(null);
+        props.onHoverId?.(null);
         props.onCursor?.(null);
       }}
     >
@@ -240,14 +282,30 @@ export function Euclid2View(props: Euclid2ViewProps) {
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
           <For each={ink()}>
-            {(n) => <Stroke node={n} hot={hover() === n.id} camera={camera()} size={size()} />}
+            {(n) => (
+              <Stroke
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+                camera={camera()}
+                size={size()}
+              />
+            )}
           </For>
           {props.ghost ? <GhostMark ghost={props.ghost} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
         <For each={points()}>
-          {(n) => <PointMark node={n} size={size()} camera={camera()} hot={hover() === n.id} />}
+          {(n) => (
+            <PointMark
+              node={n}
+              size={size()}
+              camera={camera()}
+              hot={isHot(n, props.hoverId, props.selectedKey)}
+              selected={isSelected(n, props.selectedKey)}
+            />
+          )}
         </For>
         <For each={handles()}>
           {(n) => (
@@ -255,9 +313,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
               node={n}
               size={size()}
               camera={camera()}
-              hot={hover() === n.id}
-              onEnter={() => setHover(n.id)}
-              onLeave={() => setHover(null)}
+              hot={isHot(n, props.hoverId, props.selectedKey)}
+              selected={isSelected(n, props.selectedKey)}
+              onEnter={() => props.onHoverId?.(n.id)}
+              onLeave={() => props.onHoverId?.(null)}
             />
           )}
         </For>
@@ -270,22 +329,42 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function Stroke(props: { node: TraceNode; hot: boolean; camera: Camera2; size: PaneSize }) {
+function Stroke(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  camera: Camera2;
+  size: PaneSize;
+}) {
   const kind = createMemo(() => props.node.value.kind);
   return (
     <>
-      {kind() === "segment" ? <SegmentStroke node={props.node} hot={props.hot} /> : null}
-      {kind() === "line" || kind() === "offsetLine" ? (
-        <Infinite node={props.node} hot={props.hot} camera={props.camera} size={props.size} />
+      {kind() === "segment" ? (
+        <SegmentStroke node={props.node} hot={props.hot} selected={props.selected} />
       ) : null}
-      {kind() === "circle" ? <CircleStroke node={props.node} hot={props.hot} /> : null}
+      {kind() === "line" || kind() === "offsetLine" ? (
+        <Infinite
+          node={props.node}
+          hot={props.hot}
+          selected={props.selected}
+          camera={props.camera}
+          size={props.size}
+        />
+      ) : null}
+      {kind() === "circle" ? (
+        <CircleStroke node={props.node} hot={props.hot} selected={props.selected} />
+      ) : null}
     </>
   );
 }
 
-function SegmentStroke(props: { node: TraceNode; hot: boolean }) {
+function strokeClass(hot: boolean, selected: boolean) {
+  return [styles.stroke, { [styles.hot]: hot && !selected, [styles.selected]: selected }];
+}
+
+function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const s = () => props.node.value as Segment;
-  const cls = () => [styles.stroke, { [styles.hot]: props.hot }];
+  const cls = () => strokeClass(props.hot, props.selected);
   return (
     <>
       <line class={styles.hit} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
@@ -294,9 +373,9 @@ function SegmentStroke(props: { node: TraceNode; hot: boolean }) {
   );
 }
 
-function CircleStroke(props: { node: TraceNode; hot: boolean }) {
+function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const c = () => props.node.value as Circle;
-  const cls = () => [styles.stroke, { [styles.hot]: props.hot }];
+  const cls = () => strokeClass(props.hot, props.selected);
   return (
     <>
       <circle class={styles.hit} cx={c().center.x} cy={c().center.y} r={c().radius} />
@@ -305,14 +384,20 @@ function CircleStroke(props: { node: TraceNode; hot: boolean }) {
   );
 }
 
-function Infinite(props: { node: TraceNode; hot: boolean; camera: Camera2; size: PaneSize }) {
+function Infinite(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  camera: Camera2;
+  size: PaneSize;
+}) {
   const ends = createMemo(() => {
     const v = props.node.value;
     const origin = v.kind === "offsetLine" ? (v as OffsetLine).line.origin : (v as Line).origin;
     const dir = v.kind === "offsetLine" ? (v as OffsetLine).line.direction : (v as Line).direction;
     return infiniteClip(origin, dir, props.camera, props.size);
   });
-  const cls = () => [styles.stroke, { [styles.hot]: props.hot }];
+  const cls = () => strokeClass(props.hot, props.selected);
   return (
     <>
       <line class={styles.hit} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
@@ -408,16 +493,21 @@ function GhostMark(props: { ghost: Ghost }) {
 const HANDLE_R = 7;
 const POINT_R = 3.5;
 
-function PointMark(props: { node: TraceNode; size: PaneSize; camera: Camera2; hot: boolean }) {
+function PointMark(props: {
+  node: TraceNode;
+  size: PaneSize;
+  camera: Camera2;
+  hot: boolean;
+  selected: boolean;
+}) {
   const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
+  const cls = () => [
+    styles.point,
+    { [styles.hotFill]: props.hot && !props.selected, [styles.selectedFill]: props.selected },
+  ];
   return (
     <>
-      <circle
-        class={[styles.point, { [styles.hotFill]: props.hot }]}
-        cx={pos().x}
-        cy={pos().y}
-        r={POINT_R}
-      />
+      <circle class={cls()} cx={pos().x} cy={pos().y} r={POINT_R} />
       {props.node.bind ? (
         <text class={styles.label} x={pos().x + 10} y={pos().y - 8} font-size="12">
           {props.node.bind}
@@ -432,6 +522,7 @@ function Handle(props: {
   size: PaneSize;
   camera: Camera2;
   hot: boolean;
+  selected: boolean;
   onEnter: () => void;
   onLeave: () => void;
 }) {
@@ -447,7 +538,13 @@ function Handle(props: {
   const kind = () => (props.node.kind === "circle" ? "radius" : "point");
   return (
     <circle
-      class={[styles.handle, { [styles.handleHot]: props.hot }]}
+      class={[
+        styles.handle,
+        {
+          [styles.handleHot]: props.hot && !props.selected,
+          [styles.handleSelected]: props.selected,
+        },
+      ]}
       data-handle={props.node.id}
       data-kind={kind()}
       cx={pos().x}

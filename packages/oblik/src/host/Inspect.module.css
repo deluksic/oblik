@@ -1,0 +1,122 @@
+.inspect {
+  flex: 0 0 17.5rem;
+  min-width: 14rem;
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-left: 1px solid #2a3040;
+  background: #12151d;
+  overflow: auto;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.62rem;
+  color: #9a9488;
+}
+
+.crumb {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ece8de;
+  word-break: break-word;
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9a9488;
+  line-height: 1.35;
+}
+
+.originList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+}
+
+.emptyOrigin {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6f6a60;
+  line-height: 1.4;
+}
+
+.hidden {
+  display: none;
+}
+
+.originBox {
+  border: 1px solid #2a3040;
+  border-radius: 0.35rem;
+  overflow: hidden;
+  background: #0e1016;
+}
+
+.originFile {
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.68rem;
+  color: #e8876a;
+  border-bottom: 1px solid #2a3040;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.quote {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.codeRow,
+.headerRow,
+.gapRow {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.35rem;
+  padding: 0 0.45rem;
+}
+
+.headerRow {
+  color: #7ec8e3;
+  background: #171b26;
+}
+
+.codeRow {
+  color: #c8c3b6;
+}
+
+.current {
+  background: #1f2636;
+}
+
+.current .tx {
+  color: #ece8de;
+}
+
+.ln {
+  text-align: right;
+  color: #5f5a52;
+  user-select: none;
+}
+
+.tx {
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.gapRow .tx {
+  color: #5f5a52;
+}

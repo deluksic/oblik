@@ -74,8 +74,18 @@
   fill: #fff3e6;
 }
 
+.handleSelected {
+  fill: #e8876a;
+  stroke: #fff3e6;
+}
+
 .hot {
   stroke: #7ec8e3;
+}
+
+.selected {
+  stroke: #e8876a;
+  stroke-width: 2.25;
 }
 
 .point {
@@ -86,6 +96,10 @@
 
 .hotFill {
   fill: #7ec8e3;
+}
+
+.selectedFill {
+  fill: #e8876a;
 }
 
 .ghost {
