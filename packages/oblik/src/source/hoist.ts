@@ -1,6 +1,7 @@
 import { printExpr, type Expr } from "./expr";
 
-export const INTERSECTION_CTORS = new Set([
+export const HOIST_CTORS = new Set([
+  "point",
   "lineIntersection",
   "circleLineIntersection",
   "circleCircleIntersection",
@@ -45,34 +46,22 @@ export function takeBind(used: Set<string>, from: string, requested?: string): s
 }
 
 /**
- * Lift nested constructors in `exprs` to named statements.
- * Intersections always hoist. Identical nested `point(...)` calls share one bind
- * so `circle(point(x, y), dist(point(x, y), P))` does not stamp two points.
+ * Lift nested `point` / intersection constructors in `exprs` to named statements.
+ * Identical calls (same printed expr) share one bind so later tools can attach
+ * to the name instead of inlining a second `point(...)`.
  */
 export function hoistIntersections(
   exprs: readonly Expr[],
   used: Set<string>,
 ): { exprs: Expr[]; hoists: HoistedCall[] } {
-  const pointCount = new Map<string, number>();
-  const countPoints = (expr: Expr) => {
-    if (expr.kind !== "call") return;
-    for (const arg of expr.args) countPoints(arg);
-    if (expr.name === "point") {
-      const key = printExpr(expr);
-      pointCount.set(key, (pointCount.get(key) ?? 0) + 1);
-    }
-  };
-  for (const expr of exprs) countPoints(expr);
-
   const seen = new Map<string, string>();
   const hoists: HoistedCall[] = [];
   const rewrite = (expr: Expr): Expr => {
     if (expr.kind !== "call") return expr;
     const args = expr.args.map(rewrite);
     const next: Expr = { kind: "call", name: expr.name, args };
+    if (!HOIST_CTORS.has(next.name)) return next;
     const key = printExpr(next);
-    const hoistPoint = next.name === "point" && (pointCount.get(key) ?? 0) > 1;
-    if (!INTERSECTION_CTORS.has(next.name) && !hoistPoint) return next;
     let bind = seen.get(key);
     if (!bind) {
       bind = takeBind(used, next.name);

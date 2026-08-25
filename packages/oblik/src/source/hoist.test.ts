@@ -46,7 +46,7 @@ describe("hoistIntersections", () => {
     ]);
   });
 
-  test("leaves a single nested free point alone", () => {
+  test("hoists a nested free point so it can be reused", () => {
     const pt: Expr = {
       kind: "call",
       name: "point",
@@ -56,8 +56,8 @@ describe("hoistIntersections", () => {
       ],
     };
     const { exprs, hoists } = hoistIntersections([pt], new Set());
-    expect(hoists).toEqual([]);
-    expect(exprs).toEqual([pt]);
+    expect(hoists).toEqual([{ bind: "p", from: "point", args: pt.args }]);
+    expect(exprs).toEqual([{ kind: "ref", name: "p" }]);
   });
 
   test("dedups identical nested points so dist does not stamp a second one", () => {

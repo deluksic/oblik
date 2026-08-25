@@ -199,7 +199,7 @@ describe("clickTool", () => {
     });
   });
 
-  test("segment second click can nest a free point", () => {
+  test("segment second click hoists a free point on insert", () => {
     const mid = clickTool(startTool("segment"), { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in mid)) throw new Error("expected session");
     const done = clickTool(mid.session, { world: { x: 2, y: 0 }, point: free(2, 0) });

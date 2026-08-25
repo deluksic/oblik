@@ -67,7 +67,7 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, circle \} from "oblik"/);
   });
 
-  test("allocates a bind and nested point Expr", () => {
+  test("hoists a nested free point so later tools can attach to it", () => {
     const next = insertCall(
       src,
       {
@@ -85,9 +85,10 @@ describe("insertCall", () => {
         ],
         id: "o_s",
       },
-      () => "o_s",
+      () => "o_p",
     );
-    expect(next).toContain('const s = segment(A, point(4, 1), "o_s");');
+    expect(next).toContain('const p = point(4, 1, "o_p");');
+    expect(next).toContain('const s = segment(A, p, "o_s");');
   });
 
   test("inserts a parallel line with a numeric offset", () => {
@@ -99,6 +100,31 @@ describe("insertCall", () => {
     });
     expect(next).toContain('const shelf = parallelLine(ground, 1.76, "o_par");');
     expect(next).toMatch(/import \{ point, parallelLine \} from "oblik"/);
+  });
+
+  test("hoists a free circle center before a numeric radius", () => {
+    const next = insertCall(
+      src,
+      {
+        from: "circle",
+        bind: "reach",
+        args: [
+          {
+            kind: "call",
+            name: "point",
+            args: [
+              { kind: "num", value: 1.2 },
+              { kind: "num", value: 3 },
+            ],
+          },
+          { kind: "num", value: 2.5 },
+        ],
+        id: "o_r",
+      },
+      () => "o_p",
+    );
+    expect(next).toContain('const p = point(1.2, 3, "o_p");');
+    expect(next).toContain('const reach = circle(p, 2.5, "o_r");');
   });
 
   test("hoists a free circle center so dist() does not stamp a second point", () => {
