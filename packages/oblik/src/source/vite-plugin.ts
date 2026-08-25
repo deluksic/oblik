@@ -6,6 +6,7 @@ import type { Plugin, ViteDevServer } from "vite";
 
 import { analyze } from "./analyze";
 import {
+  listCatalogFiles,
   scanAnnotationsBundle,
   scanOblikCatalog,
   sceneGlobKeys,
@@ -17,6 +18,7 @@ import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
 import { parseInsert, parseLiteralPatch } from "./schema";
 import { stamp } from "./stamp";
+import { appSrcImportKey, isUserAppSource, listUserAppSources } from "./user-source";
 
 const VIRTUAL_ANN = "virtual:oblik-annotations";
 const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
@@ -88,6 +90,13 @@ function invalidateCatalogConsumers(server: ViteDevServer): void {
   for (const importer of [...catalog.importers]) void server.reloadModule(importer);
 }
 
+function helperImportKeys(appRoot: string, sceneDir: string): string[] {
+  const catalog = new Set(listCatalogFiles(sceneDir).map((abs) => path.resolve(abs)));
+  return listUserAppSources(appRoot)
+    .filter((abs) => !catalog.has(path.resolve(abs)))
+    .map((abs) => appSrcImportKey(appRoot, abs));
+}
+
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
@@ -119,14 +128,16 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   return {
     name: "oblik",
     configureServer(server) {
-      server.watcher.add(sceneDir);
+      server.watcher.add(path.join(appRoot, "src"));
       const onSceneTree = (file: string) => {
-        if (!isSceneTs(sceneDir, file)) return;
+        if (!isUserAppSource(appRoot, file)) return;
         invalidateAnnotationsBundle(server);
-        if (catalogChanged()) {
+        if (isSceneTs(sceneDir, file) && catalogChanged()) {
           invalidateCatalog(server);
           invalidateSceneLoaders(server);
           invalidateCatalogConsumers(server);
+        } else {
+          invalidateSceneLoaders(server);
         }
       };
       server.watcher.on("add", onSceneTree);
@@ -240,7 +251,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         return `export const scenes = ${JSON.stringify(scenes)};\n`;
       }
       if (id === VIRTUAL_ANN_BUNDLE_RESOLVED) {
-        const bundle = scanAnnotationsBundle(sceneDir, workspaceRoot, (src, file) =>
+        const bundle = scanAnnotationsBundle(listUserAppSources(appRoot), workspaceRoot, (src, file) =>
           analyze(src, file),
         );
         return `export const annotationsByPath = ${JSON.stringify(bundle)};\n`;
@@ -258,9 +269,9 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     transform(code, id) {
       const file = id.split("?")[0] ?? id;
       if (isSceneLoadersModule(id)) {
-        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: null };
+        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir), helperImportKeys(appRoot, sceneDir)), map: null };
       }
-      if (!isSceneTs(sceneDir, file)) return null;
+      if (!isUserAppSource(appRoot, file)) return null;
       const { source, added } = stamp(code);
       if (added.length > 0) {
         const abs = path.resolve(file);
@@ -270,24 +281,23 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     },
     handleHotUpdate(ctx) {
       const server = ctx.server;
-      if (isSceneTs(sceneDir, ctx.file)) {
-        invalidateAnnotationsBundle(server);
-        for (const mod of server.moduleGraph.idToModuleMap.values()) {
-          if (mod.id?.startsWith(VIRTUAL_ANN_RESOLVED)) void server.reloadModule(mod);
-        }
-        if (catalogChanged()) {
-          invalidateCatalog(server);
-          invalidateSceneLoaders(server);
-          invalidateCatalogConsumers(server);
-          const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
-          const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
-          const extra = catalog ? [catalog] : [];
-          if (bundle) extra.push(bundle);
-          return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
-        }
-        const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
-        return bundle ? [...ctx.modules, bundle] : ctx.modules;
+      if (!isUserAppSource(appRoot, ctx.file)) return;
+      invalidateAnnotationsBundle(server);
+      for (const mod of server.moduleGraph.idToModuleMap.values()) {
+        if (mod.id?.startsWith(VIRTUAL_ANN_RESOLVED)) void server.reloadModule(mod);
       }
+      const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
+      const extra = bundle ? [bundle] : [];
+      if (isSceneTs(sceneDir, ctx.file) && catalogChanged()) {
+        invalidateCatalog(server);
+        invalidateSceneLoaders(server);
+        invalidateCatalogConsumers(server);
+        const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+        if (catalog) extra.push(catalog);
+      } else if (!isSceneTs(sceneDir, ctx.file)) {
+        invalidateSceneLoaders(server);
+      }
+      return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
     },
   };
 }

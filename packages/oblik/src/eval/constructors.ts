@@ -51,7 +51,7 @@ function traced<T extends Geom>(value: T, id: string | undefined): T {
     bind: anno?.bind,
     editable: anno?.editable === true,
     at: anno ? { line: anno.line, column: anno.column } : undefined,
-    module: ctx.module ?? anno?.file,
+    module: anno?.file ?? ctx.module,
     stack: captureUserStack(),
   };
   ctx.trace.push(node);
@@ -193,7 +193,7 @@ function tracedSlider(n: number, meta: Omit<SliderValue, "kind" | "n">, id: stri
     bind: anno?.bind,
     editable: anno?.editable === true,
     at: anno ? { line: anno.line, column: anno.column } : undefined,
-    module: ctx.module ?? anno?.file,
+    module: anno?.file ?? ctx.module,
     stack: captureUserStack(),
   };
   ctx.trace.push(node);

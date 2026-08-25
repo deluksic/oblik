@@ -20,10 +20,10 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Shelf | `parallelLine`, `-shelf.distance` cellar, lamp glider, `dist` beam, `circleLineIntersection` |
 | Shared loop | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle |
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
-| Mounting plate | AABB from two corners, inset via `.distance`, holes via `.radius` |
+| Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
 | Triangle | three free points |
 
-Still missing vs P5 2D (not migrated): **`vector`** (relative offset widget), **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), constructors in **helpers outside the scene file** (no stamp → invisible), plate **fillets/slots** (`pointOnLine(origin, dir)`), **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.
+Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), plate **fillets/slots**, **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.
 
 The P5 paper app is still here:
 

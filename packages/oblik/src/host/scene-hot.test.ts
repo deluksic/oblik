@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 import type { Scene } from "../eval/scene";
-import { applyHotScenes, registerSceneHot } from "./scene-hot";
+import { applyHotScenes, notifyHelperHot, registerSceneHot } from "./scene-hot";
 
 const SHELF = { kind: "euclid2", title: "Shelf", build: () => ({}) } as Scene;
 const RING = { kind: "euclid2", title: "Ring", build: () => ({}) } as Scene;
@@ -23,6 +23,15 @@ describe("applyHotScenes", () => {
       [undefined, { default: RING }],
     );
     expect(onHot).toHaveBeenCalledWith("./scenes/ring.ts", RING);
+    registerSceneHot(null);
+  });
+
+  test("notifyHelperHot runs the helper callback", async () => {
+    const onHelperHot = vi.fn();
+    registerSceneHot({ onHot: vi.fn(), onHelperHot });
+    notifyHelperHot();
+    await new Promise((r) => queueMicrotask(r));
+    expect(onHelperHot).toHaveBeenCalledTimes(1);
     registerSceneHot(null);
   });
 });

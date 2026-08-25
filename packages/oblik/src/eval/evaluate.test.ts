@@ -141,4 +141,25 @@ describe("evaluate", () => {
       expect(trace[0].value.n).toBe(1.8);
     }
   });
+
+  test("a helper with ids joins the current tape; without ids it does not", () => {
+    function plate() {
+      point(1, 2, "h");
+      point(3, 4);
+    }
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        plate();
+      },
+    });
+    const helper = `const A = point(1, 2, "h");\n`;
+    const { trace } = evaluate(scene, {
+      annotations: analyze(helper, "apps/demo/src/layout/plate.ts"),
+      module: "apps/demo/src/scenes/plate.ts",
+    });
+    expect(trace.map((n) => n.id)).toEqual(["h"]);
+    expect(trace[0]?.module).toBe("apps/demo/src/layout/plate.ts");
+  });
 });

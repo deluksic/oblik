@@ -30,6 +30,7 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
+  helperRev?: number;
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -40,9 +41,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
 
-  const world = createMemo(() =>
-    evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
-  );
+  const world = createMemo(() => {
+    props.helperRev;
+    return evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file });
+  });
   const scope = createMemo(() => scopeFromTrace(world().trace));
 
   const selectedNode = createMemo(() => {
@@ -115,10 +117,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   async function commit(id: string, values: number[]) {
     mergeDraft(id, values);
+    const file = world().trace.find((n) => n.id === id)?.module ?? props.file;
     const res = await fetch("/__oblik-patch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file: props.file, id, target: "literal", values }),
+      body: JSON.stringify({ file, id, target: "literal", values }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;

@@ -86,8 +86,12 @@ export function listSceneFiles(sceneDir: string): string[] {
     .toSorted();
 }
 
+export function listCatalogFiles(sceneDir: string): string[] {
+  return listSceneFiles(sceneDir).filter((abs) => fs.readFileSync(abs, "utf8").includes("defineScene"));
+}
+
 export function scanOblikCatalog(sceneDir: string, workspaceRoot: string): OblikSceneEntry[] {
-  const entries = listSceneFiles(sceneDir).map((abs) => {
+  const entries = listCatalogFiles(sceneDir).map((abs) => {
     const rel = path.relative(workspaceRoot, abs);
     return parseOblikSceneSource(abs, fs.readFileSync(abs, "utf8"), rel);
   });
@@ -105,37 +109,49 @@ export function sceneLoaderKey(file: string): string {
 }
 
 export function sceneGlobKeys(sceneDir: string): string[] {
-  return listSceneFiles(sceneDir).map((abs) => sceneLoaderKey(path.basename(abs)));
+  return listCatalogFiles(sceneDir).map((abs) => sceneLoaderKey(path.basename(abs)));
 }
 
-export function sceneLoadersAcceptTail(keys: string[]): string {
+export function sceneLoadersAcceptTail(keys: string[], helpers: string[] = []): string {
   const lit = JSON.stringify(keys);
-  return `
+  let snip = `
 /* __oblik_scene_hmr */
-import { applyHotScenes } from "oblik/host";
+import { applyHotScenes, notifyHelperHot } from "oblik/host";
 if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });
 `;
+  if (helpers.length > 0) {
+    const helperLit = JSON.stringify(helpers);
+    for (const h of helpers) snip += `import ${JSON.stringify(h)};\n`;
+    snip += `if (import.meta.hot) import.meta.hot.accept(${helperLit}, () => { notifyHelperHot(); });\n`;
+  }
+  return snip;
 }
 
 /** Vite transform output for scene-loaders.ts — rescanned on every transform so new scenes register without restart. */
-export function sceneLoadersModule(keys: string[]): string {
+export function sceneLoadersModule(keys: string[], helpers: string[] = []): string {
   const entries = keys
     .map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)}),`)
     .join("\n");
   return `export const sceneLoaders = {
 ${entries}
 };
-${sceneLoadersAcceptTail(keys)}
+${sceneLoadersAcceptTail(keys, helpers)}
 `;
 }
 
+export function mergeAnnotationBundle<T>(bundle: Record<string, Record<string, T>>): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const file of Object.values(bundle)) Object.assign(out, file);
+  return out;
+}
+
 export function scanAnnotationsBundle(
-  sceneDir: string,
+  files: readonly string[],
   workspaceRoot: string,
   analyze: (source: string, file: string) => Map<string, unknown>,
 ): Record<string, Record<string, unknown>> {
   const out: Record<string, Record<string, unknown>> = {};
-  for (const abs of listSceneFiles(sceneDir)) {
+  for (const abs of files) {
     const rel = path.relative(workspaceRoot, abs).replace(/\\/g, "/");
     const src = fs.readFileSync(abs, "utf8");
     out[rel] = Object.fromEntries(analyze(src, rel));

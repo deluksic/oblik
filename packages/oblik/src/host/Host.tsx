@@ -4,7 +4,7 @@ import { createEffect, Errored, Loading, createMemo, createSignal, onCleanup } f
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import { sceneLoaderKey, type OblikSceneEntry } from "../source/catalog";
+import { sceneLoaderKey, mergeAnnotationBundle, type OblikSceneEntry } from "../source/catalog";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
@@ -70,6 +70,8 @@ function Host(props: {
   const sceneCache = new Map<string, Scene>();
   const [sceneRev, setSceneRev] = createSignal(0);
 
+  const [helperRev, setHelperRev] = createSignal(0);
+
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
   const loaded = createMemo(async () => {
@@ -96,10 +98,7 @@ function Host(props: {
   const scene = createMemo(() => loaded());
   const sceneKind = createMemo(() => scene().kind);
 
-  const anno = createMemo(() => {
-    const path = entry()?.path;
-    return path ? (props.annotations[path] ?? {}) : {};
-  });
+  const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
 
   createEffect(
     () => true,
@@ -108,6 +107,9 @@ function Host(props: {
         onHot(key, scene) {
           sceneCache.set(key, scene);
           setSceneRev((r) => r + 1);
+        },
+        onHelperHot() {
+          setHelperRev((r) => r + 1);
         },
       });
       return () => registerSceneHot(null);
@@ -135,7 +137,12 @@ function Host(props: {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
     return sceneKind() === "euclid2" ? (
-      <Euclid2Pane scene={scene()} file={e.path} annotations={anno()} />
+      <Euclid2Pane
+        scene={scene()}
+        file={e.path}
+        annotations={annotations()}
+        helperRev={helperRev()}
+      />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );
