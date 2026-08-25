@@ -111,6 +111,11 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
       if (!el) return;
       el.focus();
       const onKey = (e: KeyboardEvent) => {
+        if (e.code === "Space" && query().trim() === "") {
+          e.preventDefault();
+          props.onClose();
+          return;
+        }
         if (e.key === "Escape") {
           e.preventDefault();
           props.onClose();
