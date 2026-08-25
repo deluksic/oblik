@@ -1,4 +1,4 @@
-import { Errored, Show, createEffect, createSignal, onSettled } from "solid-js";
+import { Errored, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { render } from "@solidjs/web";
 
 import { evaluate } from "../eval/evaluate";
@@ -152,6 +152,19 @@ function Host(props: {
     setSceneId(id);
   }
 
+  const pane = createMemo(() => {
+    if (loading()) return <p class={styles.muted}>Loading scene…</p>;
+    const err = error();
+    if (err) return <p class={styles.err}>{err}</p>;
+    const scene = mod();
+    if (!scene) return null;
+    return scene.kind === "euclid2" ? (
+      <Euclid2Pane scene={scene} file={file()} annotations={anno()} />
+    ) : (
+      <p class={styles.err}>Unknown scene kind</p>
+    );
+  });
+
   return (
     <div class={styles.shell}>
       <header class={styles.head}>
@@ -163,23 +176,7 @@ function Host(props: {
         <p>{mod()?.hint}</p>
       </header>
       <div class={styles.stage}>
-        <Show when={loading()}>
-          <p class={styles.muted}>Loading scene…</p>
-        </Show>
-        <Show when={!loading() && error()}>
-          <p class={styles.err}>{error()}</p>
-        </Show>
-        <Show when={!loading() && !error() && mod()}>
-          {(scene) => (
-            <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
-              {scene().kind === "euclid2" ? (
-                <Euclid2Pane scene={scene()} file={file()} annotations={anno()} />
-              ) : (
-                <p class={styles.err}>Unknown scene kind</p>
-              )}
-            </Errored>
-          )}
-        </Show>
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>{pane()}</Errored>
       </div>
     </div>
   );
