@@ -20,6 +20,20 @@ body,
   min-height: 0;
 }
 
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
 .head {
   flex: 0 0 auto;
   padding: 0.7rem 1.1rem;

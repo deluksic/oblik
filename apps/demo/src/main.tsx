@@ -66,15 +66,17 @@ function App() {
             : "File matches the view."}
         </p>
       </header>
-      <Errored fallback={(err) => <p class="err">{String(err())}</p>}>
-        <Euclid2View
-          trace={world().trace}
-          camera={camera()}
-          onCamera={setCamera}
-          onDraft={mergeDraft}
-          onCommit={(id, values) => void commit(id, values)}
-        />
-      </Errored>
+      <div class="stage">
+        <Errored fallback={(err) => <p class="err">{String(err())}</p>}>
+          <Euclid2View
+            trace={world().trace}
+            camera={camera()}
+            onCamera={setCamera}
+            onDraft={mergeDraft}
+            onCommit={(id, values) => void commit(id, values)}
+          />
+        </Errored>
+      </div>
     </div>
   );
 }

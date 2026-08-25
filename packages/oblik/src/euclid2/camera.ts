@@ -20,6 +20,18 @@ export function ndcToWorld(ndc: { x: number; y: number }, cam: Camera2, size: Pa
   return { x: cam.x + ndc.x / k, y: cam.y - ndc.y / k };
 }
 
+/** Screen-space gizmos. Y-down pixels; 1 unit = 1 CSS pixel when the HUD viewBox matches the pane. */
+export function worldToScreen(
+  world: { x: number; y: number },
+  cam: Camera2,
+  size: PaneSize,
+): { x: number; y: number } {
+  return {
+    x: size.w / 2 + (world.x - cam.x) * cam.scale,
+    y: size.h / 2 - (world.y - cam.y) * cam.scale,
+  };
+}
+
 export function clientToNdc(
   client: { x: number; y: number },
   rect: DOMRect,

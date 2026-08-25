@@ -8,7 +8,7 @@ import {
   kWorldToNdc,
   ndcToWorld,
   viewBox,
-  worldToNdc,
+  worldToScreen,
   type Camera2,
   type PaneSize,
 } from "./camera";
@@ -56,23 +56,29 @@ function finite(n: TraceNode): boolean {
   return false;
 }
 
+function readPaneSize(el: Element): PaneSize | null {
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return null;
+  return { w: r.width, h: r.height };
+}
+
 export function Euclid2View(props: Euclid2ViewProps) {
-  const svgRef: { current: SVGSVGElement | null } = { current: null };
+  const paneRef: { current: HTMLDivElement | null } = { current: null };
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [hover, setHover] = createSignal<string | null>(null);
   const [grabbing, setGrabbing] = createSignal(false);
   let drag: Drag | null = null;
 
   onSettled(() => {
-    const el = svgRef.current;
+    const el = paneRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      setSize({ w: Math.max(1, r.width), h: Math.max(1, r.height) });
-    });
+    const apply = () => {
+      const next = readPaneSize(el);
+      if (next) setSize(next);
+    };
+    const ro = new ResizeObserver(apply);
     ro.observe(el);
-    const r = el.getBoundingClientRect();
-    setSize({ w: Math.max(1, r.width), h: Math.max(1, r.height) });
+    apply();
     return () => ro.disconnect();
   });
 
@@ -85,7 +91,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   });
 
   function worldOf(e: PointerEvent) {
-    const el = svgRef.current!;
+    const el = paneRef.current!;
     const rect = el.getBoundingClientRect();
     const ndc = clientToNdc({ x: e.clientX, y: e.clientY }, rect, size());
     return ndcToWorld(ndc, props.camera, size());
@@ -101,7 +107,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    const el = svgRef.current;
+    const el = paneRef.current;
     if (!el) return;
     el.setPointerCapture(e.pointerId);
     const t = e.target;
@@ -173,37 +179,28 @@ export function Euclid2View(props: Euclid2ViewProps) {
   const handles = createMemo(() =>
     strokes().filter((n) => n.editable && (n.kind === "point" || n.kind === "circle")),
   );
-  const handleR = createMemo(() => 7 / Math.max(1, size().h / 2));
-
   return (
-    <div class={styles.paper}>
-      <svg
-        ref={(el) => {
-          svgRef.current = el;
-        }}
-        class={[styles.svg, { [styles.grabbing]: grabbing() }]}
-        viewBox={vb()}
-        onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onPointerLeave={() => setHover(null)}
-      >
+    <div
+      ref={(el) => {
+        paneRef.current = el;
+      }}
+      class={[styles.paper, { [styles.grabbing]: grabbing() }]}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onPointerLeave={() => setHover(null)}
+    >
+      <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={props.camera} size={size()} />
           <For each={ink()}>{(n) => <Stroke node={n} hot={hover() === n.id} camera={props.camera} size={size()} />}</For>
         </g>
+      </svg>
+      <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
         <For each={points()}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={props.camera}
-              r={handleR() * 0.45}
-              hot={hover() === n.id}
-            />
-          )}
+          {(n) => <PointMark node={n} size={size()} camera={props.camera} hot={hover() === n.id} />}
         </For>
         <For each={handles()}>
           {(n) => (
@@ -211,7 +208,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
               node={n}
               size={size()}
               camera={props.camera}
-              r={handleR()}
               hot={hover() === n.id}
               onEnter={() => setHover(n.id)}
               onLeave={() => setHover(null)}
@@ -322,24 +318,16 @@ function Grid(props: { camera: Camera2; size: PaneSize }) {
   );
 }
 
-function PointMark(props: { node: TraceNode; size: PaneSize; camera: Camera2; r: number; hot: boolean }) {
-  const pos = createMemo(() => worldToNdc(props.node.value as Point, props.camera, props.size));
+const HANDLE_R = 7;
+const POINT_R = 3.5;
+
+function PointMark(props: { node: TraceNode; size: PaneSize; camera: Camera2; hot: boolean }) {
+  const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
   return (
     <>
-      <circle
-        class={[styles.point, { [styles.hotFill]: props.hot }]}
-        cx={pos().x}
-        cy={pos().y}
-        r={props.r}
-        pointer-events="none"
-      />
+      <circle class={[styles.point, { [styles.hotFill]: props.hot }]} cx={pos().x} cy={pos().y} r={POINT_R} />
       {props.node.bind ? (
-        <text
-          class={styles.label}
-          x={pos().x + props.r * 2.2}
-          y={pos().y - props.r * 1.4}
-          font-size={String(props.r * 2.6)}
-        >
+        <text class={styles.label} x={pos().x + 10} y={pos().y - 8} font-size="12">
           {props.node.bind}
         </text>
       ) : null}
@@ -351,17 +339,16 @@ function Handle(props: {
   node: TraceNode;
   size: PaneSize;
   camera: Camera2;
-  r: number;
   hot: boolean;
   onEnter: () => void;
   onLeave: () => void;
 }) {
   const pos = createMemo(() => {
     const v = props.node.value;
-    if (v.kind === "point") return worldToNdc(v, props.camera, props.size);
+    if (v.kind === "point") return worldToScreen(v, props.camera, props.size);
     if (v.kind === "circle") {
       const c = v as Circle;
-      return worldToNdc({ x: c.center.x + c.radius, y: c.center.y }, props.camera, props.size);
+      return worldToScreen({ x: c.center.x + c.radius, y: c.center.y }, props.camera, props.size);
     }
     return { x: 0, y: 0 };
   });
@@ -373,7 +360,7 @@ function Handle(props: {
       data-kind={kind()}
       cx={pos().x}
       cy={pos().y}
-      r={props.r}
+      r={HANDLE_R}
       onPointerEnter={props.onEnter}
       onPointerLeave={props.onLeave}
     />
