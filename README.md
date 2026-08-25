@@ -26,7 +26,7 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `ap
 - Scene module: `export default defineScene({ kind, title, camera?, build })`.
 - Trailing call arg is the uuid: `circle(A, 2.5, "o_ab12")`.
 - `draft` is an override until the new module’s `build()` has run.
-- Space inserts Point / Circle / Line / Segment. Point snaps to named points and crossings (`lineIntersection` / `circleLineIntersection` / `circleCircleIntersection`). Using a crossing as a point slot inserts that constructor as its own named `const`, then references it. Circle radius can pin `dist()` to a point or crossing.
+- Space inserts Point / Circle / Line / Segment / Parallel line via `Expr` (snap from the tape). Each verb owns click, ghost, preview, Tab fields, and Enter. Pane only routes keys — there is no `session.ts`. Type a number to lock a length or axis; Tab names the bind.
 - Euclid2 camera is a group transform over aspect-correct NDC `viewBox` (y-up via `scale(1,-1)`). Handles move by relative Δ.
 
 P5 paper notes (catalog, Space, layouts): [docs/scenes.md](./docs/scenes.md).

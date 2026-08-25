@@ -1,12 +1,20 @@
 import { asPoint, dist, exprOfPlace, previewCall, round, sameRef } from "./common";
-import type { PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
+import { nameField, parseNum, previewName, typedField, withBind } from "./draft";
+import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
 
 type CircleSession = Extract<ToolSession, { verb: "circle" }>;
 
-function radiusExpr(center: Placed, hit: PlaceHit) {
+const fields: Field<CircleSession>[] = [
+  typedField(() => true),
+  nameField(),
+];
+
+function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit) {
   if (hit.point.kind !== "free" && !sameRef(center.expr, hit.point)) {
     return { kind: "call" as const, name: "dist", args: [center.expr, exprOfPlace(hit.point)] };
   }
+  const typed = parseNum(session.typed);
+  if (typed != null) return { kind: "num" as const, value: round(Math.max(0.05, typed)) };
   const r = Math.max(0.05, dist(hit.point.at, center.at));
   return { kind: "num" as const, value: round(r) };
 }
@@ -17,17 +25,50 @@ export const circle: Tool<CircleSession> = {
     title: "Circle",
     hint: "Center, then radius. A point or crossing pins dist() instead of a literal.",
     prefix: "c",
-    draft: true,
   },
-  start: () => ({ verb: "circle" }),
+  start: () => ({ verb: "circle", focus: "typed", typed: "", name: "" }),
+  fields,
+  focus: (s) => s.focus,
+  setFocus: (s, id) => ({ ...s, focus: id as CircleSession["focus"] }),
   click(session, hit) {
-    if (!session.center) return { session: { verb: "circle", center: asPoint(hit), typed: session.typed } };
-    return { insert: { from: "circle", args: [session.center.expr, radiusExpr(session.center, hit)] } };
+    if (!session.center) {
+      return {
+        session: {
+          ...session,
+          center: asPoint(hit),
+          focus: session.focus === "name" ? "name" : "typed",
+        },
+      };
+    }
+    return {
+      insert: withBind(session, { from: "circle", args: [session.center.expr, radiusExpr(session, session.center, hit)] }),
+    };
+  },
+  commit(session) {
+    if (!session.center) {
+      if (session.focus === "name") return { session };
+      return null;
+    }
+    const typed = parseNum(session.typed);
+    if (typed != null) {
+      return {
+        insert: withBind(session, {
+          from: "circle",
+          args: [session.center.expr, { kind: "num", value: round(Math.max(0.05, typed)) }],
+        }),
+      };
+    }
+    if (session.focus === "name") return { session: { ...session, focus: "typed" } };
+    return null;
   },
   ghost(session, place) {
     if (!session.center) {
       const at = place?.point.at;
       return at ? { kind: "point", at } : null;
+    }
+    const typed = parseNum(session.typed);
+    if (typed != null) {
+      return { kind: "circle", center: session.center.at, radius: Math.max(0.05, typed) };
     }
     if (!place) return { kind: "circle", center: session.center.at, radius: 0.05 };
     return {
@@ -38,33 +79,33 @@ export const circle: Tool<CircleSession> = {
   },
   preview(session, place, usedNames): Preview {
     const spec = circle.spec;
+    const bind = previewName(session, spec.prefix);
     const p = place?.point ?? null;
+    const r = session.typed?.trim() || "radius";
     if (!session.center) {
       if (p && p.kind !== "free") {
         return {
-          line: previewCall("circle", [exprOfPlace(p)], usedNames, ([c]) => `circle(${c}, radius)`),
-          hint: "Click to set the center. A crossing is inserted as its own named point.",
+          line: previewCall("circle", [exprOfPlace(p)], usedNames, ([c]) => `circle(${c}, ${r})`, bind),
+          hint: "Click to set the center. Type a radius, or Tab to name it.",
         };
       }
-      return { line: `const ${spec.prefix} = circle(center, radius)`, hint: spec.hint };
+      return { line: `const ${bind} = circle(center, ${r})`, hint: spec.hint };
     }
-    if (p && p.kind !== "free" && !sameRef(session.center.expr, p)) {
+    if (p && p.kind !== "free" && !sameRef(session.center.expr, p) && parseNum(session.typed) == null) {
       return {
         line: previewCall(
           "circle",
-          [
-            session.center.expr,
-            { kind: "call", name: "dist", args: [session.center.expr, exprOfPlace(p)] },
-          ],
+          [session.center.expr, { kind: "call", name: "dist", args: [session.center.expr, exprOfPlace(p)] }],
           usedNames,
           ([c, d]) => `circle(${c}, ${d})`,
+          bind,
         ),
-        hint: "Click to pin the radius to that distance.",
+        hint: "Click to pin the radius to that distance. Tab to name it.",
       };
     }
     return {
-      line: previewCall("circle", [session.center.expr], usedNames, ([c]) => `circle(${c}, radius)`),
-      hint: "Click the radius, or a point / crossing to pin dist().",
+      line: previewCall("circle", [session.center.expr], usedNames, ([c]) => `circle(${c}, ${r})`, bind),
+      hint: "Type a radius and Enter, click to measure, or click a point for dist(). Tab to name it.",
     };
   },
 };

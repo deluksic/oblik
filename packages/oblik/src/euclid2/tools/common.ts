@@ -77,11 +77,12 @@ export function previewCall(
   args: Expr[],
   usedNames: readonly string[],
   call: (printed: string[]) => string,
+  bind?: string,
 ): string {
   const used = new Set(usedNames);
   const { exprs, hoists } = hoistIntersections(args, used);
-  const bind = takeBind(used, from);
-  return [...hoists.map(printHoist), `const ${bind} = ${call(exprs.map((e) => printExpr(e)))}`].join("\n");
+  const id = bind?.trim() ? bind.trim() : takeBind(used, from);
+  return [...hoists.map(printHoist), `const ${id} = ${call(exprs.map((e) => printExpr(e)))}`].join("\n");
 }
 
 export function hoverBind(trace: readonly { occ: number; bind?: string; id: string }[], bind: string): string | null {

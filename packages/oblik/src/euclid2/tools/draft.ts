@@ -1,0 +1,134 @@
+import type { InsertJob, Field, FieldKind, Draft, Tool, ToolKey, ToolSession, ToolStep } from "./types";
+
+const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function parseNum(raw: string | undefined): number | undefined {
+  const t = raw?.trim() ?? "";
+  if (t === "" || t === "-" || t === "." || t === "-.") return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function identError(raw: string, usedNames: readonly string[] = []): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!IDENT.test(t)) return "Name must be an identifier.";
+  if (usedNames.includes(t)) return `bind ${t} is already used`;
+  return null;
+}
+
+export function namedBind(name: string | undefined): string | undefined {
+  const t = name?.trim() ?? "";
+  return IDENT.test(t) ? t : undefined;
+}
+
+export function withBind(session: { name?: string }, job: InsertJob): InsertJob {
+  const bind = namedBind(session.name);
+  return bind ? { ...job, bind } : job;
+}
+
+export function nameField<S extends { name: string }>(open: (session: S) => boolean = () => true): Field<S> {
+  return {
+    id: "name",
+    kind: "ident",
+    placeholder: "<name>",
+    open,
+    get: (s) => s.name,
+    set: (s, raw) => ({ ...s, name: raw }),
+  };
+}
+
+export function typedField<S extends { typed: string }>(open: (session: S) => boolean): Field<S> {
+  return {
+    id: "typed",
+    kind: "number",
+    placeholder: "<n>",
+    open,
+    get: (s) => s.typed,
+    set: (s, raw) => ({ ...s, typed: raw }),
+  };
+}
+
+export function editValue(value: string, kind: FieldKind, key: string): string | null {
+  if (key === "Backspace") return value.slice(0, -1);
+  if (key === "Delete") return "";
+  if (key.length !== 1) return null;
+  if (kind === "ident") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
+  if (key === "-" && value === "") return "-";
+  if (/[0-9.]/.test(key)) return value + key;
+  return null;
+}
+
+export function openFields<S extends ToolSession>(tool: Tool<S>, session: S): Field<S>[] {
+  return (tool.fields ?? []).filter((f) => f.open(session));
+}
+
+export function focusedField<S extends ToolSession>(tool: Tool<S>, session: S): Field<S> | null {
+  const open = openFields(tool, session);
+  if (open.length === 0) return null;
+  const id = tool.focus?.(session) ?? open[0]!.id;
+  return open.find((f) => f.id === id) ?? open[0]!;
+}
+
+export function focusedDraft<S extends ToolSession>(
+  tool: Tool<S>,
+  session: S,
+  usedNames: readonly string[] = [],
+): Draft | null {
+  const field = focusedField(tool, session);
+  if (!field) return null;
+  const value = field.get(session);
+  const error = field.kind === "ident" ? identError(value, usedNames) : undefined;
+  return {
+    id: field.id,
+    kind: field.kind,
+    value,
+    placeholder: field.placeholder,
+    invalid: error != null,
+    error: error ?? undefined,
+  };
+}
+
+export function tabSession<S extends ToolSession>(tool: Tool<S>, session: S, dir: 1 | -1): S {
+  const open = openFields(tool, session);
+  if (open.length === 0 || !tool.setFocus) return session;
+  const ids = open.map((f) => f.id);
+  const cur = tool.focus?.(session) ?? ids[0]!;
+  const i = Math.max(0, ids.indexOf(cur));
+  return tool.setFocus(session, ids[(i + dir + ids.length) % ids.length]!);
+}
+
+export function typeSession<S extends ToolSession>(tool: Tool<S>, session: S, raw: string): S {
+  const field = focusedField(tool, session);
+  return field ? field.set(session, raw) : session;
+}
+
+export type KeyOutcome = ToolStep | { ignore: true };
+
+export function keySession<S extends ToolSession>(
+  tool: Tool<S>,
+  session: S,
+  e: ToolKey,
+  place: import("./types").PlaceHit | null,
+  usedNames: readonly string[] = [],
+): KeyOutcome {
+  if (e.ctrl || e.meta || e.alt) return { ignore: true };
+  if (e.key === "Tab") return { session: tabSession(tool, session, e.shift ? -1 : 1) };
+  if (e.key === "Enter") {
+    const field = focusedField(tool, session);
+    if (field?.kind === "ident") {
+      const err = identError(field.get(session), usedNames);
+      if (err) return { ignore: true };
+    }
+    return tool.commit?.(session, place) ?? { ignore: true };
+  }
+  const field = focusedField(tool, session);
+  if (!field) return { ignore: true };
+  const next = editValue(field.get(session), field.kind, e.key);
+  if (next == null) return { ignore: true };
+  return { session: field.set(session, next) };
+}
+
+export function previewName(session: { name?: string }, fallback: string): string {
+  return session.name?.trim() || fallback;
+}

@@ -1,12 +1,26 @@
 import type { TraceNode } from "../../eval/context";
+import { focusedDraft, keySession, tabSession, typeSession } from "./draft";
 import { circle } from "./circle";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { point } from "./point";
 import { segment } from "./segment";
-import type { PlaceCtx, PlaceHit, Tool, ToolId, ToolSession } from "./types";
+import type { PlaceCtx, PlaceHit, Tool, ToolId, ToolKey, ToolSession } from "./types";
 
-export type { Ghost, InsertJob, PlaceCtx, PlaceHit, Preview, Tool, ToolId, ToolSession, ToolSpec, ToolStep } from "./types";
+export type {
+  Draft,
+  Ghost,
+  InsertJob,
+  PlaceCtx,
+  PlaceHit,
+  Preview,
+  Tool,
+  ToolId,
+  ToolKey,
+  ToolSession,
+  ToolSpec,
+  ToolStep,
+} from "./types";
 export { exprOfPlace } from "./common";
 
 const byId = {
@@ -51,7 +65,33 @@ export function ghostOf(session: ToolSession, place: PlaceHit | null) {
 }
 
 export function previewOf(session: ToolSession, place: PlaceHit | null = null, usedNames: readonly string[] = []) {
-  return of(session).preview(session as never, place, usedNames);
+  const tool = of(session);
+  const preview = tool.preview(session as never, place, usedNames);
+  const draft = focusedDraft(tool, session as never, usedNames);
+  return draft ? { ...preview, draft } : preview;
+}
+
+export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
+  return tabSession(of(session), session as never, dir);
+}
+
+export function typeTool(session: ToolSession, raw: string): ToolSession {
+  return typeSession(of(session), session as never, raw);
+}
+
+export function keyTool(
+  session: ToolSession,
+  e: ToolKey,
+  place: PlaceHit | null = null,
+  usedNames: readonly string[] = [],
+) {
+  const out = keySession(of(session), session as never, e, place, usedNames);
+  if ("ignore" in out) return undefined;
+  return out;
+}
+
+export function commitTool(session: ToolSession, place: PlaceHit | null = null) {
+  return of(session).commit?.(session as never, place) ?? undefined;
 }
 
 export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): PlaceHit {

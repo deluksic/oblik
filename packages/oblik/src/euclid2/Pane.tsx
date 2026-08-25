@@ -11,11 +11,15 @@ import { Palette } from "./Palette";
 import {
   clickTool,
   ghostOf,
+  keyTool,
   previewOf,
   startTool,
+  tabTool,
+  typeTool,
   type PlaceHit,
   type ToolId,
   type ToolSession,
+  type ToolStep,
 } from "./tool";
 import { Euclid2View } from "./view/View";
 
@@ -26,6 +30,10 @@ export type Euclid2PaneProps = {
   file: string;
   annotations: Record<string, Annotation>;
 };
+
+function usedBinds(trace: readonly { bind?: string }[]): string[] {
+  return trace.map((n) => n.bind).filter((b): b is string => !!b);
+}
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
@@ -51,6 +59,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return selectionDetailForNode(node);
   });
 
+  function applyStep(next: ToolStep | undefined) {
+    if (!next) return;
+    if ("insert" in next) void insert(next.insert);
+    else setTool(next.session);
+  }
+
   createEffect(
     () => 1,
     () => {
@@ -70,7 +84,23 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         if (e.code === "Space" && !tool()) {
           e.preventDefault();
           setPicker((p) => !p);
+          return;
         }
+        const session = tool();
+        if (!session || picker()) return;
+        const next = keyTool(session, {
+          key: e.key,
+          shift: e.shiftKey,
+          ctrl: e.ctrlKey,
+          meta: e.metaKey,
+          alt: e.altKey,
+        }, place(), usedBinds(world().trace));
+        if (next) {
+          e.preventDefault();
+          applyStep(next);
+          return;
+        }
+        if (e.key === "Tab" || e.key === "Enter") e.preventDefault();
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
@@ -98,7 +128,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     }
   }
 
-  async function insert(job: { from: string; args: unknown }) {
+  async function insert(job: { from: string; args: unknown; bind?: string }) {
     const res = await fetch("/__oblik-insert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,13 +164,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const prompt = createMemo(() => {
     const t = tool();
     if (!t) return null;
-    const used = world()
-      .trace.map((n) => n.bind)
-      .filter((b): b is string => !!b);
-    return previewOf(t, place(), used);
+    return previewOf(t, place(), usedBinds(world().trace));
   });
   const status = createMemo(() => {
-    if (tool()) return "Space is placing. Click a crossing to insert an intersection. Escape cancels.";
+    if (tool()) return "Type into the prompt, Tab between fields, Enter to commit. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
     return "Space inserts. Click to inspect. Drag handles write literals.";
@@ -175,6 +202,19 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             setTool(startTool(id));
           }}
           onClosePicker={() => setPicker(false)}
+          onDraft={(raw) => {
+            const session = tool();
+            if (session) setTool(typeTool(session, raw));
+          }}
+          onTab={(dir) => {
+            const session = tool();
+            if (session) setTool(tabTool(session, dir));
+          }}
+          onCommit={() => {
+            const session = tool();
+            if (!session) return;
+            applyStep(keyTool(session, { key: "Enter" }, place(), usedBinds(world().trace)));
+          }}
         />
       </div>
       <Loading fallback={<SelectionSidebar detail={EMPTY_SELECTION_DETAIL} />}>

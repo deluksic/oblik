@@ -41,7 +41,46 @@
   width: 100%;
   max-width: none;
   padding: 0.55rem 0.75rem 0.65rem;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.promptInvalid {
+  border-color: #ff7b7288;
+}
+
+.draft {
+  display: block;
+  width: min(12rem, 100%);
+  margin: 0.4rem 0 0;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--oblik-line);
+  color: var(--oblik-accent);
+  caret-color: var(--oblik-accent);
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.15rem 0 0.2rem;
+  outline: none;
+}
+
+.draft::placeholder {
+  color: var(--oblik-accent);
+  opacity: 0.38;
+  font-weight: 600;
+}
+
+.draftInvalid {
+  color: #ff7b72;
+  caret-color: #ff7b72;
+  border-bottom-color: #ff7b72;
+  text-decoration: underline wavy #ff7b72;
+  text-underline-offset: 0.12em;
+}
+
+.hintError {
+  color: #ff7b72;
 }
 
 .preview {

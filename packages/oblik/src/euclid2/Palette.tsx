@@ -1,13 +1,16 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 
-import { filterTools, type ToolId, type ToolSpec } from "./tool";
+import { filterTools, type Preview, type ToolId, type ToolSpec } from "./tool";
 import styles from "./Palette.module.css";
 
 export type PaletteProps = {
   picker: boolean;
-  prompt: { line: string; hint: string } | null;
+  prompt: Preview | null;
   onPick: (id: ToolId) => void;
   onClosePicker: () => void;
+  onDraft?: (raw: string) => void;
+  onTab?: (dir: 1 | -1) => void;
+  onCommit?: () => void;
 };
 
 export function Palette(props: PaletteProps) {
@@ -19,9 +22,38 @@ export function Palette(props: PaletteProps) {
       <Show when={props.prompt}>
         {(p) => (
           <div class={styles.promptDock}>
-            <div class={styles.prompt}>
+            <div class={[styles.prompt, { [styles.promptInvalid]: p().draft?.invalid === true }]}>
               <p class={styles.preview}>{p().line}</p>
-              <p class={styles.hint}>{p().hint}</p>
+              <Show when={p().draft}>
+                {(d) => (
+                  <input
+                    type="text"
+                    class={[styles.draft, { [styles.draftInvalid]: d().invalid }]}
+                    inputmode={d().kind === "ident" ? "text" : "decimal"}
+                    autocomplete="off"
+                    spellcheck={false}
+                    value={d().value}
+                    placeholder={d().placeholder}
+                    aria-label={d().placeholder}
+                    onInput={(e) => props.onDraft?.(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        props.onTab?.(e.shiftKey ? -1 : 1);
+                        return;
+                      }
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (d().invalid) return;
+                        props.onCommit?.();
+                      }
+                    }}
+                  />
+                )}
+              </Show>
+              <p class={[styles.hint, { [styles.hintError]: p().draft?.invalid === true }]}>
+                {p().draft?.error ?? p().hint}
+              </p>
             </div>
           </div>
         )}
