@@ -431,7 +431,7 @@ function CircleStroke(props: {
   grabbable: boolean;
 }) {
   const c = () => props.node.value as Circle;
-  const cls = () => strokeClass(props.hot, props.selected);
+  const cls = () => circleClass(props.hot, props.selected, props.grabbable);
   const hitCls = () => [styles.hit, { [styles.hitGrab]: props.grabbable }];
   return (
     <>
