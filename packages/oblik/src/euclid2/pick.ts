@@ -102,15 +102,23 @@ export function hitTest(
   return hitsNear(trace, world, camera, size)[0] ?? null;
 }
 
+function occSiblings(hits: readonly TraceNode[], id: string): TraceNode[] {
+  return hits.filter((n) => n.id === id).toSorted((a, b) => a.occ - b.occ);
+}
+
 /**
- * Resolve a click against overlapping hits (already nearest-first).
- * First click takes the nearest; clicking the same stack again walks to the next.
+ * First click takes the nearest hit. Re-click cycles `occ` for that same id
+ * (the same constructor ran more than once) and ignores other overlapping ink.
  */
 export function pickAmong(hits: readonly TraceNode[], priorKey: string | null): TraceNode | null {
   if (hits.length === 0) return null;
-  const idx = priorKey ? hits.findIndex((n) => traceKey(n) === priorKey) : -1;
-  if (idx >= 0) return hits[(idx + 1) % hits.length]!;
-  return hits[0]!;
+  const prior = priorKey ? hits.find((n) => traceKey(n) === priorKey) : undefined;
+  if (!prior) return hits[0]!;
+  const siblings = occSiblings(hits, prior.id);
+  if (siblings.length === 0) return hits[0]!;
+  const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
+  if (idx < 0) return siblings[0]!;
+  return siblings[(idx + 1) % siblings.length]!;
 }
 
 export const PICK_CLICK_PX = 4;

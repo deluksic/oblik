@@ -51,7 +51,7 @@ describe("hitTest", () => {
 });
 
 describe("pickAmong", () => {
-  test("first click takes the nearest; re-click cycles the overlap list", () => {
+  test("re-click cycles occ for the same id", () => {
     const dup0: TraceNode = {
       ...A,
       occ: 0,
@@ -70,5 +70,21 @@ describe("pickAmong", () => {
     expect(traceKey(second!)).toBe("o_a:1");
     const third = pickAmong(hits, traceKey(second!));
     expect(traceKey(third!)).toBe("o_a:0");
+  });
+
+  test("does not cycle onto overlapping geometry with a different id", () => {
+    const s0: TraceNode = { ...SEG, occ: 0 };
+    const s1: TraceNode = {
+      ...SEG,
+      occ: 1,
+      stack: [{ file: "scene.ts", line: 20, column: 4 }],
+    };
+    const hits = hitsNear([s0, s1, A], { x: 0, y: 0 }, camera, size);
+    const first = pickAmong(hits, null);
+    expect(first?.id).toBe("o_a");
+    expect(pickAmong(hits, traceKey(first!))?.id).toBe("o_a");
+    const segs = pickAmong([s0, s1], null);
+    expect(traceKey(segs!)).toBe("o_s:0");
+    expect(traceKey(pickAmong([s0, s1], traceKey(segs!))!)).toBe("o_s:1");
   });
 });
