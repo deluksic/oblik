@@ -3,7 +3,7 @@ import { For, createEffect, createMemo, createSignal } from "solid-js";
 import type { TraceNode } from "../../eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
-import type { Ghost, PlaceHit, ToolSession } from "../tool";
+import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
@@ -131,12 +131,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession);
       props.onCursor?.(hit);
       const session = props.toolSession;
-      if (session?.verb === "parallelLine" && !session.carrier) {
-        const id = hit.carrier
-          ? (props.trace.find((n) => n.bind === hit.carrier!.bind && n.occ === 0)?.id ?? null)
-          : null;
-        props.onHoverId?.(id);
-      }
+      props.onHoverId?.(session ? hoverTool(session, hit, props.trace) : null);
     } else noteHover(e);
     if (!drag) return;
     if (!drag.moved) {

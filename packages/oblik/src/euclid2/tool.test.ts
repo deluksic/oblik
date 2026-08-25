@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, exprOfPlace, ghostOf, previewOf, startTool } from "./tool";
+import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -287,5 +287,11 @@ describe("previewOf", () => {
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");
+  });
+});
+
+describe("filterTools", () => {
+  test("matches parallel line by offset alias", () => {
+    expect(filterTools("offset").map((t) => t.id)).toEqual(["parallelLine"]);
   });
 });

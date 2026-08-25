@@ -3,9 +3,9 @@ import type { Circle, Line, ParallelLine, Point } from "../../geom";
 import { lineBasis, signedDist } from "../../geom/ops";
 import { mul, perp, sub } from "../../geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
-import { hitsNear, movedPastClick, snapLineCarrier } from "../pick";
-import { placeSnapWorld, resolvePlacePoint, type PlacePoint } from "../place";
-import type { ToolSession, PlaceHit } from "../tool";
+import { hitsNear, movedPastClick } from "../pick";
+import { placeSnapWorld, resolvePlacePoint } from "../place";
+import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
 
 export type Drag =
   | {
@@ -158,11 +158,7 @@ export function placeFromEvent(
     }
   }
   const hit: PlaceHit = { world: w, point };
-  if (tool?.verb === "parallelLine" && !tool.carrier) {
-    const carrier = snapLineCarrier(trace, w, camera, size);
-    if (carrier) hit.carrier = carrier;
-  }
-  return hit;
+  return tool ? enrichHit(tool, hit, { trace, camera, size }) : hit;
 }
 
 export function applyDrag(
