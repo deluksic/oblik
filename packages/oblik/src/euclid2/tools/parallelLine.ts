@@ -2,7 +2,7 @@ import type { LineLike } from "../../geom";
 import { signedDist } from "../../geom/ops";
 import { snapLineCarrier } from "../pick";
 import { exprOfPlace, hoverBind, previewCall, round } from "./common";
-import { nameField, parseNum, previewName, typedField, withBind } from "./draft";
+import { inSlot, nameField, parseNum, previewName, typedField, withBind } from "./draft";
 import type { Field, PlaceHit, Preview, Tool, ToolSession } from "./types";
 
 type ParallelSession = Extract<ToolSession, { verb: "parallelLine" }>;
@@ -95,15 +95,16 @@ export const parallelLine: Tool<ParallelSession> = {
     const spec = parallelLine.spec;
     const bind = previewName(session, spec.prefix);
     const p = place?.point ?? null;
+    const name = inSlot(session.focus === "name", bind);
     if (!session.carrier) {
-      const d = session.typed?.trim() || "distance";
+      const d = inSlot(session.focus === "typed", session.typed?.trim() || "distance");
       if (place?.carrier) {
         return {
-          line: `const ${bind} = parallelLine(${place.carrier.bind}, ${d})`,
+          line: `const ${name} = parallelLine(${place.carrier.bind}, ${d})`,
           hint: `Click ${place.carrier.bind} to select the carrier. Type a distance, or Tab to name it.`,
         };
       }
-      return { line: `const ${bind} = parallelLine(carrier, ${d})`, hint: spec.hint };
+      return { line: `const ${name} = parallelLine(carrier, ${d})`, hint: spec.hint };
     }
     if (p && p.kind !== "free" && parseNum(session.typed) == null) {
       return {
@@ -112,19 +113,19 @@ export const parallelLine: Tool<ParallelSession> = {
           [session.carrier.expr, exprOfPlace(p)],
           usedNames,
           ([g, q]) => `parallelLine(${g}, signedDist(${q}, ${g}))`,
-          bind,
+          name,
         ),
         hint: "Click a point to pin signedDist(), or type a distance. Tab to name it.",
       };
     }
-    const d = session.typed?.trim() || (place ? String(round(distAt(place, session.carrier.geom))) : "distance");
+    const shown = session.typed?.trim() || (place ? String(round(distAt(place, session.carrier.geom))) : "distance");
     return {
       line: previewCall(
         "parallelLine",
         [session.carrier.expr, ...(parseNum(session.typed) != null ? [{ kind: "num" as const, value: parseNum(session.typed)! }] : [])],
         usedNames,
-        ([g, n]) => `parallelLine(${g}, ${n ?? d})`,
-        bind,
+        ([g, n]) => `parallelLine(${g}, ${inSlot(session.focus === "typed", n ?? shown)})`,
+        name,
       ),
       hint: "Type a distance and Enter, or click to measure. Tab to name it.",
     };

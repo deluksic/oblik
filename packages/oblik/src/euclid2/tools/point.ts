@@ -2,7 +2,7 @@ import { printExpr } from "../../source/expr";
 import { hoistIntersections, printHoist } from "../../source/hoist";
 import { isCrossing } from "../place";
 import { exprOfPlace, intersectionInsert, round } from "./common";
-import { nameField, parseNum, previewName, withBind } from "./draft";
+import { inSlot, nameField, parseNum, previewName, withBind } from "./draft";
 import type { Field, Preview, Tool, ToolSession } from "./types";
 
 type PointSession = Extract<ToolSession, { verb: "point" }>;
@@ -90,12 +90,17 @@ export const point: Tool<PointSession> = {
       const used = new Set(usedNames);
       const { hoists } = hoistIntersections([exprOfPlace(p)], used);
       const line = hoists.map(printHoist).join("\n") || `const ${bind} = ${printExpr(exprOfPlace(p))}`;
-      return { line, hint: "Click to insert the crossing. Tab to name it." };
+      return {
+        line: line.replace(/const (\S+) = ([^\n]*)$/, (_m, id: string, call: string) =>
+          `const ${inSlot(session.focus === "name", previewName(session, id))} = ${call}`,
+        ),
+        hint: "Click to insert the crossing. Tab to name it.",
+      };
     }
     const x = session.x.trim() || "x";
     const y = session.y.trim() || "y";
     return {
-      line: `const ${bind} = point(${x}, ${y})`,
+      line: `const ${inSlot(session.focus === "name", bind)} = point(${inSlot(session.focus === "x", x)}, ${inSlot(session.focus === "y", y)})`,
       hint: "Click to place. Type an x or y to lock that axis; Tab for name. Enter if both are typed.",
     };
   },

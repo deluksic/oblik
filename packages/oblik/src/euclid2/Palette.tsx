@@ -19,45 +19,79 @@ export function Palette(props: PaletteProps) {
       <Show when={props.picker}>
         <Picker onPick={props.onPick} onClose={props.onClosePicker} />
       </Show>
-      <Show when={props.prompt}>
-        {(p) => (
-          <div class={styles.promptDock}>
-            <div class={[styles.prompt, { [styles.promptInvalid]: p().draft?.invalid === true }]}>
-              <p class={styles.preview}>{p().line}</p>
-              <Show when={p().draft}>
-                {(d) => (
-                  <input
-                    type="text"
-                    class={[styles.draft, { [styles.draftInvalid]: d().invalid }]}
-                    inputmode={d().kind === "ident" ? "text" : "decimal"}
-                    autocomplete="off"
-                    spellcheck={false}
-                    value={d().value}
-                    placeholder={d().placeholder}
-                    aria-label={d().placeholder}
-                    onInput={(e) => props.onDraft?.(e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-                        props.onTab?.(e.shiftKey ? -1 : 1);
-                        return;
-                      }
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (d().invalid) return;
-                        props.onCommit?.();
-                      }
-                    }}
-                  />
-                )}
-              </Show>
-              <p class={[styles.hint, { [styles.hintError]: p().draft?.invalid === true }]}>
-                {p().draft?.error ?? p().hint}
-              </p>
-            </div>
-          </div>
-        )}
-      </Show>
+      <Show when={props.prompt}>{(p) => <Prompt preview={p()} onDraft={props.onDraft} onTab={props.onTab} onCommit={props.onCommit} />}</Show>
+    </div>
+  );
+}
+
+function Prompt(props: {
+  preview: Preview;
+  onDraft?: (raw: string) => void;
+  onTab?: (dir: 1 | -1) => void;
+  onCommit?: () => void;
+}) {
+  const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
+
+  createEffect(
+    () => [inputEl(), props.preview.draft?.id ?? ""] as const,
+    ([el, id]) => {
+      if (!el || !id) return;
+      queueMicrotask(() => {
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
+    },
+  );
+
+  const slotWidth = () => {
+    const d = props.preview.draft;
+    const token = props.preview.token ?? d?.placeholder ?? "";
+    const text = d?.value || token;
+    return `${Math.max(text.length, 1) + 1}ch`;
+  };
+
+  return (
+    <div class={styles.promptDock}>
+      <div class={[styles.prompt, { [styles.promptInvalid]: props.preview.draft?.invalid === true }]}>
+        <Show
+          when={props.preview.draft && props.preview.before != null}
+          fallback={<p class={styles.preview}>{props.preview.line}</p>}
+        >
+          <p class={[styles.preview, styles.hasSlot]}>
+            <span class={styles.dim}>{props.preview.before}</span>
+            <input
+              ref={setInputEl}
+              type="text"
+              class={[styles.slot, { [styles.slotInvalid]: props.preview.draft?.invalid === true }]}
+              style={{ width: slotWidth() }}
+              inputmode={props.preview.draft?.kind === "ident" ? "text" : "decimal"}
+              autocomplete="off"
+              spellcheck={false}
+              value={props.preview.draft?.value ?? ""}
+              placeholder={props.preview.token ?? props.preview.draft?.placeholder ?? ""}
+              aria-label={props.preview.draft?.placeholder}
+              onInput={(e) => props.onDraft?.(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab") {
+                  e.preventDefault();
+                  props.onTab?.(e.shiftKey ? -1 : 1);
+                  return;
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (props.preview.draft?.invalid) return;
+                  props.onCommit?.();
+                }
+              }}
+            />
+            <span class={styles.dim}>{props.preview.after}</span>
+          </p>
+        </Show>
+        <p class={[styles.hint, { [styles.hintError]: props.preview.draft?.invalid === true }]}>
+          {props.preview.draft?.error ?? props.preview.hint}
+        </p>
+      </div>
     </div>
   );
 }

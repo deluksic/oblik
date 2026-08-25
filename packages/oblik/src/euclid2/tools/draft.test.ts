@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 import { clickTool, keyTool, startTool, tabTool } from "../tool";
+import { inSlot, splitSlot, unmarkSlot } from "./draft";
 import type { PlaceHit, ToolSession, ToolStep } from "./types";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -206,6 +207,14 @@ describe("keyTool", () => {
 
   test("ignores modifier chords", () => {
     expect(keyTool(startTool("point"), { key: "a", ctrl: true })).toBeUndefined();
+  });
+});
+
+describe("inSlot", () => {
+  test("marks one focused token and splits it back out", () => {
+    const line = `const ${inSlot(true, "p")} = point(${inSlot(false, "x")}, y)`;
+    expect(unmarkSlot(line)).toBe("const p = point(x, y)");
+    expect(splitSlot(line)).toEqual({ before: "const ", token: "p", after: " = point(x, y)" });
   });
 });
 

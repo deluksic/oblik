@@ -1,5 +1,5 @@
 import { asPoint, dist, exprOfPlace, previewCall, round, sameRef } from "./common";
-import { nameField, parseNum, previewName, typedField, withBind } from "./draft";
+import { inSlot, nameField, parseNum, previewName, typedField, withBind } from "./draft";
 import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
 
 type CircleSession = Extract<ToolSession, { verb: "circle" }>;
@@ -82,14 +82,16 @@ export const circle: Tool<CircleSession> = {
     const bind = previewName(session, spec.prefix);
     const p = place?.point ?? null;
     const r = session.typed?.trim() || "radius";
+    const name = inSlot(session.focus === "name", bind);
+    const radius = inSlot(session.focus === "typed", r);
     if (!session.center) {
       if (p && p.kind !== "free") {
         return {
-          line: previewCall("circle", [exprOfPlace(p)], usedNames, ([c]) => `circle(${c}, ${r})`, bind),
+          line: previewCall("circle", [exprOfPlace(p)], usedNames, ([c]) => `circle(${c}, ${radius})`, name),
           hint: "Click to set the center. Type a radius, or Tab to name it.",
         };
       }
-      return { line: `const ${bind} = circle(center, ${r})`, hint: spec.hint };
+      return { line: `const ${name} = circle(center, ${radius})`, hint: spec.hint };
     }
     if (p && p.kind !== "free" && !sameRef(session.center.expr, p) && parseNum(session.typed) == null) {
       return {
@@ -98,13 +100,13 @@ export const circle: Tool<CircleSession> = {
           [session.center.expr, { kind: "call", name: "dist", args: [session.center.expr, exprOfPlace(p)] }],
           usedNames,
           ([c, d]) => `circle(${c}, ${d})`,
-          bind,
+          name,
         ),
         hint: "Click to pin the radius to that distance. Tab to name it.",
       };
     }
     return {
-      line: previewCall("circle", [session.center.expr], usedNames, ([c]) => `circle(${c}, ${r})`, bind),
+      line: previewCall("circle", [session.center.expr], usedNames, ([c]) => `circle(${c}, ${radius})`, name),
       hint: "Type a radius and Enter, click to measure, or click a point for dist(). Tab to name it.",
     };
   },

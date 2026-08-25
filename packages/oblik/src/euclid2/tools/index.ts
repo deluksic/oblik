@@ -1,5 +1,5 @@
 import type { TraceNode } from "../../eval/context";
-import { focusedDraft, keySession, tabSession, typeSession } from "./draft";
+import { focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
 import { circle } from "./circle";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
@@ -66,9 +66,7 @@ export function ghostOf(session: ToolSession, place: PlaceHit | null) {
 
 export function previewOf(session: ToolSession, place: PlaceHit | null = null, usedNames: readonly string[] = []) {
   const tool = of(session);
-  const preview = tool.preview(session as never, place, usedNames);
-  const draft = focusedDraft(tool, session as never, usedNames);
-  return draft ? { ...preview, draft } : preview;
+  return withSlot(tool.preview(session as never, place, usedNames), focusedDraft(tool, session as never, usedNames));
 }
 
 export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {

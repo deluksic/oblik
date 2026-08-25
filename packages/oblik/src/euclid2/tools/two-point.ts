@@ -1,5 +1,5 @@
 import { asPoint, exprOfPlace, previewCall } from "./common";
-import { nameField, previewName, withBind } from "./draft";
+import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Preview, Tool, ToolSession } from "./types";
 
 type TwoPointId = "line" | "segment";
@@ -27,7 +27,7 @@ export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPoi
       return { kind: spec.id, a: session.a.at, b: cursor };
     },
     preview(session, place, usedNames): Preview {
-      const bind = previewName(session, spec.prefix);
+      const bind = inSlot(true, previewName(session, spec.prefix));
       const p = place?.point ?? null;
       if (!session.a) {
         if (p && p.kind !== "free") {

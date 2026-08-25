@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool } from "./tool";
+import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -317,6 +317,17 @@ describe("previewOf", () => {
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");
+  });
+  test("exposes the focused token so the prompt can caret into the source", () => {
+    const x = previewOf(startTool("point"));
+    expect(x.line).toBe("const p = point(x, y)");
+    expect(x.before).toBe("const p = point(");
+    expect(x.token).toBe("x");
+    expect(x.after).toBe(", y)");
+    const name = previewOf(tabTool(tabTool(startTool("point"))));
+    expect(name.before).toBe("const ");
+    expect(name.token).toBe("p");
+    expect(name.after).toBe(" = point(x, y)");
   });
 });
 

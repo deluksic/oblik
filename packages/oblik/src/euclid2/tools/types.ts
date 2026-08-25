@@ -77,7 +77,15 @@ export type InsertJob = {
 
 export type ToolStep = { session: ToolSession } | { insert: InsertJob };
 
-export type Preview = { line: string; hint: string; draft?: Draft };
+export type Preview = {
+  line: string;
+  hint: string;
+  draft?: Draft;
+  /** Source around the focused field; the caret lives between these. */
+  before?: string;
+  after?: string;
+  token?: string;
+};
 
 export type ToolKey = { key: string; shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean };
 

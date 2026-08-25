@@ -132,3 +132,38 @@ export function keySession<S extends ToolSession>(
 export function previewName(session: { name?: string }, fallback: string): string {
   return session.name?.trim() || fallback;
 }
+
+const SLOT_OPEN = "\u0001";
+const SLOT_CLOSE = "\u0002";
+
+/** Wrap the focused token so the prompt can put the caret in the source line. */
+export function inSlot(active: boolean, text: string): string {
+  return active ? `${SLOT_OPEN}${text}${SLOT_CLOSE}` : text;
+}
+
+export function unmarkSlot(line: string): string {
+  return line.replaceAll(SLOT_OPEN, "").replaceAll(SLOT_CLOSE, "");
+}
+
+export type SlotParts = { before: string; token: string; after: string };
+
+export function splitSlot(line: string): SlotParts | null {
+  const i = line.indexOf(SLOT_OPEN);
+  const j = line.indexOf(SLOT_CLOSE);
+  if (i < 0 || j < 0 || j < i) return null;
+  return {
+    before: unmarkSlot(line.slice(0, i)),
+    token: line.slice(i + SLOT_OPEN.length, j),
+    after: unmarkSlot(line.slice(j + SLOT_CLOSE.length)),
+  };
+}
+
+export function withSlot(preview: { line: string; hint: string }, draft: Draft | null) {
+  const parts = splitSlot(preview.line);
+  return {
+    line: unmarkSlot(preview.line),
+    hint: preview.hint,
+    ...(draft ? { draft } : {}),
+    ...(parts ? { before: parts.before, after: parts.after, token: parts.token } : {}),
+  };
+}
