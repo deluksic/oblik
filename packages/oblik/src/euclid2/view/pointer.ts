@@ -1,5 +1,6 @@
 import type { TraceNode } from "../../eval/context";
-import type { Circle, Line, ParallelLine, Point } from "../../geom";
+import type { Circle, Glider, LineLike, ParallelLine, Point, Segment } from "../../geom";
+import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "../../geom/gliders";
 import { lineBasis, signedDist } from "../../geom/ops";
 import { mul, perp, sub } from "../../geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
@@ -56,6 +57,39 @@ export type Drag =
       id: string;
       node: TraceNode;
       startN: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "gliderSegment";
+      id: string;
+      node: TraceNode;
+      seg: Segment;
+      startT: number;
+      grabT: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "gliderLine";
+      id: string;
+      node: TraceNode;
+      geom: LineLike;
+      startS: number;
+      grabS: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "gliderCircle";
+      id: string;
+      node: TraceNode;
+      circle: Circle;
+      startUx: number;
+      startUy: number;
       downX: number;
       downY: number;
       moved: boolean;
@@ -133,6 +167,52 @@ export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: Po
   };
 }
 
+export function gliderDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag | null {
+  const g = node.value as Glider;
+  if (g.kind === "gliderSegment") {
+    return {
+      kind: "gliderSegment",
+      id: node.id,
+      node,
+      seg: { kind: "segment", a: g.a, b: g.b },
+      startT: g.t,
+      grabT: segmentTAt({ kind: "segment", a: g.a, b: g.b }, w),
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    };
+  }
+  if (g.kind === "gliderLine") {
+    const geom: LineLike = { kind: "line", origin: g.origin, direction: g.direction };
+    return {
+      kind: "gliderLine",
+      id: node.id,
+      node,
+      geom,
+      startS: g.s,
+      grabS: lineSAt(geom, w),
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    };
+  }
+  if (g.kind === "gliderCircle") {
+    const circle: Circle = { kind: "circle", center: g.center, radius: g.radius };
+    return {
+      kind: "gliderCircle",
+      id: node.id,
+      node,
+      circle,
+      startUx: g.ux,
+      startUy: g.uy,
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    };
+  }
+  return null;
+}
+
 export function sliderDrag(node: TraceNode, e: PointerEvent): Drag {
   const g = node.value;
   const startN = g.kind === "slider" ? g.n : 0;
@@ -172,12 +252,13 @@ export function placeFromEvent(
   if (t instanceof Element && t.hasAttribute("data-handle")) {
     const id = t.getAttribute("data-handle")!;
     const found = trace.find((n) => n.id === id && n.occ === 0) ?? trace.find((n) => n.id === id);
-    if (found?.bind && found.value.kind === "point") {
+    if (found?.bind && (found.value.kind === "point" || isGlider(found.value))) {
+      const at = found.value.kind === "point" ? found.value : gliderAt(found.value);
       point = {
         kind: "ref",
         bind: found.bind,
         id: found.id,
-        at: { x: found.value.x, y: found.value.y },
+        at: { x: at.x, y: at.y },
       };
     }
   }
@@ -241,6 +322,18 @@ export function applyDrag(
     const screenX = e.clientX - rect.left;
     const n = sliderValueFromPointer(drag.node, screenX, sliderNodes(trace));
     return { draft: { id: drag.id, values: [round(n)] } };
+  }
+  if (drag.kind === "gliderSegment") {
+    const t = segmentTAt(drag.seg, w);
+    return { draft: { id: drag.id, values: [round(clamp01(drag.startT + (t - drag.grabT)))] } };
+  }
+  if (drag.kind === "gliderLine") {
+    const s = lineSAt(drag.geom, w);
+    return { draft: { id: drag.id, values: [round(drag.startS + (s - drag.grabS))] } };
+  }
+  if (drag.kind === "gliderCircle") {
+    const { ux, uy } = circleUnitAt(drag.circle, w);
+    return { draft: { id: drag.id, values: [round(ux), round(uy)] } };
   }
   const now = Math.hypot(w.x - drag.origin.x, w.y - drag.origin.y);
   return { draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] } };

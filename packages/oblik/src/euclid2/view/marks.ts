@@ -1,4 +1,5 @@
 import type { TraceNode } from "../../eval/context";
+import { isGlider } from "../../geom/gliders";
 import { traceKey } from "../pick";
 
 export function isHot(node: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined): boolean {
@@ -12,7 +13,10 @@ export function isSelected(node: TraceNode, selectedKey: string | null | undefin
 export function isGrabbable(node: TraceNode | null | undefined): boolean {
   return (
     !!node?.editable &&
-    (node.kind === "point" || node.kind === "circle" || node.kind === "parallelLine")
+    (node.kind === "point" ||
+      node.kind === "circle" ||
+      node.kind === "parallelLine" ||
+      isGlider(node.value))
   );
 }
 

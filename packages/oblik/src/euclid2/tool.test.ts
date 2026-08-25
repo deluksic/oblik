@@ -231,6 +231,7 @@ describe("clickTool", () => {
       used: ["ground", "reach"],
       points: {},
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      circles: {},
       lengths: { reach: 1.25 },
     };
     expect(
@@ -250,6 +251,7 @@ describe("clickTool", () => {
       used: ["A", "reach"],
       points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       carriers: {},
+      circles: {},
       lengths: { reach: 2.5 },
     };
     expect(
@@ -261,6 +263,25 @@ describe("clickTool", () => {
           { kind: "ref", name: "A" },
           { kind: "ref", name: "reach" },
         ],
+      },
+    });
+  });
+
+  test("glider on a segment inserts pointOnSegment", () => {
+    const span = { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 4, y: 0 } };
+    const mid = clickTool(startTool("glider"), {
+      world: { x: 2, y: 0 },
+      point: free(2, 0),
+      carrier: { bind: "span", geom: span },
+    });
+    if (!("session" in mid) || mid.session.verb !== "glider" || !mid.session.carrier) {
+      throw new Error("expected glider carrier session");
+    }
+    const done = clickTool(mid.session, { world: { x: 3, y: 0 }, point: free(3, 0) });
+    expect(done).toEqual({
+      insert: {
+        from: "pointOnSegment",
+        args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.75 }],
       },
     });
   });
@@ -301,6 +322,7 @@ describe("clickTool", () => {
       used: ["ground", "P"],
       points: { P: { expr: { kind: "ref", name: "P" }, at: { x: 0, y: 2 } } },
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      circles: {},
       lengths: {},
     };
     const mid = clickTool(startTool("perpendicularLine"), {
@@ -332,7 +354,7 @@ describe("ghostOf", () => {
     const g = ghostOf(
       { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 2.5 } },
-      { used: ["A", "reach"], points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, carriers: {}, lengths: { reach: 2.5 } },
+      { used: ["A", "reach"], points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, carriers: {}, circles: {}, lengths: { reach: 2.5 } },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 });
   });
@@ -359,7 +381,7 @@ describe("ghostOf", () => {
     const g = ghostOf(
       { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 1.25 } },
-      { used: ["ground", "reach"], points: {}, carriers: {}, lengths: { reach: 1.25 } },
+      { used: ["ground", "reach"], points: {}, carriers: {}, circles: {}, lengths: { reach: 1.25 } },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.25 });
   });
@@ -485,6 +507,10 @@ describe("filterTools", () => {
 
   test("matches perpendicular line by alias", () => {
     expect(filterTools("perpendicular").map((t) => t.id)).toEqual(["perpendicularLine"]);
+  });
+
+  test("matches glider by alias", () => {
+    expect(filterTools("pointOn").map((t) => t.id)).toEqual(["glider"]);
   });
 
   test("matches slider by name", () => {

@@ -4,6 +4,7 @@ import type { TraceNode } from "../../eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
+import { isGlider } from "../../geom/gliders";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
@@ -19,6 +20,7 @@ import {
   parallelDrag,
   pointDrag,
   radiusDrag,
+  gliderDrag,
   sliderDrag,
   topHit,
   worldOf,
@@ -115,6 +117,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
       drag = pointDrag(hit, w, e);
       return;
     }
+    if (hit && isGrabbable(hit) && isGlider(hit.value)) {
+      const g = gliderDrag(hit, w, e);
+      if (g) {
+        drag = g;
+        return;
+      }
+    }
     if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
       drag = radiusDrag(hit, w, e);
       return;
@@ -184,9 +193,11 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
-  const ink = createMemo(() => strokes().filter((n) => n.kind !== "point"));
-  const points = createMemo(() => strokes().filter((n) => n.kind === "point"));
-  const handles = createMemo(() => strokes().filter((n) => n.editable && n.kind === "point"));
+  const ink = createMemo(() => strokes().filter((n) => n.kind !== "point" && !isGlider(n.value)));
+  const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
+  const handles = createMemo(() =>
+    strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+  );
   const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
 

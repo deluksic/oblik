@@ -45,8 +45,10 @@ export function fieldError<S extends ToolSession>(field: Field<S>, session: S, s
   if (field.kind === "length") return lengthError(raw, Object.keys(scope.lengths));
   if (field.kind === "number") return numError(raw);
   if (field.kind === "ident") return identError(raw, scope.used);
-  const names = field.looks === "carrier" ? Object.keys(scope.carriers) : Object.keys(scope.points);
-  const label = field.looks === "carrier" ? "line" : "point";
+  const names = field.looks === "carrier"
+    ? [...Object.keys(scope.carriers), ...Object.keys(scope.circles ?? {})]
+    : Object.keys(scope.points);
+  const label = field.looks === "carrier" ? "geometry" : "point";
   return refError(raw, names, label);
 }
 

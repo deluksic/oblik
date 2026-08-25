@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
+import { gliderAt, isGlider } from "../../geom/gliders";
 import type { Point } from "../../geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
@@ -18,7 +19,11 @@ export function PointMark(props: {
   hot: boolean;
   selected: boolean;
 }) {
-  const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
+  const pos = createMemo(() => {
+    const v = props.node.value;
+    const at = v.kind === "point" ? (v as Point) : isGlider(v) ? gliderAt(v) : { x: 0, y: 0 };
+    return worldToScreen(at, props.camera, props.size);
+  });
   return (
     <>
       <circle
@@ -46,7 +51,11 @@ export function Handle(props: {
   hot: boolean;
   selected: boolean;
 }) {
-  const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
+  const pos = createMemo(() => {
+    const v = props.node.value;
+    const at = v.kind === "point" ? (v as Point) : isGlider(v) ? gliderAt(v) : { x: 0, y: 0 };
+    return worldToScreen(at, props.camera, props.size);
+  });
   return (
     <circle
       class={[

@@ -113,6 +113,17 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, perpendicularLine \} from "oblik"/);
   });
 
+  test("inserts a glider on a segment", () => {
+    const next = insertCall(src, {
+      from: "pointOnSegment",
+      bind: "mid",
+      args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.5 }],
+      id: "o_g",
+    });
+    expect(next).toContain('const mid = pointOnSegment(span, 0.5, "o_g");');
+    expect(next).toMatch(/import \{ point, pointOnSegment \} from "oblik"/);
+  });
+
   test("hoists a free circle center before a numeric radius", () => {
     const next = insertCall(
       src,

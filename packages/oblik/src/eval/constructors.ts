@@ -1,15 +1,23 @@
 import {
   circleCircleIntersectionValue,
   circleLineIntersectionValue,
+  circleUnitAt,
   dist as distVec,
   isFiniteVec,
+  isGlider,
   lineIntersectionValue,
+  lineSAt,
   parallelLineValue,
   perpendicularLineValue,
+  pointOnCircleValue,
+  pointOnLineValue,
+  pointOnSegmentValue,
+  segmentTAt,
   signedDist as signedDistValue,
   type Branch,
   type Circle,
   type Geom,
+  type Glider,
   type Line,
   type LineLike,
   type ParallelLine,
@@ -71,6 +79,7 @@ function isFiniteValue(v: { kind: string }): boolean {
       return isFiniteVec(o.line.origin) && isFiniteVec(o.line.direction) && Number.isFinite(o.distance);
     }
     default:
+      if (isGlider(v)) return isFiniteVec(v);
       return false;
   }
 }
@@ -111,6 +120,22 @@ export const parallelLine = mark((geom: LineLike, signedD: number, id?: string):
 export const perpendicularLine = mark((geom: LineLike, through: Vec2, id?: string): Line => {
   return traced(perpendicularLineValue(geom, through), id);
 }, { dof: [] });
+
+export const pointOnSegment = mark((seg: Segment, t: number, id?: string): Glider => {
+  const tt = draftAt(id, 0, t);
+  return traced(pointOnSegmentValue(seg, tt), id);
+}, { dof: [1] });
+
+export const pointOnLine = mark((geom: LineLike, s: number, id?: string): Glider => {
+  const ss = draftAt(id, 0, s);
+  return traced(pointOnLineValue(geom, ss), id);
+}, { dof: [1] });
+
+export const pointOnCircle = mark((c: Circle, ux: number, uy: number, id?: string): Glider => {
+  const u = draftAt(id, 0, ux);
+  const v = draftAt(id, 1, uy);
+  return traced(pointOnCircleValue(c, u, v), id);
+}, { dof: [1, 2] });
 
 export function signedDist(p: Vec2, geom: LineLike): number {
   return signedDistValue(p, geom);
@@ -191,6 +216,9 @@ export const constructors = {
   line,
   parallelLine,
   perpendicularLine,
+  pointOnSegment,
+  pointOnLine,
+  pointOnCircle,
   lineIntersection,
   circleLineIntersection,
   circleCircleIntersection,

@@ -1,5 +1,6 @@
 import type { TraceNode } from "../eval/context";
 import type { LineLike } from "../geom";
+import { gliderAt, isGlider } from "../geom/gliders";
 import { lineBasis } from "../geom/ops";
 import type { Circle, Line, ParallelLine, Point, Segment } from "../geom";
 import { dist, distToLine, distToSegment } from "../geom/vec";
@@ -24,6 +25,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
   if (v.kind === "line") return Number.isFinite(v.origin.x);
   if (v.kind === "parallelLine") return Number.isFinite(v.distance);
+  if (isGlider(v)) return Number.isFinite(v.x) && Number.isFinite(v.y);
   return false;
 }
 
@@ -47,6 +49,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     const c = v as Circle;
     return Math.abs(dist(world, c.center) - Math.abs(c.radius));
   }
+  if (isGlider(v)) return dist(world, gliderAt(v));
   return Infinity;
 }
 
@@ -54,8 +57,9 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
 export function snapBoundPoint(trace: readonly TraceNode[], world: Vec2, maxDist: number): SnapPoint | null {
   let best: { snap: SnapPoint; d: number } | null = null;
   for (const n of trace) {
-    if (n.occ !== 0 || n.value.kind !== "point" || !n.bind) continue;
-    const p = n.value;
+    if (n.occ !== 0 || !n.bind) continue;
+    if (n.value.kind !== "point" && !isGlider(n.value)) continue;
+    const p = n.value.kind === "point" ? n.value : gliderAt(n.value);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     const d = Math.hypot(p.x - world.x, p.y - world.y);
     if (d > maxDist) continue;
@@ -84,8 +88,8 @@ export function hitsNear(
     if (d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
   }
   out.sort((a, b) => {
-    const pa = a.node.value.kind === "point" ? 0 : 1;
-    const pb = b.node.value.kind === "point" ? 0 : 1;
+    const pa = a.node.value.kind === "point" || isGlider(a.node.value) ? 0 : 1;
+    const pb = b.node.value.kind === "point" || isGlider(b.node.value) ? 0 : 1;
     if (pa !== pb) return pa - pb;
     if (a.d !== b.d) return a.d - b.d;
     return stackRank(a.node) - stackRank(b.node);
@@ -117,6 +121,7 @@ export function movedPastClick(fromX: number, fromY: number, toX: number, toY: n
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
+const CIRCLE_KIND = "circle";
 
 /** Nearest named line-like stroke under the pointer (ignores points). */
 export function snapLineCarrier(
@@ -133,6 +138,25 @@ export function snapLineCarrier(
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
+  }
+  return best ? { bind: best.bind, geom: best.geom } : null;
+}
+
+/** Nearest named circle under the pointer. */
+export function snapCircleCarrier(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  camera: Camera2,
+  size: PaneSize,
+  maxPx = GEOM_PX,
+): { bind: string; geom: Circle } | null {
+  let best: { bind: string; geom: Circle; d: number } | null = null;
+  for (const n of trace) {
+    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (n.value.kind !== CIRCLE_KIND) continue;
+    const d = geomDistWorld(world, n);
+    if (d > pickRadiusWorld(n, camera, maxPx)) continue;
+    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as Circle, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

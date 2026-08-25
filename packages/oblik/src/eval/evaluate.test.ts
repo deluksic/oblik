@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { circle, point, segment, slider } from "./constructors";
+import { circle, point, pointOnSegment, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
 import { emit, evaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -42,6 +42,32 @@ describe("evaluate", () => {
     const c = trace.find((n) => n.id === "c");
     expect(c?.value.kind).toBe("circle");
     if (c?.value.kind === "circle") expect(c.value.radius).toBe(4);
+  });
+
+  test("draft overrides a segment glider parameter", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const a = point(0, 0, "a");
+        const b = point(4, 0, "b");
+        const span = segment(a, b, "s");
+        return pointOnSegment(span, 0.25, "g");
+      },
+    });
+    const annotations = analyze(
+      `const a = point(0, 0, "a");\nconst b = point(4, 0, "b");\nconst span = segment(a, b, "s");\npointOnSegment(span, 0.25, "g");\n`,
+    );
+    const { trace } = evaluate(scene, {
+      annotations,
+      draft: new Map([["g", [0.75]]]),
+    });
+    const g = trace.find((n) => n.id === "g");
+    expect(g?.value.kind).toBe("gliderSegment");
+    if (g?.value.kind === "gliderSegment") {
+      expect(g.value.t).toBe(0.75);
+      expect(g.value.x).toBe(3);
+    }
   });
 
   test("nested evaluate does not leak tape; emit re-emits the same id", () => {
