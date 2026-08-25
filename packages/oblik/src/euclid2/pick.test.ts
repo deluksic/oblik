@@ -48,6 +48,11 @@ describe("hitTest", () => {
     const hit = hitTest([SEG], { x: 2, y: 0.05 }, camera, size);
     expect(hit?.id).toBe("o_s");
   });
+
+  test("keeps endpoint points in range when the click is closer to the stroke", () => {
+    const hit = hitTest([SEG, A], { x: 0.09, y: 0.04 }, camera, size);
+    expect(hit?.kind).toBe("point");
+  });
 });
 
 describe("pickAmong", () => {
@@ -107,5 +112,33 @@ describe("pickAmong", () => {
     expect(hits[0]?.id).toBe("o_p");
     const picked = pickAmong(hits, traceKey(CIRCLE));
     expect(picked?.id).toBe("o_p");
+  });
+
+  test("points win over overlapping ink even when another kind is selected", () => {
+    const P = {
+      ...A,
+      id: "o_p",
+      bind: "P",
+      value: { kind: "point", x: 2, y: 0 },
+    } as TraceNode;
+    const CIRCLE = {
+      id: "o_c",
+      occ: 0,
+      kind: "circle",
+      value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
+      editable: false,
+      stack: [{ file: "scene.ts", line: 14, column: 4 }],
+    } as TraceNode;
+    const LINE = {
+      id: "o_l",
+      occ: 0,
+      kind: "line",
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+      editable: false,
+      stack: [{ file: "scene.ts", line: 12, column: 4 }],
+    } as TraceNode;
+    const hits = hitsNear([CIRCLE, LINE, P], { x: 2, y: 0 }, camera, size);
+    expect(pickAmong(hits, traceKey(LINE))?.id).toBe("o_p");
+    expect(pickAmong(hits, traceKey(CIRCLE))?.id).toBe("o_p");
   });
 });

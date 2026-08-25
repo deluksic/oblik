@@ -9,6 +9,7 @@ export type Vec2 = { x: number; y: number };
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
 
 const GEOM_PX = 8;
+const POINT_PX = 12;
 
 export function traceKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
@@ -60,7 +61,12 @@ export function snapBoundPoint(trace: readonly TraceNode[], world: Vec2, maxDist
   return best?.snap ?? null;
 }
 
-/** All trace nodes within pick radius of `world`, nearest first. */
+function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
+  const px = n.value.kind === "point" ? POINT_PX : maxPx;
+  return px / Math.max(8, camera.scale);
+}
+
+/** All trace nodes within pick radius of `world`, nearest first. Points always sort ahead of ink. */
 export function hitsNear(
   trace: readonly TraceNode[],
   world: Vec2,
@@ -68,12 +74,11 @@ export function hitsNear(
   _size: PaneSize,
   maxPx = GEOM_PX,
 ): TraceNode[] {
-  const maxWorld = maxPx / Math.max(8, camera.scale);
   const out: { node: TraceNode; d: number }[] = [];
   for (const n of trace) {
     if (!isFiniteTrace(n)) continue;
     const d = geomDistWorld(world, n);
-    if (d <= maxWorld) out.push({ node: n, d });
+    if (d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
   }
   out.sort((a, b) => {
     const pa = a.node.value.kind === "point" ? 0 : 1;
@@ -106,22 +111,31 @@ function occSiblings(hits: readonly TraceNode[], id: string): TraceNode[] {
   return hits.filter((n) => n.id === id).toSorted((a, b) => a.occ - b.occ);
 }
 
+function pointHits(hits: readonly TraceNode[]): TraceNode[] {
+  return hits.filter((n) => n.value.kind === "point");
+}
+
 /**
- * First click takes the nearest hit. Re-click cycles `occ` for the same point id
- * (points stay sticky). Re-click on other geometry cycles through every hit at
- * the pick location so a point on a selected circle or line can be reached.
+ * Points always win when any are in range. Re-click cycles `occ` for the same
+ * point id only. With no point at the pick, re-click cycles other ink.
  */
 export function pickAmong(hits: readonly TraceNode[], priorKey: string | null): TraceNode | null {
   if (hits.length === 0) return null;
-  if (!priorKey) return hits[0]!;
-  const prior = hits.find((n) => traceKey(n) === priorKey);
-  if (!prior) return hits[0]!;
-  if (prior.value.kind === "point") {
-    const siblings = occSiblings(hits, prior.id);
-    if (siblings.length <= 1) return prior;
-    const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
-    return siblings[(idx + 1) % siblings.length]!;
+  const points = pointHits(hits);
+  const prior = priorKey ? hits.find((n) => traceKey(n) === priorKey) : undefined;
+
+  if (points.length > 0) {
+    if (prior?.value.kind === "point") {
+      const siblings = occSiblings(hits, prior.id);
+      if (siblings.length <= 1) return prior;
+      const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
+      return siblings[(idx + 1) % siblings.length]!;
+    }
+    return points[0]!;
   }
+
+  if (!priorKey) return hits[0]!;
+  if (!prior) return hits[0]!;
   const idx = hits.findIndex((n) => traceKey(n) === priorKey);
   return hits[(idx + 1) % hits.length]!;
 }
