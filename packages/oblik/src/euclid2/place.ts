@@ -31,23 +31,17 @@ export function isCrossing(p: PlacePoint): p is Crossing {
   );
 }
 
-type Cand = { point: PlacePoint; d: number; rank: number };
-
 /** Named bound point, then nearest finite crossing, else a free point at `world`. */
 export function resolvePlacePoint(
   trace: readonly TraceNode[],
   world: Vec2,
   maxDist: number,
 ): PlacePoint {
-  const cands: Cand[] = [];
   const named = snapBoundPoint(trace, world, maxDist);
   if (named) {
-    cands.push({
-      point: { kind: "ref", bind: named.bind, id: named.id, at: named.at },
-      d: dist(world, named.at),
-      rank: 0,
-    });
+    return { kind: "ref", bind: named.bind, id: named.id, at: named.at };
   }
+  const cands: { point: PlacePoint; d: number; rank: number }[] = [];
   const cc = nearestCircleCircle(trace, world, maxDist);
   if (cc) cands.push({ point: cc.point, d: cc.d, rank: 1 });
   const cl = nearestCircleLine(trace, world, maxDist);
@@ -56,7 +50,12 @@ export function resolvePlacePoint(
   if (ll) cands.push({ point: ll.point, d: ll.d, rank: 2 });
   if (cands.length === 0) return { kind: "free", at: { x: world.x, y: world.y } };
   cands.sort((a, b) => a.d - b.d || a.rank - b.rank);
-  return cands[0]!.point;
+  const best = cands[0]!;
+  const atCrossing = snapBoundPoint(trace, best.point.at, maxDist);
+  if (atCrossing) {
+    return { kind: "ref", bind: atCrossing.bind, id: atCrossing.id, at: atCrossing.at };
+  }
+  return best.point;
 }
 
 function boundOf(

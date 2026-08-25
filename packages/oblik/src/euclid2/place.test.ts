@@ -112,7 +112,17 @@ describe("resolvePlacePoint", () => {
     expect(p).toMatchObject({ kind: "ref", bind: "P" });
   });
 
-  test("picks the nearer crossing over a farther named point", () => {
+  test("reuses a named point in range even if the crossing is closer", () => {
+    const P = node({
+      id: "o_p",
+      bind: "P",
+      value: { kind: "point", x: 2.12, y: 0 },
+    });
+    const p = resolvePlacePoint([ground, wall, P], { x: 2, y: 0 }, 0.3);
+    expect(p).toMatchObject({ kind: "ref", bind: "P" });
+  });
+
+  test("picks a crossing when the named point is out of range", () => {
     const p = resolvePlacePoint([A, ground, wall], { x: 2, y: 0 }, 0.3);
     expect(p.kind).toBe("lineIntersection");
   });

@@ -74,7 +74,8 @@
   fill: #fff3e6;
 }
 
-.handleSelected {
+.handleSelected,
+.handleSelected:hover {
   fill: #e8876a;
   stroke: #fff3e6;
 }
@@ -98,7 +99,8 @@
   fill: #7ec8e3;
 }
 
-.selectedFill {
+.selectedFill,
+.selectedFill.hotFill {
   fill: #e8876a;
 }
 
