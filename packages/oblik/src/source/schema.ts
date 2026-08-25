@@ -20,7 +20,12 @@ export function parseLiteralPatch(raw: unknown): LiteralPatch | string {
 const exprSchema: v.GenericSchema<Expr> = v.lazy(() =>
   v.union([
     v.object({ kind: v.literal("num"), value: v.number() }),
+    v.object({ kind: v.literal("str"), value: v.string() }),
     v.object({ kind: v.literal("ref"), name: v.pipe(v.string(), v.minLength(1)) }),
+    v.object({
+      kind: v.literal("props"),
+      props: v.record(v.string(), exprSchema),
+    }),
     v.object({
       kind: v.literal("call"),
       name: v.pipe(v.string(), v.minLength(1)),
