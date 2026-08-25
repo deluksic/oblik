@@ -1,10 +1,11 @@
-import { createMemo, createSignal, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 
 import { evaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import { EMPTY_INSPECT, inspectForNode, type InspectState } from "../host/inspect";
+import { Inspect } from "../host/Inspect";
+import { EMPTY_INSPECT, inspectForNode } from "../host/inspect";
 import { pickAmong, traceKey } from "./pick";
 import { Palette } from "./Palette";
 import {
@@ -24,7 +25,6 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
-  onInspect?: (state: InspectState) => void;
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -48,20 +48,35 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return world().trace.find((n) => traceKey(n) === key) ?? null;
   });
 
-  onSettled(() => {
-    let cancelled = false;
+  const inspect = createMemo(async () => {
     const node = selectedNode();
-    if (!node) {
-      props.onInspect?.(EMPTY_INSPECT);
-      return;
-    }
-    void inspectForNode(node, peekCache).then((state) => {
-      if (!cancelled) props.onInspect?.(state);
-    });
-    return () => {
-      cancelled = true;
-    };
+    if (!node) return EMPTY_INSPECT;
+    return inspectForNode(node, peekCache);
   });
+
+  createEffect(
+    () => 1,
+    () => {
+      const onKey = (e: KeyboardEvent) => {
+        const typing =
+          e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+        if (e.key === "Escape") {
+          e.preventDefault();
+          if (picker()) setPicker(false);
+          else if (tool()) setTool(null);
+          else if (selectedKey()) setSelectedKey(null);
+          return;
+        }
+        if (typing) return;
+        if (e.code === "Space" && !tool()) {
+          e.preventDefault();
+          setPicker((p) => !p);
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    },
+  );
 
   function mergeDraft(id: string, values: number[]) {
     setDraft((d) => {
@@ -115,27 +130,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     if (next) setSelectedKey(traceKey(next));
   }
 
-  onSettled(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const typing =
-        e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        if (picker()) setPicker(false);
-        else if (tool()) setTool(null);
-        else if (selectedKey()) setSelectedKey(null);
-        return;
-      }
-      if (typing) return;
-      if (e.code === "Space" && !tool()) {
-        e.preventDefault();
-        setPicker((p) => !p);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
   const draftIds = createMemo(() => [...draft().keys()]);
   const ghost = createMemo(() => {
     const t = tool();
@@ -153,31 +147,36 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   });
 
   return (
-    <div class={styles.wrap}>
-      <p class={styles.status}>{status()}</p>
-      <Euclid2View
-        trace={world().trace}
-        initialCamera={props.scene.camera}
-        placing={tool() != null}
-        ghost={ghost()}
-        hoverId={hoverId()}
-        selectedKey={selectedKey()}
-        onHoverId={setHoverId}
-        onPick={onPick}
-        onDraft={mergeDraft}
-        onCommit={(id, values) => void commit(id, values)}
-        onPlace={onPlace}
-        onCursor={setCursor}
-      />
-      <Palette
-        picker={picker()}
-        prompt={prompt()}
-        onPick={(id: ToolId) => {
-          setPicker(false);
-          setTool(startTool(id));
-        }}
-        onClosePicker={() => setPicker(false)}
-      />
+    <div class={styles.workspace}>
+      <div class={styles.wrap}>
+        <p class={styles.status}>{status()}</p>
+        <Euclid2View
+          trace={world().trace}
+          initialCamera={props.scene.camera}
+          placing={tool() != null}
+          ghost={ghost()}
+          hoverId={hoverId()}
+          selectedKey={selectedKey()}
+          onHoverId={setHoverId}
+          onPick={onPick}
+          onDraft={mergeDraft}
+          onCommit={(id, values) => void commit(id, values)}
+          onPlace={onPlace}
+          onCursor={setCursor}
+        />
+        <Palette
+          picker={picker()}
+          prompt={prompt()}
+          onPick={(id: ToolId) => {
+            setPicker(false);
+            setTool(startTool(id));
+          }}
+          onClosePicker={() => setPicker(false)}
+        />
+      </div>
+      <Loading fallback={<Inspect state={EMPTY_INSPECT} />}>
+        <Inspect state={inspect()} />
+      </Loading>
     </div>
   );
 }

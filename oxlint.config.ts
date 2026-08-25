@@ -21,6 +21,18 @@ export default defineConfig({
       },
     ],
     "eslint/no-underscore-dangle": "off",
+    "eslint/no-restricted-imports": [
+      "error",
+      {
+        paths: [
+          {
+            name: "solid-js",
+            importNames: ["onSettled"],
+            message: "onSettled is forbidden — use createEffect (compute/effect split) instead.",
+          },
+        ],
+      },
+    ],
   },
   overrides: [
     {

@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onSettled } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 
 import { filterTools, type ToolId, type ToolSpec } from "./tool";
 import styles from "./Palette.module.css";
@@ -31,7 +31,7 @@ export function Palette(props: PaletteProps) {
 }
 
 function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
-  const inputRef: { current: HTMLInputElement | null } = { current: null };
+  const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
   const items = () => {
@@ -39,34 +39,37 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
     return list;
   };
 
-  onSettled(() => {
-    const el = inputRef.current;
-    el?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        props.onClose();
-        return;
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setActive((i) => Math.min(items().length - 1, i + 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setActive((i) => Math.max(0, i - 1));
-        return;
-      }
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const c = items()[active()];
-        if (c) props.onPick(c.id);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+  createEffect(
+    () => inputEl(),
+    (el) => {
+      if (!el) return;
+      el.focus();
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          props.onClose();
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setActive((i) => Math.min(items().length - 1, i + 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setActive((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const c = items()[active()];
+          if (c) props.onPick(c.id);
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    },
+  );
 
   return (
     <div class={styles.picker} onPointerDown={props.onClose}>
@@ -77,9 +80,7 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
         onPointerDown={(e) => e.stopPropagation()}
       >
         <input
-          ref={(el) => {
-            inputRef.current = el;
-          }}
+          ref={setInputEl}
           type="search"
           class={styles.input}
           placeholder="Point, circle, line, segment"

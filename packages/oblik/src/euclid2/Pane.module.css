@@ -1,3 +1,10 @@
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
 .wrap {
   position: relative;
   display: flex;

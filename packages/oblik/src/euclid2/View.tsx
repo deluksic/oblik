@@ -1,4 +1,4 @@
-import { For, createMemo, createSignal, onSettled } from "solid-js";
+import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "../eval/context";
 import type { Circle, Line, OffsetLine, Point, Segment } from "../geom";
@@ -89,7 +89,7 @@ function readPaneSize(el: Element): PaneSize | null {
 }
 
 export function Euclid2View(props: Euclid2ViewProps) {
-  const paneRef: { current: HTMLDivElement | null } = { current: null };
+  const [paneEl, setPaneEl] = createSignal<HTMLDivElement | null>(null);
   const initialCameraMemo = createMemo(() => props.initialCamera, {
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
@@ -99,18 +99,20 @@ export function Euclid2View(props: Euclid2ViewProps) {
   let drag: Drag | null = null;
   let pendingPick: PendingPick | null = null;
 
-  onSettled(() => {
-    const el = paneRef.current;
-    if (!el) return;
-    const apply = () => {
-      const next = readPaneSize(el);
-      if (next) setSize(next);
-    };
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    apply();
-    return () => ro.disconnect();
-  });
+  createEffect(
+    () => paneEl(),
+    (el) => {
+      if (!el) return;
+      const apply = () => {
+        const next = readPaneSize(el);
+        if (next) setSize(next);
+      };
+      const ro = new ResizeObserver(apply);
+      ro.observe(el);
+      apply();
+      return () => ro.disconnect();
+    },
+  );
 
   const k = createMemo(() => kWorldToNdc(camera(), size()));
   const vb = createMemo(() => viewBox(size()));
@@ -121,7 +123,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
   });
 
   function worldOf(e: PointerEvent) {
-    const el = paneRef.current!;
+    const el = paneEl();
+    if (!el) return { x: 0, y: 0 };
     const rect = el.getBoundingClientRect();
     const ndc = clientToNdc({ x: e.clientX, y: e.clientY }, rect, size());
     return ndcToWorld(ndc, camera(), size());
@@ -137,7 +140,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    const el = paneRef.current;
+    const el = paneEl();
     if (!el) return;
     if (props.placing) {
       const w = worldOf(e);
@@ -264,9 +267,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   );
   return (
     <div
-      ref={(el) => {
-        paneRef.current = el;
-      }}
+      ref={setPaneEl}
       class={[styles.paper, { [styles.grabbing]: grabbing(), [styles.placing]: !!props.placing }]}
       onWheel={onWheel}
       onPointerDown={onPointerDown}

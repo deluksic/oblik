@@ -1,12 +1,10 @@
 import { render } from "@solidjs/web";
-import { Errored, Loading, createMemo, createSignal, onSettled } from "solid-js";
+import { createEffect, Errored, Loading, createMemo, createSignal } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import { sceneLoaderKey, type OblikSceneEntry } from "../source/catalog";
-import { Inspect } from "./Inspect";
-import { EMPTY_INSPECT, type InspectState } from "./inspect";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
@@ -68,7 +66,6 @@ function Host(props: {
   initialSceneId: string;
 }) {
   const [sceneId, setSceneId] = createSignal(props.initialSceneId);
-  const [inspect, setInspect] = createSignal<InspectState>(EMPTY_INSPECT);
   const [hot, setHot] = createSignal<Scene | null>(() => {
     sceneId();
     props.loaders;
@@ -93,26 +90,29 @@ function Host(props: {
     return path ? (props.annotations[path] ?? {}) : {};
   });
 
-  onSettled(() => {
-    sceneId();
-    setInspect(EMPTY_INSPECT);
-  });
+  createEffect(
+    () => entry()?.path ?? "",
+    (path) => {
+      registerSceneHot({
+        currentPath: () => path,
+        onHot(scene) {
+          setHot(scene);
+        },
+      });
+    },
+  );
 
-  onSettled(() => {
-    registerSceneHot({
-      currentPath: () => entry()?.path ?? "",
-      onHot(scene) {
-        setHot(scene);
-      },
-    });
-
-    const onPop = () => {
-      const id = currentSceneId();
-      if (id && id !== sceneId()) setSceneId(id);
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  });
+  createEffect(
+    () => 1,
+    () => {
+      const onPop = () => {
+        const id = currentSceneId();
+        if (id && id !== sceneId()) setSceneId(id);
+      };
+      window.addEventListener("popstate", onPop);
+      return () => window.removeEventListener("popstate", onPop);
+    },
+  );
 
   function selectScene(id: string) {
     openScene(id);
@@ -126,12 +126,7 @@ function Host(props: {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
     return sceneKind() === "euclid2" ? (
-      <Euclid2Pane
-        scene={scene()}
-        file={e.path}
-        annotations={anno()}
-        onInspect={setInspect}
-      />
+      <Euclid2Pane scene={scene()} file={e.path} annotations={anno()} />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );
@@ -149,13 +144,10 @@ function Host(props: {
           <p>{(hot() ?? loaded())?.hint}</p>
         </Loading>
       </header>
-      <div class={styles.body}>
-        <div class={styles.stage}>
-          <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
-            <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
-          </Errored>
-        </div>
-        <Inspect state={inspect()} />
+      <div class={styles.stage}>
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
+          <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
+        </Errored>
       </div>
     </div>
   );

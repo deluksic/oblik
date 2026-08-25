@@ -58,7 +58,7 @@ Static-only: `class={styles.nav}`.
 
 ## Lifecycle & DOM
 
-- **`onSettled`** — run after DOM is ready (replaces `onMount` for ref-dependent work). Return a cleanup. **Cannot read pending async** (`PENDING_ASYNC_FORBIDDEN_SCOPE`). Window listeners under a tree with async memos use `createEffect`.
+- **`createEffect` (compute / effect)** — subscriptions, window listeners, `ResizeObserver`, focus. **Do not use `onSettled`** — it is forbidden in this repo (oxlint + vitest).
 - **Async resource in `createMemo`** — register `onCleanup` **before** the first `await`. If the memo re-runs while awaiting, cleanup still runs.
 
 ```tsx
@@ -73,7 +73,7 @@ const handle = createMemo(async () => {
 
 Read under `<Loading>`; rejected loads → `<Errored>`. `host.mount()` → `render()` calls `onInspect` (and sometimes `onCommandBar`) while the async memo is still owned — wrap those two in `runWithOwner(null, …)`. `onFocus` / `onLiveChange` / `onHandle` do not write signals from that path.
 
-- **Refs** — prefer callback refs or `{ current: null as T | null }` if the linter flags unassigned `let` refs.
+- **Refs** — use signal refs (`const [el, setEl] = createSignal<HTMLDivElement | null>(null)` + `ref={setEl}`) so `createEffect` can react when the node mounts.
 
 ## Reactivity
 
@@ -128,14 +128,27 @@ Scene-driven **signal** resets: function-form `createSignal(() => inspectForScen
 - **The effect function must `return` its cleanup** (do not call `onCleanup` in the effect).
 
 ```tsx
-// ✅ window listener: onSettled, not createEffect
-onSettled(() => {
-  window.addEventListener("keydown", onKey);
-  return () => window.removeEventListener("keydown", onKey);
-});
+// ✅ window listener: createEffect with mount-stable compute
+createEffect(
+  () => 1,
+  () => {
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  },
+);
 
-// ❌ dummy effect for the same job
-createEffect(() => void 0, () => { window.addEventListener(…); });
+// ✅ ResizeObserver on a signal ref
+createEffect(
+  () => paneEl(),
+  (el) => {
+    if (!el) return;
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  },
+);
+
+// ❌ onSettled — forbidden
 ```
 
 ## Styling

@@ -115,8 +115,9 @@ Plugin import: `packages/shell/src/plugin/vite-plugin.ts`.
 | ------------------------------ | ----------------------------------------------- |
 | `createEffect` **compute**     | `onCleanup(fn)`                                 |
 | `createEffect` **effect**      | `return fn` from the effect function            |
-| `onSettled` callback           | `return fn` from the callback (not `onCleanup`) |
 | `createTrackedEffect` callback | `return fn` from the callback (not `onCleanup`) |
+
+`onSettled` is **forbidden** in this repo — use `createEffect` with a signal ref instead.
 
 The effect function is the apply phase — `onCleanup` registered there is ignored. Return a function instead.
 
