@@ -317,6 +317,46 @@ describe("clickTool", () => {
     });
   });
 
+  test("circle click on a named point wins over field reuse", () => {
+    const mid = clickTool(startTool("circle"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in mid)) throw new Error("expected session");
+    expect(
+      clickTool(mid.session, {
+        world: namedP.at,
+        point: namedP,
+        length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+      }),
+    ).toEqual({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "call", name: "dist", args: [{ kind: "ref", name: "A" }, { kind: "ref", name: "P" }] },
+        ],
+      },
+    });
+  });
+
+  test("circle click on an intersection wins over field reuse", () => {
+    const mid = clickTool(startTool("circle"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in mid)) throw new Error("expected session");
+    expect(
+      clickTool(mid.session, {
+        world: ll.at,
+        point: ll,
+        length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+      }),
+    ).toMatchObject({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "call", name: "dist" },
+        ],
+      },
+    });
+  });
+
   test("parallel line click reuses a parallel line distance field", () => {
     const ground = {
       kind: "line" as const,
@@ -361,6 +401,37 @@ describe("clickTool", () => {
         args: [
           { kind: "ref", name: "ground" },
           { kind: "member", object: "shelf", field: "distance" },
+        ],
+      },
+    });
+  });
+
+  test("parallel line click on a named point wins over field reuse", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const session = {
+      verb: "parallelLine" as const,
+      focus: "typed" as const,
+      typed: "",
+      name: "",
+      carrierRef: "",
+      carrier: { expr: { kind: "ref" as const, name: "ground" }, geom: ground },
+    };
+    expect(
+      clickTool(session, {
+        world: namedP.at,
+        point: namedP,
+        length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+      }),
+    ).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "call", name: "signedDist", args: [{ kind: "ref", name: "P" }, { kind: "ref", name: "ground" }] },
         ],
       },
     });

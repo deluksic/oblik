@@ -2,6 +2,7 @@ import type { TraceNode } from "../../eval/context";
 import type { Circle, ParallelLine } from "../../geom";
 import { printExpr, type Expr, type ProductField } from "../../source/expr";
 import { hitsNear } from "../pick";
+import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
 import { round } from "./common";
 import { parseNum } from "./draft";
@@ -192,6 +193,7 @@ export function attachLengthHit(
       return { ...hit, length: { expr, value } };
     }
   }
+  if (isPinnedPoint(hit.point)) return hit;
   let node: TraceNode | undefined;
   const target = ctx.target;
   if (isDomElement(target)) {

@@ -39,7 +39,6 @@ function centerOf(session: CircleSession, scope: Scope): Placed | undefined {
 }
 
 function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope: Scope) {
-  if (hit.length) return hit.length.expr;
   const bound = resolveLengthExpr(session, scope, { min: 0.05 });
   if (isPinnedPoint(hit.point) && !sameRef(center.expr, hit.point)) {
     if (!bound || bound.kind === "num") {
@@ -47,6 +46,7 @@ function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope
     }
     return bound;
   }
+  if (hit.length) return hit.length.expr;
   if (bound) return bound;
   const r = Math.max(0.05, dist(hit.point.at, center.at));
   return { kind: "num" as const, value: round(r) };
@@ -94,7 +94,7 @@ export const circle: Tool<CircleSession> = {
         },
       };
     }
-    if (hit.length && resolveLengthExpr(session, scope) == null) {
+    if (hit.length && resolveLengthExpr(session, scope) == null && !isPinnedPoint(hit.point)) {
       return {
         insert: withBind(session, {
           from: "circle",
@@ -126,9 +126,15 @@ export const circle: Tool<CircleSession> = {
       const at = place?.point.at;
       return at ? { kind: "point", at } : null;
     }
-    if (resolveLengthExpr(session, scope) != null || place?.length) {
+    if (resolveLengthExpr(session, scope) != null) {
       const fallback = place?.length?.value ?? 0.05;
       return { kind: "circle", center: center.at, radius: Math.max(0.05, lengthValue(session, scope, fallback)) };
+    }
+    if (place && isPinnedPoint(place.point) && !sameRef(center.expr, place.point)) {
+      return { kind: "circle", center: center.at, radius: Math.max(0.05, dist(place.point.at, center.at)) };
+    }
+    if (place?.length) {
+      return { kind: "circle", center: center.at, radius: Math.max(0.05, lengthValue(session, scope, place.length.value)) };
     }
     if (!place) return { kind: "circle", center: center.at, radius: 0.05 };
     return {
@@ -155,6 +161,18 @@ export const circle: Tool<CircleSession> = {
       }
       return { line: `const ${name} = circle(${cTok}, ${radius})`, hint: spec.hint };
     }
+    if (p && isPinnedPoint(p) && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null) {
+      return {
+        line: previewCall(
+          "circle",
+          [center.expr, { kind: "call", name: "dist", args: [center.expr, exprOfPlace(p)] }],
+          scope.used,
+          ([c, d]) => `circle(${inSlot(session.focus === "center", c)}, ${d})`,
+          name,
+        ),
+        hint: "Click to pin the radius to that distance. Tab to name it.",
+      };
+    }
     if (place?.length && resolveLengthExpr(session, scope) == null) {
       return {
         line: previewCall(
@@ -165,18 +183,6 @@ export const circle: Tool<CircleSession> = {
           name,
         ),
         hint: "Click to reuse that length. Tab to name it.",
-      };
-    }
-    if (p && isPinnedPoint(p) && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null && !place?.length) {
-      return {
-        line: previewCall(
-          "circle",
-          [center.expr, { kind: "call", name: "dist", args: [center.expr, exprOfPlace(p)] }],
-          scope.used,
-          ([c, d]) => `circle(${inSlot(session.focus === "center", c)}, ${d})`,
-          name,
-        ),
-        hint: "Click to pin the radius to that distance. Tab to name it.",
       };
     }
     const bound = resolveLengthExpr(session, scope);
