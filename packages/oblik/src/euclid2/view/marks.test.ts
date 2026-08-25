@@ -30,10 +30,24 @@ const SEG = {
   stack: [],
 } as TraceNode;
 
+const OFFSET = {
+  id: "o_off",
+  occ: 0,
+  kind: "offsetLine",
+  value: {
+    kind: "offsetLine",
+    line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
+    distance: 1.76,
+  },
+  editable: true,
+  stack: [],
+} as TraceNode;
+
 describe("isGrabbable", () => {
-  test("only editable points and circles", () => {
+  test("editable points, circles, and offset lines", () => {
     expect(isGrabbable(A)).toBe(true);
     expect(isGrabbable(CIRCLE)).toBe(true);
+    expect(isGrabbable(OFFSET)).toBe(true);
     expect(isGrabbable(SEG)).toBe(false);
     expect(isGrabbable({ ...A, editable: false })).toBe(false);
     expect(isGrabbable(null)).toBe(false);

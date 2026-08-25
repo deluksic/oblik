@@ -1,5 +1,7 @@
 import type { TraceNode } from "../../eval/context";
-import type { Circle, Point } from "../../geom";
+import type { Circle, Line, OffsetLine, Point } from "../../geom";
+import { lineBasis, signedDist } from "../../geom/ops";
+import { mul, perp, sub } from "../../geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick } from "../pick";
 import { placeSnapWorld, resolvePlacePoint, type PlacePoint } from "../place";
@@ -32,6 +34,17 @@ export type Drag =
       startR: number;
       origin: { x: number; y: number };
       grabDist: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "offset";
+      id: string;
+      node: TraceNode;
+      startD: number;
+      base: Line;
+      grabSigned: number;
       downX: number;
       downY: number;
       moved: boolean;
@@ -78,6 +91,31 @@ export function radiusDrag(node: TraceNode, w: { x: number; y: number }, e: Poin
     startR: c.radius,
     origin: c.center,
     grabDist: Math.hypot(w.x - c.center.x, w.y - c.center.y),
+    downX: e.clientX,
+    downY: e.clientY,
+    moved: false,
+  };
+}
+
+function carrierLine(ol: OffsetLine): Line {
+  const { origin, dir } = lineBasis(ol);
+  return {
+    kind: "line",
+    origin: sub(origin, mul(perp(dir), ol.distance)),
+    direction: dir,
+  };
+}
+
+export function offsetDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
+  const ol = node.value as OffsetLine;
+  const base = carrierLine(ol);
+  return {
+    kind: "offset",
+    id: node.id,
+    node,
+    startD: ol.distance,
+    base,
+    grabSigned: signedDist(w, base),
     downX: e.clientX,
     downY: e.clientY,
     moved: false,
@@ -144,6 +182,10 @@ export function applyDrag(
         values: [round(drag.startX + (w.x - drag.pointerX)), round(drag.startY + (w.y - drag.pointerY))],
       },
     };
+  }
+  if (drag.kind === "offset") {
+    const signed = signedDist(w, drag.base);
+    return { draft: { id: drag.id, values: [round(drag.startD + (signed - drag.grabSigned))] } };
   }
   const now = Math.hypot(w.x - drag.origin.x, w.y - drag.origin.y);
   return { draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] } };

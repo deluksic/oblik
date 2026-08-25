@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../../eval/context";
-import { applyDrag, panDrag, radiusDrag, round } from "./pointer";
+import { applyDrag, offsetDrag, panDrag, radiusDrag, round } from "./pointer";
 
 const camera = { x: 0, y: 0, scale: 48 };
 const size = { w: 800, h: 600 };
@@ -11,6 +11,19 @@ const CIRCLE = {
   occ: 0,
   kind: "circle",
   value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 },
+  editable: true,
+  stack: [],
+} as TraceNode;
+
+const OFFSET = {
+  id: "o_off",
+  occ: 0,
+  kind: "offsetLine",
+  value: {
+    kind: "offsetLine",
+    line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
+    distance: 1.76,
+  },
   editable: true,
   stack: [],
 } as TraceNode;
@@ -37,5 +50,21 @@ describe("applyDrag", () => {
     if (drag.kind !== "radius") return;
     expect(drag.grabDist).toBe(2.5);
     expect(drag.startR).toBe(2.5);
+  });
+
+  test("offsets by signed distance along the carrier normal", () => {
+    const el = {
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    } as HTMLDivElement;
+    const down = { clientX: 400, clientY: 300 - 1.76 * 48 } as PointerEvent;
+    const drag = offsetDrag(OFFSET, { x: 0, y: 1.76 }, down);
+    expect(drag.kind).toBe("offset");
+    if (drag.kind !== "offset") return;
+    expect(drag.grabSigned).toBeCloseTo(1.76);
+    drag.moved = true;
+    const same = applyDrag(drag, down, el, camera, size);
+    expect(same.draft?.values[0]).toBeCloseTo(1.76);
+    const pulled = applyDrag(drag, { clientX: 400, clientY: 300 - 2.5 * 48 } as PointerEvent, el, camera, size);
+    expect(pulled.draft?.values[0]).toBeCloseTo(2.5);
   });
 });

@@ -92,7 +92,7 @@ function InfiniteStroke(props: {
     <>
       <line class={styles.hit} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
-        class={inkClass(props.hot, props.selected, false)}
+        class={inkClass(props.hot, props.selected, props.node.value.kind === "offsetLine" && props.node.editable)}
         x1={ends().a.x}
         y1={ends().a.y}
         x2={ends().b.x}

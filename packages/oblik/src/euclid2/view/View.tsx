@@ -15,6 +15,7 @@ import {
   dragMoved,
   panDrag,
   placeFromEvent,
+  offsetDrag,
   pointDrag,
   radiusDrag,
   topHit,
@@ -103,6 +104,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
     if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
       drag = radiusDrag(hit, w, e);
+      return;
+    }
+    if (hit && isGrabbable(hit) && hit.value.kind === "offsetLine") {
+      drag = offsetDrag(hit, w, e);
       return;
     }
     drag = panDrag(e, camera());
