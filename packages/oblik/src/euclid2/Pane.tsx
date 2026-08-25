@@ -7,6 +7,7 @@ import type { Annotation } from "../source/analyze";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
 import { pickAmong, traceKey } from "./pick";
+import type { PlacePoint } from "./place";
 import { Palette } from "./Palette";
 import {
   clickTool,
@@ -31,9 +32,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
   const [picker, setPicker] = createSignal(() => (props.scene, false));
   const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
-  const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(
-    () => (props.scene, null),
-  );
+  const [place, setPlace] = createSignal<PlacePoint | null>(() => (props.scene, null));
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.scene, null));
 
@@ -62,8 +61,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         if (e.key === "Escape") {
           e.preventDefault();
           if (picker()) setPicker(false);
-          else if (tool()) setTool(null);
-          else if (selectedKey()) setSelectedKey(null);
+          else if (tool()) {
+            setTool(null);
+            setPlace(null);
+          } else if (selectedKey()) setSelectedKey(null);
           return;
         }
         if (typing) return;
@@ -109,12 +110,13 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       throw new Error(body?.error ?? `insert failed (${res.status})`);
     }
     setTool(null);
-    setCursor(null);
+    setPlace(null);
   }
 
   function onPlace(hit: PlaceHit) {
     const session = tool();
     if (!session) return;
+    setPlace(hit.point);
     const next = clickTool(session, hit);
     if ("insert" in next) void insert(next.insert);
     else setTool(next.session);
@@ -132,14 +134,15 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const draftIds = createMemo(() => [...draft().keys()]);
   const ghost = createMemo(() => {
     const t = tool();
-    return t ? ghostOf(t, cursor()) : null;
+    const p = place();
+    return t ? ghostOf(t, p?.at ?? null) : null;
   });
   const prompt = createMemo(() => {
     const t = tool();
-    return t ? previewOf(t) : null;
+    return t ? previewOf(t, place()) : null;
   });
   const status = createMemo(() => {
-    if (tool()) return "Space is placing. Escape cancels.";
+    if (tool()) return "Space is placing. Click a crossing to insert an intersection. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
     return "Space inserts. Click to inspect. Drag handles write literals.";
@@ -154,6 +157,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           initialCamera={props.scene.camera}
           placing={tool() != null}
           ghost={ghost()}
+          place={place()}
           hoverId={hoverId()}
           selectedKey={selectedKey()}
           onHoverId={setHoverId}
@@ -161,13 +165,14 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onDraft={mergeDraft}
           onCommit={(id, values) => void commit(id, values)}
           onPlace={onPlace}
-          onCursor={setCursor}
+          onCursor={setPlace}
         />
         <Palette
           picker={picker()}
           prompt={prompt()}
           onPick={(id: ToolId) => {
             setPicker(false);
+            setPlace(null);
             setTool(startTool(id));
           }}
           onClosePicker={() => setPicker(false)}

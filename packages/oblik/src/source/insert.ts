@@ -70,6 +70,8 @@ const PREFIX: Record<string, string> = {
   circle: "c",
   line: "l",
   segment: "s",
+  lineIntersection: "x",
+  circleLineIntersection: "x",
   offsetLine: "off",
 };
 

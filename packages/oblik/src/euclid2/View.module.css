@@ -118,6 +118,18 @@
   pointer-events: none;
 }
 
+.snapDiamond {
+  fill: #e8876a;
+  stroke: #0e1016;
+  stroke-width: 1.5;
+}
+
+.snapPoint {
+  fill: none;
+  stroke: #e8876a;
+  stroke-width: 2;
+}
+
 .label {
   fill: #9a9488;
   font-family: system-ui, sans-serif;

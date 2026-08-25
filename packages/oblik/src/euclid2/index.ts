@@ -8,10 +8,18 @@ export {
   ghostOf,
   previewOf,
   startTool,
+  exprOfPlace,
   type Ghost,
   type PlaceHit,
   type ToolId,
   type ToolSession,
 } from "./tool";
 export { snapBoundPoint, hitsNear, hitTest, pickAmong, traceKey, isFiniteTrace, movedPastClick, PICK_CLICK_PX, type SnapPoint } from "./pick";
+export {
+  resolvePlacePoint,
+  placeSnapWorld,
+  isCrossing,
+  PLACE_SNAP_PX,
+  type PlacePoint,
+} from "./place";
 export type { Camera2 } from "./camera";

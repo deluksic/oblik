@@ -30,6 +30,23 @@ describe("printExpr", () => {
     expect(printExpr({ kind: "call", name: "point", args: [{ kind: "num", value: 1.2 }, { kind: "num", value: -3 }] })).toBe(
       "point(1.2, -3)",
     );
+    expect(
+      printExpr({
+        kind: "call",
+        name: "dist",
+        args: [
+          { kind: "ref", name: "A" },
+          {
+            kind: "call",
+            name: "lineIntersection",
+            args: [
+              { kind: "ref", name: "ground" },
+              { kind: "ref", name: "wall" },
+            ],
+          },
+        ],
+      }),
+    ).toBe("dist(A, lineIntersection(ground, wall))");
   });
 });
 
@@ -71,5 +88,53 @@ describe("insertCall", () => {
       () => "o_s",
     );
     expect(next).toContain('const s = segment(A, point(4, 1), "o_s");');
+  });
+
+  test("inserts a circle whose radius is dist to an intersection", () => {
+    const next = insertCall(
+      src,
+      {
+        from: "circle",
+        bind: "beam",
+        args: [
+          { kind: "ref", name: "A" },
+          {
+            kind: "call",
+            name: "dist",
+            args: [
+              { kind: "ref", name: "A" },
+              {
+                kind: "call",
+                name: "lineIntersection",
+                args: [
+                  { kind: "ref", name: "ground" },
+                  { kind: "ref", name: "wall" },
+                ],
+              },
+            ],
+          },
+        ],
+        id: "o_beam",
+      },
+      () => "o_beam",
+    );
+    expect(next).toContain('const beam = circle(A, dist(A, lineIntersection(ground, wall)), "o_beam");');
+    expect(next).toMatch(/import \{ point, circle, dist, lineIntersection \} from "oblik"/);
+  });
+
+  test("inserts lineIntersection as its own bind", () => {
+    const next = insertCall(
+      src,
+      {
+        from: "lineIntersection",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "ref", name: "wall" },
+        ],
+        id: "o_x",
+      },
+      () => "o_x",
+    );
+    expect(next).toContain('const x = lineIntersection(ground, wall, "o_x");');
   });
 });

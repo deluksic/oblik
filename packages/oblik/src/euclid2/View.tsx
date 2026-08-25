@@ -12,7 +12,8 @@ import {
   type Camera2,
   type PaneSize,
 } from "./camera";
-import { snapBoundPoint, hitsNear, isFiniteTrace, movedPastClick, traceKey } from "./pick";
+import { hitsNear, isFiniteTrace, movedPastClick, traceKey } from "./pick";
+import { isCrossing, placeSnapWorld, resolvePlacePoint, type PlacePoint } from "./place";
 import type { Ghost, PlaceHit } from "./tool";
 
 import styles from "./View.module.css";
@@ -24,6 +25,7 @@ export type Euclid2ViewProps = {
   initialCamera?: Camera2;
   placing?: boolean;
   ghost?: Ghost | null;
+  place?: PlacePoint | null;
   hoverId?: string | null;
   selectedKey?: string | null;
   onHoverId?: (id: string | null) => void;
@@ -31,7 +33,7 @@ export type Euclid2ViewProps = {
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
   onPlace?: (hit: PlaceHit) => void;
-  onCursor?: (world: { x: number; y: number } | null) => void;
+  onCursor?: (place: PlacePoint | null) => void;
 };
 
 type Drag =
@@ -124,6 +126,26 @@ export function Euclid2View(props: Euclid2ViewProps) {
     return ndcToWorld(ndc, camera(), size());
   }
 
+  function placeFromEvent(e: PointerEvent): { world: { x: number; y: number }; point: PlacePoint } {
+    const w = worldOf(e);
+    let point = resolvePlacePoint(props.trace, w, placeSnapWorld(camera().scale));
+    const t = e.target;
+    if (t instanceof Element && t.hasAttribute("data-handle")) {
+      const id = t.getAttribute("data-handle")!;
+      const found =
+        props.trace.find((n) => n.id === id && n.occ === 0) ?? props.trace.find((n) => n.id === id);
+      if (found?.bind && found.value.kind === "point") {
+        point = {
+          kind: "ref",
+          bind: found.bind,
+          id: found.id,
+          at: { x: found.value.x, y: found.value.y },
+        };
+      }
+    }
+    return { world: w, point };
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const cam = camera();
@@ -137,18 +159,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const el = paneEl();
     if (!el) return;
     if (props.placing) {
-      const w = worldOf(e);
-      const max = 16 / Math.max(8, camera().scale);
-      let snap = snapBoundPoint(props.trace, w, max);
-      const t = e.target;
-      if (t instanceof Element && t.hasAttribute("data-handle")) {
-        const id = t.getAttribute("data-handle")!;
-        const node = props.trace.find((n) => n.id === id);
-        if (node?.bind && node.value.kind === "point") {
-          snap = { id: node.id, bind: node.bind, at: { x: node.value.x, y: node.value.y } };
-        }
-      }
-      props.onPlace?.({ world: w, snap: snap ?? undefined });
+      props.onPlace?.(placeFromEvent(e));
       return;
     }
     el.setPointerCapture(e.pointerId);
@@ -210,7 +221,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
-      props.onCursor?.(worldOf(e));
+      props.onCursor?.(placeFromEvent(e).point);
     } else {
       noteHover(e);
     }
@@ -331,6 +342,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
             />
           )}
         </For>
+        {props.placing && props.place && props.place.kind !== "free" ? (
+          <PlaceSnap point={props.place} camera={camera()} size={size()} />
+        ) : null}
       </svg>
     </div>
   );
@@ -503,6 +517,24 @@ function GhostMark(props: { ghost: Ghost }) {
 
 const HANDLE_R = 7;
 const POINT_R = 3.5;
+const SNAP_R = 9;
+
+function PlaceSnap(props: { point: PlacePoint; camera: Camera2; size: PaneSize }) {
+  const pos = createMemo(() => worldToScreen(props.point.at, props.camera, props.size));
+  const crossing = () => isCrossing(props.point);
+  return (
+    <g pointer-events="none">
+      {crossing() ? (
+        <polygon
+          class={styles.snapDiamond}
+          points={`${pos().x},${pos().y - SNAP_R} ${pos().x + SNAP_R},${pos().y} ${pos().x},${pos().y + SNAP_R} ${pos().x - SNAP_R},${pos().y}`}
+        />
+      ) : (
+        <circle class={styles.snapPoint} cx={pos().x} cy={pos().y} r={SNAP_R - 2} />
+      )}
+    </g>
+  );
+}
 
 function PointMark(props: {
   node: TraceNode;
