@@ -72,7 +72,7 @@ function Host(props: {
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
-  const loaded = createMemo(() => {
+  const loaded = createMemo(async () => {
     sceneRev();
     const e = entry();
     const loaders = props.loaders;
@@ -87,14 +87,14 @@ function Host(props: {
     onCleanup(() => {
       cancelled = true;
     });
-    return loader().then((sceneMod) => {
-      if (cancelled) return sceneMod.default;
-      sceneCache.set(key, sceneMod.default);
-      return sceneMod.default;
-    });
+    const sceneMod = await loader();
+    if (cancelled) return sceneMod.default;
+    sceneCache.set(key, sceneMod.default);
+    return sceneMod.default;
   });
 
   const scene = createMemo(() => loaded());
+  const sceneKind = createMemo(() => scene().kind);
 
   const anno = createMemo(() => {
     const path = entry()?.path;
@@ -134,7 +134,7 @@ function Host(props: {
   const pane = createMemo(() => {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
-    return scene().kind === "euclid2" ? (
+    return sceneKind() === "euclid2" ? (
       <Euclid2Pane scene={scene()} file={e.path} annotations={anno()} />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
