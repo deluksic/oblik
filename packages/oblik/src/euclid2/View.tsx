@@ -328,7 +328,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               />
             )}
           </For>
-          {props.ghost ? <GhostMark ghost={props.ghost} /> : null}
+          {props.ghost ? <GhostMark ghost={props.ghost} camera={camera()} size={size()} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
@@ -404,8 +404,8 @@ function Stroke(props: {
 
 function circleClass(hot: boolean, selected: boolean, editable: boolean) {
   return [
-    styles.stroke,
-    { [styles.editableCircle]: editable, [styles.hot]: hot && !selected, [styles.selected]: selected },
+    editable ? styles.editableCircleStroke : styles.stroke,
+    { [styles.hot]: hot && !selected, [styles.selected]: selected },
   ];
 }
 
@@ -507,12 +507,20 @@ function Grid(props: { camera: Camera2; size: PaneSize }) {
   );
 }
 
-function GhostMark(props: { ghost: Ghost }) {
+function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
   const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : null));
   const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : null));
-  const seg = createMemo(() =>
-    props.ghost.kind === "line" || props.ghost.kind === "segment" ? props.ghost : null,
-  );
+  const line = createMemo(() => (props.ghost.kind === "line" ? props.ghost : null));
+  const segment = createMemo(() => (props.ghost.kind === "segment" ? props.ghost : null));
+  const lineEnds = createMemo(() => {
+    const g = line();
+    if (!g) return null;
+    const dx = g.b.x - g.a.x;
+    const dy = g.b.y - g.a.y;
+    const len = Math.hypot(dx, dy);
+    const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
+    return infiniteClip(g.a, dir, props.camera, props.size);
+  });
   return (
     <>
       {point() ? (
@@ -534,13 +542,22 @@ function GhostMark(props: { ghost: Ghost }) {
           />
         </>
       ) : null}
-      {seg() ? (
+      {lineEnds() ? (
         <line
           class={styles.ghost}
-          x1={seg()!.a.x}
-          y1={seg()!.a.y}
-          x2={seg()!.b.x}
-          y2={seg()!.b.y}
+          x1={lineEnds()!.a.x}
+          y1={lineEnds()!.a.y}
+          x2={lineEnds()!.b.x}
+          y2={lineEnds()!.b.y}
+        />
+      ) : null}
+      {segment() ? (
+        <line
+          class={styles.ghost}
+          x1={segment()!.a.x}
+          y1={segment()!.a.y}
+          x2={segment()!.b.x}
+          y2={segment()!.b.y}
         />
       ) : null}
     </>
