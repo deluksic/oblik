@@ -6,6 +6,6 @@ Greenfield paper for Prototype 6. Scenes live in `src/scenes/`; the header picke
 pnpm demo
 ```
 
-- `src/scenes/*.ts` — scene modules (`defineScene`)
+- `src/scenes/*.ts` — scene modules (`defineScene`): shelf, triangle, shared-loop, truss, mounting-plate
 - `src/scene-loaders.ts` — `import.meta.glob` for lazy load + HMR
 - `src/main.tsx` — mount + catalog HMR

@@ -97,6 +97,31 @@ describe("evaluate", () => {
     expect(siteOf(slider)?.dof).toEqual([0]);
   });
 
+  test("a loop reuses one constructor id across occ", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const o = point(0, 0, "o");
+        for (let i = 0; i < 5; i++) {
+          circle({ x: o.x + i, y: 0 }, 1, "ring");
+        }
+      },
+    });
+    const annotations = analyze(
+      `const o = point(0, 0, "o");\nfor (let i = 0; i < 5; i++) {\n  circle({ x: o.x + i, y: 0 }, 1, "ring");\n}\n`,
+    );
+    const { trace } = evaluate(scene, { annotations });
+    const rings = trace.filter((n) => n.id === "ring");
+    expect(rings).toHaveLength(5);
+    expect(rings.map((n) => n.occ)).toEqual([0, 1, 2, 3, 4]);
+    expect(rings.every((n) => n.editable)).toBe(true);
+    const drafted = evaluate(scene, { annotations, draft: new Map([["ring", [1.5]]]) }).trace.filter(
+      (n) => n.id === "ring",
+    );
+    expect(drafted.every((n) => n.value.kind === "circle" && n.value.radius === 1.5)).toBe(true);
+  });
+
   test("slider traces a HUD number", () => {
     const scene = defineScene({
       kind: "euclid2",
