@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 18vh 1rem 1rem;
-  background: #0e1016aa;
+  background: color-mix(in srgb, var(--oblik-paper) 67%, transparent);
   pointer-events: auto;
 }
 
@@ -31,8 +31,8 @@
 .panel,
 .prompt {
   width: min(28rem, 100%);
-  background: #171a22;
-  border: 1px solid #2a3040;
+  background: var(--oblik-panel);
+  border: 1px solid var(--oblik-line);
   border-radius: 10px;
   box-shadow: 0 18px 40px #0008;
 }
@@ -48,13 +48,13 @@
   margin: 0;
   font-family: ui-monospace, monospace;
   font-size: 0.82rem;
-  color: #ece8de;
+  color: var(--oblik-text);
   white-space: pre-wrap;
 }
 
 .hint {
   margin: 0.25rem 0 0;
-  color: #9a9488;
+  color: var(--oblik-muted);
   font-size: 0.75rem;
 }
 
@@ -64,8 +64,8 @@
   box-sizing: border-box;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a3040;
-  color: #ece8de;
+  border-bottom: 1px solid var(--oblik-line);
+  color: var(--oblik-text);
   font: inherit;
   padding: 0.75rem 0.9rem;
   outline: none;
@@ -89,21 +89,21 @@
 
 .listItemActive,
 .listItem:hover {
-  background: #221c1a;
+  background: color-mix(in srgb, var(--oblik-accent) 12%, var(--oblik-panel));
 }
 
 .cmd {
-  color: #e8876a;
+  color: var(--oblik-accent);
   font-weight: 600;
 }
 
 .cmdHint {
-  color: #9a9488;
+  color: var(--oblik-muted);
   font-size: 0.82rem;
 }
 
 .empty {
   margin: 0;
   padding: 0.9rem;
-  color: #9a9488;
+  color: var(--oblik-muted);
 }

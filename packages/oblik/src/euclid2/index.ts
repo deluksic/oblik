@@ -1,5 +1,5 @@
 export { Euclid2Pane, type Euclid2PaneProps } from "./Pane";
-export { Euclid2View, type Euclid2ViewProps } from "./View";
+export { Euclid2View, type Euclid2ViewProps } from "./view/View";
 export { Palette, type PaletteProps } from "./Palette";
 export {
   TOOLS,

@@ -9,6 +9,7 @@ import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 
+import "../theme.css";
 import styles from "./Host.module.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;

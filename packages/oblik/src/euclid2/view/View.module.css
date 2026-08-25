@@ -4,7 +4,7 @@
   min-height: 0;
   min-width: 0;
   height: 100%;
-  background: #0e1016;
+  background: var(--oblik-paper);
   overflow: hidden;
   touch-action: none;
   cursor: default;
@@ -32,46 +32,59 @@
   cursor: crosshair;
 }
 
-.gridLine {
+.grid {
   fill: none;
-  stroke: #1d2230;
+  stroke: var(--oblik-grid);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .axis {
-  stroke: #3a4156;
+  stroke: var(--oblik-axis);
 }
 
-.stroke {
+.ink {
   fill: none;
-  stroke: #d7d2c4;
-  stroke-width: 1.5;
+  stroke: var(--oblik-ink);
+  stroke-width: var(--oblik-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
+.editable {
+  stroke: var(--oblik-accent);
+}
+
+.hot {
+  stroke: var(--oblik-hover);
+}
+
+.selected {
+  stroke: var(--oblik-accent);
+  stroke-width: var(--oblik-stroke-selected);
+}
+
 .hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 14;
+  stroke-width: var(--oblik-hit);
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
   pointer-events: stroke;
 }
 
-.hitGrab {
+.grabbable {
   cursor: grab;
 }
 
-.grabbing .hitGrab {
+.grabbing .grabbable {
   cursor: grabbing;
 }
 
 .handle {
-  fill: #e8876a;
-  stroke: #0e1016;
+  fill: var(--oblik-accent);
+  stroke: var(--oblik-paper);
   stroke-width: 2;
   cursor: grab;
   pointer-events: auto;
@@ -79,45 +92,32 @@
 
 .handleHot,
 .handle:hover {
-  fill: #fff3e6;
+  fill: var(--oblik-cream);
 }
 
 .handleSelected {
-  fill: #e8876a;
-  stroke: #fff3e6;
-}
-
-.hot {
-  stroke: #7ec8e3;
-}
-
-.selected {
-  stroke: #e8876a;
-  stroke-width: 2.25;
-}
-
-.stroke.editableCircle {
-  stroke: #e8876a;
+  fill: var(--oblik-accent);
+  stroke: var(--oblik-cream);
 }
 
 .point {
-  fill: #d7d2c4;
-  stroke: #0e1016;
+  fill: var(--oblik-ink);
+  stroke: var(--oblik-paper);
   stroke-width: 1.5;
 }
 
 .hotFill {
-  fill: #7ec8e3;
+  fill: var(--oblik-hover);
 }
 
 .selectedFill {
-  fill: #e8876a;
+  fill: var(--oblik-accent);
 }
 
 .ghost {
   fill: none;
-  stroke: #e8876a;
-  stroke-width: 1.5;
+  stroke: var(--oblik-accent);
+  stroke-width: var(--oblik-stroke);
   stroke-dasharray: 5 4;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
@@ -125,25 +125,25 @@
 }
 
 .ghostPoint {
-  fill: #e8876a;
+  fill: var(--oblik-accent);
   stroke: none;
   pointer-events: none;
 }
 
 .snapDiamond {
-  fill: #e8876a;
-  stroke: #0e1016;
+  fill: var(--oblik-accent);
+  stroke: var(--oblik-paper);
   stroke-width: 1.5;
 }
 
 .snapPoint {
   fill: none;
-  stroke: #e8876a;
+  stroke: var(--oblik-accent);
   stroke-width: 2;
 }
 
 .label {
-  fill: #9a9488;
+  fill: var(--oblik-muted);
   font-family: system-ui, sans-serif;
   pointer-events: none;
 }

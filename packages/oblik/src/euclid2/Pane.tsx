@@ -18,7 +18,7 @@ import {
   type ToolId,
   type ToolSession,
 } from "./tool";
-import { Euclid2View } from "./View";
+import { Euclid2View } from "./view/View";
 
 import styles from "./Pane.module.css";
 
