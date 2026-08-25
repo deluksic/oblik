@@ -23,16 +23,19 @@ export function viteUrlForRepoFile(
 ): string {
   const key = repoFile.replace(/^\/+/, "").replace(/\?.*$/, "");
   const root = path.resolve(appRoot).replace(/\\/g, "/");
-  const candidates = [path.resolve(workspaceRoot, key), path.resolve(appRoot, key)];
-  for (const candidate of candidates) {
-    const abs = candidate.replace(/\\/g, "/");
-    if (abs === root || abs.startsWith(`${root}/`)) {
-      const rel = abs.slice(root.length).replace(/^\//, "");
+  const fromWorkspace = path.resolve(workspaceRoot, key).replace(/\\/g, "/");
+  if (fromWorkspace === root || fromWorkspace.startsWith(`${root}/`)) {
+    const rel = fromWorkspace.slice(root.length).replace(/^\//, "");
+    return `/${rel}`;
+  }
+  if (key === "src" || key.startsWith("src/")) {
+    const fromApp = path.resolve(appRoot, key).replace(/\\/g, "/");
+    if (fromApp === root || fromApp.startsWith(`${root}/`)) {
+      const rel = fromApp.slice(root.length).replace(/^\//, "");
       return `/${rel}`;
     }
   }
-  const abs = path.resolve(workspaceRoot, key).replace(/\\/g, "/");
-  return `/@fs${abs.startsWith("/") ? abs : `/${abs}`}`;
+  return `/@fs${fromWorkspace.startsWith("/") ? fromWorkspace : `/${fromWorkspace}`}`;
 }
 
 export function sourceMapFromCode(code: string): EncodedSourceMap | null {
