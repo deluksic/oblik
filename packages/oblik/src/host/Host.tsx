@@ -1,4 +1,4 @@
-import { Errored, createMemo, createSignal, type Accessor } from "solid-js";
+import { Errored, createSignal } from "solid-js";
 import { render } from "@solidjs/web";
 
 import { evaluate } from "../eval/evaluate";
@@ -23,7 +23,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   const [mod, setMod] = createSignal(opts.scene);
   const [anno, setAnno] = createSignal(opts.annotations);
 
-  render(() => <Host file={opts.file} mod={mod} anno={anno} />, opts.el);
+  render(() => <Host file={opts.file} mod={mod()} anno={anno()} />, opts.el);
 
   return {
     setScene(next) {
@@ -36,27 +36,24 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
 
 function Host(props: {
   file: string;
-  mod: Accessor<Scene>;
-  anno: Accessor<Record<string, Annotation>>;
+  mod: Scene;
+  anno: Record<string, Annotation>;
 }) {
-  const pane = createMemo(() => {
-    const scene = props.mod();
-    return scene.kind === "euclid2" ? (
-      <Euclid2Pane scene={scene} file={props.file} annotations={props.anno()} />
-    ) : (
-      <p class={styles.err}>Unknown scene kind</p>
-    );
-  });
-
   return (
     <div class={styles.shell}>
       <header class={styles.head}>
         <p class={styles.kicker}>oblik</p>
-        <h1>{props.mod().title}</h1>
-        <p>{props.mod().hint}</p>
+        <h1>{props.mod.title}</h1>
+        <p>{props.mod.hint}</p>
       </header>
       <div class={styles.stage}>
-        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>{pane()}</Errored>
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
+          {props.mod.kind === "euclid2" ? (
+            <Euclid2Pane scene={props.mod} file={props.file} annotations={props.anno} />
+          ) : (
+            <p class={styles.err}>Unknown scene kind</p>
+          )}
+        </Errored>
       </div>
     </div>
   );
