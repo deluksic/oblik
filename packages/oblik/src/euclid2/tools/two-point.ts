@@ -1,53 +1,102 @@
+import { printExpr } from "../../source/expr";
 import { asPoint, exprOfPlace, previewCall } from "./common";
-import { inSlot, nameField, previewName, withBind } from "./draft";
-import type { Field, Preview, Tool, ToolSession } from "./types";
+import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
+import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
 
 type TwoPointId = "line" | "segment";
 type TwoPointSession = Extract<ToolSession, { verb: TwoPointId }>;
 
+function label(ref: string, placed: Placed | undefined, fallback: string, place: PlaceHit | null): string {
+  if (ref.trim()) return ref.trim();
+  if (placed) return printExpr(placed.expr);
+  const p = place?.point;
+  if (p && p.kind !== "free") return printExpr(exprOfPlace(p));
+  return fallback;
+}
+
 export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPointSession> {
-  const fields: Field<TwoPointSession>[] = [nameField()];
+  const fields: Field<TwoPointSession>[] = [
+    refField("a", "<a>", "point", (s) => s.aRef, (s, raw) => ({ ...s, aRef: raw })),
+    refField("b", "<b>", "point", (s) => s.bRef, (s, raw) => ({ ...s, bRef: raw })),
+    nameField(),
+  ];
   return {
     spec,
-    start: () => ({ verb: spec.id, focus: "name", name: "" }),
+    start: () => ({ verb: spec.id, focus: "a", aRef: "", bRef: "", name: "" }),
     fields,
     focus: (s) => s.focus,
     setFocus: (s, id) => ({ ...s, focus: id as TwoPointSession["focus"] }),
-    click(session, hit) {
-      if (!session.a) return { session: { ...session, a: asPoint(hit) } };
-      return { insert: withBind(session, { from: spec.id, args: [session.a.expr, asPoint(hit).expr] }) };
-    },
-    commit() {
-      return null;
-    },
-    ghost(session, place) {
-      const cursor = place?.point.at;
-      if (!cursor) return null;
-      if (!session.a) return { kind: "point", at: cursor };
-      return { kind: spec.id, a: session.a.at, b: cursor };
-    },
-    preview(session, place, usedNames): Preview {
-      const bind = inSlot(true, previewName(session, spec.prefix));
-      const p = place?.point ?? null;
-      if (!session.a) {
-        if (p && p.kind !== "free") {
-          return {
-            line: previewCall(spec.id, [exprOfPlace(p)], usedNames, ([a]) => `${spec.id}(${a}, b)`, bind),
-            hint: "Click the first point. Tab to name it.",
-          };
-        }
-        return { line: `const ${bind} = ${spec.id}(a, b)`, hint: spec.hint };
-      }
-      if (p && p.kind !== "free") {
+    click(session, hit, scope) {
+      const a = resolvePoint(session.aRef, session.a, scope);
+      if (!a) {
         return {
-          line: previewCall(spec.id, [session.a.expr, exprOfPlace(p)], usedNames, ([a, b]) => `${spec.id}(${a}, ${b})`, bind),
-          hint: "Click the second point. Tab to name it.",
+          session: {
+            ...session,
+            a: asPoint(hit),
+            aRef: hitRef(hit) || session.aRef,
+            focus: session.focus === "name" ? "name" : "b",
+          },
         };
       }
       return {
-        line: previewCall(spec.id, [session.a.expr], usedNames, ([a]) => `${spec.id}(${a}, b)`, bind),
-        hint: "Click the second point. Tab to name it.",
+        insert: withBind(session, { from: spec.id, args: [a.expr, asPoint(hit).expr] }),
       };
+    },
+    commit(session, _place, scope) {
+      const a = resolvePoint(session.aRef, session.a, scope);
+      const b = resolvePoint(session.bRef, session.b, scope);
+      if (a && b) return { insert: withBind(session, { from: spec.id, args: [a.expr, b.expr] }) };
+      if (session.focus === "name" || (session.focus === "b" && !a) || (session.focus === "a" && a && !b)) {
+        return { session: { ...session, focus: a ? "b" : "a" } };
+      }
+      return null;
+    },
+    ghost(session, place, scope) {
+      const cursor = place?.point.at;
+      const a = resolvePoint(session.aRef, session.a, scope);
+      const b = resolvePoint(session.bRef, session.b, scope);
+      if (a && b) return { kind: spec.id, a: a.at, b: b.at };
+      if (!cursor) {
+        if (a) return { kind: "point", at: a.at };
+        return null;
+      }
+      if (!a) return { kind: "point", at: cursor };
+      return { kind: spec.id, a: a.at, b: cursor };
+    },
+    preview(session, place, scope): Preview {
+      const bind = previewName(session, spec.prefix);
+      const a = resolvePoint(session.aRef, session.a, scope);
+      const b = resolvePoint(session.bRef, session.b, scope);
+      const aTok = inSlot(session.focus === "a", label(session.aRef, a, "a", !a ? place : null));
+      const bTok = inSlot(session.focus === "b", label(session.bRef, b, "b", a && !b ? place : null));
+      const name = inSlot(session.focus === "name", bind);
+      if (a && b) {
+        return {
+          line: previewCall(spec.id, [a.expr, b.expr], scope.used, ([x, y]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${inSlot(session.focus === "b", y)})`, name),
+          hint: "Enter to insert. Tab to name it.",
+        };
+      }
+      if (a) {
+        const p = place?.point ?? null;
+        if (p && p.kind !== "free" && !session.bRef.trim()) {
+          return {
+            line: previewCall(spec.id, [a.expr, exprOfPlace(p)], scope.used, ([x, y]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${inSlot(session.focus === "b", y)})`, name),
+            hint: "Type a point name or click the second point. Tab to name it.",
+          };
+        }
+        return {
+          line: previewCall(spec.id, [a.expr], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
+          hint: "Type a point name or click the second point. Tab to name it.",
+        };
+      }
+      const p = place?.point ?? null;
+      if (p && p.kind !== "free" && !session.aRef.trim()) {
+        return {
+          line: previewCall(spec.id, [exprOfPlace(p)], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
+          hint: "Type a point name or click the first point.",
+        };
+      }
+      return { line: `const ${name} = ${spec.id}(${aTok}, ${bTok})`, hint: spec.hint };
     },
   };
 }

@@ -79,7 +79,7 @@ export const point: Tool<PointSession> = {
     if (!at) return null;
     return { kind: "point", at: { x: x ?? at.x, y: y ?? at.y } };
   },
-  preview(session, place, usedNames): Preview {
+  preview(session, place, scope): Preview {
     const spec = point.spec;
     const p = place?.point ?? null;
     const bind = previewName(session, spec.prefix);
@@ -87,7 +87,7 @@ export const point: Tool<PointSession> = {
       return { line: `${p.bind}`, hint: "Already a named point — click does nothing." };
     }
     if (p && isCrossing(p) && parseNum(session.x) == null && parseNum(session.y) == null) {
-      const used = new Set(usedNames);
+      const used = new Set(scope.used);
       const { hoists } = hoistIntersections([exprOfPlace(p)], used);
       const line = hoists.map(printHoist).join("\n") || `const ${bind} = ${printExpr(exprOfPlace(p))}`;
       return {

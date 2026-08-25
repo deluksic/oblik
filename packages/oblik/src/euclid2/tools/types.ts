@@ -15,16 +15,25 @@ export type ToolSpec = {
   aliases?: readonly string[];
 };
 
-export type FieldKind = "number" | "ident";
+export type FieldKind = "number" | "ident" | "ref";
 
 /** One Tab stop. Declared on the verb; the dispatcher only cycles/types. */
 export type Field<S extends ToolSession = ToolSession> = {
   id: string;
   kind: FieldKind;
   placeholder: string;
+  /** For `ref`: existing point vs line/segment/parallel. */
+  looks?: "point" | "carrier";
   open: (session: S) => boolean;
   get: (session: S) => string;
   set: (session: S, raw: string) => S;
+};
+
+/** Named geometry on the tape. Pane builds this; tools look up without switching on verb. */
+export type Scope = {
+  used: readonly string[];
+  points: Readonly<Record<string, Placed>>;
+  carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
 };
 
 export type Draft = {
@@ -52,13 +61,21 @@ export type PlaceCtx = {
 
 export type ToolSession =
   | { verb: "point"; focus: "x" | "y" | "name"; x: string; y: string; name: string }
-  | { verb: "circle"; focus: "typed" | "name"; center?: Placed; typed: string; name: string }
-  | { verb: "line"; focus: "name"; a?: Placed; name: string }
-  | { verb: "segment"; focus: "name"; a?: Placed; name: string }
+  | {
+      verb: "circle";
+      focus: "center" | "typed" | "name";
+      center?: Placed;
+      centerRef: string;
+      typed: string;
+      name: string;
+    }
+  | { verb: "line"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
+  | { verb: "segment"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
   | {
       verb: "parallelLine";
-      focus: "typed" | "name";
+      focus: "carrier" | "typed" | "name";
       carrier?: { expr: Expr; geom: LineLike };
+      carrierRef: string;
       typed: string;
       name: string;
     };
@@ -96,14 +113,14 @@ export type ToolKey = { key: string; shift?: boolean; ctrl?: boolean; meta?: boo
 export type Tool<S extends ToolSession = ToolSession> = {
   spec: ToolSpec;
   start(): S;
-  click(session: S, hit: PlaceHit): ToolStep;
-  ghost(session: S, place: PlaceHit | null): Ghost | null;
-  preview(session: S, place: PlaceHit | null, usedNames: readonly string[]): Preview;
+  click(session: S, hit: PlaceHit, scope: Scope): ToolStep;
+  ghost(session: S, place: PlaceHit | null, scope: Scope): Ghost | null;
+  preview(session: S, place: PlaceHit | null, scope: Scope): Preview;
   fields?: readonly Field<S>[];
   focus?(session: S): string;
   setFocus?(session: S, id: string): S;
   /** Enter. `null` means the key was not a commit (stay in session). */
-  commit?(session: S, place: PlaceHit | null): ToolStep | null;
+  commit?(session: S, place: PlaceHit | null, scope: Scope): ToolStep | null;
   hit?(session: S, hit: PlaceHit, ctx: PlaceCtx): PlaceHit;
   hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[]): string | null;
 };

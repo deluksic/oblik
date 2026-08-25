@@ -1,11 +1,12 @@
 import type { TraceNode } from "../../eval/context";
-import { focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
+import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
 import { circle } from "./circle";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { point } from "./point";
 import { segment } from "./segment";
-import type { PlaceCtx, PlaceHit, Tool, ToolId, ToolKey, ToolSession } from "./types";
+import { scopeFromTrace, scopeOf } from "./scope";
+import type { PlaceCtx, PlaceHit, Scope, Tool, ToolId, ToolKey, ToolSession } from "./types";
 
 export type {
   Draft,
@@ -14,6 +15,7 @@ export type {
   PlaceCtx,
   PlaceHit,
   Preview,
+  Scope,
   Tool,
   ToolId,
   ToolKey,
@@ -22,6 +24,7 @@ export type {
   ToolStep,
 } from "./types";
 export { exprOfPlace } from "./common";
+export { scopeFromTrace } from "./scope";
 
 const byId = {
   point,
@@ -56,17 +59,26 @@ export function startTool(id: ToolId): ToolSession {
   return byId[id].start();
 }
 
-export function clickTool(session: ToolSession, hit: PlaceHit) {
-  return of(session).click(session as never, hit);
-}
-
-export function ghostOf(session: ToolSession, place: PlaceHit | null) {
-  return of(session).ghost(session as never, place);
-}
-
-export function previewOf(session: ToolSession, place: PlaceHit | null = null, usedNames: readonly string[] = []) {
+export function clickTool(session: ToolSession, hit: PlaceHit, scope: Scope | readonly string[] = []) {
+  const sc = scopeOf(scope);
   const tool = of(session);
-  return withSlot(tool.preview(session as never, place, usedNames), focusedDraft(tool, session as never, usedNames));
+  const next = tool.click(session as never, hit, sc);
+  if ("insert" in next && firstInvalid(tool, session as never, sc)) return { session };
+  return next;
+}
+
+export function ghostOf(session: ToolSession, place: PlaceHit | null, scope: Scope | readonly string[] = []) {
+  return of(session).ghost(session as never, place, scopeOf(scope));
+}
+
+export function previewOf(
+  session: ToolSession,
+  place: PlaceHit | null = null,
+  scope: Scope | readonly string[] = [],
+) {
+  const tool = of(session);
+  const sc = scopeOf(scope);
+  return withSlot(tool.preview(session as never, place, sc), focusedDraft(tool, session as never, sc));
 }
 
 export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
@@ -81,15 +93,18 @@ export function keyTool(
   session: ToolSession,
   e: ToolKey,
   place: PlaceHit | null = null,
-  usedNames: readonly string[] = [],
+  scope: Scope | readonly string[] = [],
 ) {
-  const out = keySession(of(session), session as never, e, place, usedNames);
+  const out = keySession(of(session), session as never, e, place, scopeOf(scope));
   if ("ignore" in out) return undefined;
   return out;
 }
 
-export function commitTool(session: ToolSession, place: PlaceHit | null = null) {
-  return of(session).commit?.(session as never, place) ?? undefined;
+export function commitTool(session: ToolSession, place: PlaceHit | null = null, scope: Scope | readonly string[] = []) {
+  const sc = scopeOf(scope);
+  const tool = of(session);
+  if (firstInvalid(tool, session as never, sc)) return undefined;
+  return tool.commit?.(session as never, place, sc) ?? undefined;
 }
 
 export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): PlaceHit {

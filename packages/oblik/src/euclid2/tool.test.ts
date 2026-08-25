@@ -188,6 +188,7 @@ describe("clickTool", () => {
       focus: "typed" as const,
       typed: "",
       name: "",
+      carrierRef: "",
       carrier: { expr: { kind: "ref" as const, name: "ground" }, geom: ground },
     };
     const done = clickTool(session, { world: { x: 9, y: 0.2 }, point: namedP });
@@ -218,7 +219,7 @@ describe("clickTool", () => {
 describe("ghostOf", () => {
   test("rubber-bands a circle after the center", () => {
     const g = ghostOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       { world: { x: 0, y: 2 }, point: free(0, 2) },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2 });
@@ -231,7 +232,7 @@ describe("ghostOf", () => {
       direction: { x: 1, y: 0 },
     };
     const g = ghostOf(
-      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       { world: { x: 0, y: 1.5 }, point: free(0, 1.5) },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.5 });
@@ -245,7 +246,7 @@ describe("ghostOf", () => {
     };
     expect(
       ghostOf(
-        { verb: "parallelLine", focus: "name", typed: "", name: "" },
+        { verb: "parallelLine", focus: "name", typed: "", name: "", carrierRef: "" },
         { world: { x: 1, y: 0 }, point: free(1, 0), carrier: { bind: "ground", geom: ground } },
       ),
     ).toBeNull();
@@ -258,7 +259,7 @@ describe("ghostOf", () => {
       direction: { x: 1, y: 0 },
     };
     const g = ghostOf(
-      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       { world: { x: 9, y: 0.2 }, point: namedP },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 0 });
@@ -276,7 +277,7 @@ describe("previewOf", () => {
 
   test("shows dist() when a circle radius hovers a point", () => {
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const c = circle(A, dist(A, P))");
@@ -292,7 +293,7 @@ describe("previewOf", () => {
       ],
     };
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", center: { expr: center, at: { x: 1, y: 2 } } },
+      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: center, at: { x: 1, y: 2 } } },
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const p = point(1, 2)\nconst c = circle(p, dist(p, P))");
@@ -305,7 +306,7 @@ describe("previewOf", () => {
 
   test("keeps a typed name on the outer const, not the hoisted crossing", () => {
     const p = previewOf(
-      { verb: "circle", focus: "name", typed: "", name: "reach" },
+      { verb: "circle", focus: "name", typed: "", name: "reach", centerRef: "" },
       { world: ll.at, point: ll },
     );
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst reach = circle(x, radius)");
@@ -313,7 +314,7 @@ describe("previewOf", () => {
 
   test("hoists a stored crossing center when pinning dist()", () => {
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", center: { expr: exprOfPlace(ll), at: ll.at } },
+      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: exprOfPlace(ll), at: ll.at } },
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");

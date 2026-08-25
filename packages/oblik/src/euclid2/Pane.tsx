@@ -13,6 +13,7 @@ import {
   ghostOf,
   keyTool,
   previewOf,
+  scopeFromTrace,
   startTool,
   tabTool,
   typeTool,
@@ -31,10 +32,6 @@ export type Euclid2PaneProps = {
   annotations: Record<string, Annotation>;
 };
 
-function usedBinds(trace: readonly { bind?: string }[]): string[] {
-  return trace.map((n) => n.bind).filter((b): b is string => !!b);
-}
-
 export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
   const [picker, setPicker] = createSignal(() => (props.scene, false));
@@ -46,6 +43,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const world = createMemo(() =>
     evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
   );
+  const scope = createMemo(() => scopeFromTrace(world().trace));
 
   const selectedNode = createMemo(() => {
     const key = selectedKey();
@@ -94,7 +92,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           ctrl: e.ctrlKey,
           meta: e.metaKey,
           alt: e.altKey,
-        }, place(), usedBinds(world().trace));
+        }, place(), scope());
         if (next) {
           e.preventDefault();
           applyStep(next);
@@ -146,7 +144,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     const session = tool();
     if (!session) return;
     setPlace(hit);
-    const next = clickTool(session, hit);
+    const next = clickTool(session, hit, scope());
     if ("insert" in next) void insert(next.insert);
     else setTool(next.session);
   }
@@ -159,12 +157,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const ghost = createMemo(() => {
     const t = tool();
     const p = place();
-    return t ? ghostOf(t, p) : null;
+    return t ? ghostOf(t, p, scope()) : null;
   });
   const prompt = createMemo(() => {
     const t = tool();
     if (!t) return null;
-    return previewOf(t, place(), usedBinds(world().trace));
+    return previewOf(t, place(), scope());
   });
   const status = createMemo(() => {
     if (tool()) return "Type into the prompt, Tab between fields, Enter to commit. Escape cancels.";
@@ -213,7 +211,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onCommit={() => {
             const session = tool();
             if (!session) return;
-            applyStep(keyTool(session, { key: "Enter" }, place(), usedBinds(world().trace)));
+            applyStep(keyTool(session, { key: "Enter" }, place(), scope()));
           }}
         />
       </div>

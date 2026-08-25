@@ -1,4 +1,5 @@
-import type { InsertJob, Field, FieldKind, Draft, Tool, ToolKey, ToolSession, ToolStep } from "./types";
+import type { InsertJob, Field, FieldKind, Draft, Scope, Tool, ToolKey, ToolSession, ToolStep } from "./types";
+import { scopeOf } from "./scope";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -17,6 +18,34 @@ export function identError(raw: string, usedNames: readonly string[] = []): stri
   return null;
 }
 
+export function numError(raw: string): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (parseNum(t) == null) return "Not a number.";
+  return null;
+}
+
+export function refError(raw: string, names: readonly string[], label: string): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!IDENT.test(t)) return "Name must be an identifier.";
+  if (names.length > 0 && !names.includes(t)) return `No ${label} named ${t}.`;
+  return null;
+}
+
+export function fieldError<S extends ToolSession>(field: Field<S>, session: S, scope: Scope): string | null {
+  const raw = field.get(session);
+  if (field.kind === "number") return numError(raw);
+  if (field.kind === "ident") return identError(raw, scope.used);
+  const names = field.looks === "carrier" ? Object.keys(scope.carriers) : Object.keys(scope.points);
+  const label = field.looks === "carrier" ? "line" : "point";
+  return refError(raw, names, label);
+}
+
+export function firstInvalid<S extends ToolSession>(tool: Tool<S>, session: S, scope: Scope): Field<S> | null {
+  return openFields(tool, session).find((f) => fieldError(f, session, scope) != null) ?? null;
+}
+
 export function namedBind(name: string | undefined): string | undefined {
   const t = name?.trim() ?? "";
   return IDENT.test(t) ? t : undefined;
@@ -25,6 +54,28 @@ export function namedBind(name: string | undefined): string | undefined {
 export function withBind(session: { name?: string }, job: InsertJob): InsertJob {
   const bind = namedBind(session.name);
   return bind ? { ...job, bind } : job;
+}
+
+export function resolvePoint(ref: string, placed: import("./types").Placed | undefined, scope: Scope) {
+  const t = ref.trim();
+  if (!t) return placed;
+  if (scope.points[t]) return scope.points[t];
+  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+}
+
+export function resolveCarrier(
+  ref: string,
+  placed: Scope["carriers"][string] | undefined,
+  scope: Scope,
+) {
+  const t = ref.trim();
+  if (!t) return placed;
+  if (scope.carriers[t]) return scope.carriers[t];
+  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+}
+
+export function hitRef(hit: import("./types").PlaceHit): string {
+  return hit.point.kind === "ref" ? hit.point.bind : "";
 }
 
 export function nameField<S extends { name: string }>(open: (session: S) => boolean = () => true): Field<S> {
@@ -49,11 +100,21 @@ export function typedField<S extends { typed: string }>(open: (session: S) => bo
   };
 }
 
+export function refField<S extends ToolSession>(
+  id: string,
+  placeholder: string,
+  looks: "point" | "carrier",
+  get: (session: S) => string,
+  set: (session: S, raw: string) => S,
+): Field<S> {
+  return { id, kind: "ref", placeholder, looks, open: () => true, get, set };
+}
+
 export function editValue(value: string, kind: FieldKind, key: string): string | null {
   if (key === "Backspace") return value.slice(0, -1);
   if (key === "Delete") return "";
   if (key.length !== 1) return null;
-  if (kind === "ident") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
+  if (kind === "ident" || kind === "ref") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
   if (key === "-" && value === "") return "-";
   if (/[0-9.]/.test(key)) return value + key;
   return null;
@@ -70,15 +131,11 @@ export function focusedField<S extends ToolSession>(tool: Tool<S>, session: S): 
   return open.find((f) => f.id === id) ?? open[0]!;
 }
 
-export function focusedDraft<S extends ToolSession>(
-  tool: Tool<S>,
-  session: S,
-  usedNames: readonly string[] = [],
-): Draft | null {
+export function focusedDraft<S extends ToolSession>(tool: Tool<S>, session: S, scope: Scope): Draft | null {
   const field = focusedField(tool, session);
   if (!field) return null;
   const value = field.get(session);
-  const error = field.kind === "ident" ? identError(value, usedNames) : undefined;
+  const error = fieldError(field, session, scope);
   return {
     id: field.id,
     kind: field.kind,
@@ -110,17 +167,20 @@ export function keySession<S extends ToolSession>(
   session: S,
   e: ToolKey,
   place: import("./types").PlaceHit | null,
-  usedNames: readonly string[] = [],
+  scope: Scope | readonly string[] = [],
 ): KeyOutcome {
+  const sc = scopeOf(scope);
   if (e.ctrl || e.meta || e.alt) return { ignore: true };
   if (e.key === "Tab") return { session: tabSession(tool, session, e.shift ? -1 : 1) };
   if (e.key === "Enter") {
-    const field = focusedField(tool, session);
-    if (field?.kind === "ident") {
-      const err = identError(field.get(session), usedNames);
-      if (err) return { ignore: true };
+    const bad = firstInvalid(tool, session, sc);
+    if (bad) {
+      if (tool.setFocus && tool.focus?.(session) !== bad.id) {
+        return { session: tool.setFocus(session, bad.id) };
+      }
+      return { ignore: true };
     }
-    return tool.commit?.(session, place) ?? { ignore: true };
+    return tool.commit?.(session, place, sc) ?? { ignore: true };
   }
   const field = focusedField(tool, session);
   if (!field) return { ignore: true };

@@ -65,7 +65,7 @@ function Prompt(props: {
               type="text"
               class={[styles.slot, { [styles.slotInvalid]: props.preview.draft?.invalid === true }]}
               style={{ width: slotWidth() }}
-              inputmode={props.preview.draft?.kind === "ident" ? "text" : "decimal"}
+              inputmode={props.preview.draft?.kind === "number" ? "decimal" : "text"}
               autocomplete="off"
               spellcheck={false}
               value={props.preview.draft?.value ?? ""}

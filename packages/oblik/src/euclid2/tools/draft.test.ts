@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
-import { clickTool, keyTool, startTool, tabTool } from "../tool";
+import { clickTool, keyTool, previewOf, startTool, tabTool, typeTool } from "../tool";
 import { inSlot, splitSlot, unmarkSlot } from "./draft";
-import type { PlaceHit, ToolSession, ToolStep } from "./types";
+import type { PlaceHit, Scope, ToolSession, ToolStep } from "./types";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +28,16 @@ function typeChars(session: ToolSession, chars: string): ToolSession {
   let s = session;
   for (const key of chars) s = asSession(keyTool(s, { key }));
   return s;
+}
+
+function pointScope(...pts: { bind: string; x: number; y: number }[]): Scope {
+  const points: Scope["points"] = {};
+  const used: string[] = [];
+  for (const p of pts) {
+    used.push(p.bind);
+    points[p.bind] = { expr: { kind: "ref", name: p.bind }, at: { x: p.x, y: p.y } };
+  }
+  return { used, points, carriers: {} };
 }
 
 describe("keyTool", () => {
@@ -106,19 +116,53 @@ describe("keyTool", () => {
 
   test("duplicate bind refuses Enter", () => {
     let s = startTool("line");
+    s = tabTool(tabTool(s));
     s = typeChars(s, "ground");
     expect(keyTool(s, { key: "Enter" }, null, ["ground"])).toBeUndefined();
   });
 
-  test("circle tabs typed ↔ name before the center", () => {
+  test("circle tabs center → typed → name", () => {
     const s = startTool("circle");
-    expect(s).toMatchObject({ focus: "typed" });
-    expect(tabTool(s)).toMatchObject({ focus: "name" });
-    expect(tabTool(tabTool(s))).toMatchObject({ focus: "typed" });
+    expect(s).toMatchObject({ focus: "center" });
+    expect(tabTool(s)).toMatchObject({ focus: "typed" });
+    expect(tabTool(tabTool(s))).toMatchObject({ focus: "name" });
   });
 
-  test("circle types a radius before the center, then Enter after the click", () => {
-    const typed = typeChars(startTool("circle"), "2.5");
+  test("circle types a named center then a radius and Enter inserts", () => {
+    const scope = pointScope({ bind: "A", x: 0, y: 0 });
+    let s = typeChars(startTool("circle"), "A");
+    s = tabTool(s);
+    s = typeChars(s, "2.5");
+    expect(keyTool(s, { key: "Enter" }, null, scope)).toEqual({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "num", value: 2.5 },
+        ],
+      },
+    });
+  });
+
+  test("circle unknown point ident is invalid and refuses Enter", () => {
+    const s = typeChars(startTool("circle"), "Z");
+    expect(previewOf(s, null, pointScope({ bind: "A", x: 0, y: 0 })).draft).toMatchObject({
+      id: "center",
+      invalid: true,
+    });
+    expect(keyTool(s, { key: "Enter" }, null, pointScope({ bind: "A", x: 0, y: 0 }))).toBeUndefined();
+  });
+
+  test("invalid number is flagged and blocks insert", () => {
+    const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
+    const bad = typeTool(mid, "..");
+    expect(previewOf(bad).draft).toMatchObject({ id: "typed", invalid: true });
+    expect(keyTool(bad, { key: "Enter" })).toBeUndefined();
+    expect(clickTool(bad, free(10, 0))).toEqual({ session: bad });
+  });
+
+  test("circle types a radius after Tab, then Enter after the click", () => {
+    const typed = typeChars(tabTool(startTool("circle")), "2.5");
     const mid = asSession(clickTool(typed, named("A", 0, 0)));
     expect(keyTool(mid, { key: "Enter" })).toEqual({
       insert: {
@@ -178,9 +222,26 @@ describe("keyTool", () => {
     expect(asSession(keyTool(naming, { key: "Enter" }))).toMatchObject({ focus: "typed" });
   });
 
-  test("line Enter does not insert; two clicks still required", () => {
+  test("line types two point names and Enter inserts", () => {
+    const scope = pointScope({ bind: "A", x: 0, y: 0 }, { bind: "P", x: 2, y: 0 });
+    let s = typeChars(startTool("line"), "A");
+    s = tabTool(s);
+    s = typeChars(s, "P");
+    expect(keyTool(s, { key: "Enter" }, null, scope)).toEqual({
+      insert: {
+        from: "line",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "P" },
+        ],
+      },
+    });
+  });
+
+  test("line Enter with only the first point does not insert", () => {
     expect(keyTool(startTool("line"), { key: "Enter" })).toBeUndefined();
     const mid = asSession(clickTool(startTool("line"), named("A", 0, 0)));
+    expect(mid).toMatchObject({ focus: "b" });
     expect(keyTool(mid, { key: "Enter" })).toBeUndefined();
   });
 
