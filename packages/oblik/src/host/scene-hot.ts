@@ -1,24 +1,24 @@
 import type { Scene } from "../eval/scene";
 
 export type SceneHotHandler = {
-  currentPath: () => string;
-  onHot: (scene: Scene) => void;
+  onHot: (key: string, scene: Scene) => void;
 };
 
 let handler: SceneHotHandler | null = null;
 
-export function registerSceneHot(next: SceneHotHandler): void {
+export function registerSceneHot(next: SceneHotHandler | null): void {
   handler = next;
 }
 
+/** Vite-injected `hot.accept` delivers freshly fetched modules; cache every update by glob key. */
 export function applyHotScenes(keys: string[], mods: unknown): void {
   const h = handler;
   if (!h) return;
-  const path = h.currentPath();
-  const base = path.split("/").pop() ?? "";
-  const idx = keys.findIndex((k) => k.endsWith(`/${base}`) || k === `./scenes/${base}`);
-  if (idx < 0) return;
   const list = Array.isArray(mods) ? mods : [mods];
-  const mod = list[idx] as { default?: Scene } | undefined;
-  if (mod?.default) h.onHot(mod.default);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const mod = list[i] as { default?: Scene } | undefined;
+    if (!key || !mod?.default) continue;
+    h.onHot(key, mod.default);
+  }
 }

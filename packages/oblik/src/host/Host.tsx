@@ -67,22 +67,24 @@ function Host(props: {
   initialSceneId: string;
 }) {
   const [sceneId, setSceneId] = createSignal(props.initialSceneId);
-  const [hot, setHot] = createSignal<Scene | null>(() => {
-    sceneId();
-    props.loaders;
-    return null;
-  });
+  const sceneCache = new Map<string, Scene>();
+  const [sceneRev, setSceneRev] = createSignal(0);
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
   const loaded = createMemo(async () => {
+    sceneRev();
     const e = entry();
     const loaders = props.loaders;
     if (!e) throw new Error(`Unknown scene "${sceneId()}"`);
     if (e.error) throw new Error(e.error);
-    const loader = loaders[sceneLoaderKey(e.file)];
+    const key = sceneLoaderKey(e.file);
+    const cached = sceneCache.get(key);
+    if (cached) return cached;
+    const loader = loaders[key];
     if (!loader) throw new Error(`No loader for ${e.file}`);
     const sceneMod = await loader();
+    sceneCache.set(key, sceneMod.default);
     return sceneMod.default;
   });
 
@@ -92,14 +94,15 @@ function Host(props: {
   });
 
   createEffect(
-    () => entry()?.path ?? "",
-    (path) => {
+    () => true,
+    () => {
       registerSceneHot({
-        currentPath: () => path,
-        onHot(scene) {
-          setHot(scene);
+        onHot(key, scene) {
+          sceneCache.set(key, scene);
+          setSceneRev((r) => r + 1);
         },
       });
+      return () => registerSceneHot(null);
     },
   );
 
@@ -120,7 +123,7 @@ function Host(props: {
     setSceneId(id);
   }
 
-  const scene = createMemo(() => hot() ?? loaded());
+  const scene = createMemo(() => loaded());
   const sceneKind = createMemo(() => scene().kind);
 
   const pane = createMemo(() => {
@@ -142,7 +145,7 @@ function Host(props: {
         </div>
         <h1>{entry()?.title ?? "…"}</h1>
         <Loading fallback={null}>
-          <p>{(hot() ?? loaded())?.hint}</p>
+          <p>{loaded()?.hint}</p>
         </Loading>
       </header>
       <div class={styles.stage}>
