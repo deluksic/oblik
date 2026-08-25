@@ -12,7 +12,7 @@ import {
   type Camera2,
   type PaneSize,
 } from "./camera";
-import { snapBoundPoint, hitsNear, movedPastClick, traceKey } from "./pick";
+import { snapBoundPoint, hitsNear, isFiniteTrace, movedPastClick, traceKey } from "./pick";
 import type { Ghost, PlaceHit } from "./tool";
 
 import styles from "./View.module.css";
@@ -68,8 +68,6 @@ type Drag =
 
 type PendingPick = {
   hits: TraceNode[];
-  x: number;
-  y: number;
 };
 
 function isHot(node: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined): boolean {
@@ -78,16 +76,6 @@ function isHot(node: TraceNode, hoverId: string | null | undefined, selectedKey:
 
 function isSelected(node: TraceNode, selectedKey: string | null | undefined): boolean {
   return traceKey(node) === selectedKey;
-}
-
-function finite(n: TraceNode): boolean {
-  const v = n.value;
-  if (v.kind === "point") return Number.isFinite(v.x) && Number.isFinite(v.y);
-  if (v.kind === "circle") return Number.isFinite(v.radius) && Number.isFinite(v.center.x);
-  if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
-  if (v.kind === "line") return Number.isFinite(v.origin.x);
-  if (v.kind === "offsetLine") return Number.isFinite(v.distance);
-  return false;
 }
 
 function readPaneSize(el: Element): PaneSize | null {
@@ -111,13 +99,11 @@ export function Euclid2View(props: Euclid2ViewProps) {
     () => paneEl(),
     (el) => {
       if (!el) return;
-      const apply = () => {
+      const ro = new ResizeObserver(() => {
         const next = readPaneSize(el);
         if (next) setSize(next);
-      };
-      const ro = new ResizeObserver(apply);
+      });
       ro.observe(el);
-      apply();
       return () => ro.disconnect();
     },
   );
@@ -208,7 +194,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (!props.placing) {
       const w = worldOf(e);
       const hits = hitsNear(props.trace, w, camera(), size());
-      pendingPick = hits.length > 0 ? { hits, x: e.clientX, y: e.clientY } : null;
+      pendingPick = hits.length > 0 ? { hits } : null;
     } else {
       pendingPick = null;
     }
@@ -283,7 +269,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
   }
 
-  const strokes = createMemo(() => props.trace.filter(finite));
+  const strokes = createMemo(() => props.trace.filter(isFiniteTrace));
   const ink = createMemo(() => strokes().filter((n) => n.kind !== "point"));
   const points = createMemo(() => strokes().filter((n) => n.kind === "point"));
   const handles = createMemo(() =>

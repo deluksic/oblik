@@ -1,7 +1,7 @@
 import type { TraceNode } from "../eval/context";
 import { lineBasis } from "../geom/ops";
 import type { Circle, Line, OffsetLine, Point, Segment } from "../geom";
-import { dist, dot, perp, sub } from "../geom/vec";
+import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
 export type Vec2 = { x: number; y: number };
@@ -14,28 +14,7 @@ export function traceKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
 }
 
-export function traceKeyOf(id: string, occ: number): string {
-  return `${id}:${occ}`;
-}
-
-function projectT(a: Vec2, b: Vec2, p: Vec2): number {
-  const ab = sub(b, a);
-  const l2 = dot(ab, ab);
-  if (l2 < 1e-12) return 0;
-  return dot(sub(p, a), ab) / l2;
-}
-
-function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
-  const t = Math.min(1, Math.max(0, projectT(a, b, p)));
-  return dist(p, { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
-}
-
-function distToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
-  const n = perp(dir);
-  return Math.abs(dot(sub(p, origin), n));
-}
-
-function finite(n: TraceNode): boolean {
+export function isFiniteTrace(n: TraceNode): boolean {
   const v = n.value;
   if (v.kind === "point") return Number.isFinite(v.x) && Number.isFinite(v.y);
   if (v.kind === "circle") return Number.isFinite(v.radius) && Number.isFinite(v.center.x);
@@ -67,10 +46,6 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
   return Infinity;
 }
 
-function pickRadius(camera: Camera2): number {
-  return GEOM_PX / Math.max(8, camera.scale);
-}
-
 /** Nearest finite bound point on the live tape. Distance is in world units. */
 export function snapBoundPoint(trace: readonly TraceNode[], world: Vec2, maxDist: number): SnapPoint | null {
   let best: { snap: SnapPoint; d: number } | null = null;
@@ -96,7 +71,7 @@ export function hitsNear(
   const maxWorld = maxPx / Math.max(8, camera.scale);
   const out: { node: TraceNode; d: number }[] = [];
   for (const n of trace) {
-    if (!finite(n)) continue;
+    if (!isFiniteTrace(n)) continue;
     const d = geomDistWorld(world, n);
     if (d <= maxWorld) out.push({ node: n, d });
   }
@@ -110,7 +85,7 @@ export function hitsNear(
   return out.map((x) => x.node);
 }
 
-/** Stable ordering when distances tie — prefers deeper user frames. */
+/** Tie-break equal distances using the innermost user frame. */
 function stackRank(n: TraceNode): number {
   const leaf = n.stack[0];
   if (!leaf) return 0;
@@ -128,24 +103,14 @@ export function hitTest(
 }
 
 /**
- * Choose one node from overlapping hits. Re-clicking the same screen target
- * cycles when several nodes share an id (different `occ`); stack order breaks ties.
+ * Resolve a click against overlapping hits (already nearest-first).
+ * First click takes the nearest; clicking the same stack again walks to the next.
  */
 export function pickAmong(hits: readonly TraceNode[], priorKey: string | null): TraceNode | null {
   if (hits.length === 0) return null;
-  if (hits.length === 1) return hits[0]!;
   const idx = priorKey ? hits.findIndex((n) => traceKey(n) === priorKey) : -1;
   if (idx >= 0) return hits[(idx + 1) % hits.length]!;
-  const byId = new Map<string, TraceNode[]>();
-  for (const n of hits) {
-    const row = byId.get(n.id) ?? [];
-    row.push(n);
-    byId.set(n.id, row);
-  }
-  const top = hits[0]!;
-  const siblings = byId.get(top.id);
-  if (siblings && siblings.length > 1) return siblings[0]!;
-  return top;
+  return hits[0]!;
 }
 
 export const PICK_CLICK_PX = 4;

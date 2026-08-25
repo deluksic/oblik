@@ -12,6 +12,7 @@ import {
   sceneLoadersAcceptTail,
 } from "./catalog";
 import { insertCall } from "./insert";
+import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
 import { parseInsert, parseLiteralPatch } from "./schema";
@@ -84,6 +85,7 @@ function invalidateSceneLoaders(server: ViteDevServer): void {
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
+  const appRoot = path.dirname(path.dirname(sceneDir));
   const writeTail = new Map<string, Promise<void>>();
   let lastCatalog = "";
 
@@ -191,6 +193,26 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           } catch (err) {
             res.statusCode = 404;
             res.end(err instanceof Error ? err.message : String(err));
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__map-stack") {
+          let body: unknown;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { error: "invalid json" });
+            return;
+          }
+          const frames = parseStackLocs(
+            body && typeof body === "object" ? (body as { frames?: unknown }).frames : [],
+          );
+          try {
+            json(res, 200, {
+              frames: await remapStackFrames(server, frames, workspaceRoot, appRoot),
+            });
+          } catch (err) {
+            json(res, 500, { error: err instanceof Error ? err.message : String(err) });
           }
           return;
         }

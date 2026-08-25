@@ -51,7 +51,7 @@ describe("hitTest", () => {
 });
 
 describe("pickAmong", () => {
-  test("cycles duplicate ids by occurrence", () => {
+  test("first click takes the nearest; re-click cycles the overlap list", () => {
     const dup0: TraceNode = {
       ...A,
       occ: 0,

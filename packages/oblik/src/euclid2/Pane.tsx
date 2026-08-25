@@ -36,7 +36,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   );
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.scene, null));
-  const peekCache = new Map<string, string>();
 
   const world = createMemo(() =>
     evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
@@ -51,7 +50,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const selectionDetail = createMemo(async () => {
     const node = selectedNode();
     if (!node) return EMPTY_SELECTION_DETAIL;
-    return selectionDetailForNode(node, peekCache);
+    return selectionDetailForNode(node);
   });
 
   createEffect(

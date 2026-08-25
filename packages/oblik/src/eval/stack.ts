@@ -11,7 +11,7 @@ const SKIP_NAME = new Set(["", "eval", "anonymous", "<anonymous>", "Module", "ev
 export function isUserSourcePath(file: string): boolean {
   const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
   if (/(^|\/)node_modules(\/|$)/.test(key)) return false;
-  if (/(^|\/)\\.vite(\/|$)/.test(key)) return false;
+  if (/(^|\/)\.vite(\/|$)/.test(key)) return false;
   if (/^node:/.test(key)) return false;
   if (/\/oblik\//.test(key)) return false;
   return /\.(ts|tsx)$/.test(key);

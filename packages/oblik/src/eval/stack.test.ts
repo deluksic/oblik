@@ -10,6 +10,7 @@ describe("isUserSourcePath", () => {
   test("rejects vite prebundles and node_modules", () => {
     expect(isUserSourcePath("node_modules/.vite/deps/dev-DEjxqSxT.js")).toBe(false);
     expect(isUserSourcePath("node_modules/oblik/src/index.ts")).toBe(false);
+    expect(isUserSourcePath(".vite/deps/chunk.ts")).toBe(false);
   });
 
   test("rejects oblik internals and node builtins", () => {

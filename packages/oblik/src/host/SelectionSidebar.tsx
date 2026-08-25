@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For } from "solid-js";
 
 import type { OriginDisplayLine, OriginView, SelectionDetail } from "./selection-detail";
 

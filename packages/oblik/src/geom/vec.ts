@@ -38,6 +38,27 @@ export function dist(a: Vec2, b: Vec2): number {
   return len(sub(b, a));
 }
 
+export function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
+  return add(a, mul(sub(b, a), t));
+}
+
+export function projectT(a: Vec2, b: Vec2, p: Vec2): number {
+  const ab = sub(b, a);
+  const l2 = dot(ab, ab);
+  if (l2 < 1e-12) return 0;
+  return dot(sub(p, a), ab) / l2;
+}
+
+export function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const t = Math.min(1, Math.max(0, projectT(a, b, p)));
+  return dist(p, lerp(a, b, t));
+}
+
+/** Distance from `p` to the infinite line through `origin` along unit `dir`. */
+export function distToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
+  return Math.abs(dot(sub(p, origin), perp(dir)));
+}
+
 export function cross2(a: Vec2, b: Vec2): number {
   return a.x * b.y - a.y * b.x;
 }

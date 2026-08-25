@@ -130,6 +130,22 @@ export async function peekFile(
   return text;
 }
 
+export async function mapStack(frames: readonly CallSite[]): Promise<CallSite[]> {
+  if (frames.length === 0) return [];
+  try {
+    const res = await fetch("/__map-stack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frames }),
+    });
+    if (!res.ok) return frames.map((f) => ({ ...f }));
+    const body = (await res.json()) as { frames?: CallSite[] };
+    return Array.isArray(body.frames) ? body.frames : frames.map((f) => ({ ...f }));
+  } catch {
+    return frames.map((f) => ({ ...f }));
+  }
+}
+
 export async function originFromStack(
   frames: readonly CallSite[],
   cache: Map<string, string>,
@@ -179,13 +195,12 @@ export function stackForNode(node: TraceNode): CallSite[] {
   return fromStack;
 }
 
-function selectionMeta(node: TraceNode): string {
-  const stack = pinConstructorSite(
-    stackForNode(node),
-    node.at && node.module
-      ? { file: node.module, line: node.at.line, column: node.at.column }
-      : undefined,
-  );
+function constructorSite(node: TraceNode): { file: string; line: number; column: number } | undefined {
+  if (!node.at || !node.module) return undefined;
+  return { file: node.module, line: node.at.line, column: node.at.column };
+}
+
+function selectionMeta(stack: readonly CallSite[], node: TraceNode): string {
   const label = stackLabel(stack);
   if (label) return label;
   if (node.at && node.module) return `${node.module}:${node.at.line}:${node.at.column}`;
@@ -198,14 +213,20 @@ function selectionCrumb(node: TraceNode): string {
   return node.id || node.kind;
 }
 
-export async function selectionDetailForNode(
-  node: TraceNode,
-  cache: Map<string, string>,
-): Promise<SelectionDetail> {
-  const stack = stackForNode(node);
+export async function selectionDetailForNode(node: TraceNode): Promise<SelectionDetail> {
+  const runtime = node.stack
+    .filter((f) => isUserSourcePath(f.file))
+    .map((f) => ({
+      ...f,
+      file: normalizeSceneRelPath(f.file, node.module),
+    }));
+  const mapped = await mapStack(runtime);
+  const stack = pinConstructorSite(mapped, constructorSite(node));
+  const cache = new Map<string, string>();
+  const origin = await originFromStack(stack, cache, node.module);
   return {
     crumb: selectionCrumb(node),
-    meta: selectionMeta(node),
-    origin: await originFromStack(stack, cache, node.module),
+    meta: selectionMeta(stack, node),
+    origin,
   };
 }
