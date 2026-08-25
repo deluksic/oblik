@@ -87,7 +87,7 @@
 .headerRow,
 .gapRow {
   display: grid;
-  grid-template-columns: 2.4rem 1fr;
+  grid-template-columns: max-content 1fr;
   gap: 0.35rem;
   padding: 0 0.45rem;
 }
