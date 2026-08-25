@@ -1,4 +1,6 @@
+import { printExpr } from "../../source/expr";
 import type { InsertJob, Field, FieldKind, Draft, Scope, Tool, ToolKey, ToolSession, ToolStep } from "./types";
+import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -33,16 +35,34 @@ export function refError(raw: string, names: readonly string[], label: string): 
   return null;
 }
 
-export function lengthError(raw: string, names: readonly string[]): string | null {
+export function lengthError(raw: string, scope: Scope): string | null {
   const t = raw.trim();
-  if (t === "") return null;
+  if (t === "" || t === "-") return null;
   if (parseNum(t) != null) return null;
-  return refError(raw, names, "slider");
+  let rest = t;
+  if (rest.startsWith("-")) {
+    rest = rest.slice(1).trim();
+    if (rest === "") return null;
+  }
+  const dot = rest.lastIndexOf(".");
+  if (dot > 0) {
+    const object = rest.slice(0, dot);
+    const field = rest.slice(dot + 1);
+    if (field === "radius") {
+      if (!scope.circles[object]) return `No circle named ${object}.`;
+      return null;
+    }
+    if (field === "distance") {
+      if (scope.carriers[object]?.geom.kind !== "parallelLine") return `No parallel line named ${object}.`;
+      return null;
+    }
+  }
+  return refError(raw, Object.keys(scope.lengths), "slider");
 }
 
 export function fieldError<S extends ToolSession>(field: Field<S>, session: S, scope: Scope): string | null {
   const raw = field.get(session);
-  if (field.kind === "length") return lengthError(raw, Object.keys(scope.lengths));
+  if (field.kind === "length") return lengthError(raw, scope);
   if (field.kind === "number") return numError(raw);
   if (field.kind === "ident") return identError(raw, scope.used);
   const names = field.looks === "carrier"
@@ -110,17 +130,15 @@ export function typedField<S extends { typed: string }>(open: (session: S) => bo
   };
 }
 
-/** Numeric literal or an existing slider bind. */
-export function lengthField<S extends { typed: string; lengthReuse?: string }>(
-  placeholder = "<n>",
-): Field<S> {
+/** Numeric literal, slider ref, or geometry field (e.g. reach.radius). */
+export function lengthField<S extends LengthDraft>(placeholder = "<n>"): Field<S> {
   return {
     id: "typed",
     kind: "length",
     placeholder,
     open: () => true,
-    get: (s) => s.lengthReuse ?? s.typed,
-    set: (s, raw) => ({ ...s, typed: raw, lengthReuse: undefined }),
+    get: (s) => (s.lengthPick ? printExpr(s.lengthPick) : s.typed),
+    set: (s, raw) => ({ ...s, typed: raw, lengthPick: undefined }),
   };
 }
 
@@ -143,7 +161,7 @@ export function editValue(value: string, kind: FieldKind, key: string): string |
   if (kind === "ident" || kind === "ref") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
   if (kind === "length") {
     if (key === "-" && value === "") return "-";
-    if (/[0-9.]/.test(key) || /[A-Za-z0-9_]/.test(key)) return value + key;
+    if (key === "." || /[0-9A-Za-z_]/.test(key)) return value + key;
     return null;
   }
   if (key === "-" && value === "") return "-";

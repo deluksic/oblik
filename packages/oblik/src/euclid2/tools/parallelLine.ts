@@ -4,10 +4,10 @@ import { snapLineCarrier } from "../pick";
 import { exprOfPlace, hoverBind, previewCall, round } from "./common";
 import {
   attachLengthHit,
+  lengthHover,
   lengthLabel,
   lengthValue,
   resolveLengthExpr,
-  resolveLengthRef,
 } from "./length";
 import { inSlot, lengthField, nameField, previewName, refField, resolveCarrier, withBind } from "./draft";
 import { scopeFromTrace } from "./scope";
@@ -37,16 +37,19 @@ function distAt(hit: PlaceHit, geom: LineLike): number {
 }
 
 function distExpr(session: ParallelSession, carrier: NonNullable<ReturnType<typeof carrierOf>>, hit: PlaceHit, scope: Scope) {
-  if (hit.point.kind !== "free" && resolveLengthRef(session.typed, scope, session.lengthReuse) == null) {
-    return {
-      kind: "call" as const,
-      name: "signedDist",
-      args: [exprOfPlace(hit.point), carrier.expr],
-    };
-  }
+  if (hit.length) return hit.length.expr;
   const bound = resolveLengthExpr(session, scope);
+  if (hit.point.kind !== "free") {
+    if (!bound || bound.kind === "num") {
+      return {
+        kind: "call" as const,
+        name: "signedDist",
+        args: [exprOfPlace(hit.point), carrier.expr],
+      };
+    }
+    return bound;
+  }
   if (bound) return bound;
-  if (hit.length) return { kind: "ref" as const, name: hit.length.bind };
   return { kind: "num" as const, value: round(distAt(hit, carrier.geom)) };
 }
 
@@ -75,15 +78,14 @@ export const parallelLine: Tool<ParallelSession> = {
       const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size);
       return carrier ? { ...hit, carrier } : hit;
     }
-    return attachLengthHit(hit, ctx);
+    return attachLengthHit(hit, ctx, session, ["distance"]);
   },
   hover(session, hit, trace) {
     if (!carrierOf(session, scopeFromTrace(trace))) {
       if (!hit.carrier) return null;
       return hoverBind(trace, hit.carrier.bind);
     }
-    if (hit.length) return hoverBind(trace, hit.length.bind);
-    return null;
+    return lengthHover(hit, trace);
   },
   click(session, hit, scope) {
     const carrier = carrierOf(session, scope);
@@ -102,7 +104,7 @@ export const parallelLine: Tool<ParallelSession> = {
       return {
         insert: withBind(session, {
           from: "parallelLine",
-          args: [carrier.expr, { kind: "ref", name: hit.length.bind }],
+          args: [carrier.expr, hit.length.expr],
         }),
       };
     }
@@ -155,15 +157,15 @@ export const parallelLine: Tool<ParallelSession> = {
       return {
         line: previewCall(
           "parallelLine",
-          [carrier.expr, { kind: "ref", name: place.length.bind }],
+          [carrier.expr, place.length.expr],
           scope.used,
           ([g, d]) => `parallelLine(${inSlot(session.focus === "carrier", g)}, ${d})`,
           name,
         ),
-        hint: "Click to reuse that slider. Tab to name it.",
+        hint: "Click to reuse that length. Tab to name it.",
       };
     }
-    if (p && p.kind !== "free" && resolveLengthExpr(session, scope) == null) {
+    if (p && p.kind !== "free" && resolveLengthExpr(session, scope) == null && !place?.length) {
       return {
         line: previewCall(
           "parallelLine",
@@ -185,7 +187,7 @@ export const parallelLine: Tool<ParallelSession> = {
         ([g, n]) => `parallelLine(${inSlot(session.focus === "carrier", g)}, ${inSlot(session.focus === "typed", n ?? shown)})`,
         name,
       ),
-      hint: "Type a distance or slider name, click a slider, measure, or click a point for signedDist(). Tab to name it.",
+      hint: "Type a distance, slider, or field (-shelf.distance), click to reuse, measure, or click a point for signedDist(). Tab to name it.",
     };
   },
 };

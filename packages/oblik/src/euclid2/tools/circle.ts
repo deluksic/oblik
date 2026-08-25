@@ -1,11 +1,11 @@
 import { printExpr } from "../../source/expr";
-import { asPoint, dist, exprOfPlace, hoverBind, hoverPlace, previewCall, round, sameRef } from "./common";
+import { asPoint, dist, exprOfPlace, hoverPlace, previewCall, round, sameRef } from "./common";
 import {
   attachLengthHit,
+  lengthHover,
   lengthLabel,
   lengthValue,
   resolveLengthExpr,
-  resolveLengthRef,
 } from "./length";
 import {
   hitRef,
@@ -39,12 +39,15 @@ function centerOf(session: CircleSession, scope: Scope): Placed | undefined {
 }
 
 function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope: Scope) {
-  if (hit.point.kind !== "free" && !sameRef(center.expr, hit.point) && resolveLengthRef(session.typed, scope, session.lengthReuse) == null) {
-    return { kind: "call" as const, name: "dist", args: [center.expr, exprOfPlace(hit.point)] };
-  }
+  if (hit.length) return hit.length.expr;
   const bound = resolveLengthExpr(session, scope, { min: 0.05 });
+  if (hit.point.kind !== "free" && !sameRef(center.expr, hit.point)) {
+    if (!bound || bound.kind === "num") {
+      return { kind: "call" as const, name: "dist", args: [center.expr, exprOfPlace(hit.point)] };
+    }
+    return bound;
+  }
   if (bound) return bound;
-  if (hit.length) return { kind: "ref" as const, name: hit.length.bind };
   const r = Math.max(0.05, dist(hit.point.at, center.at));
   return { kind: "num" as const, value: round(r) };
 }
@@ -72,12 +75,11 @@ export const circle: Tool<CircleSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as CircleSession["focus"] }),
   hit(session, hit, ctx) {
     if (!centerOf(session, scopeFromTrace(ctx.trace))) return hit;
-    return attachLengthHit(hit, ctx);
+    return attachLengthHit(hit, ctx, session, ["radius"]);
   },
   hover(session, hit, trace) {
     if (!centerOf(session, scopeFromTrace(trace))) return hoverPlace(hit.point, trace);
-    if (hit.length) return hoverBind(trace, hit.length.bind);
-    return hoverPlace(hit.point, trace);
+    return lengthHover(hit, trace) ?? hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {
     const center = centerOf(session, scope);
@@ -96,7 +98,7 @@ export const circle: Tool<CircleSession> = {
       return {
         insert: withBind(session, {
           from: "circle",
-          args: [center.expr, { kind: "ref", name: hit.length.bind }],
+          args: [center.expr, hit.length.expr],
         }),
       };
     }
@@ -157,15 +159,15 @@ export const circle: Tool<CircleSession> = {
       return {
         line: previewCall(
           "circle",
-          [center.expr, { kind: "ref", name: place.length.bind }],
+          [center.expr, place.length.expr],
           scope.used,
           ([c, d]) => `circle(${inSlot(session.focus === "center", c)}, ${d})`,
           name,
         ),
-        hint: "Click to reuse that slider. Tab to name it.",
+        hint: "Click to reuse that length. Tab to name it.",
       };
     }
-    if (p && p.kind !== "free" && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null) {
+    if (p && p.kind !== "free" && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null && !place?.length) {
       return {
         line: previewCall(
           "circle",
@@ -186,7 +188,7 @@ export const circle: Tool<CircleSession> = {
         ([c, d]) => `circle(${inSlot(session.focus === "center", c)}, ${inSlot(session.focus === "typed", d ?? r)})`,
         name,
       ),
-      hint: "Type a radius or slider name, click a slider, measure, or click a point for dist(). Tab to name it.",
+      hint: "Type a radius, slider, or field (reach.radius), click to reuse, measure, or click a point for dist(). Tab to name it.",
     };
   },
 };

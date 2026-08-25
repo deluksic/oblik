@@ -235,7 +235,7 @@ describe("clickTool", () => {
       lengths: { reach: 1.25 },
     };
     expect(
-      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 1.25 } }, scope),
+      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 1.25 } }, scope),
     ).toEqual({
       insert: {
         from: "parallelLine",
@@ -255,13 +255,133 @@ describe("clickTool", () => {
       lengths: { reach: 2.5 },
     };
     expect(
-      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 2.5 } }, scope),
+      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 2.5 } }, scope),
     ).toEqual({
       insert: {
         from: "circle",
         args: [
           { kind: "ref", name: "A" },
           { kind: "ref", name: "reach" },
+        ],
+      },
+    });
+  });
+
+  test("circle click on another circle reuses its radius field", () => {
+    const mid = clickTool(startTool("circle"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in mid)) throw new Error("expected session");
+    const scope = {
+      used: ["A", "reach"],
+      points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      carriers: {},
+      circles: { reach: { expr: { kind: "ref", name: "reach" }, geom: { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2.5 } } },
+      lengths: {},
+    };
+    expect(
+      clickTool(
+        mid.session,
+        {
+          world: { x: 2.5, y: 0 },
+          point: free(2.5, 0),
+          length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+        },
+        scope,
+      ),
+    ).toEqual({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "member", object: "reach", field: "radius" },
+        ],
+      },
+    });
+  });
+
+  test("parallel line click reuses a parallel line distance field", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const shelf = {
+      kind: "parallelLine" as const,
+      origin: { x: 0, y: 1.76 },
+      direction: { x: 1, y: 0 },
+      distance: 1.76,
+    };
+    const mid = clickTool(startTool("parallelLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid)) throw new Error("expected session");
+    const scope = {
+      used: ["ground", "shelf"],
+      points: {},
+      carriers: {
+        ground: { expr: { kind: "ref", name: "ground" }, geom: ground },
+        shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
+      },
+      circles: {},
+      lengths: {},
+    };
+    expect(
+      clickTool(
+        mid.session,
+        {
+          world: { x: 0, y: 1.76 },
+          point: free(0, 1.76),
+          length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+        },
+        scope,
+      ),
+    ).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "member", object: "shelf", field: "distance" },
+        ],
+      },
+    });
+  });
+
+  test("parallel line typed negated field commits on Enter", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const shelf = {
+      kind: "parallelLine" as const,
+      origin: { x: 0, y: 1.76 },
+      direction: { x: 1, y: 0 },
+      distance: 1.76,
+    };
+    const scope = {
+      used: ["ground", "shelf"],
+      points: {},
+      carriers: {
+        ground: { expr: { kind: "ref", name: "ground" }, geom: ground },
+        shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
+      },
+      circles: {},
+      lengths: {},
+    };
+    const mid = clickTool(startTool("parallelLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid)) throw new Error("expected session");
+    const typed = typeTool(mid.session, "-shelf.distance");
+    expect(commitTool(typed, null, scope)).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "neg", expr: { kind: "member", object: "shelf", field: "distance" } },
         ],
       },
     });
@@ -421,7 +541,7 @@ describe("ghostOf", () => {
   test("previews a slider radius after the center", () => {
     const g = ghostOf(
       { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 2.5 } },
+      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 2.5 } },
       { used: ["A", "reach"], points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, carriers: {}, circles: {}, lengths: { reach: 2.5 } },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 });
@@ -448,7 +568,7 @@ describe("ghostOf", () => {
     };
     const g = ghostOf(
       { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 1.25 } },
+      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 1.25 } },
       { used: ["ground", "reach"], points: {}, carriers: {}, circles: {}, lengths: { reach: 1.25 } },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.25 });

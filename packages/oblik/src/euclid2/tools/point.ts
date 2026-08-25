@@ -2,10 +2,12 @@ import type { Expr } from "../../source/expr";
 import { printExpr } from "../../source/expr";
 import { hoistIntersections, printHoist } from "../../source/hoist";
 import { isConstructed } from "../place";
-import { constructedInsert, exprOfPlace, hoverBind, hoverPlace, round } from "./common";
+import { constructedInsert, exprOfPlace, hoverPlace, round } from "./common";
 import {
   attachLengthHit,
   hasNumberBinding,
+  lengthHover,
+  lengthRefName,
   numberField,
   numberValue,
   resolveNumberExpr,
@@ -30,7 +32,8 @@ function pointArgs(session: PointSession, at: { x: number; y: number }, scope: S
 }
 
 function applyLengthToAxis(session: PointSession, hit: PlaceHit, scope: Scope): PointSession | { insert: ReturnType<typeof withBind> } {
-  const bind = hit.length!.bind;
+  const bind = lengthRefName(hit.length!.expr);
+  if (!bind) return session;
   if (session.focus === "x") {
     const next = { ...session, x: bind };
     const yExpr = resolveNumberExpr(session.y, scope);
@@ -60,11 +63,11 @@ export const point: Tool<PointSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as PointSession["focus"] }),
   hit(session, hit, ctx) {
     if (session.focus !== "x" && session.focus !== "y") return hit;
-    return attachLengthHit(hit, ctx);
+    return attachLengthHit(hit, ctx, session);
   },
   hover(session, hit, trace) {
     if (hit.length && (session.focus === "x" || session.focus === "y")) {
-      return hoverBind(trace, hit.length.bind);
+      return lengthHover(hit, trace);
     }
     return hoverPlace(hit.point, trace);
   },

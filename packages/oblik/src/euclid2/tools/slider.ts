@@ -1,6 +1,6 @@
 import type { Expr } from "../../source/expr";
 import { inSlot, nameField, parseNum, previewName, withBind } from "./draft";
-import { attachLengthHit, numberField, resolveNumberExpr } from "./length";
+import { attachLengthHit, lengthRefName, numberField, resolveNumberExpr } from "./length";
 import { round } from "./common";
 import { scopeFromTrace } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
@@ -61,11 +61,12 @@ export const slider: Tool<SliderSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as SliderSession["focus"] }),
   hit(session, hit, ctx) {
     if (!NUMERIC_FOCUS.has(session.focus)) return hit;
-    return attachLengthHit(hit, ctx);
+    return attachLengthHit(hit, ctx, session);
   },
   click(session, hit, scope) {
     if (hit.length && NUMERIC_FOCUS.has(session.focus)) {
-      const raw = hit.length.bind;
+      const raw = lengthRefName(hit.length.expr);
+      if (!raw) return { session };
       const next =
         session.focus === "value"
           ? { ...session, value: raw }

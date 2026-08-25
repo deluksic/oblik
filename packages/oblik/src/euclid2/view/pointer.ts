@@ -278,7 +278,7 @@ export function placeFromEvent(
     if (id) {
       const found = trace.find((n) => n.id === id && n.kind === "slider");
       if (found?.bind && found.value.kind === "slider") {
-        length = { bind: found.bind, value: found.value.n };
+        length = { expr: { kind: "ref", name: found.bind }, value: found.value.n };
       }
     }
   }
@@ -288,11 +288,11 @@ export function placeFromEvent(
   if (!length && screen) {
     const slider = hitSlider(screen, sliderNodes(trace));
     if (slider?.bind && slider.value.kind === "slider") {
-      length = { bind: slider.bind, value: slider.value.n };
+      length = { expr: { kind: "ref", name: slider.bind }, value: slider.value.n };
     }
   }
   const hit: PlaceHit = { world: w, point, ...(length ? { length } : {}) };
-  return tool ? enrichHit(tool, hit, { trace, camera, size, screen }) : hit;
+  return tool ? enrichHit(tool, hit, { trace, camera, size, screen, target: t }) : hit;
 }
 
 export function applyDrag(

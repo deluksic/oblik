@@ -54,7 +54,7 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike };
-  length?: { bind: string; value: number };
+  length?: { expr: Expr; value: number };
 };
 
 export type PlaceCtx = {
@@ -62,6 +62,7 @@ export type PlaceCtx = {
   camera: Camera2;
   size: PaneSize;
   screen?: { x: number; y: number };
+  target?: EventTarget | null;
 };
 
 export type ToolSession =
@@ -73,7 +74,7 @@ export type ToolSession =
       centerRef: string;
       typed: string;
       name: string;
-      lengthReuse?: string;
+      lengthPick?: Expr;
     }
   | { verb: "line"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
   | { verb: "segment"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
@@ -84,7 +85,7 @@ export type ToolSession =
       carrierRef: string;
       typed: string;
       name: string;
-      lengthReuse?: string;
+      lengthPick?: Expr;
     }
   | {
       verb: "perpendicularLine";

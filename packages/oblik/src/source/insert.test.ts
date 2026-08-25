@@ -48,6 +48,14 @@ describe("printExpr", () => {
       }),
     ).toBe("dist(A, lineIntersection(ground, wall))");
   });
+
+  test("prints member and neg expressions", () => {
+    expect(printExpr({ kind: "member", object: "reach", field: "radius" })).toBe("reach.radius");
+    expect(
+      printExpr({ kind: "neg", expr: { kind: "member", object: "shelf", field: "distance" } }),
+    ).toBe("-shelf.distance");
+    expect(printExpr({ kind: "neg", expr: { kind: "ref", name: "reach" } })).toBe("-reach");
+  });
 });
 
 describe("insertCall", () => {
