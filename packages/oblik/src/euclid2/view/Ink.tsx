@@ -50,7 +50,7 @@ function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean
   const s = () => props.node.value as Segment;
   return (
     <>
-      <line class={styles.hit} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
+      <line class={styles.hit} data-ink={props.node.id} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
       <line class={inkClass(props.hot, props.selected, false)} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
     </>
   );
@@ -59,19 +59,22 @@ function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean
 function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const c = () => props.node.value as Circle;
   return (
-    <circle
-      class={[
-        styles.ink,
-        {
-          [styles.editable]: props.node.editable,
-          [styles.hot]: props.hot && !props.selected,
-          [styles.selected]: props.selected,
-        },
-      ]}
-      cx={c().center.x}
-      cy={c().center.y}
-      r={Math.abs(c().radius)}
-    />
+    <>
+      <circle class={styles.hit} data-ink={props.node.id} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
+      <circle
+        class={[
+          styles.ink,
+          {
+            [styles.editable]: props.node.editable,
+            [styles.hot]: props.hot && !props.selected,
+            [styles.selected]: props.selected,
+          },
+        ]}
+        cx={c().center.x}
+        cy={c().center.y}
+        r={Math.abs(c().radius)}
+      />
+    </>
   );
 }
 
@@ -90,7 +93,7 @@ function InfiniteStroke(props: {
   });
   return (
     <>
-      <line class={styles.hit} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
+      <line class={styles.hit} data-ink={props.node.id} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
         class={inkClass(props.hot, props.selected, props.node.value.kind === "parallelLine" && props.node.editable)}
         x1={ends().a.x}

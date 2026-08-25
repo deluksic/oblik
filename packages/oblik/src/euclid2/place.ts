@@ -36,9 +36,15 @@ export type Crossing =
   | { kind: "circleCircleIntersection"; a: string; b: string; k: Branch; at: Vec2 };
 
 export const PLACE_SNAP_PX = 16;
+/** Looser than point/crossing snap so clicking a stroke lands a glider. */
+export const GLIDER_SNAP_PX = 28;
 
 export function placeSnapWorld(scale: number): number {
   return PLACE_SNAP_PX / Math.max(8, scale);
+}
+
+export function gliderSnapWorld(scale: number): number {
+  return GLIDER_SNAP_PX / Math.max(8, scale);
 }
 
 export function isCrossing(p: PlacePoint): p is Crossing {
@@ -62,6 +68,7 @@ export function resolvePlacePoint(
   trace: readonly TraceNode[],
   world: Vec2,
   maxDist: number,
+  gliderMaxDist = maxDist,
 ): PlacePoint {
   const named = snapBoundPoint(trace, world, maxDist);
   if (named) {
@@ -83,7 +90,7 @@ export function resolvePlacePoint(
     }
     return best.point;
   }
-  const glider = nearestGlider(trace, world, maxDist);
+  const glider = nearestGlider(trace, world, gliderMaxDist);
   if (glider) return glider.point;
   return { kind: "free", at: { x: world.x, y: world.y } };
 }
@@ -148,6 +155,18 @@ function gliderOnLine(bind: string, geom: LineLike, world: Vec2): GliderPlace {
   const s = lineSAt(geom, world);
   const g = pointOnLineValue(geom, s);
   return { kind: "pointOnLine", bind, s: g.s, at: { x: g.x, y: g.y } };
+}
+
+/** Project `world` onto a named line, segment, or circle. */
+export function gliderOnTraceNode(n: TraceNode, world: Vec2): GliderPlace | null {
+  if (!n.bind) return null;
+  const geom = asLineLike(n);
+  if (geom) return gliderOnLine(n.bind, geom, world);
+  if (n.value.kind !== "circle") return null;
+  const circle = n.value as Circle;
+  const { ux, uy } = circleUnitAt(circle, world);
+  const g = pointOnCircleValue(circle, ux, uy);
+  return { kind: "pointOnCircle", bind: n.bind, ux: g.ux, uy: g.uy, at: { x: g.x, y: g.y } };
 }
 
 function nearestLineLine(

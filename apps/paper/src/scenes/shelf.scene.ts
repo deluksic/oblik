@@ -32,4 +32,7 @@ export function scene() {
   const Q = circleLineIntersection(beam, ground, +1);
   line(P, Q);
   pairedOffset(ground, true);
+  const p = point(4.96, -0.93);
+  const p2 = point(7.3, 3.76);
+  const ln = line(p2, A);
 }

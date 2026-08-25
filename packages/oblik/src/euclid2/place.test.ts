@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { resolvePlacePoint } from "./place";
+import { gliderOnTraceNode, resolvePlacePoint } from "./place";
 
 function node(
   partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>,
@@ -198,5 +198,23 @@ describe("resolvePlacePoint", () => {
   test("prefers a named point over a glider on the same stroke", () => {
     const p = resolvePlacePoint([A, ground], { x: 0.1, y: 0 }, 0.3);
     expect(p).toMatchObject({ kind: "ref", bind: "A" });
+  });
+
+  test("glider snap can be looser than point/crossing snap", () => {
+    const miss = resolvePlacePoint([ground], { x: 2, y: 0.4 }, 0.3);
+    expect(miss.kind).toBe("free");
+    const p = resolvePlacePoint([ground], { x: 2, y: 0.4 }, 0.3, 0.5);
+    expect(p.kind).toBe("pointOnLine");
+    if (p.kind !== "pointOnLine") return;
+    expect(p.bind).toBe("ground");
+    expect(p.s).toBeCloseTo(2);
+  });
+
+  test("projects a world point onto a named carrier", () => {
+    const p = gliderOnTraceNode(ground, { x: 3.2, y: 1 });
+    expect(p).toMatchObject({ kind: "pointOnLine", bind: "ground" });
+    if (p?.kind !== "pointOnLine") return;
+    expect(p.s).toBeCloseTo(3.2);
+    expect(p.at.y).toBeCloseTo(0);
   });
 });

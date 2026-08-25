@@ -3,6 +3,6 @@ import { defineTwoPoint } from "./two-point";
 export const segment = defineTwoPoint({
   id: "segment",
   title: "Segment",
-  hint: "Two points — finite.",
+  hint: "Two points — click points, crossings, or lines.",
   prefix: "s",
 });

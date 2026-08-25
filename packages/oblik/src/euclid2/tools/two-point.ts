@@ -84,19 +84,19 @@ export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPoi
         if (p && p.kind !== "free" && !session.bRef.trim()) {
           return {
             line: previewCall(spec.id, [a.expr, exprOfPlace(p)], scope.used, ([x, y]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${inSlot(session.focus === "b", y)})`, name),
-            hint: "Type a point name or click the second point. Tab to name it.",
+            hint: "Type a point name or click a point, a crossing, or a line. Tab to name it.",
           };
         }
         return {
           line: previewCall(spec.id, [a.expr], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
-          hint: "Type a point name or click the second point. Tab to name it.",
+          hint: "Type a point name or click a point, a crossing, or a line. Tab to name it.",
         };
       }
       const p = place?.point ?? null;
       if (p && p.kind !== "free" && !session.aRef.trim()) {
         return {
           line: previewCall(spec.id, [exprOfPlace(p)], scope.used, ([x]) => `${spec.id}(${inSlot(session.focus === "a", x)}, ${bTok})`, name),
-          hint: "Type a point name or click the first point.",
+          hint: "Type a point name or click a point, a crossing, or a line.",
         };
       }
       return { line: `const ${name} = ${spec.id}(${aTok}, ${bTok})`, hint: spec.hint };
