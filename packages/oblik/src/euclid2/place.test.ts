@@ -217,4 +217,10 @@ describe("resolvePlacePoint", () => {
     expect(p.s).toBeCloseTo(3.2);
     expect(p.at.y).toBeCloseTo(0);
   });
+
+  test("does not place a glider on a parallel offset line", () => {
+    const p = resolvePlacePoint([shelf], { x: 2, y: 1.85 }, 0.3, 0.5);
+    expect(p.kind).toBe("free");
+    expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toBeNull();
+  });
 });

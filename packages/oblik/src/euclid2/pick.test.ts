@@ -96,4 +96,32 @@ describe("snapLineCarrier", () => {
     const hit = snapLineCarrier([ground, A], { x: 1, y: 0.05 }, camera, size);
     expect(hit).toEqual({ bind: "ground", geom: ground.value });
   });
+
+  test("ignores parallel offset lines when snapping a carrier", () => {
+    const ground = {
+      id: "o_g",
+      occ: 0,
+      kind: "line",
+      bind: "ground",
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const shelf = {
+      id: "o_par",
+      occ: 0,
+      kind: "parallelLine",
+      bind: "shelf",
+      value: {
+        kind: "parallelLine",
+        line: { kind: "line", origin: { x: 0, y: 1.8 }, direction: { x: 1, y: 0 } },
+        distance: 1.8,
+      },
+      editable: true,
+      stack: [],
+    } as TraceNode;
+    expect(snapLineCarrier([shelf], { x: 2, y: 1.85 }, camera, size)).toBeNull();
+    const hit = snapLineCarrier([ground, shelf], { x: 2, y: 0.05 }, camera, size);
+    expect(hit).toEqual({ bind: "ground", geom: ground.value });
+  });
 });

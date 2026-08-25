@@ -120,9 +120,9 @@ export function movedPastClick(fromX: number, fromY: number, toX: number, toY: n
   return Math.hypot(toX - fromX, toY - fromY) >= PICK_CLICK_PX;
 }
 
-const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
+const LINE_CARRIER = new Set(["line", "segment"]);
 
-/** Nearest named line-like stroke under the pointer (ignores points). */
+/** Nearest named line or segment under the pointer (ignores points and parallel offsets). */
 export function snapLineCarrier(
   trace: readonly TraceNode[],
   world: Vec2,
@@ -133,7 +133,7 @@ export function snapLineCarrier(
   let best: { bind: string; geom: LineLike; d: number } | null = null;
   for (const n of trace) {
     if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
-    if (!LINE_LIKE.has(n.value.kind)) continue;
+    if (!LINE_CARRIER.has(n.value.kind)) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
