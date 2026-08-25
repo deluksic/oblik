@@ -1,6 +1,7 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
+import { isStyleVisible, matchedStyle, type StyleSheet } from "../../eval/style";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
@@ -33,6 +34,7 @@ const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
 
 export type Euclid2ViewProps = {
   trace: TraceNode[];
+  sheet?: StyleSheet;
   initialCamera?: Camera2;
   placing?: boolean;
   ghost?: Ghost | null;
@@ -193,12 +195,20 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
-  const ink = createMemo(() => strokes().filter((n) => n.kind !== "point" && !isGlider(n.value)));
-  const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
-  const handles = createMemo(() =>
-    strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+  const shown = createMemo(() =>
+    strokes().filter((n) => {
+      const style = matchedStyle(props.sheet ?? {}, n.id, n.kind);
+      return isStyleVisible(style) || isSelected(n, props.selectedKey);
+    }),
   );
-  const sliders = createMemo(() => sliderNodes(props.trace));
+  const ink = createMemo(() => shown().filter((n) => n.kind !== "point" && !isGlider(n.value)));
+  const points = createMemo(() => shown().filter((n) => n.kind === "point" || isGlider(n.value)));
+  const handles = createMemo(() =>
+    shown().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+  );
+  const sliders = createMemo(() =>
+    sliderNodes(props.trace).filter((n) => isStyleVisible(matchedStyle(props.sheet ?? {}, n.id, n.kind))),
+  );
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
 
   return (
@@ -229,6 +239,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
             {(n) => (
               <Stroke
                 node={n}
+                sheet={props.sheet}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
                 camera={camera()}
@@ -244,6 +255,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
           {(n) => (
             <PointMark
               node={n}
+              sheet={props.sheet}
               size={size()}
               camera={camera()}
               hot={isHot(n, props.hoverId, props.selectedKey)}

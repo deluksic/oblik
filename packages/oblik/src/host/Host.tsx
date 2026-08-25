@@ -3,6 +3,7 @@ import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanu
 
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
+import { findStyleMismatches, type StyleSheet } from "../eval/style";
 import type { Annotation } from "../source/analyze";
 import {
   sceneLoaderKey,
@@ -27,6 +28,7 @@ export type OblikMount = {
   setLoaders: (loaders: SceneLoaderMap) => void;
   setAnnotations: (annotations: AnnotationBundle) => void;
   setCollisions: (collisions: DuplicateId[]) => void;
+  setSheet: (sheet: StyleSheet) => void;
 };
 
 export type OblikMountOpts = {
@@ -35,6 +37,7 @@ export type OblikMountOpts = {
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
   collisions?: DuplicateId[];
+  sheet?: StyleSheet;
 };
 
 function pickSceneId(scenes: OblikSceneEntry[]): string {
@@ -53,6 +56,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   const [loaders, setLoaders] = createSignal(opts.loaders);
   const [annotations, setAnnotations] = createSignal(opts.annotations);
   const [collisions, setCollisions] = createSignal(opts.collisions ?? []);
+  const [sheet, setSheet] = createSignal(opts.sheet ?? {});
 
   render(
     () => (
@@ -61,13 +65,15 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
         loaders={loaders()}
         annotations={annotations()}
         collisions={collisions()}
+        sheet={sheet()}
+        onSheet={setSheet}
         initialSceneId={initialSceneId}
       />
     ),
     opts.el,
   );
 
-  return { setScenes, setLoaders, setAnnotations, setCollisions };
+  return { setScenes, setLoaders, setAnnotations, setCollisions, setSheet };
 }
 
 function Host(props: {
@@ -75,6 +81,8 @@ function Host(props: {
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
   collisions: DuplicateId[];
+  sheet: StyleSheet;
+  onSheet: (sheet: StyleSheet) => void;
   initialSceneId: string;
 }) {
   const [sceneId, setSceneId] = createSignal(props.initialSceneId);
@@ -108,6 +116,7 @@ function Host(props: {
   const sceneKind = createMemo(() => scene().kind);
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
+  const styleMismatches = createMemo(() => findStyleMismatches(props.sheet, annotations()));
 
   createEffect(
     () => true,
@@ -143,7 +152,13 @@ function Host(props: {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
     return sceneKind() === "euclid2" ? (
-      <Euclid2Pane scene={scene()} file={e.path} annotations={annotations()} />
+      <Euclid2Pane
+        scene={scene()}
+        file={e.path}
+        annotations={annotations()}
+        sheet={props.sheet}
+        onSheet={props.onSheet}
+      />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );
@@ -177,6 +192,17 @@ function Host(props: {
                 )}
               </For>
             </ul>
+          </div>
+        )}
+      </For>
+      <For each={styleMismatches()}>
+        {(row) => (
+          <div class={styles.dupWarn} role="alert">
+            <p>
+              Sheet row <code class={styles.dupId}>{row.id}</code> is kind {row.kind}
+              {row.expected ? ` but this id is a ${row.expected}. ` : " and this id is missing. "}
+              Delete the sheet row so it can be rewritten.
+            </p>
           </div>
         )}
       </For>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseInsert } from "./schema";
+import { parseInsert, parseSheetPatch } from "./schema";
 
 describe("parseInsert", () => {
   test("accepts slider args with props", () => {
@@ -32,5 +32,13 @@ describe("parseInsert", () => {
         step: { kind: "num", value: 0.05 },
       },
     });
+  });
+});
+
+describe("parseSheetPatch", () => {
+  test("accepts a kind-tagged style or null", () => {
+    const patch = parseSheetPatch({ id: "o_g", style: { kind: "line", hidden: true } });
+    expect(patch).toEqual({ id: "o_g", style: { kind: "line", hidden: true } });
+    expect(parseSheetPatch({ id: "o_g", style: null })).toEqual({ id: "o_g", style: null });
   });
 });

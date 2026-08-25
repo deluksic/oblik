@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
+import { matchedStyle, svgPaint, type StyleSheet } from "../../eval/style";
 import type { Circle, Line, ParallelLine, Segment } from "../../geom";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 
@@ -17,8 +18,18 @@ function inkClass(hot: boolean, selected: boolean, editable: boolean) {
   ];
 }
 
+function paintCss(node: TraceNode, sheet: StyleSheet | undefined) {
+  const paint = svgPaint(matchedStyle(sheet ?? {}, node.id, node.kind));
+  const css: Record<string, string> = {};
+  if (paint.stroke) css.stroke = paint.stroke;
+  if (paint.fill) css.fill = paint.fill;
+  if (paint.dash) css["stroke-dasharray"] = paint.dash;
+  return Object.keys(css).length > 0 ? css : undefined;
+}
+
 export function Stroke(props: {
   node: TraceNode;
+  sheet?: StyleSheet;
   hot: boolean;
   selected: boolean;
   camera: Camera2;
@@ -28,11 +39,12 @@ export function Stroke(props: {
   return (
     <>
       {kind() === "segment" ? (
-        <SegmentStroke node={props.node} hot={props.hot} selected={props.selected} />
+        <SegmentStroke node={props.node} sheet={props.sheet} hot={props.hot} selected={props.selected} />
       ) : null}
       {kind() === "line" || kind() === "parallelLine" ? (
         <InfiniteStroke
           node={props.node}
+          sheet={props.sheet}
           hot={props.hot}
           selected={props.selected}
           camera={props.camera}
@@ -40,23 +52,30 @@ export function Stroke(props: {
         />
       ) : null}
       {kind() === "circle" ? (
-        <CircleStroke node={props.node} hot={props.hot} selected={props.selected} />
+        <CircleStroke node={props.node} sheet={props.sheet} hot={props.hot} selected={props.selected} />
       ) : null}
     </>
   );
 }
 
-function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function SegmentStroke(props: { node: TraceNode; sheet?: StyleSheet; hot: boolean; selected: boolean }) {
   const s = () => props.node.value as Segment;
   return (
     <>
       <line class={styles.hit} data-ink={props.node.id} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
-      <line class={inkClass(props.hot, props.selected, false)} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
+      <line
+        class={inkClass(props.hot, props.selected, false)}
+        style={paintCss(props.node, props.sheet)}
+        x1={s().a.x}
+        y1={s().a.y}
+        x2={s().b.x}
+        y2={s().b.y}
+      />
     </>
   );
 }
 
-function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function CircleStroke(props: { node: TraceNode; sheet?: StyleSheet; hot: boolean; selected: boolean }) {
   const c = () => props.node.value as Circle;
   return (
     <>
@@ -70,6 +89,7 @@ function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean 
             [styles.selected]: props.selected,
           },
         ]}
+        style={paintCss(props.node, props.sheet)}
         cx={c().center.x}
         cy={c().center.y}
         r={Math.abs(c().radius)}
@@ -80,6 +100,7 @@ function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean 
 
 function InfiniteStroke(props: {
   node: TraceNode;
+  sheet?: StyleSheet;
   hot: boolean;
   selected: boolean;
   camera: Camera2;
@@ -96,6 +117,7 @@ function InfiniteStroke(props: {
       <line class={styles.hit} data-ink={props.node.id} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
         class={inkClass(props.hot, props.selected, props.node.value.kind === "parallelLine" && props.node.editable)}
+        style={paintCss(props.node, props.sheet)}
         x1={ends().a.x}
         y1={ends().a.y}
         x2={ends().b.x}

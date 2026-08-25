@@ -21,3 +21,8 @@ declare module "virtual:oblik-annotations?*" {
   const annotations: Record<string, Annotation>;
   export default annotations;
 }
+
+declare module "virtual:oblik-sheet" {
+  import type { StyleSheet } from "oblik";
+  export const sheet: StyleSheet;
+}

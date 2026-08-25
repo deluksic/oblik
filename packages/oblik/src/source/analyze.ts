@@ -5,6 +5,7 @@ import { siteOf, type SiteFn, type SiteSpec } from "../eval/site";
 
 export type Annotation = {
   id: string;
+  kind: string;
   editable: boolean;
   bind?: string;
   file: string;
@@ -85,6 +86,7 @@ export function listAnnotationSites(source: string, file = "scene.ts"): Annotati
           const bind = bindName(node);
           out.push({
             id,
+            kind: spec.kind,
             editable,
             bind,
             file,

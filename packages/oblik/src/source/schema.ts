@@ -55,3 +55,16 @@ export function parseInsert(raw: unknown): InsertBody | string {
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
 }
+
+export const sheetPatchSchema = v.object({
+  id: v.pipe(v.string(), v.minLength(1)),
+  style: v.nullable(v.unknown()),
+});
+
+export type SheetPatch = { id: string; style: unknown | null };
+
+export function parseSheetPatch(raw: unknown): SheetPatch | string {
+  const r = v.safeParse(sheetPatchSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}
