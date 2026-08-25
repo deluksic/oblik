@@ -6,7 +6,7 @@ import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
-import { pickAmong, traceKey } from "./pick";
+import { traceKey } from "./pick";
 import type { PlacePoint } from "./place";
 import { Palette } from "./Palette";
 import {
@@ -123,12 +123,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   }
 
   function onPick(hits: TraceNode[]) {
-    if (hits.length === 0) {
-      setSelectedKey(null);
-      return;
-    }
-    const next = pickAmong(hits, selectedKey());
-    if (next) setSelectedKey(traceKey(next));
+    setSelectedKey(hits[0] ? traceKey(hits[0]) : null);
   }
 
   const draftIds = createMemo(() => [...draft().keys()]);

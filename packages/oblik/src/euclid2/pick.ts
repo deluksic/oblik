@@ -107,39 +107,6 @@ export function hitTest(
   return hitsNear(trace, world, camera, size)[0] ?? null;
 }
 
-function occSiblings(hits: readonly TraceNode[], id: string): TraceNode[] {
-  return hits.filter((n) => n.id === id).toSorted((a, b) => a.occ - b.occ);
-}
-
-function pointHits(hits: readonly TraceNode[]): TraceNode[] {
-  return hits.filter((n) => n.value.kind === "point");
-}
-
-/**
- * Points always win when any are in range. Re-click cycles `occ` for the same
- * point id only. With no point at the pick, re-click cycles other ink.
- */
-export function pickAmong(hits: readonly TraceNode[], priorKey: string | null): TraceNode | null {
-  if (hits.length === 0) return null;
-  const points = pointHits(hits);
-  const prior = priorKey ? hits.find((n) => traceKey(n) === priorKey) : undefined;
-
-  if (points.length > 0) {
-    if (prior?.value.kind === "point") {
-      const siblings = occSiblings(hits, prior.id);
-      if (siblings.length <= 1) return prior;
-      const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
-      return siblings[(idx + 1) % siblings.length]!;
-    }
-    return points[0]!;
-  }
-
-  if (!priorKey) return hits[0]!;
-  if (!prior) return hits[0]!;
-  const idx = hits.findIndex((n) => traceKey(n) === priorKey);
-  return hits[(idx + 1) % hits.length]!;
-}
-
 export const PICK_CLICK_PX = 4;
 
 export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {

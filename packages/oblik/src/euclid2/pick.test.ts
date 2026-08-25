@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { hitTest, hitsNear, pickAmong, snapBoundPoint, traceKey } from "./pick";
+import { hitTest, hitsNear, snapBoundPoint } from "./pick";
 
 const A = {
   id: "o_a",
@@ -53,68 +53,8 @@ describe("hitTest", () => {
     const hit = hitTest([SEG, A], { x: 0.09, y: 0.04 }, camera, size);
     expect(hit?.kind).toBe("point");
   });
-});
 
-describe("pickAmong", () => {
-  test("re-click cycles occ for the same id", () => {
-    const dup0: TraceNode = {
-      ...A,
-      occ: 0,
-      stack: [{ file: "scene.ts", line: 8, column: 4 }],
-    };
-    const dup1: TraceNode = {
-      ...A,
-      occ: 1,
-      stack: [{ file: "scene.ts", line: 12, column: 4 }],
-    };
-    const hits = hitsNear([dup0, dup1], { x: 0, y: 0 }, camera, size);
-    expect(hits).toHaveLength(2);
-    const first = pickAmong(hits, null);
-    expect(traceKey(first!)).toBe("o_a:0");
-    const second = pickAmong(hits, traceKey(first!));
-    expect(traceKey(second!)).toBe("o_a:1");
-    const third = pickAmong(hits, traceKey(second!));
-    expect(traceKey(third!)).toBe("o_a:0");
-  });
-
-  test("does not cycle onto overlapping geometry with a different id", () => {
-    const s0: TraceNode = { ...SEG, occ: 0 };
-    const s1: TraceNode = {
-      ...SEG,
-      occ: 1,
-      stack: [{ file: "scene.ts", line: 20, column: 4 }],
-    };
-    const hits = hitsNear([s0, s1, A], { x: 0, y: 0 }, camera, size);
-    const first = pickAmong(hits, null);
-    expect(first?.id).toBe("o_a");
-    expect(pickAmong(hits, traceKey(first!))?.id).toBe("o_a");
-    const segs = pickAmong([s0, s1], null);
-    expect(traceKey(segs!)).toBe("o_s:0");
-    expect(traceKey(pickAmong([s0, s1], traceKey(segs!))!)).toBe("o_s:1");
-  });
-
-  test("re-click on selected ink cycles to a point on top of it", () => {
-    const P = {
-      ...A,
-      id: "o_p",
-      bind: "P",
-      value: { kind: "point", x: 2, y: 0 },
-    } as TraceNode;
-    const CIRCLE = {
-      id: "o_c",
-      occ: 0,
-      kind: "circle",
-      value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
-      editable: true,
-      stack: [{ file: "scene.ts", line: 14, column: 4 }],
-    } as TraceNode;
-    const hits = hitsNear([CIRCLE, P], { x: 2, y: 0 }, camera, size);
-    expect(hits[0]?.id).toBe("o_p");
-    const picked = pickAmong(hits, traceKey(CIRCLE));
-    expect(picked?.id).toBe("o_p");
-  });
-
-  test("points win over overlapping ink even when another kind is selected", () => {
+  test("prefers points over overlapping circle and line", () => {
     const P = {
       ...A,
       id: "o_p",
@@ -138,7 +78,6 @@ describe("pickAmong", () => {
       stack: [{ file: "scene.ts", line: 12, column: 4 }],
     } as TraceNode;
     const hits = hitsNear([CIRCLE, LINE, P], { x: 2, y: 0 }, camera, size);
-    expect(pickAmong(hits, traceKey(LINE))?.id).toBe("o_p");
-    expect(pickAmong(hits, traceKey(CIRCLE))?.id).toBe("o_p");
+    expect(hits[0]?.id).toBe("o_p");
   });
 });
