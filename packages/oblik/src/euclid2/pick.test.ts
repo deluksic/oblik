@@ -87,4 +87,25 @@ describe("pickAmong", () => {
     expect(traceKey(segs!)).toBe("o_s:0");
     expect(traceKey(pickAmong([s0, s1], traceKey(segs!))!)).toBe("o_s:1");
   });
+
+  test("re-click on selected ink cycles to a point on top of it", () => {
+    const P = {
+      ...A,
+      id: "o_p",
+      bind: "P",
+      value: { kind: "point", x: 2, y: 0 },
+    } as TraceNode;
+    const CIRCLE = {
+      id: "o_c",
+      occ: 0,
+      kind: "circle",
+      value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
+      editable: true,
+      stack: [{ file: "scene.ts", line: 14, column: 4 }],
+    } as TraceNode;
+    const hits = hitsNear([CIRCLE, P], { x: 2, y: 0 }, camera, size);
+    expect(hits[0]?.id).toBe("o_p");
+    const picked = pickAmong(hits, traceKey(CIRCLE));
+    expect(picked?.id).toBe("o_p");
+  });
 });

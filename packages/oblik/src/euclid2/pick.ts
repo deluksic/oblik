@@ -107,18 +107,23 @@ function occSiblings(hits: readonly TraceNode[], id: string): TraceNode[] {
 }
 
 /**
- * First click takes the nearest hit. Re-click cycles `occ` for that same id
- * (the same constructor ran more than once) and ignores other overlapping ink.
+ * First click takes the nearest hit. Re-click cycles `occ` for the same point id
+ * (points stay sticky). Re-click on other geometry cycles through every hit at
+ * the pick location so a point on a selected circle or line can be reached.
  */
 export function pickAmong(hits: readonly TraceNode[], priorKey: string | null): TraceNode | null {
   if (hits.length === 0) return null;
-  const prior = priorKey ? hits.find((n) => traceKey(n) === priorKey) : undefined;
+  if (!priorKey) return hits[0]!;
+  const prior = hits.find((n) => traceKey(n) === priorKey);
   if (!prior) return hits[0]!;
-  const siblings = occSiblings(hits, prior.id);
-  if (siblings.length === 0) return hits[0]!;
-  const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
-  if (idx < 0) return siblings[0]!;
-  return siblings[(idx + 1) % siblings.length]!;
+  if (prior.value.kind === "point") {
+    const siblings = occSiblings(hits, prior.id);
+    if (siblings.length <= 1) return prior;
+    const idx = siblings.findIndex((n) => traceKey(n) === priorKey);
+    return siblings[(idx + 1) % siblings.length]!;
+  }
+  const idx = hits.findIndex((n) => traceKey(n) === priorKey);
+  return hits[(idx + 1) % hits.length]!;
 }
 
 export const PICK_CLICK_PX = 4;
