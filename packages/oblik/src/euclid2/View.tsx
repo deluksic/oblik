@@ -147,6 +147,37 @@ export function Euclid2View(props: Euclid2ViewProps) {
     return { world: w, point };
   }
 
+  function startRadiusDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent) {
+    const c = node.value as Circle;
+    drag = {
+      kind: "radius",
+      id: node.id,
+      node,
+      startR: c.radius,
+      origin: c.center,
+      grabDist: Math.hypot(w.x - c.center.x, w.y - c.center.y),
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    };
+  }
+
+  function startPointDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent) {
+    const p = node.value as Point;
+    drag = {
+      kind: "point",
+      id: node.id,
+      node,
+      startX: p.x,
+      startY: p.y,
+      pointerX: w.x,
+      pointerY: w.y,
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    };
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const cam = camera();
@@ -164,40 +195,19 @@ export function Euclid2View(props: Euclid2ViewProps) {
       return;
     }
     const t = e.target;
+    const w = worldOf(e);
     if (t instanceof Element && t.hasAttribute("data-handle")) {
       const id = t.getAttribute("data-handle")!;
-      const kind = t.getAttribute("data-kind");
       const node =
         props.trace.find((n) => n.id === id && n.occ === 0) ?? props.trace.find((n) => n.id === id);
       if (!node) return;
-      const w = worldOf(e);
-      if (kind === "point" && node.value.kind === "point") {
-        drag = {
-          kind: "point",
-          id,
-          node,
-          startX: node.value.x,
-          startY: node.value.y,
-          pointerX: w.x,
-          pointerY: w.y,
-          downX: e.clientX,
-          downY: e.clientY,
-          moved: false,
-        };
-      } else if (kind === "radius" && node.value.kind === "circle") {
-        const c = node.value.center;
-        drag = {
-          kind: "radius",
-          id,
-          node,
-          startR: node.value.radius,
-          origin: c,
-          grabDist: Math.hypot(w.x - c.x, w.y - c.y),
-          downX: e.clientX,
-          downY: e.clientY,
-          moved: false,
-        };
-      }
+      if (node.value.kind === "point") startPointDrag(node, w, e);
+      return;
+    }
+    const hits = hitsNear(props.trace, w, camera(), size());
+    const hit = hits[0];
+    if (hit?.editable && hit.value.kind === "circle") {
+      startRadiusDrag(hit, w, e);
       return;
     }
     drag = {
@@ -208,8 +218,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
       camY: camera().y,
       moved: false,
     };
-    const w = worldOf(e);
-    const hits = hitsNear(props.trace, w, camera(), size());
     pendingPick = hits.length > 0 ? { hits } : null;
   }
 
@@ -291,9 +299,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   const strokes = createMemo(() => props.trace.filter(isFiniteTrace));
   const ink = createMemo(() => strokes().filter((n) => n.kind !== "point"));
   const points = createMemo(() => strokes().filter((n) => n.kind === "point"));
-  const handles = createMemo(() =>
-    strokes().filter((n) => n.editable && (n.kind === "point" || n.kind === "circle")),
-  );
+  const handles = createMemo(() => strokes().filter((n) => n.editable && n.kind === "point"));
   return (
     <div
       ref={setPaneEl}
@@ -385,7 +391,12 @@ function Stroke(props: {
         />
       ) : null}
       {kind() === "circle" ? (
-        <CircleStroke node={props.node} hot={props.hot} selected={props.selected} />
+        <CircleStroke
+          node={props.node}
+          hot={props.hot}
+          selected={props.selected}
+          grabbable={props.node.editable}
+        />
       ) : null}
     </>
   );
@@ -406,12 +417,18 @@ function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean
   );
 }
 
-function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function CircleStroke(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  grabbable: boolean;
+}) {
   const c = () => props.node.value as Circle;
   const cls = () => strokeClass(props.hot, props.selected);
+  const hitCls = () => [styles.hit, { [styles.hitGrab]: props.grabbable }];
   return (
     <>
-      <circle class={styles.hit} cx={c().center.x} cy={c().center.y} r={c().radius} />
+      <circle class={hitCls()} cx={c().center.x} cy={c().center.y} r={c().radius} />
       <circle class={cls()} cx={c().center.x} cy={c().center.y} r={c().radius} />
     </>
   );
@@ -577,16 +594,7 @@ function Handle(props: {
   onEnter: () => void;
   onLeave: () => void;
 }) {
-  const pos = createMemo(() => {
-    const v = props.node.value;
-    if (v.kind === "point") return worldToScreen(v, props.camera, props.size);
-    if (v.kind === "circle") {
-      const c = v as Circle;
-      return worldToScreen({ x: c.center.x + c.radius, y: c.center.y }, props.camera, props.size);
-    }
-    return { x: 0, y: 0 };
-  });
-  const kind = () => (props.node.kind === "circle" ? "radius" : "point");
+  const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
   return (
     <circle
       class={[
@@ -597,7 +605,7 @@ function Handle(props: {
         },
       ]}
       data-handle={props.node.id}
-      data-kind={kind()}
+      data-kind="point"
       cx={pos().x}
       cy={pos().y}
       r={HANDLE_R}

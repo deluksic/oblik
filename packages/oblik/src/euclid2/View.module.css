@@ -61,6 +61,14 @@
   pointer-events: stroke;
 }
 
+.hitGrab {
+  cursor: grab;
+}
+
+.grabbing .hitGrab {
+  cursor: grabbing;
+}
+
 .handle {
   fill: #e8876a;
   stroke: #0e1016;
