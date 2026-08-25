@@ -6,7 +6,7 @@ import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera"
 import { hitsNear, movedPastClick } from "../pick";
 import { placeSnapWorld, resolvePlacePoint } from "../place";
 import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
-import { sliderNodes, sliderValueFromPointer } from "./sliderHud";
+import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
 export type Drag =
   | {
@@ -181,8 +181,28 @@ export function placeFromEvent(
       };
     }
   }
-  const hit: PlaceHit = { world: w, point };
-  return tool ? enrichHit(tool, hit, { trace, camera, size }) : hit;
+  let length: PlaceHit["length"];
+  if (t instanceof Element) {
+    const sliderEl = t.closest("[data-slider]");
+    const id = sliderEl?.getAttribute("data-slider");
+    if (id) {
+      const found = trace.find((n) => n.id === id && n.kind === "slider");
+      if (found?.bind && found.value.kind === "slider") {
+        length = { bind: found.bind, value: found.value.n };
+      }
+    }
+  }
+  const screen = el
+    ? { x: e.clientX - el.getBoundingClientRect().left, y: e.clientY - el.getBoundingClientRect().top }
+    : undefined;
+  if (!length && screen) {
+    const slider = hitSlider(screen, sliderNodes(trace));
+    if (slider?.bind && slider.value.kind === "slider") {
+      length = { bind: slider.bind, value: slider.value.n };
+    }
+  }
+  const hit: PlaceHit = { world: w, point, ...(length ? { length } : {}) };
+  return tool ? enrichHit(tool, hit, { trace, camera, size, screen }) : hit;
 }
 
 export function applyDrag(

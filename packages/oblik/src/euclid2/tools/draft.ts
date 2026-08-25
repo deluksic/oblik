@@ -33,8 +33,16 @@ export function refError(raw: string, names: readonly string[], label: string): 
   return null;
 }
 
+export function lengthError(raw: string, names: readonly string[]): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (parseNum(t) != null) return null;
+  return refError(raw, names, "slider");
+}
+
 export function fieldError<S extends ToolSession>(field: Field<S>, session: S, scope: Scope): string | null {
   const raw = field.get(session);
+  if (field.kind === "length") return lengthError(raw, Object.keys(scope.lengths));
   if (field.kind === "number") return numError(raw);
   if (field.kind === "ident") return identError(raw, scope.used);
   const names = field.looks === "carrier" ? Object.keys(scope.carriers) : Object.keys(scope.points);
@@ -100,6 +108,20 @@ export function typedField<S extends { typed: string }>(open: (session: S) => bo
   };
 }
 
+/** Numeric literal or an existing slider bind. */
+export function lengthField<S extends { typed: string; lengthReuse?: string }>(
+  placeholder = "<radius>",
+): Field<S> {
+  return {
+    id: "typed",
+    kind: "length",
+    placeholder,
+    open: () => true,
+    get: (s) => s.lengthReuse ?? s.typed,
+    set: (s, raw) => ({ ...s, typed: raw, lengthReuse: undefined }),
+  };
+}
+
 export function refField<S extends ToolSession>(
   id: string,
   placeholder: string,
@@ -115,6 +137,11 @@ export function editValue(value: string, kind: FieldKind, key: string): string |
   if (key === "Delete") return "";
   if (key.length !== 1) return null;
   if (kind === "ident" || kind === "ref") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
+  if (kind === "length") {
+    if (key === "-" && value === "") return "-";
+    if (/[0-9.]/.test(key) || /[A-Za-z0-9_]/.test(key)) return value + key;
+    return null;
+  }
   if (key === "-" && value === "") return "-";
   if (/[0-9.]/.test(key)) return value + key;
   return null;

@@ -37,7 +37,7 @@ function pointScope(...pts: { bind: string; x: number; y: number }[]): Scope {
     used.push(p.bind);
     points[p.bind] = { expr: { kind: "ref", name: p.bind }, at: { x: p.x, y: p.y } };
   }
-  return { used, points, carriers: {} };
+  return { used, points, carriers: {}, lengths: {} };
 }
 
 describe("keyTool", () => {
@@ -213,6 +213,38 @@ describe("keyTool", () => {
         ],
       },
     });
+  });
+
+  test("circle typed slider name commits as a ref", () => {
+    const scope = {
+      used: ["A", "reach"],
+      points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      carriers: {},
+      lengths: { reach: 2.5 },
+    };
+    const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
+    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, null, scope)).toEqual({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "reach" },
+        ],
+      },
+    });
+  });
+
+  test("invalid slider name is flagged on circle radius", () => {
+    const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
+    const bad = typeTool(mid, "nope");
+    expect(
+      previewOf(bad, null, {
+        used: ["A"],
+        points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+        carriers: {},
+        lengths: { reach: 1 },
+      }).draft,
+    ).toMatchObject({ id: "typed", invalid: true });
   });
 
   test("circle Enter on name without a radius retargets to typed", () => {

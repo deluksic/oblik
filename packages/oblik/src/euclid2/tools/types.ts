@@ -15,15 +15,15 @@ export type ToolSpec = {
   aliases?: readonly string[];
 };
 
-export type FieldKind = "number" | "ident" | "ref";
+export type FieldKind = "number" | "ident" | "ref" | "length";
 
 /** One Tab stop. Declared on the verb; the dispatcher only cycles/types. */
 export type Field<S extends ToolSession = ToolSession> = {
   id: string;
   kind: FieldKind;
   placeholder: string;
-  /** For `ref`: existing point vs line/segment/parallel. */
-  looks?: "point" | "carrier";
+  /** For `ref`: existing point vs line/segment/parallel. For `length`: slider bind. */
+  looks?: "point" | "carrier" | "length";
   open: (session: S) => boolean;
   get: (session: S) => string;
   set: (session: S, raw: string) => S;
@@ -34,6 +34,8 @@ export type Scope = {
   used: readonly string[];
   points: Readonly<Record<string, Placed>>;
   carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
+  /** Slider binds → live value (for length reuse). */
+  lengths: Readonly<Record<string, number>>;
 };
 
 export type Draft = {
@@ -51,12 +53,14 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike };
+  length?: { bind: string; value: number };
 };
 
 export type PlaceCtx = {
   trace: readonly TraceNode[];
   camera: Camera2;
   size: PaneSize;
+  screen?: { x: number; y: number };
 };
 
 export type ToolSession =
@@ -68,6 +72,7 @@ export type ToolSession =
       centerRef: string;
       typed: string;
       name: string;
+      lengthReuse?: string;
     }
   | { verb: "line"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
   | { verb: "segment"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }

@@ -214,6 +214,28 @@ describe("clickTool", () => {
       },
     });
   });
+
+  test("circle click on a slider reuses its bind for the radius", () => {
+    const mid = clickTool(startTool("circle"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in mid)) throw new Error("expected session");
+    const scope = {
+      used: ["A", "reach"],
+      points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      carriers: {},
+      lengths: { reach: 2.5 },
+    };
+    expect(
+      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 2.5 } }, scope),
+    ).toEqual({
+      insert: {
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "reach" },
+        ],
+      },
+    });
+  });
 });
 
 describe("ghostOf", () => {
@@ -223,6 +245,15 @@ describe("ghostOf", () => {
       { world: { x: 0, y: 2 }, point: free(0, 2) },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2 });
+  });
+
+  test("previews a slider radius after the center", () => {
+    const g = ghostOf(
+      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 2.5 } },
+      { used: ["A", "reach"], points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, carriers: {}, lengths: { reach: 2.5 } },
+    );
+    expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 });
   });
 
   test("previews a parallel line after picking the carrier", () => {
