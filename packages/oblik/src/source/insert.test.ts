@@ -91,6 +91,7 @@ describe("insertCall", () => {
   });
 
   test("inserts a circle whose radius is dist to an intersection", () => {
+    let n = 0;
     const next = insertCall(
       src,
       {
@@ -116,10 +117,38 @@ describe("insertCall", () => {
         ],
         id: "o_beam",
       },
-      () => "o_beam",
+      () => `o_h${n++}`,
     );
-    expect(next).toContain('const beam = circle(A, dist(A, lineIntersection(ground, wall)), "o_beam");');
-    expect(next).toMatch(/import \{ point, circle, dist, lineIntersection \} from "oblik"/);
+    expect(next).toContain('const x = lineIntersection(ground, wall, "o_h0");');
+    expect(next).toContain('const beam = circle(A, dist(A, x), "o_beam");');
+    expect(next.indexOf("const x =")).toBeLessThan(next.indexOf("const beam ="));
+    expect(next).toMatch(/import \{ point, lineIntersection, circle, dist \} from "oblik"/);
+  });
+
+  test("hoists an intersection used as a circle center", () => {
+    let n = 0;
+    const next = insertCall(
+      src,
+      {
+        from: "circle",
+        args: [
+          {
+            kind: "call",
+            name: "circleLineIntersection",
+            args: [
+              { kind: "ref", name: "reach" },
+              { kind: "ref", name: "shelf" },
+              { kind: "num", value: 1 },
+            ],
+          },
+          { kind: "num", value: 2.5 },
+        ],
+        id: "o_c",
+      },
+      () => `o_h${n++}`,
+    );
+    expect(next).toContain('const x = circleLineIntersection(reach, shelf, 1, "o_h0");');
+    expect(next).toContain('const c = circle(x, 2.5, "o_c");');
   });
 
   test("inserts lineIntersection as its own bind", () => {

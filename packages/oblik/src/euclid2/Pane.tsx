@@ -139,7 +139,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   });
   const prompt = createMemo(() => {
     const t = tool();
-    return t ? previewOf(t, place()) : null;
+    if (!t) return null;
+    const used = world()
+      .trace.map((n) => n.bind)
+      .filter((b): b is string => !!b);
+    return previewOf(t, place(), used);
   });
   const status = createMemo(() => {
     if (tool()) return "Space is placing. Click a crossing to insert an intersection. Escape cancels.";

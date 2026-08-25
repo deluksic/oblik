@@ -49,6 +49,7 @@
   font-family: ui-monospace, monospace;
   font-size: 0.82rem;
   color: #ece8de;
+  white-space: pre-wrap;
 }
 
 .hint {

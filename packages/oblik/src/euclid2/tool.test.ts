@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, ghostOf, previewOf, startTool } from "./tool";
+import { clickTool, exprOfPlace, ghostOf, previewOf, startTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -187,5 +187,18 @@ describe("previewOf", () => {
       namedP,
     );
     expect(p.line).toBe("const c = circle(A, dist(A, P))");
+  });
+
+  test("previews a crossing center as its own named point", () => {
+    const p = previewOf(startTool("circle"), ll);
+    expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, radius)");
+  });
+
+  test("hoists a stored crossing center when pinning dist()", () => {
+    const p = previewOf(
+      { verb: "circle", center: { expr: exprOfPlace(ll), at: ll.at } },
+      namedP,
+    );
+    expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");
   });
 });

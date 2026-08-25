@@ -2,6 +2,7 @@ import * as ts from "typescript";
 
 import { siteSpecs } from "./analyze";
 import { printExpr, type Expr } from "./expr";
+import { hoistIntersections, takeBind } from "./hoist";
 import { freshSiteId } from "./stamp";
 
 export type Insert = {
@@ -63,34 +64,8 @@ function usedIdentifiers(sf: ts.SourceFile): Set<string> {
   return names;
 }
 
-const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-const PREFIX: Record<string, string> = {
-  point: "p",
-  circle: "c",
-  line: "l",
-  segment: "s",
-  lineIntersection: "x",
-  circleLineIntersection: "x",
-  circleCircleIntersection: "x",
-  offsetLine: "off",
-};
-
 export function freshBind(source: string, from: string, requested?: string): string {
-  const used = usedIdentifiers(parse(source));
-  if (requested?.trim()) {
-    const n = requested.trim();
-    if (!BIND.test(n)) throw new Error("bind must be an identifier");
-    if (used.has(n)) throw new Error(`bind ${n} is already used`);
-    return n;
-  }
-  const prefix = PREFIX[from] ?? "n";
-  if (!used.has(prefix)) return prefix;
-  for (let i = 2; i < 1000; i++) {
-    const n = `${prefix}${i}`;
-    if (!used.has(n)) return n;
-  }
-  throw new Error(`could not allocate bind for ${from}`);
+  return takeBind(usedIdentifiers(parse(source)), from, requested);
 }
 
 export function ensureNamedImport(source: string, moduleName: string, names: readonly string[]): string {
@@ -132,11 +107,19 @@ function callees(expr: Expr): string[] {
 export function insertCall(source: string, job: Insert, nextId: () => string = freshSiteId): string {
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
-  const bind = freshBind(source, job.from, job.bind);
-  const id = job.id ?? nextId();
-  const args = job.args.map(printExpr).join(", ");
-  const line = `const ${bind} = ${job.from}(${args}, "${id}");`;
-  const names = [...new Set([job.from, ...job.args.flatMap(callees)])];
+  const used = usedIdentifiers(parse(source));
+  const { exprs: args, hoists } = hoistIntersections(job.args, used);
+  for (const h of hoists) {
+    if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
+  }
+  const bind = takeBind(used, job.from, job.bind);
+  const statements = [
+    ...hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() })),
+    { bind, from: job.from, args, id: job.id ?? nextId() },
+  ];
+  const names = [
+    ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),
+  ];
   let next = ensureNamedImport(source, "oblik", names);
   const sf = parse(next);
   const body = findBuildBody(sf);
@@ -144,7 +127,9 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   const stmts = body.statements;
   const last = stmts[stmts.length - 1];
   const indent = last ? indentAt(next, last.getStart(sf)) : "    ";
-  const chunk = `${indent}${line}\n`;
+  const chunk = statements
+    .map((s) => `${indent}const ${s.bind} = ${s.from}(${s.args.map(printExpr).join(", ")}, "${s.id}");\n`)
+    .join("");
   if (last && ts.isReturnStatement(last)) {
     const lineStart = next.lastIndexOf("\n", last.getStart(sf) - 1) + 1;
     return next.slice(0, lineStart) + chunk + next.slice(lineStart);

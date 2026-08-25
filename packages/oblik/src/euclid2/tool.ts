@@ -1,4 +1,5 @@
 import { printExpr, type Expr } from "../source/expr";
+import { hoistIntersections, printHoist, takeBind } from "../source/hoist";
 import { isCrossing, type PlacePoint } from "./place";
 import type { Vec2 } from "./pick";
 
@@ -174,37 +175,84 @@ export function ghostOf(session: ToolSession, cursor: Vec2 | null): Ghost | null
   return { kind: session.verb, a: session.a.at, b: cursor };
 }
 
-export function previewOf(session: ToolSession, place: PlacePoint | null = null): { line: string; hint: string } {
+function previewCall(
+  from: string,
+  args: Expr[],
+  usedNames: readonly string[],
+  call: (printed: string[]) => string,
+): string {
+  const used = new Set(usedNames);
+  const { exprs, hoists } = hoistIntersections(args, used);
+  const bind = takeBind(used, from);
+  return [...hoists.map(printHoist), `const ${bind} = ${call(exprs.map((e) => printExpr(e)))}`].join("\n");
+}
+
+export function previewOf(
+  session: ToolSession,
+  place: PlacePoint | null = null,
+  usedNames: readonly string[] = [],
+): { line: string; hint: string } {
   const spec = TOOLS.find((t) => t.id === session.verb)!;
   if (session.verb === "point") {
     if (place?.kind === "ref") {
       return { line: `${place.bind}`, hint: "Already a named point — click does nothing." };
     }
     if (place && isCrossing(place)) {
-      return { line: `const x = ${printExpr(exprOfPlace(place))}`, hint: "Click to insert the crossing." };
+      const used = new Set(usedNames);
+      const { hoists } = hoistIntersections([exprOfPlace(place)], used);
+      const line = hoists.map(printHoist).join("\n") || `const ${spec.prefix} = ${printExpr(exprOfPlace(place))}`;
+      return { line, hint: "Click to insert the crossing." };
     }
     return { line: `const ${spec.prefix} = point(x, y)`, hint: spec.hint };
   }
   if (session.verb === "circle") {
-    const c = session.center ? printExpr(session.center.expr) : "center";
     if (!session.center) {
       if (place && place.kind !== "free") {
         return {
-          line: `const ${spec.prefix} = circle(${printExpr(exprOfPlace(place))}, radius)`,
-          hint: "Click to set the center.",
+          line: previewCall("circle", [exprOfPlace(place)], usedNames, ([c]) => `circle(${c}, radius)`),
+          hint: "Click to set the center. A crossing is inserted as its own named point.",
         };
       }
-      return { line: `const ${spec.prefix} = circle(${c}, radius)`, hint: spec.hint };
+      return { line: `const ${spec.prefix} = circle(center, radius)`, hint: spec.hint };
     }
     if (place && place.kind !== "free" && !sameRef(session.center.expr, place)) {
-      const r = printExpr({ kind: "call", name: "dist", args: [session.center.expr, exprOfPlace(place)] });
-      return { line: `const ${spec.prefix} = circle(${c}, ${r})`, hint: "Click to pin the radius to that distance." };
+      return {
+        line: previewCall(
+          "circle",
+          [session.center.expr, exprOfPlace(place)],
+          usedNames,
+          ([c, p]) => `circle(${c}, dist(${c}, ${p}))`,
+        ),
+        hint: "Click to pin the radius to that distance.",
+      };
     }
-    return { line: `const ${spec.prefix} = circle(${c}, radius)`, hint: "Click the radius, or a point / crossing to pin dist()." };
+    return {
+      line: previewCall("circle", [session.center.expr], usedNames, ([c]) => `circle(${c}, radius)`),
+      hint: "Click the radius, or a point / crossing to pin dist().",
+    };
   }
-  const a = session.a ? printExpr(session.a.expr) : "a";
+  if (!session.a) {
+    if (place && place.kind !== "free") {
+      return {
+        line: previewCall(session.verb, [exprOfPlace(place)], usedNames, ([a]) => `${session.verb}(${a}, b)`),
+        hint: spec.hint,
+      };
+    }
+    return { line: `const ${spec.prefix} = ${session.verb}(a, b)`, hint: spec.hint };
+  }
+  if (place && place.kind !== "free") {
+    return {
+      line: previewCall(
+        session.verb,
+        [session.a.expr, exprOfPlace(place)],
+        usedNames,
+        ([a, b]) => `${session.verb}(${a}, ${b})`,
+      ),
+      hint: "Click the second point.",
+    };
+  }
   return {
-    line: `const ${spec.prefix} = ${session.verb}(${a}, b)`,
-    hint: session.a ? "Click the second point." : spec.hint,
+    line: previewCall(session.verb, [session.a.expr], usedNames, ([a]) => `${session.verb}(${a}, b)`),
+    hint: "Click the second point.",
   };
 }

@@ -1,0 +1,67 @@
+import { describe, expect, test } from "vitest";
+
+import type { Expr } from "./expr";
+import { hoistIntersections } from "./hoist";
+
+const crossing: Expr = {
+  kind: "call",
+  name: "lineIntersection",
+  args: [
+    { kind: "ref", name: "ground" },
+    { kind: "ref", name: "wall" },
+  ],
+};
+
+describe("hoistIntersections", () => {
+  test("lifts a nested crossing to a named statement", () => {
+    const { exprs, hoists } = hoistIntersections(
+      [
+        {
+          kind: "call",
+          name: "dist",
+          args: [{ kind: "ref", name: "A" }, crossing],
+        },
+      ],
+      new Set(["A", "ground", "wall"]),
+    );
+    expect(hoists).toEqual([{ bind: "x", from: "lineIntersection", args: crossing.args }]);
+    expect(exprs).toEqual([
+      {
+        kind: "call",
+        name: "dist",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "x" },
+        ],
+      },
+    ]);
+  });
+
+  test("dedups identical crossings to one bind", () => {
+    const { exprs, hoists } = hoistIntersections([crossing, crossing], new Set());
+    expect(hoists).toHaveLength(1);
+    expect(exprs).toEqual([
+      { kind: "ref", name: "x" },
+      { kind: "ref", name: "x" },
+    ]);
+  });
+
+  test("leaves nested free points alone", () => {
+    const pt: Expr = {
+      kind: "call",
+      name: "point",
+      args: [
+        { kind: "num", value: 4 },
+        { kind: "num", value: 1 },
+      ],
+    };
+    const { exprs, hoists } = hoistIntersections([pt], new Set());
+    expect(hoists).toEqual([]);
+    expect(exprs).toEqual([pt]);
+  });
+
+  test("skips x if that bind is already used", () => {
+    const { hoists } = hoistIntersections([crossing], new Set(["x"]));
+    expect(hoists[0]?.bind).toBe("x2");
+  });
+});
