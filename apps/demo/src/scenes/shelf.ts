@@ -1,4 +1,4 @@
-import { circle, line, parallelLine, point, pointOnLine, segment, circleLineIntersection, pointOnCircle } from "oblik";
+import { circle, line, parallelLine, point, pointOnLine, segment, circleLineIntersection } from "oblik";
 import { defineScene } from "oblik";
 
 export default defineScene({
@@ -13,12 +13,8 @@ export default defineScene({
     const shelf = parallelLine(ground, 1.76, "o_par");
     const reach = circle(A, 2.5, "o_r");
     const P = circleLineIntersection(reach, shelf, 1, "o_p");
-    const lamp = pointOnLine(shelf, 4.94, "o_lamp");
+    const lamp = pointOnLine(shelf, 2.2, "o_lamp");
     segment(A, P, "o_s");
-    const g = pointOnLine(ground, -3.37, "o_d7df92d8de");
-    const g2 = pointOnCircle(reach, 0.68, 0.73, "o_9be85acae0");
-    const p = point(2.8, 3.44, "o_118203e7b1");
-    const l = line(p, B, "o_0fd938420c");
     return { A, B, ground, shelf, reach, P, lamp };
   },
 });
