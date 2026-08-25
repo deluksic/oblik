@@ -165,8 +165,8 @@ function Host(props: {
         {(dup) => (
           <div class={styles.dupWarn} role="alert">
             <p>
-              Duplicate id <code class={styles.dupId}>{dup.id}</code> — ids must be unique across the
-              project.
+              Duplicate id <code class={styles.dupId}>{dup.id}</code>. Delete the colliding trailing
+              ids so stamp can regenerate unique ones.
             </p>
             <ul class={styles.dupSites}>
               <For each={dup.sites}>
