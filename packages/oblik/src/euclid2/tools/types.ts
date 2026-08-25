@@ -83,6 +83,7 @@ export type ToolSession =
       carrierRef: string;
       typed: string;
       name: string;
+      lengthReuse?: string;
     }
   | {
       verb: "slider";

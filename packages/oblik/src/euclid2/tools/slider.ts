@@ -1,43 +1,17 @@
 import type { Expr } from "../../source/expr";
 import { inSlot, nameField, parseNum, previewName, withBind } from "./draft";
+import { attachLengthHit, numberField, resolveNumberExpr } from "./length";
 import { round } from "./common";
-import type { Field, PlaceHit, Preview, Tool, ToolSession } from "./types";
+import { scopeFromTrace } from "./scope";
+import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type SliderSession = Extract<ToolSession, { verb: "slider" }>;
 
 const fields: Field<SliderSession>[] = [
-  {
-    id: "value",
-    kind: "number",
-    placeholder: "<value>",
-    open: () => true,
-    get: (s) => s.value,
-    set: (s, raw) => ({ ...s, value: raw }),
-  },
-  {
-    id: "min",
-    kind: "number",
-    placeholder: "<min>",
-    open: () => true,
-    get: (s) => s.min,
-    set: (s, raw) => ({ ...s, min: raw }),
-  },
-  {
-    id: "max",
-    kind: "number",
-    placeholder: "<max>",
-    open: () => true,
-    get: (s) => s.max,
-    set: (s, raw) => ({ ...s, max: raw }),
-  },
-  {
-    id: "step",
-    kind: "number",
-    placeholder: "<step>",
-    open: () => true,
-    get: (s) => s.step,
-    set: (s, raw) => ({ ...s, step: raw }),
-  },
+  numberField("value", "<value>", (s) => s.value, (s, raw) => ({ ...s, value: raw })),
+  numberField("min", "<min>", (s) => s.min, (s, raw) => ({ ...s, min: raw })),
+  numberField("max", "<max>", (s) => s.max, (s, raw) => ({ ...s, max: raw })),
+  numberField("step", "<step>", (s) => s.step, (s, raw) => ({ ...s, step: raw })),
   nameField(),
 ];
 
@@ -45,24 +19,34 @@ function measure(hit: PlaceHit): number {
   return round(Math.max(0.05, Math.hypot(hit.world.x, hit.world.y) || 1));
 }
 
-function sliderArgs(session: SliderSession, value: number): Expr[] {
-  const props: Record<string, Expr> = {};
-  const min = parseNum(session.min);
-  if (min != null) props.min = { kind: "num", value: min };
-  const max = parseNum(session.max);
-  if (max != null) props.max = { kind: "num", value: max };
-  const step = parseNum(session.step);
-  if (step != null) props.step = { kind: "num", value: step };
-  return [{ kind: "num", value: round(value) }, { kind: "props", props }];
+function optProp(raw: string, scope: Scope): Expr | undefined {
+  return resolveNumberExpr(raw, scope) ?? undefined;
 }
 
-function insertValue(session: SliderSession, value: number) {
-  return { insert: withBind(session, { from: "slider", args: sliderArgs(session, value) }) };
+function sliderArgs(session: SliderSession, value: Expr, scope: Scope): Expr[] {
+  const props: Record<string, Expr> = {};
+  const min = optProp(session.min, scope);
+  if (min) props.min = min;
+  const max = optProp(session.max, scope);
+  if (max) props.max = max;
+  const step = optProp(session.step, scope);
+  if (step) props.step = step;
+  return [value, { kind: "props", props }];
+}
+
+function valueExpr(session: SliderSession, scope: Scope, fallback: number): Expr {
+  return resolveNumberExpr(session.value, scope, fallback) ?? { kind: "num", value: round(fallback) };
+}
+
+function insertValue(session: SliderSession, value: Expr, scope: Scope) {
+  return { insert: withBind(session, { from: "slider", args: sliderArgs(session, value, scope) }) };
 }
 
 function optSlot(session: SliderSession, field: SliderSession["focus"], raw: string, label: string): string {
   return inSlot(session.focus === field, raw.trim() || label);
 }
+
+const NUMERIC_FOCUS = new Set<SliderSession["focus"]>(["value", "min", "max", "step"]);
 
 export const slider: Tool<SliderSession> = {
   spec: {
@@ -75,14 +59,33 @@ export const slider: Tool<SliderSession> = {
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as SliderSession["focus"] }),
-  click(session, hit) {
-    const typed = parseNum(session.value);
-    return insertValue(session, typed != null ? Math.max(0.05, typed) : measure(hit));
+  hit(session, hit, ctx) {
+    if (!NUMERIC_FOCUS.has(session.focus)) return hit;
+    return attachLengthHit(hit, ctx);
   },
-  commit(session, place) {
-    const typed = parseNum(session.value);
-    if (typed != null) return insertValue(session, typed);
-    if (place) return insertValue(session, measure(place));
+  click(session, hit, scope) {
+    if (hit.length && NUMERIC_FOCUS.has(session.focus)) {
+      const raw = hit.length.bind;
+      const next =
+        session.focus === "value"
+          ? { ...session, value: raw }
+          : session.focus === "min"
+            ? { ...session, min: raw }
+            : session.focus === "max"
+              ? { ...session, max: raw }
+              : { ...session, step: raw };
+      const value = valueExpr(next, scope, hit.length.value);
+      if (session.focus === "value") return insertValue(next, value, scope);
+      return { session: next };
+    }
+    const bound = resolveNumberExpr(session.value, scope);
+    if (bound) return insertValue(session, bound, scope);
+    return insertValue(session, { kind: "num", value: measure(hit) }, scope);
+  },
+  commit(session, place, scope) {
+    const bound = resolveNumberExpr(session.value, scope);
+    if (bound) return insertValue(session, bound, scope);
+    if (place) return insertValue(session, { kind: "num", value: measure(place) }, scope);
     if (session.focus !== "value") return { session: { ...session, focus: "value" } };
     return null;
   },

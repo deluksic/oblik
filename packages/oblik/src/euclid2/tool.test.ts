@@ -215,6 +215,34 @@ describe("clickTool", () => {
     });
   });
 
+  test("parallel line click on a slider reuses its bind for the distance", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const mid = clickTool(startTool("parallelLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid)) throw new Error("expected session");
+    const scope = {
+      used: ["ground", "reach"],
+      points: {},
+      carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      lengths: { reach: 1.25 },
+    };
+    expect(
+      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 1.25 } }, scope),
+    ).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "reach" }],
+      },
+    });
+  });
+
   test("circle click on a slider reuses its bind for the radius", () => {
     const mid = clickTool(startTool("circle"), { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in mid)) throw new Error("expected session");
@@ -267,6 +295,20 @@ describe("ghostOf", () => {
       { world: { x: 0, y: 1.5 }, point: free(0, 1.5) },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.5 });
+  });
+
+  test("previews a slider distance on a parallel line", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const g = ghostOf(
+      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      { world: { x: 0, y: 0 }, point: free(0, 0), length: { bind: "reach", value: 1.25 } },
+      { used: ["ground", "reach"], points: {}, carriers: {}, lengths: { reach: 1.25 } },
+    );
+    expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.25 });
   });
 
   test("does not preview a parallel line before the carrier is chosen", () => {

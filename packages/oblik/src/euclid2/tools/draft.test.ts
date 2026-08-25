@@ -298,6 +298,52 @@ describe("keyTool", () => {
     });
   });
 
+  test("parallel line typed slider name commits as a ref", () => {
+    const ground = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+    const scope = {
+      used: ["ground", "reach"],
+      points: {},
+      carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      lengths: { reach: 1.25 },
+    };
+    const mid = asSession(
+      clickTool(startTool("parallelLine"), {
+        world: { x: 1, y: 0 },
+        point: { kind: "free", at: { x: 1, y: 0 } },
+        carrier: { bind: "ground", geom: ground },
+      }),
+    );
+    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, null, scope)).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "ref", name: "reach" },
+        ],
+      },
+    });
+  });
+
+  test("point typed slider name commits as a ref", () => {
+    const scope = {
+      used: ["reach"],
+      points: {},
+      carriers: {},
+      lengths: { reach: 3 },
+    };
+    const mid = typeChars(startTool("point"), "reach");
+    const y = tabTool(mid);
+    expect(keyTool(typeChars(y, "reach"), { key: "Enter" }, null, scope)).toEqual({
+      insert: {
+        from: "point",
+        args: [
+          { kind: "ref", name: "reach" },
+          { kind: "ref", name: "reach" },
+        ],
+      },
+    });
+  });
+
   test("ignores modifier chords", () => {
     expect(keyTool(startTool("point"), { key: "a", ctrl: true })).toBeUndefined();
   });

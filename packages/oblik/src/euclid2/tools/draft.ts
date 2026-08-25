@@ -110,7 +110,7 @@ export function typedField<S extends { typed: string }>(open: (session: S) => bo
 
 /** Numeric literal or an existing slider bind. */
 export function lengthField<S extends { typed: string; lengthReuse?: string }>(
-  placeholder = "<radius>",
+  placeholder = "<n>",
 ): Field<S> {
   return {
     id: "typed",
@@ -121,6 +121,8 @@ export function lengthField<S extends { typed: string; lengthReuse?: string }>(
     set: (s, raw) => ({ ...s, typed: raw, lengthReuse: undefined }),
   };
 }
+
+export { numberField } from "./length";
 
 export function refField<S extends ToolSession>(
   id: string,
