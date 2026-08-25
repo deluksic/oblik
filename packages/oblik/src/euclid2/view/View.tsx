@@ -128,7 +128,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
-      props.onCursor?.(placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession));
+      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession);
+      props.onCursor?.(hit);
+      const session = props.toolSession;
+      if (session?.verb === "parallelLine" && !session.carrier) {
+        const id = hit.carrier
+          ? (props.trace.find((n) => n.bind === hit.carrier!.bind && n.occ === 0)?.id ?? null)
+          : null;
+        props.onHoverId?.(id);
+      }
     } else noteHover(e);
     if (!drag) return;
     if (!drag.moved) {

@@ -133,9 +133,14 @@ function radiusExpr(center: { expr: Expr; at: Vec2 }, hit: PlaceHit): Expr {
   return { kind: "num", value: round(r) };
 }
 
+function parallelDistAt(hit: PlaceHit, geom: LineLike): number {
+  const at = hit.point.kind === "free" ? hit.world : hit.point.at;
+  return signedDist(at, geom);
+}
+
 function parallelDistExpr(carrier: Expr, geom: LineLike, hit: PlaceHit): Expr {
   if (hit.point.kind === "free") {
-    return { kind: "num", value: round(signedDist(hit.world, geom)) };
+    return { kind: "num", value: round(parallelDistAt(hit, geom)) };
   }
   return { kind: "call", name: "signedDist", args: [exprOfPlace(hit.point), carrier] };
 }
@@ -214,10 +219,12 @@ export function ghostOf(session: ToolSession, place: PlaceHit | null): Ghost | n
     };
   }
   if (session.verb === "parallelLine") {
-    const geom = session.carrier?.geom ?? place?.carrier?.geom;
-    if (!geom) return null;
-    const at = place?.world ?? cursor;
-    return { kind: "parallelLine", geom, distance: signedDist(at, geom) };
+    if (!session.carrier || !place) return null;
+    return {
+      kind: "parallelLine",
+      geom: session.carrier.geom,
+      distance: parallelDistAt(place, session.carrier.geom),
+    };
   }
   if (!session.a) return { kind: "point", at: cursor };
   return { kind: session.verb, a: session.a.at, b: cursor };
@@ -284,13 +291,8 @@ export function previewOf(
     if (!session.carrier) {
       if (place?.carrier) {
         return {
-          line: previewCall(
-            "parallelLine",
-            [{ kind: "ref", name: place.carrier.bind }],
-            usedNames,
-            ([g]) => `parallelLine(${g}, distance)`,
-          ),
-          hint: "Click the carrier line, then set the signed offset.",
+          line: `const ${spec.prefix} = parallelLine(${place.carrier.bind}, distance)`,
+          hint: `Click ${place.carrier.bind} to select the carrier.`,
         };
       }
       return { line: `const ${spec.prefix} = parallelLine(carrier, distance)`, hint: spec.hint };
@@ -303,11 +305,20 @@ export function previewOf(
           usedNames,
           ([g, p]) => `parallelLine(${g}, signedDist(${p}, ${g}))`,
         ),
-        hint: "Click to pin the offset to signedDist from that point.",
+        hint: "Click a point or crossing to pin signedDist(), or click the offset distance.",
       };
     }
+    const dist = place ? round(parallelDistAt(place, session.carrier.geom)) : null;
     return {
-      line: previewCall("parallelLine", [session.carrier.expr], usedNames, ([g]) => `parallelLine(${g}, distance)`),
+      line:
+        dist != null
+          ? previewCall(
+              "parallelLine",
+              [session.carrier.expr, { kind: "num", value: dist }],
+              usedNames,
+              ([g, d]) => `parallelLine(${g}, ${d})`,
+            )
+          : previewCall("parallelLine", [session.carrier.expr], usedNames, ([g]) => `parallelLine(${g}, distance)`),
       hint: "Click the signed offset distance from the carrier.",
     };
   }

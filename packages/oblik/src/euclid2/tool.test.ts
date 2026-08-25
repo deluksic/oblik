@@ -177,6 +177,28 @@ describe("clickTool", () => {
     });
   });
 
+  test("parallel line distance on a named point emits signedDist", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const session = {
+      verb: "parallelLine" as const,
+      carrier: { expr: { kind: "ref" as const, name: "ground" }, geom: ground },
+    };
+    const done = clickTool(session, { world: { x: 9, y: 0.2 }, point: namedP });
+    expect(done).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "call", name: "signedDist", args: [{ kind: "ref", name: "P" }, { kind: "ref", name: "ground" }] },
+        ],
+      },
+    });
+  });
+
   test("segment second click can nest a free point", () => {
     const mid = clickTool(startTool("segment"), { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in mid)) throw new Error("expected session");
@@ -210,6 +232,30 @@ describe("ghostOf", () => {
       { world: { x: 0, y: 1.5 }, point: free(0, 1.5) },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.5 });
+  });
+
+  test("does not preview a parallel line before the carrier is chosen", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    expect(
+      ghostOf({ verb: "parallelLine" }, { world: { x: 1, y: 0 }, point: free(1, 0), carrier: { bind: "ground", geom: ground } }),
+    ).toBeNull();
+  });
+
+  test("parallel line distance snaps to a named point for the ghost", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const g = ghostOf(
+      { verb: "parallelLine", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      { world: { x: 9, y: 0.2 }, point: namedP },
+    );
+    expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 0 });
   });
 });
 
