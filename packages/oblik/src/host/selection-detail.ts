@@ -1,4 +1,5 @@
 import type { CallSite } from "../eval/stack";
+import { isUserSourcePath } from "../eval/stack";
 import type { TraceNode } from "../eval/context";
 
 export type OriginCodeLine = {
@@ -57,7 +58,10 @@ export function pinConstructorSite(
   frames: readonly CallSite[],
   site?: { file: string; line: number; column: number },
 ): CallSite[] {
-  if (!site || frames.length === 0) return frames.map((f) => ({ ...f }));
+  if (!site) return frames.map((f) => ({ ...f }));
+  if (frames.length === 0) {
+    return [{ file: site.file, line: site.line, column: site.column }];
+  }
   const next = frames.map((f) => ({ ...f }));
   next[0] = { ...next[0]!, file: site.file, line: site.line, column: site.column };
   return next;
@@ -131,6 +135,7 @@ export async function originFromStack(
 
   const originFrames: OriginFrame[] = [];
   for (const frame of frames) {
+    if (!isUserSourcePath(frame.file)) continue;
     try {
       const text = await peekFile(cache, frame.file);
       originFrames.push({
@@ -145,15 +150,21 @@ export async function originFromStack(
     }
   }
 
+  if (originFrames.length === 0) {
+    return { kind: "empty", message: "No peekable source for this object." };
+  }
+
   return { kind: "origin", frames: originFrames };
 }
 
 export function stackForNode(node: TraceNode): CallSite[] {
-  if (node.stack.length > 0) return node.stack.map((f) => ({ ...f }));
-  if (node.at && node.module) {
-    return [{ file: node.module, line: node.at.line, column: node.at.column }];
-  }
-  return [];
+  const site =
+    node.at && node.module
+      ? { file: node.module, line: node.at.line, column: node.at.column }
+      : undefined;
+  const fromStack = node.stack.filter((f) => isUserSourcePath(f.file));
+  if (site) return pinConstructorSite(fromStack, site);
+  return fromStack;
 }
 
 function selectionMeta(node: TraceNode): string {

@@ -5,15 +5,24 @@ export type CallSite = {
   name?: string;
 };
 
-const SKIP_FILE = [/\/oblik\//, /\/node_modules\//, /\/vite\//, /node:/];
 const SKIP_NAME = new Set(["", "eval", "anonymous", "<anonymous>", "Module", "evaluate", "traced"]);
+
+/** Scene / user source paths we can peek on disk — not Vite prebundles or oblik internals. */
+export function isUserSourcePath(file: string): boolean {
+  const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
+  if (/(^|\/)node_modules(\/|$)/.test(key)) return false;
+  if (/(^|\/)\\.vite(\/|$)/.test(key)) return false;
+  if (/^node:/.test(key)) return false;
+  if (/\/oblik\//.test(key)) return false;
+  return /\.(ts|tsx)$/.test(key);
+}
 
 function parseFrame(raw: string): CallSite | null {
   const line = raw.replace(/\.(tsx?|jsx?|mjs)\?[^:]*:/, ".$1:");
   const m = line.match(/(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/);
   if (!m?.[1] || !m[2] || !m[3]) return null;
   const file = m[1].replace(/^\//, "");
-  if (SKIP_FILE.some((re) => re.test(file))) return null;
+  if (!isUserSourcePath(file)) return null;
   const nameMatch = raw.match(/^\s*at\s+(?:async\s+)?([^\s(/]+)/);
   const name = nameMatch?.[1];
   return {
