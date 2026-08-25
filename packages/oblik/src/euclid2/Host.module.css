@@ -1,0 +1,52 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: #ece8de;
+  background: #0e1016;
+}
+
+.head {
+  flex: 0 0 auto;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid #2a3040;
+}
+
+.head h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.head p {
+  margin: 0.25rem 0 0;
+  color: #9a9488;
+  font-size: 0.82rem;
+}
+
+.status {
+  color: #e8876a;
+}
+
+.kicker {
+  margin: 0 0 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: #e8876a;
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.err {
+  margin: 1rem;
+  color: #e8876a;
+}
