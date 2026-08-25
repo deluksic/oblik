@@ -116,3 +116,17 @@ import { applyHotScenes } from "oblik/host";
 if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });
 `;
 }
+
+export function scanAnnotationsBundle(
+  sceneDir: string,
+  workspaceRoot: string,
+  analyze: (source: string, file: string) => Map<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const abs of listSceneFiles(sceneDir)) {
+    const rel = path.relative(workspaceRoot, abs).replace(/\\/g, "/");
+    const src = fs.readFileSync(abs, "utf8");
+    out[rel] = Object.fromEntries(analyze(src, rel));
+  }
+  return out;
+}

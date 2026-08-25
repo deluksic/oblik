@@ -14,11 +14,14 @@ import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 import styles from "./Host.module.css";
 
+export type AnnotationBundle = Record<string, Record<string, Annotation>>;
+
 export type SceneLoaderMap = Record<string, () => Promise<{ default: Scene }>>;
 
 export type OblikMount = {
   setScenes: (scenes: OblikSceneEntry[]) => void;
   setLoaders: (loaders: SceneLoaderMap) => void;
+  setAnnotations: (annotations: AnnotationBundle) => void;
   reloadCurrentScene: () => Promise<void>;
 };
 
@@ -26,6 +29,7 @@ export type OblikMountOpts = {
   el: HTMLElement;
   scenes: OblikSceneEntry[];
   loaders: SceneLoaderMap;
+  annotations: AnnotationBundle;
 };
 
 function pickSceneId(scenes: OblikSceneEntry[]): string {
@@ -42,6 +46,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
 
   const [scenes, setScenes] = createSignal(opts.scenes);
   const [loaders, setLoaders] = createSignal(opts.loaders);
+  const [annotations, setAnnotations] = createSignal(opts.annotations);
   const [sceneId, setSceneId] = createSignal(startId);
   const [mod, setMod] = createSignal<Scene | null>(null);
   const [anno, setAnno] = createSignal<Record<string, Annotation>>({});
@@ -59,11 +64,10 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
       const loader = loaders()[sceneLoaderKey(entry.file)];
       if (!loader) throw new Error(`No loader for ${entry.file}`);
       const sceneMod = await loader();
-      const annMod = await import(/* @vite-ignore */ `virtual:oblik-annotations?file=${entry.path}`);
       evaluate(sceneMod.default, { module: entry.path });
       setMod(sceneMod.default);
-      setAnno(annMod.default ?? {});
       setFile(entry.path);
+      setAnno(annotations()[entry.path] ?? {});
     } catch (err) {
       setMod(null);
       setError(err instanceof Error ? err.message : String(err));
@@ -79,6 +83,13 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
     },
   );
 
+  createEffect(
+    () => [file(), annotations()] as const,
+    ([path, bundle]) => {
+      if (path) setAnno(bundle[path] ?? {});
+    },
+  );
+
   registerSceneHot({
     currentPath: file,
     onHot(scene) {
@@ -86,9 +97,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
       if (!path) return;
       evaluate(scene, { module: path });
       setMod(scene);
-      void import(/* @vite-ignore */ `virtual:oblik-annotations?file=${path}`).then((m) =>
-        setAnno(m.default ?? {}),
-      );
+      setAnno(annotations()[path] ?? {});
     },
   });
 
@@ -125,6 +134,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   return {
     setScenes,
     setLoaders,
+    setAnnotations,
     reloadCurrentScene: () => loadScene(sceneId()),
   };
 }

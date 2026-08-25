@@ -10,6 +10,11 @@ declare module "virtual:oblik-catalog" {
   export const scenes: OblikSceneEntry[];
 }
 
+declare module "virtual:oblik-annotations" {
+  import type { Annotation } from "oblik";
+  export const annotationsByPath: Record<string, Record<string, Annotation>>;
+}
+
 declare module "virtual:oblik-annotations?*" {
   import type { Annotation } from "oblik";
   const annotations: Record<string, Annotation>;
