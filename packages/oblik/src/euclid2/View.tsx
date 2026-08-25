@@ -43,6 +43,7 @@ type Drag =
       y: number;
       camX: number;
       camY: number;
+      moved: boolean;
     }
   | {
       kind: "point";
@@ -162,7 +163,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
       props.onPlace?.(placeFromEvent(e));
       return;
     }
-    el.setPointerCapture(e.pointerId);
     const t = e.target;
     if (t instanceof Element && t.hasAttribute("data-handle")) {
       const id = t.getAttribute("data-handle")!;
@@ -198,25 +198,32 @@ export function Euclid2View(props: Euclid2ViewProps) {
           moved: false,
         };
       }
-      setGrabbing(true);
       return;
     }
-    drag = { kind: "pan", x: e.clientX, y: e.clientY, camX: camera().x, camY: camera().y };
-    if (!props.placing) {
-      const w = worldOf(e);
-      const hits = hitsNear(props.trace, w, camera(), size());
-      pendingPick = hits.length > 0 ? { hits } : null;
-    } else {
-      pendingPick = null;
-    }
-    setGrabbing(true);
+    drag = {
+      kind: "pan",
+      x: e.clientX,
+      y: e.clientY,
+      camX: camera().x,
+      camY: camera().y,
+      moved: false,
+    };
+    const w = worldOf(e);
+    const hits = hitsNear(props.trace, w, camera(), size());
+    pendingPick = hits.length > 0 ? { hits } : null;
   }
 
   function noteHover(e: PointerEvent) {
-    if (props.placing || drag) return;
+    if (props.placing || drag?.moved) return;
     const w = worldOf(e);
     const hit = hitsNear(props.trace, w, camera(), size())[0];
     props.onHoverId?.(hit?.id ?? null);
+  }
+
+  function beginDrag(e: PointerEvent) {
+    const el = paneEl();
+    if (el && !el.hasPointerCapture(e.pointerId)) el.setPointerCapture(e.pointerId);
+    if (!grabbing()) setGrabbing(true);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -226,8 +233,12 @@ export function Euclid2View(props: Euclid2ViewProps) {
       noteHover(e);
     }
     if (!drag) return;
-    if (drag.kind !== "pan" && !drag.moved) {
-      if (movedPastClick(drag.downX, drag.downY, e.clientX, e.clientY)) drag.moved = true;
+    if (!drag.moved) {
+      const fromX = drag.kind === "pan" ? drag.x : drag.downX;
+      const fromY = drag.kind === "pan" ? drag.y : drag.downY;
+      if (!movedPastClick(fromX, fromY, e.clientX, e.clientY)) return;
+      drag.moved = true;
+      beginDrag(e);
     }
     if (drag.kind === "pan") {
       const cam = camera();
@@ -238,7 +249,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
       });
       return;
     }
-    if (!drag.moved) return;
     const w = worldOf(e);
     if (drag.kind === "point") {
       const nx = drag.startX + (w.x - drag.pointerX);
@@ -258,9 +268,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     pendingPick = null;
     setGrabbing(false);
     if (d?.kind === "pan") {
-      if (!movedPastClick(d.x, d.y, e.clientX, e.clientY)) {
-        props.onPick?.(pick?.hits ?? []);
-      }
+      if (!d.moved) props.onPick?.(pick?.hits ?? []);
       return;
     }
     if (!d) return;
