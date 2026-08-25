@@ -9,7 +9,7 @@ import {
   scanAnnotationsBundle,
   scanOblikCatalog,
   sceneGlobKeys,
-  sceneLoadersAcceptTail,
+  sceneLoadersModule,
 } from "./catalog";
 import { insertCall } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
@@ -82,6 +82,12 @@ function invalidateSceneLoaders(server: ViteDevServer): void {
   }
 }
 
+function invalidateCatalogConsumers(server: ViteDevServer): void {
+  const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+  if (!catalog) return;
+  for (const importer of [...catalog.importers]) void server.reloadModule(importer);
+}
+
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
@@ -120,6 +126,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         if (catalogChanged()) {
           invalidateCatalog(server);
           invalidateSceneLoaders(server);
+          invalidateCatalogConsumers(server);
         }
       };
       server.watcher.on("add", onSceneTree);
@@ -251,8 +258,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     transform(code, id) {
       const file = id.split("?")[0] ?? id;
       if (isSceneLoadersModule(id)) {
-        if (code.includes("__oblik_scene_hmr")) return null;
-        return { code: code + sceneLoadersAcceptTail(sceneGlobKeys(sceneDir)), map: null };
+        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: null };
       }
       if (!isSceneTs(sceneDir, file)) return null;
       const { source, added } = stamp(code);
@@ -272,6 +278,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         if (catalogChanged()) {
           invalidateCatalog(server);
           invalidateSceneLoaders(server);
+          invalidateCatalogConsumers(server);
           const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
           const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
           const extra = catalog ? [catalog] : [];

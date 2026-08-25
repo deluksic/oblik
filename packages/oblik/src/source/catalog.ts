@@ -117,6 +117,21 @@ if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyH
 `;
 }
 
+/** Vite transform output for scene-loaders.ts — rescanned on every transform so new scenes register without restart. */
+export function sceneLoadersModule(keys: string[]): string {
+  const entries = keys
+    .map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)}),`)
+    .join("\n");
+  const lit = JSON.stringify(keys);
+  return `import type { Scene } from "oblik";
+
+export const sceneLoaders = {
+${entries}
+} satisfies Record<string, () => Promise<{ default: Scene }>>;
+${sceneLoadersAcceptTail(keys)}
+`;
+}
+
 export function scanAnnotationsBundle(
   sceneDir: string,
   workspaceRoot: string,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseOblikSceneSource } from "./catalog";
+import { parseOblikSceneSource, sceneLoadersModule } from "./catalog";
 
 const src = `import { point, defineScene } from "oblik";
 
@@ -29,5 +29,14 @@ describe("parseOblikSceneSource", () => {
   test("errors when defineScene is missing", () => {
     const e = parseOblikSceneSource("/repo/x.ts", "export const x = 1;", "x.ts");
     expect(e.error).toMatch(/defineScene/);
+  });
+
+  test("sceneLoadersModule lists every glob key with HMR accept", () => {
+    const keys = ["./scenes/shelf.ts", "./scenes/triangle.ts"];
+    const mod = sceneLoadersModule(keys);
+    expect(mod).toContain('"./scenes/shelf.ts": () => import("./scenes/shelf.ts")');
+    expect(mod).toContain('"./scenes/triangle.ts": () => import("./scenes/triangle.ts")');
+    expect(mod).toContain("/* __oblik_scene_hmr */");
+    expect(mod).toContain("applyHotScenes");
   });
 });

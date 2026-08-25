@@ -12,6 +12,8 @@ const host = mountOblik({
   annotations: initialAnnotations,
 });
 
+const reloadLoaders = async () => (await import("./scene-loaders")).sceneLoaders;
+
 if (import.meta.hot) {
   import.meta.hot.accept(
     ["virtual:oblik-catalog", "virtual:oblik-annotations", "./scene-loaders"],
@@ -24,7 +26,7 @@ if (import.meta.hot) {
       if (annMod) host.setAnnotations(annMod.annotationsByPath);
       else host.setAnnotations((await import("virtual:oblik-annotations")).annotationsByPath);
       if (loadersMod) host.setLoaders(loadersMod.sceneLoaders);
-      else host.setLoaders((await import("./scene-loaders")).sceneLoaders);
+      else host.setLoaders(await reloadLoaders());
     },
   );
 }
