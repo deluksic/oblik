@@ -38,11 +38,7 @@ describe("parseOblikSceneSource", () => {
     expect(mod).toContain('"./scenes/triangle.ts": () => import("./scenes/triangle.ts")');
     expect(mod).toContain("/* __oblik_scene_hmr */");
     expect(mod).toContain("applyHotScenes");
-  });
-
-  test("sceneLoadersModule accepts helper modules for HMR", () => {
-    const mod = sceneLoadersModule(["./scenes/plate.ts"], ["./layout/mounting-plate.ts"]);
-    expect(mod).toContain('import "./layout/mounting-plate.ts"');
-    expect(mod).toContain("notifyHelperHot");
+    expect(mod).not.toContain("notifyHelperHot");
+    expect(mod).not.toContain("import \"./layout/");
   });
 });

@@ -30,7 +30,6 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
-  helperRev?: number;
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -41,10 +40,9 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
 
-  const world = createMemo(() => {
-    props.helperRev;
-    return evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file });
-  });
+  const world = createMemo(() =>
+    evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
+  );
   const scope = createMemo(() => scopeFromTrace(world().trace));
 
   const selectedNode = createMemo(() => {

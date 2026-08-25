@@ -6,7 +6,6 @@ import type { Plugin, ViteDevServer } from "vite";
 
 import { analyze } from "./analyze";
 import {
-  listCatalogFiles,
   scanAnnotationsBundle,
   scanOblikCatalog,
   sceneGlobKeys,
@@ -17,8 +16,8 @@ import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
 import { parseInsert, parseLiteralPatch } from "./schema";
-import { stamp } from "./stamp";
-import { appSrcImportKey, isUserAppSource, listUserAppSources } from "./user-source";
+import { freshSiteId, stamp } from "./stamp";
+import { isUserAppSource, listUserAppSources } from "./user-source";
 
 const VIRTUAL_ANN = "virtual:oblik-annotations";
 const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
@@ -90,13 +89,6 @@ function invalidateCatalogConsumers(server: ViteDevServer): void {
   for (const importer of [...catalog.importers]) void server.reloadModule(importer);
 }
 
-function helperImportKeys(appRoot: string, sceneDir: string): string[] {
-  const catalog = new Set(listCatalogFiles(sceneDir).map((abs) => path.resolve(abs)));
-  return listUserAppSources(appRoot)
-    .filter((abs) => !catalog.has(path.resolve(abs)))
-    .map((abs) => appSrcImportKey(appRoot, abs));
-}
-
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
@@ -136,8 +128,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           invalidateCatalog(server);
           invalidateSceneLoaders(server);
           invalidateCatalogConsumers(server);
-        } else {
-          invalidateSceneLoaders(server);
         }
       };
       server.watcher.on("add", onSceneTree);
@@ -269,15 +259,17 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     transform(code, id) {
       const file = id.split("?")[0] ?? id;
       if (isSceneLoadersModule(id)) {
-        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir), helperImportKeys(appRoot, sceneDir)), map: null };
+        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: null };
       }
       if (!isUserAppSource(appRoot, file)) return null;
-      const { source, added } = stamp(code);
-      if (added.length > 0) {
-        const abs = path.resolve(file);
-        void enqueue(abs, () => fs.writeFileSync(abs, source));
-      }
-      return { code: source, map: null };
+      // Vite chains maps by source name — this must match the module Vite is serving
+      // (`src/layout/foo.ts`), not a repo path (`apps/demo/src/layout/foo.ts`).
+      const viteSource = path.relative(appRoot, file).replace(/\\/g, "/");
+      const { source, added, map } = stamp(code, freshSiteId, viteSource);
+      if (added.length === 0) return null;
+      const abs = path.resolve(file);
+      void enqueue(abs, () => fs.writeFileSync(abs, source));
+      return { code: source, map };
     },
     handleHotUpdate(ctx) {
       const server = ctx.server;
@@ -294,8 +286,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         invalidateCatalogConsumers(server);
         const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
         if (catalog) extra.push(catalog);
-      } else if (!isSceneTs(sceneDir, ctx.file)) {
-        invalidateSceneLoaders(server);
       }
       return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
     },

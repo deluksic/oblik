@@ -2,7 +2,6 @@ import type { Scene } from "../eval/scene";
 
 export type SceneHotHandler = {
   onHot: (key: string, scene: Scene) => void;
-  onHelperHot?: () => void;
 };
 
 let handler: SceneHotHandler | null = null;
@@ -22,9 +21,4 @@ export function applyHotScenes(keys: string[], mods: unknown): void {
     if (!key || !mod?.default) continue;
     h.onHot(key, mod.default);
   }
-}
-
-/** Helper module updated — re-evaluate; live ESM bindings already point at the new helper. */
-export function notifyHelperHot(): void {
-  queueMicrotask(() => handler?.onHelperHot?.());
 }

@@ -112,30 +112,24 @@ export function sceneGlobKeys(sceneDir: string): string[] {
   return listCatalogFiles(sceneDir).map((abs) => sceneLoaderKey(path.basename(abs)));
 }
 
-export function sceneLoadersAcceptTail(keys: string[], helpers: string[] = []): string {
+export function sceneLoadersAcceptTail(keys: string[]): string {
   const lit = JSON.stringify(keys);
-  let snip = `
+  return `
 /* __oblik_scene_hmr */
-import { applyHotScenes, notifyHelperHot } from "oblik/host";
+import { applyHotScenes } from "oblik/host";
 if (import.meta.hot) import.meta.hot.accept(${lit}, (mods) => { if (mods) applyHotScenes(${lit}, mods); });
 `;
-  if (helpers.length > 0) {
-    const helperLit = JSON.stringify(helpers);
-    for (const h of helpers) snip += `import ${JSON.stringify(h)};\n`;
-    snip += `if (import.meta.hot) import.meta.hot.accept(${helperLit}, () => { notifyHelperHot(); });\n`;
-  }
-  return snip;
 }
 
 /** Vite transform output for scene-loaders.ts — rescanned on every transform so new scenes register without restart. */
-export function sceneLoadersModule(keys: string[], helpers: string[] = []): string {
+export function sceneLoadersModule(keys: string[]): string {
   const entries = keys
     .map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)}),`)
     .join("\n");
   return `export const sceneLoaders = {
 ${entries}
 };
-${sceneLoadersAcceptTail(keys, helpers)}
+${sceneLoadersAcceptTail(keys)}
 `;
 }
 

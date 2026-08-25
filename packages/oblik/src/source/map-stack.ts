@@ -15,18 +15,23 @@ export type StackLoc = {
   name?: string;
 };
 
-/** Vite URL for a repo-relative file. The demo is served from `apps/demo`. */
+/** Vite URL for a repo-relative or app-relative (`src/…`) file. The demo is served from `apps/demo`. */
 export function viteUrlForRepoFile(
   repoFile: string,
   workspaceRoot: string,
   appRoot: string,
 ): string {
-  const abs = path.resolve(workspaceRoot, repoFile).replace(/\\/g, "/");
+  const key = repoFile.replace(/^\/+/, "").replace(/\?.*$/, "");
   const root = path.resolve(appRoot).replace(/\\/g, "/");
-  if (abs === root || abs.startsWith(`${root}/`)) {
-    const rel = abs.slice(root.length).replace(/^\//, "");
-    return `/${rel}`;
+  const candidates = [path.resolve(workspaceRoot, key), path.resolve(appRoot, key)];
+  for (const candidate of candidates) {
+    const abs = candidate.replace(/\\/g, "/");
+    if (abs === root || abs.startsWith(`${root}/`)) {
+      const rel = abs.slice(root.length).replace(/^\//, "");
+      return `/${rel}`;
+    }
   }
+  const abs = path.resolve(workspaceRoot, key).replace(/\\/g, "/");
   return `/@fs${abs.startsWith("/") ? abs : `/${abs}`}`;
 }
 

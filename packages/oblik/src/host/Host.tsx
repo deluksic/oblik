@@ -70,8 +70,6 @@ function Host(props: {
   const sceneCache = new Map<string, Scene>();
   const [sceneRev, setSceneRev] = createSignal(0);
 
-  const [helperRev, setHelperRev] = createSignal(0);
-
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
   const loaded = createMemo(async () => {
@@ -108,9 +106,6 @@ function Host(props: {
           sceneCache.set(key, scene);
           setSceneRev((r) => r + 1);
         },
-        onHelperHot() {
-          setHelperRev((r) => r + 1);
-        },
       });
       return () => registerSceneHot(null);
     },
@@ -137,12 +132,7 @@ function Host(props: {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
     return sceneKind() === "euclid2" ? (
-      <Euclid2Pane
-        scene={scene()}
-        file={e.path}
-        annotations={annotations()}
-        helperRev={helperRev()}
-      />
+      <Euclid2Pane scene={scene()} file={e.path} annotations={annotations()} />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );

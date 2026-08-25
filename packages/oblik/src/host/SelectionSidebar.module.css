@@ -72,6 +72,7 @@
   color: var(--oblik-accent);
   border-bottom: 1px solid var(--oblik-line);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
 }
 
 .quote {

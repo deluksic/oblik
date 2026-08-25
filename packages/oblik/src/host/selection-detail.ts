@@ -40,6 +40,14 @@ function fileName(file: string): string {
   return file.split("/").pop() ?? file;
 }
 
+/** Path shown in origin / stack labels — `src/layout/foo.ts`, not a colliding basename. */
+export function originFileLabel(file: string): string {
+  const key = file.replace(/^\/+/, "").replace(/\?.*$/, "");
+  const src = key.indexOf("src/");
+  if (src >= 0) return key.slice(src);
+  return fileName(key);
+}
+
 function frameWho(f: CallSite): string {
   const named = f.name?.trim();
   if (named) return named;
@@ -50,7 +58,7 @@ export function stackLabel(frames: readonly CallSite[]): string {
   if (frames.length === 0) return "";
   const leaf = frames[0]!;
   const who = frameWho(leaf);
-  const file = fileName(leaf.file);
+  const file = originFileLabel(leaf.file);
   if (frames.length === 1) return `Built in ${file}`;
   return `From ${who} in ${file}`;
 }
@@ -120,14 +128,27 @@ export async function peekFile(
   file: string,
   module?: string,
 ): Promise<string> {
-  const key = normalizeSceneRelPath(file, module);
-  const cached = cache.get(key);
-  if (cached != null) return cached;
-  const res = await fetch(`/__peek?file=${encodeURIComponent(key)}`);
-  if (!res.ok) throw new Error(`Could not read ${key}`);
-  const text = await res.text();
-  cache.set(key, text);
-  return text;
+  const keys = [...new Set([normalizeSceneRelPath(file, module), file.replace(/^\/+/, "").replace(/\?.*$/, "")])];
+  for (const key of keys) {
+    const cached = cache.get(key);
+    if (cached != null) return cached;
+  }
+  let lastErr: Error | undefined;
+  for (const key of keys) {
+    try {
+      const res = await fetch(`/__peek?file=${encodeURIComponent(key)}`);
+      if (!res.ok) {
+        lastErr = new Error(`Could not read ${key}`);
+        continue;
+      }
+      const text = await res.text();
+      cache.set(key, text);
+      return text;
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastErr ?? new Error(`Could not read ${file}`);
 }
 
 export async function mapStack(frames: readonly CallSite[]): Promise<CallSite[]> {
@@ -161,7 +182,7 @@ export async function originFromStack(
     try {
       const text = await peekFile(cache, frame.file, module);
       originFrames.push({
-        file: fileName(frame.file),
+        file: originFileLabel(frame.file),
         lines: buildOriginFrameLines(text, frame.line, frame.name),
       });
     } catch (err) {

@@ -39,6 +39,13 @@ describe("stamp", () => {
     expect(added).toEqual([]);
     expect(source).toContain("o_keep");
   });
+
+  test("emits a source map for the Vite module path", () => {
+    const { map, added } = stamp("export const c = circle(80);\n", () => "o_1", "src/layout/plate.ts");
+    expect(added).toEqual(["o_1"]);
+    expect(map.sources).toContain("src/layout/plate.ts");
+    expect(map.mappings.length).toBeGreaterThan(0);
+  });
 });
 
 describe("patchLiterals", () => {

@@ -1,19 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { sceneBaseName } from "./scene-path";
-
 export function resolveSceneFileAbs(
   workspaceRoot: string,
   sceneDir: string,
   rel: string,
 ): string {
   const key = rel.replace(/^\/+/, "").replace(/\?.*$/, "");
-  const direct = safeResolveUnder(workspaceRoot, key);
-  if (direct && fs.existsSync(direct)) return direct;
+  const appRoot = path.resolve(sceneDir, "..", "..");
+  const candidates = [safeResolveUnder(workspaceRoot, key), safeResolveUnder(appRoot, key)];
+  for (const abs of candidates) {
+    if (abs && fs.existsSync(abs)) return abs;
+  }
 
-  const inSceneDir = path.join(sceneDir, sceneBaseName(key));
-  if (fs.existsSync(inSceneDir)) return inSceneDir;
+  // Bare catalog id (`shelf.ts`) — not a same-basename helper such as `src/layout/foo.ts`.
+  if (!key.includes("/")) {
+    const inSceneDir = path.join(sceneDir, key);
+    if (fs.existsSync(inSceneDir)) return inSceneDir;
+  }
 
   throw new Error(`ENOENT: no such file or directory, open '${path.resolve(workspaceRoot, key)}'`);
 }

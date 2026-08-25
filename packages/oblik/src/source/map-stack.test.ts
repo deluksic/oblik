@@ -8,6 +8,9 @@ test("demo scene files map to the Vite app-root URL", () => {
     viteUrlForRepoFile("apps/demo/src/scenes/shelf.ts", "/workspace", "/workspace/apps/demo"),
   ).toBe("/src/scenes/shelf.ts");
   expect(
+    viteUrlForRepoFile("src/layout/mounting-plate.ts", "/workspace", "/workspace/apps/demo"),
+  ).toBe("/src/layout/mounting-plate.ts");
+  expect(
     viteUrlForRepoFile("packages/oblik/src/eval/scene.ts", "/workspace", "/workspace/apps/demo"),
   ).toBe("/@fs/workspace/packages/oblik/src/eval/scene.ts");
 });

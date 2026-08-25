@@ -13,7 +13,11 @@ export function freshSiteId(): string {
   return `o_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function stamp(source: string, nextId: () => string = freshSiteId): { source: string; added: string[] } {
+export function stamp(
+  source: string,
+  nextId: () => string = freshSiteId,
+  file = "scene.ts",
+): { source: string; added: string[]; map: { mappings: string; names: string[]; sources: string[]; version: 3 } } {
   const specs = siteSpecs();
   const sf = parse(source);
   const ms = new MagicString(source);
@@ -32,5 +36,6 @@ export function stamp(source: string, nextId: () => string = freshSiteId): { sou
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return { source: ms.toString(), added };
+  const map = ms.generateMap({ hires: true, includeContent: true, source: file });
+  return { source: ms.toString(), added, map };
 }

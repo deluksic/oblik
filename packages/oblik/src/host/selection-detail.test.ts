@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { pinConstructorSite, stackForNode } from "./selection-detail";
+import { pinConstructorSite, originFileLabel, stackForNode } from "./selection-detail";
 
 const node = {
   id: "o_a",
@@ -49,6 +49,29 @@ describe("stackForNode", () => {
     expect(stack[0]).toMatchObject({ line: 10, column: 4 });
     expect(stack[1]).toMatchObject({ line: 12, column: 6, name: "build" });
   });
+
+  test("does not rewrite a helper frame onto a same-named scene", () => {
+    const stack = stackForNode({
+      ...node,
+      module: "apps/demo/src/layout/mounting-plate.ts",
+      at: { line: 5, column: 17 },
+      stack: [
+        { file: "src/layout/mounting-plate.ts", line: 5, column: 17, name: "mountingPlateLayout" },
+        { file: "src/scenes/mounting-plate.ts", line: 11, column: 12, name: "build" },
+      ],
+    });
+    expect(stack[0]).toMatchObject({
+      file: "apps/demo/src/layout/mounting-plate.ts",
+      line: 5,
+      column: 17,
+    });
+    expect(stack[1]).toMatchObject({
+      file: "src/scenes/mounting-plate.ts",
+      line: 11,
+      column: 12,
+      name: "build",
+    });
+  });
 });
 
 describe("pinConstructorSite", () => {
@@ -60,5 +83,12 @@ describe("pinConstructorSite", () => {
         column: 4,
       }),
     ).toEqual([{ file: "apps/demo/src/scenes/shelf.ts", line: 10, column: 4 }]);
+  });
+});
+
+describe("originFileLabel", () => {
+  test("keeps src/… so a helper is distinct from a same-named scene", () => {
+    expect(originFileLabel("apps/demo/src/layout/mounting-plate.ts")).toBe("src/layout/mounting-plate.ts");
+    expect(originFileLabel("src/scenes/mounting-plate.ts")).toBe("src/scenes/mounting-plate.ts");
   });
 });
