@@ -16,7 +16,7 @@ import {
   type Segment,
   type Vec2,
 } from "../geom";
-import { brand, currentEval, type TraceNode } from "./context";
+import { brand, currentEval, type SliderValue, type TraceNode } from "./context";
 import { $site, type SiteSpec } from "./site";
 import { captureUserStack } from "./stack";
 
@@ -136,6 +136,60 @@ export function dist(a: Vec2, b: Vec2): number {
   return distVec(a, b);
 }
 
+export type SliderOpts = {
+  label?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+};
+
+function snapEditNumber(raw: number, min: number, max: number, step: number): number {
+  const clamped = Math.min(max, Math.max(min, raw));
+  if (!(step > 0)) return clamped;
+  return Math.round((clamped - min) / step) * step + min;
+}
+
+function tracedSlider(n: number, meta: Omit<SliderValue, "kind">, id: string | undefined): number {
+  const ctx = currentEval();
+  if (!ctx || !id) return n;
+  const occ = ctx.occ.get(id) ?? 0;
+  ctx.occ.set(id, occ + 1);
+  const anno = ctx.annotations.get(id);
+  const value: SliderValue = { kind: "slider", ...meta, n };
+  const node: TraceNode = {
+    id,
+    occ,
+    kind: "slider",
+    value,
+    bind: anno?.bind,
+    editable: anno?.editable === true,
+    at: anno ? { line: anno.line, column: anno.column } : undefined,
+    module: ctx.module ?? anno?.file,
+    stack: captureUserStack(),
+  };
+  ctx.trace.push(node);
+  return n;
+}
+
+export const slider = mark((n: number, opts?: SliderOpts, id?: string): number => {
+  const raw = draftAt(id, 0, n);
+  const min = opts?.min ?? Math.min(0, raw);
+  const max = opts?.max ?? Math.max(Math.abs(raw) * 2, 1, min + 1);
+  const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
+  const v = snapEditNumber(raw, min, max, step);
+  return tracedSlider(
+    v,
+    {
+      n: v,
+      label: opts?.label?.trim() || "value",
+      min,
+      max,
+      step,
+    },
+    id,
+  );
+}, { dof: [0] });
+
 export const constructors = {
   point,
   circle,
@@ -145,4 +199,5 @@ export const constructors = {
   lineIntersection,
   circleLineIntersection,
   circleCircleIntersection,
+  slider,
 } as const;

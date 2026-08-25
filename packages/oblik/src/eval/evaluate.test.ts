@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { circle, point, segment } from "./constructors";
+import { circle, point, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
 import { emit, evaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -68,5 +68,28 @@ describe("evaluate", () => {
     expect(siteOf(circle)?.dof).toEqual([1]);
     expect(siteOf(point)?.dof).toEqual([0, 1]);
     expect(siteOf(segment)?.dof).toEqual([]);
+    expect(siteOf(slider)?.dof).toEqual([0]);
+  });
+
+  test("slider traces a HUD number", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const reach = slider(1.8, { label: "reach", min: 0, max: 4, step: 0.05 }, "o_sl");
+        return reach;
+      },
+    });
+    const annotations = analyze(
+      `const reach = slider(1.8, { label: "reach", min: 0, max: 4, step: 0.05 }, "o_sl");\n`,
+    );
+    const { trace, value } = evaluate(scene, { annotations });
+    expect(value).toBe(1.8);
+    expect(trace).toHaveLength(1);
+    expect(trace[0]?.kind).toBe("slider");
+    if (trace[0]?.value.kind === "slider") {
+      expect(trace[0].value.n).toBe(1.8);
+      expect(trace[0].value.label).toBe("reach");
+    }
   });
 });

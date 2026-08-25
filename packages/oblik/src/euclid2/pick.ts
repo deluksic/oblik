@@ -18,6 +18,7 @@ export function traceKey(n: TraceNode): string {
 
 export function isFiniteTrace(n: TraceNode): boolean {
   const v = n.value;
+  if (v.kind === "slider") return Number.isFinite(v.n);
   if (v.kind === "point") return Number.isFinite(v.x) && Number.isFinite(v.y);
   if (v.kind === "circle") return Number.isFinite(v.radius) && Number.isFinite(v.center.x);
   if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
@@ -28,6 +29,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
 
 function geomDistWorld(world: Vec2, n: TraceNode): number {
   const v = n.value;
+  if (v.kind === "slider") return Infinity;
   if (v.kind === "point") return dist(world, v as Point);
   if (v.kind === "segment") {
     const s = v as Segment;

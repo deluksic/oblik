@@ -6,6 +6,7 @@ import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera"
 import { hitsNear, movedPastClick } from "../pick";
 import { placeSnapWorld, resolvePlacePoint } from "../place";
 import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
+import { sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
 export type Drag =
   | {
@@ -46,6 +47,15 @@ export type Drag =
       startD: number;
       base: Line;
       grabSigned: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "slider";
+      id: string;
+      node: TraceNode;
+      startN: number;
       downX: number;
       downY: number;
       moved: boolean;
@@ -123,6 +133,20 @@ export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: Po
   };
 }
 
+export function sliderDrag(node: TraceNode, e: PointerEvent): Drag {
+  const g = node.value;
+  const startN = g.kind === "slider" ? g.n : 0;
+  return {
+    kind: "slider",
+    id: node.id,
+    node,
+    startN,
+    downX: e.clientX,
+    downY: e.clientY,
+    moved: false,
+  };
+}
+
 export function panDrag(e: PointerEvent, camera: Camera2): Drag {
   return {
     kind: "pan",
@@ -167,6 +191,7 @@ export function applyDrag(
   el: HTMLDivElement | null,
   camera: Camera2,
   size: PaneSize,
+  trace: readonly TraceNode[] = [],
 ): { camera?: Camera2; draft?: { id: string; values: number[] } } {
   if (drag.kind === "pan") {
     return {
@@ -189,6 +214,13 @@ export function applyDrag(
   if (drag.kind === "parallel") {
     const signed = signedDist(w, drag.base);
     return { draft: { id: drag.id, values: [round(drag.startD + (signed - drag.grabSigned))] } };
+  }
+  if (drag.kind === "slider") {
+    if (!el) return {};
+    const rect = el.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const n = sliderValueFromPointer(drag.node, screenX, sliderNodes(trace));
+    return { draft: { id: drag.id, values: [round(n)] } };
   }
   const now = Math.hypot(w.x - drag.origin.x, w.y - drag.origin.y);
   return { draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] } };

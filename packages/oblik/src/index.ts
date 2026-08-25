@@ -13,8 +13,10 @@ export {
   circleLineIntersection,
   circleCircleIntersection,
   dist,
+  slider,
   constructors,
 } from "./eval/constructors";
+export type { SliderOpts } from "./eval/constructors";
 export {
   analyze,
   siteSpecs,

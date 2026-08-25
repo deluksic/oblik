@@ -3,11 +3,22 @@ import type { Annotation } from "../source/analyze";
 import type { CallSite } from "./stack";
 import { $node } from "./site";
 
+export type SliderValue = {
+  kind: "slider";
+  n: number;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+};
+
+export type TraceValue = Geom | SliderValue;
+
 export type TraceNode = {
   id: string;
   occ: number;
-  kind: Geom["kind"];
-  value: Geom;
+  kind: TraceValue["kind"];
+  value: TraceValue;
   bind?: string;
   editable: boolean;
   at?: { line: number; column: number };

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool } from "./tool";
+import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -335,5 +335,52 @@ describe("previewOf", () => {
 describe("filterTools", () => {
   test("matches parallel line by offset alias", () => {
     expect(filterTools("offset").map((t) => t.id)).toEqual(["parallelLine"]);
+  });
+
+  test("matches slider by name", () => {
+    expect(filterTools("slider").map((t) => t.id)).toEqual(["slider"]);
+  });
+});
+
+describe("slider tool", () => {
+  test("click measures from the origin when value is empty", () => {
+    const done = clickTool(startTool("slider"), { world: { x: 3, y: 4 }, point: free(3, 4) });
+    expect(done).toEqual({
+      insert: {
+        from: "slider",
+        args: [{ kind: "num", value: 5 }, { kind: "props", props: {} }],
+      },
+    });
+  });
+
+  test("click uses a typed value", () => {
+    let s = startTool("slider");
+    s = typeTool(s, "2.2") as typeof s;
+    const done = clickTool(s, { world: { x: 9, y: 0 }, point: free(9, 0) });
+    expect(done).toEqual({
+      insert: {
+        from: "slider",
+        args: [{ kind: "num", value: 2.2 }, { kind: "props", props: {} }],
+      },
+    });
+  });
+
+  test("tabs value → min → max → step → name", () => {
+    let s = startTool("slider");
+    expect(s.focus).toBe("value");
+    s = tabTool(s);
+    expect(s).toMatchObject({ focus: "min" });
+    s = tabTool(s);
+    expect(s).toMatchObject({ focus: "max" });
+    s = tabTool(s);
+    expect(s).toMatchObject({ focus: "step" });
+    s = tabTool(s);
+    expect(s).toMatchObject({ focus: "name" });
+  });
+
+  test("preview exposes the focused value slot", () => {
+    const p = previewOf(startTool("slider"));
+    expect(p.line).toBe("const n = slider(<value>, { min: <min>, max: <max>, step: <step> })");
+    expect(p.token).toBe("<value>");
   });
 });

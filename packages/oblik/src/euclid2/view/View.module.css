@@ -141,3 +141,46 @@
   font-family: system-ui, sans-serif;
   pointer-events: none;
 }
+
+.sliderPanel {
+  pointer-events: auto;
+}
+
+.sliderBg {
+  fill: var(--oblik-paper);
+  stroke: var(--oblik-grid);
+  stroke-width: 1;
+}
+
+.sliderHot {
+  stroke: var(--oblik-hover);
+}
+
+.sliderSelected {
+  stroke: var(--oblik-accent);
+  stroke-width: 2;
+}
+
+.sliderLabel,
+.sliderValue {
+  fill: var(--oblik-ink);
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.sliderValue {
+  fill: var(--oblik-muted);
+}
+
+.sliderTrack {
+  fill: var(--oblik-grid);
+  pointer-events: none;
+}
+
+.sliderKnob {
+  fill: var(--oblik-accent);
+  stroke: var(--oblik-paper);
+  stroke-width: 2;
+  pointer-events: none;
+}

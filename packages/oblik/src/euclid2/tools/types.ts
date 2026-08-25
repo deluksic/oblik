@@ -5,7 +5,7 @@ import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
-export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine";
+export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine" | "slider";
 
 export type ToolSpec = {
   id: ToolId;
@@ -77,6 +77,15 @@ export type ToolSession =
       carrier?: { expr: Expr; geom: LineLike };
       carrierRef: string;
       typed: string;
+      name: string;
+    }
+  | {
+      verb: "slider";
+      focus: "value" | "min" | "max" | "step" | "name";
+      value: string;
+      min: string;
+      max: string;
+      step: string;
       name: string;
     };
 

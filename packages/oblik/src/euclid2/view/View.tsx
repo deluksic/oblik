@@ -7,8 +7,10 @@ import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool"
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
+import { NumberSliders } from "./NumberSliders";
 import { Stroke } from "./Ink";
 import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
+import { hitSlider, sliderNodes } from "./sliderHud";
 import {
   applyDrag,
   dragMoved,
@@ -17,6 +19,7 @@ import {
   parallelDrag,
   pointDrag,
   radiusDrag,
+  sliderDrag,
   topHit,
   worldOf,
   type Drag,
@@ -87,12 +90,22 @@ export function Euclid2View(props: Euclid2ViewProps) {
     setCamera({ ...cam, scale: Math.min(280, Math.max(8, cam.scale * factor)) });
   }
 
+  function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
+    const rect = el.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const el = paneEl();
     if (!el) return;
     if (props.placing) {
       props.onPlace?.(placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession));
+      return;
+    }
+    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
+    if (slider) {
+      drag = sliderDrag(slider, e);
       return;
     }
     const w = worldOf(e, el, camera(), size());
@@ -116,7 +129,14 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function noteHover(e: PointerEvent) {
     if (props.placing || drag?.moved) return;
-    const hit = topHit(e, paneEl(), camera(), size(), props.trace)[0];
+    const el = paneEl();
+    if (!el) return;
+    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
+    if (slider) {
+      props.onHoverId?.(slider.id);
+      return;
+    }
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
     props.onHoverId?.(hit?.id ?? null);
   }
 
@@ -139,7 +159,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       drag.moved = true;
       beginDrag(e);
     }
-    const next = applyDrag(drag, e, paneEl(), camera(), size());
+    const next = applyDrag(drag, e, paneEl(), camera(), size(), props.trace);
     if (next.camera) setCamera(next.camera);
     if (next.draft) props.onDraft(next.draft.id, next.draft.values);
   }
@@ -159,14 +179,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
       props.onPick?.([d.node]);
       return;
     }
-    const next = applyDrag(d, e, paneEl(), camera(), size());
+    const next = applyDrag(d, e, paneEl(), camera(), size(), props.trace);
     if (next.draft) props.onCommit(next.draft.id, next.draft.values);
   }
 
-  const strokes = createMemo(() => props.trace.filter(isFiniteTrace));
+  const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
   const ink = createMemo(() => strokes().filter((n) => n.kind !== "point"));
   const points = createMemo(() => strokes().filter((n) => n.kind === "point"));
   const handles = createMemo(() => strokes().filter((n) => n.editable && n.kind === "point"));
+  const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
 
   return (
@@ -233,6 +254,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         {props.placing && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
         ) : null}
+        <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
     </div>
   );
