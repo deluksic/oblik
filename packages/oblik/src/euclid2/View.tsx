@@ -1,4 +1,4 @@
-import { For, createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { For, createMemo, createSignal, onSettled } from "solid-js";
 
 import type { TraceNode } from "../eval/context";
 import type { Circle, Line, OffsetLine, Point, Segment } from "../geom";
@@ -14,6 +14,7 @@ import {
 } from "./camera";
 import { snapBoundPoint } from "./pick";
 import type { Ghost, PlaceHit } from "./tool";
+
 import styles from "./View.module.css";
 
 const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
@@ -71,18 +72,14 @@ function readPaneSize(el: Element): PaneSize | null {
 
 export function Euclid2View(props: Euclid2ViewProps) {
   const paneRef: { current: HTMLDivElement | null } = { current: null };
-  const [camera, setCamera] = createSignal<Camera2>(props.initialCamera ?? DEFAULT_CAMERA);
+  const initialCameraMemo = createMemo(() => props.initialCamera, {
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+  const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [hover, setHover] = createSignal<string | null>(null);
   const [grabbing, setGrabbing] = createSignal(false);
   let drag: Drag | null = null;
-
-  createEffect(
-    () => props.initialCamera,
-    (cam) => {
-      if (cam) setCamera(cam);
-    },
-  );
 
   onSettled(() => {
     const el = paneRef.current;
@@ -144,11 +141,19 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (t instanceof Element && t.hasAttribute("data-handle")) {
       const id = t.getAttribute("data-handle")!;
       const kind = t.getAttribute("data-kind");
-      const node = props.trace.find((n) => n.id === id && n.occ === 0) ?? props.trace.find((n) => n.id === id);
+      const node =
+        props.trace.find((n) => n.id === id && n.occ === 0) ?? props.trace.find((n) => n.id === id);
       if (!node) return;
       const w = worldOf(e);
       if (kind === "point" && node.value.kind === "point") {
-        drag = { kind: "point", id, startX: node.value.x, startY: node.value.y, pointerX: w.x, pointerY: w.y };
+        drag = {
+          kind: "point",
+          id,
+          startX: node.value.x,
+          startY: node.value.y,
+          pointerX: w.x,
+          pointerY: w.y,
+        };
       } else if (kind === "radius" && node.value.kind === "circle") {
         const c = node.value.center;
         drag = {
@@ -199,7 +204,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (!d || d.kind === "pan") return;
     const w = worldOf(e);
     if (d.kind === "point") {
-      props.onCommit(d.id, [round(d.startX + (w.x - d.pointerX)), round(d.startY + (w.y - d.pointerY))]);
+      props.onCommit(d.id, [
+        round(d.startX + (w.x - d.pointerX)),
+        round(d.startY + (w.y - d.pointerY)),
+      ]);
     } else {
       const now = Math.hypot(w.x - d.origin.x, w.y - d.origin.y);
       props.onCommit(d.id, [round(Math.max(0.05, d.startR + (now - d.grabDist)))]);
@@ -231,7 +239,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
-          <For each={ink()}>{(n) => <Stroke node={n} hot={hover() === n.id} camera={camera()} size={size()} />}</For>
+          <For each={ink()}>
+            {(n) => <Stroke node={n} hot={hover() === n.id} camera={camera()} size={size()} />}
+          </For>
           {props.ghost ? <GhostMark ghost={props.ghost} /> : null}
         </g>
       </svg>
@@ -363,14 +373,34 @@ function GhostMark(props: { ghost: Ghost }) {
   );
   return (
     <>
-      {point() ? <circle class={styles.ghostPoint} cx={point()!.x} cy={point()!.y} r={0.08} /> : null}
+      {point() ? (
+        <circle class={styles.ghostPoint} cx={point()!.x} cy={point()!.y} r={0.08} />
+      ) : null}
       {circle() ? (
         <>
-          <circle class={styles.ghostPoint} cx={circle()!.center.x} cy={circle()!.center.y} r={0.08} />
-          <circle class={styles.ghost} cx={circle()!.center.x} cy={circle()!.center.y} r={circle()!.radius} />
+          <circle
+            class={styles.ghostPoint}
+            cx={circle()!.center.x}
+            cy={circle()!.center.y}
+            r={0.08}
+          />
+          <circle
+            class={styles.ghost}
+            cx={circle()!.center.x}
+            cy={circle()!.center.y}
+            r={circle()!.radius}
+          />
         </>
       ) : null}
-      {seg() ? <line class={styles.ghost} x1={seg()!.a.x} y1={seg()!.a.y} x2={seg()!.b.x} y2={seg()!.b.y} /> : null}
+      {seg() ? (
+        <line
+          class={styles.ghost}
+          x1={seg()!.a.x}
+          y1={seg()!.a.y}
+          x2={seg()!.b.x}
+          y2={seg()!.b.y}
+        />
+      ) : null}
     </>
   );
 }
@@ -382,7 +412,12 @@ function PointMark(props: { node: TraceNode; size: PaneSize; camera: Camera2; ho
   const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
   return (
     <>
-      <circle class={[styles.point, { [styles.hotFill]: props.hot }]} cx={pos().x} cy={pos().y} r={POINT_R} />
+      <circle
+        class={[styles.point, { [styles.hotFill]: props.hot }]}
+        cx={pos().x}
+        cy={pos().y}
+        r={POINT_R}
+      />
       {props.node.bind ? (
         <text class={styles.label} x={pos().x + 10} y={pos().y - 8} font-size="12">
           {props.node.bind}

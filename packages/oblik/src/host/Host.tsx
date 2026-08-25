@@ -1,17 +1,15 @@
-import { Errored, createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { render } from "@solidjs/web";
+import { Errored, Loading, createMemo, createSignal, onSettled } from "solid-js";
 
+import { Euclid2Pane } from "../euclid2/Pane";
 import { evaluate } from "../eval/evaluate";
 import type { Scene } from "../eval/scene";
-import { Euclid2Pane } from "../euclid2/Pane";
 import type { Annotation } from "../source/analyze";
-import {
-  sceneLoaderKey,
-  type OblikSceneEntry,
-} from "../source/catalog";
+import { sceneLoaderKey, type OblikSceneEntry } from "../source/catalog";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
+
 import styles from "./Host.module.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;
@@ -22,7 +20,6 @@ export type OblikMount = {
   setScenes: (scenes: OblikSceneEntry[]) => void;
   setLoaders: (loaders: SceneLoaderMap) => void;
   setAnnotations: (annotations: AnnotationBundle) => void;
-  reloadCurrentScene: () => void;
 };
 
 export type OblikMountOpts = {
@@ -47,7 +44,6 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   const [scenes, setScenes] = createSignal(opts.scenes);
   const [loaders, setLoaders] = createSignal(opts.loaders);
   const [annotations, setAnnotations] = createSignal(opts.annotations);
-  const [reloadTick, setReloadTick] = createSignal(0);
 
   render(
     () => (
@@ -56,18 +52,12 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
         loaders={loaders()}
         annotations={annotations()}
         initialSceneId={initialSceneId}
-        reloadTick={reloadTick()}
       />
     ),
     opts.el,
   );
 
-  return {
-    setScenes,
-    setLoaders,
-    setAnnotations,
-    reloadCurrentScene: () => setReloadTick((t) => t + 1),
-  };
+  return { setScenes, setLoaders, setAnnotations };
 }
 
 function Host(props: {
@@ -75,67 +65,41 @@ function Host(props: {
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
   initialSceneId: string;
-  reloadTick: number;
 }) {
   const [sceneId, setSceneId] = createSignal(props.initialSceneId);
-  const [mod, setMod] = createSignal<Scene | null>(null);
-  const [anno, setAnno] = createSignal<Record<string, Annotation>>({});
-  const [file, setFile] = createSignal("");
-  const [loading, setLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
+  const [hot, setHot] = createSignal<Scene | null>(() => {
+    sceneId();
+    props.loaders;
+    return null;
+  });
 
-  async function loadScene(id: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      const entry = props.scenes.find((s) => s.id === id);
-      if (!entry) throw new Error(`Unknown scene "${id}"`);
-      if (entry.error) throw new Error(entry.error);
-      const loader = props.loaders[sceneLoaderKey(entry.file)];
-      if (!loader) throw new Error(`No loader for ${entry.file}`);
-      const sceneMod = await loader();
-      evaluate(sceneMod.default, { module: entry.path });
-      setMod(sceneMod.default);
-      setFile(entry.path);
-      setAnno(props.annotations[entry.path] ?? {});
-    } catch (err) {
-      setMod(null);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
-  createEffect(
-    () => sceneId(),
-    (id) => {
-      void loadScene(id);
-    },
-  );
+  const loaded = createMemo(async () => {
+    const e = entry();
+    const loaders = props.loaders;
+    if (!e) throw new Error(`Unknown scene "${sceneId()}"`);
+    if (e.error) throw new Error(e.error);
+    const loader = loaders[sceneLoaderKey(e.file)];
+    if (!loader) throw new Error(`No loader for ${e.file}`);
+    const sceneMod = await loader();
+    evaluate(sceneMod.default, { module: e.path });
+    return sceneMod.default;
+  });
 
-  createEffect(
-    () => [file(), props.annotations] as const,
-    ([path, bundle]) => {
-      if (path) setAnno(bundle[path] ?? {});
-    },
-  );
-
-  createEffect(
-    () => props.reloadTick,
-    (tick) => {
-      if (tick === 0) return;
-      void loadScene(sceneId());
-    },
-  );
+  const anno = createMemo(() => {
+    const path = entry()?.path;
+    return path ? (props.annotations[path] ?? {}) : {};
+  });
 
   onSettled(() => {
     registerSceneHot({
-      currentPath: file,
+      currentPath: () => entry()?.path ?? "",
       onHot(scene) {
-        const path = file();
+        const path = entry()?.path;
         if (!path) return;
         evaluate(scene, { module: path });
-        setMod(scene);
+        setHot(scene);
       },
     });
 
@@ -152,14 +116,14 @@ function Host(props: {
     setSceneId(id);
   }
 
+  const scene = createMemo(() => hot() ?? loaded());
+  const sceneKind = createMemo(() => scene().kind);
+
   const pane = createMemo(() => {
-    if (loading()) return <p class={styles.muted}>Loading scene…</p>;
-    const err = error();
-    if (err) return <p class={styles.err}>{err}</p>;
-    const scene = mod();
-    if (!scene) return null;
-    return scene.kind === "euclid2" ? (
-      <Euclid2Pane scene={scene} file={file()} annotations={anno()} />
+    const e = entry();
+    if (!e) return <p class={styles.err}>Unknown scene</p>;
+    return sceneKind() === "euclid2" ? (
+      <Euclid2Pane scene={scene()} file={e.path} annotations={anno()} />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );
@@ -172,11 +136,15 @@ function Host(props: {
           <p class={styles.kicker}>oblik</p>
           <Nav scenes={props.scenes} sceneId={sceneId()} onSelect={selectScene} />
         </div>
-        <h1>{mod()?.title ?? "…"}</h1>
-        <p>{mod()?.hint}</p>
+        <h1>{entry()?.title ?? "…"}</h1>
+        <Loading fallback={null}>
+          <p>{(hot() ?? loaded())?.hint}</p>
+        </Loading>
       </header>
       <div class={styles.stage}>
-        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>{pane()}</Errored>
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
+          <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
+        </Errored>
       </div>
     </div>
   );

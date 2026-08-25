@@ -20,18 +20,11 @@ if (import.meta.hot) {
       const annMod = mods?.[1] as { annotationsByPath: typeof initialAnnotations } | undefined;
       const loadersMod = mods?.[2] as { sceneLoaders: typeof initialLoaders } | undefined;
       if (catalogMod) host.setScenes(catalogMod.scenes);
-      else {
-        const fresh = await import("virtual:oblik-catalog");
-        host.setScenes(fresh.scenes);
-      }
+      else host.setScenes((await import("virtual:oblik-catalog")).scenes);
       if (annMod) host.setAnnotations(annMod.annotationsByPath);
-      else {
-        const fresh = await import("virtual:oblik-annotations");
-        host.setAnnotations(fresh.annotationsByPath);
-      }
+      else host.setAnnotations((await import("virtual:oblik-annotations")).annotationsByPath);
       if (loadersMod) host.setLoaders(loadersMod.sceneLoaders);
       else host.setLoaders((await import("./scene-loaders")).sceneLoaders);
-      await host.reloadCurrentScene();
     },
   );
 }

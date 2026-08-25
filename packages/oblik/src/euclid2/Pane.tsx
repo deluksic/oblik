@@ -1,9 +1,8 @@
-import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { createMemo, createSignal, onSettled } from "solid-js";
 
 import { evaluate, type Draft } from "../eval/evaluate";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import { Euclid2View } from "./View";
 import { Palette } from "./Palette";
 import {
   clickTool,
@@ -14,6 +13,8 @@ import {
   type ToolId,
   type ToolSession,
 } from "./tool";
+import { Euclid2View } from "./View";
+
 import styles from "./Pane.module.css";
 
 export type Euclid2PaneProps = {
@@ -23,19 +24,11 @@ export type Euclid2PaneProps = {
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
-  const [draft, setDraft] = createSignal<Draft>(new Map());
-  const [picker, setPicker] = createSignal(false);
-  const [tool, setTool] = createSignal<ToolSession | null>(null);
-  const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(null);
-
-  createEffect(
-    () => props.scene,
-    () => {
-      setDraft(new Map());
-      setTool(null);
-      setCursor(null);
-      setPicker(false);
-    },
+  const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
+  const [picker, setPicker] = createSignal(() => (props.scene, false));
+  const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
+  const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(
+    () => (props.scene, null),
   );
 
   const world = createMemo(() =>
@@ -87,7 +80,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
-      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      const typing =
+        e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if (e.key === "Escape") {
         e.preventDefault();
         if (picker()) setPicker(false);
