@@ -45,17 +45,25 @@ type Drag =
   | {
       kind: "point";
       id: string;
+      node: TraceNode;
       startX: number;
       startY: number;
       pointerX: number;
       pointerY: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
     }
   | {
       kind: "radius";
       id: string;
+      node: TraceNode;
       startR: number;
       origin: { x: number; y: number };
       grabDist: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
     };
 
 type PendingPick = {
@@ -170,19 +178,27 @@ export function Euclid2View(props: Euclid2ViewProps) {
         drag = {
           kind: "point",
           id,
+          node,
           startX: node.value.x,
           startY: node.value.y,
           pointerX: w.x,
           pointerY: w.y,
+          downX: e.clientX,
+          downY: e.clientY,
+          moved: false,
         };
       } else if (kind === "radius" && node.value.kind === "circle") {
         const c = node.value.center;
         drag = {
           kind: "radius",
           id,
+          node,
           startR: node.value.radius,
           origin: c,
           grabDist: Math.hypot(w.x - c.x, w.y - c.y),
+          downX: e.clientX,
+          downY: e.clientY,
+          moved: false,
         };
       }
       setGrabbing(true);
@@ -213,6 +229,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
       noteHover(e);
     }
     if (!drag) return;
+    if (drag.kind !== "pan" && !drag.moved) {
+      if (movedPastClick(drag.downX, drag.downY, e.clientX, e.clientY)) drag.moved = true;
+    }
     if (drag.kind === "pan") {
       const cam = camera();
       setCamera({
@@ -222,6 +241,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       });
       return;
     }
+    if (!drag.moved) return;
     const w = worldOf(e);
     if (drag.kind === "point") {
       const nx = drag.startX + (w.x - drag.pointerX);
@@ -247,6 +267,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
       return;
     }
     if (!d) return;
+    if (!d.moved) {
+      props.onPick?.([d.node]);
+      return;
+    }
     const w = worldOf(e);
     if (d.kind === "point") {
       props.onCommit(d.id, [

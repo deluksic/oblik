@@ -78,6 +78,9 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   line-height: 1.45;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
 }
 
 .codeRow,
@@ -114,7 +117,7 @@
 
 .tx {
   white-space: pre;
-  overflow-x: auto;
+  min-width: 0;
 }
 
 .gapRow .tx {
