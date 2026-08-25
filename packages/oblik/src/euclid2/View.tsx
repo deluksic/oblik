@@ -368,6 +368,13 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function circlePath(center: { x: number; y: number }, radius: number): string {
+  const r = Math.abs(radius);
+  if (r < 1e-9) return "";
+  const { x: cx, y: cy } = center;
+  return `M ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy}`;
+}
+
 function Stroke(props: {
   node: TraceNode;
   hot: boolean;
@@ -431,14 +438,12 @@ function CircleStroke(props: {
   grabbable: boolean;
 }) {
   const c = () => props.node.value as Circle;
-  const cls = () => circleClass(props.hot, props.selected, props.grabbable);
-  const hitCls = () => [styles.hit, { [styles.hitGrab]: props.grabbable }];
-  return (
-    <>
-      <circle class={hitCls()} cx={c().center.x} cy={c().center.y} r={c().radius} />
-      <circle class={cls()} cx={c().center.x} cy={c().center.y} r={c().radius} />
-    </>
-  );
+  const d = () => circlePath(c().center, c().radius);
+  const cls = () => [
+    circleClass(props.hot, props.selected, props.grabbable),
+    { [styles.hitGrab]: props.grabbable },
+  ];
+  return <path class={cls()} d={d()} />;
 }
 
 function Infinite(props: {
@@ -534,11 +539,9 @@ function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
             cy={circle()!.center.y}
             r={0.08}
           />
-          <circle
+          <path
             class={styles.ghost}
-            cx={circle()!.center.x}
-            cy={circle()!.center.y}
-            r={circle()!.radius}
+            d={circlePath(circle()!.center, circle()!.radius)}
           />
         </>
       ) : null}
