@@ -8,3 +8,12 @@ export function isHot(node: TraceNode, hoverId: string | null | undefined, selec
 export function isSelected(node: TraceNode, selectedKey: string | null | undefined): boolean {
   return traceKey(node) === selectedKey;
 }
+
+export function isGrabbable(node: TraceNode | null | undefined): boolean {
+  return !!node?.editable && (node.kind === "point" || node.kind === "circle");
+}
+
+export function hoverNode(trace: readonly TraceNode[], hoverId: string | null | undefined): TraceNode | null {
+  if (!hoverId) return null;
+  return trace.find((n) => n.id === hoverId) ?? null;
+}

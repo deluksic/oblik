@@ -45,8 +45,6 @@ export function Handle(props: {
   camera: Camera2;
   hot: boolean;
   selected: boolean;
-  onEnter: () => void;
-  onLeave: () => void;
 }) {
   const pos = createMemo(() => worldToScreen(props.node.value as Point, props.camera, props.size));
   return (
@@ -63,8 +61,6 @@ export function Handle(props: {
       cx={pos().x}
       cy={pos().y}
       r={HANDLE_R}
-      onPointerEnter={props.onEnter}
-      onPointerLeave={props.onLeave}
     />
   );
 }

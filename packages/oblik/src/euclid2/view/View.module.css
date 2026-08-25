@@ -28,6 +28,10 @@
   cursor: grabbing;
 }
 
+.grab {
+  cursor: grab;
+}
+
 .placing {
   cursor: crosshair;
 }
@@ -74,24 +78,14 @@
   pointer-events: stroke;
 }
 
-.grabbable {
-  cursor: grab;
-}
-
-.grabbing .grabbable {
-  cursor: grabbing;
-}
-
 .handle {
   fill: var(--oblik-accent);
   stroke: var(--oblik-paper);
   stroke-width: 2;
-  cursor: grab;
   pointer-events: auto;
 }
 
-.handleHot,
-.handle:hover {
+.handleHot {
   fill: var(--oblik-cream);
 }
 

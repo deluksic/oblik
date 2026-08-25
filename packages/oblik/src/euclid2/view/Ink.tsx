@@ -66,7 +66,6 @@ function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean 
           [styles.editable]: props.node.editable,
           [styles.hot]: props.hot && !props.selected,
           [styles.selected]: props.selected,
-          [styles.grabbable]: props.node.editable,
         },
       ]}
       cx={c().center.x}

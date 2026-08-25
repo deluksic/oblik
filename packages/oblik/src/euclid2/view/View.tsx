@@ -9,7 +9,7 @@ import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { Stroke } from "./Ink";
-import { isHot, isSelected } from "./marks";
+import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
 import {
   applyDrag,
   dragMoved,
@@ -94,18 +94,14 @@ export function Euclid2View(props: Euclid2ViewProps) {
       props.onPlace?.(placeFromEvent(e, el, camera(), size(), props.trace));
       return;
     }
-    const t = e.target;
     const w = worldOf(e, el, camera(), size());
-    if (t instanceof Element && t.hasAttribute("data-handle")) {
-      const id = t.getAttribute("data-handle")!;
-      const node =
-        props.trace.find((n) => n.id === id && n.occ === 0) ?? props.trace.find((n) => n.id === id);
-      if (node?.value.kind === "point") drag = pointDrag(node, w, e);
-      return;
-    }
     const hits = topHit(e, el, camera(), size(), props.trace);
     const hit = hits[0];
-    if (hit?.editable && hit.value.kind === "circle") {
+    if (hit && isGrabbable(hit) && hit.value.kind === "point") {
+      drag = pointDrag(hit, w, e);
+      return;
+    }
+    if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
       drag = radiusDrag(hit, w, e);
       return;
     }
@@ -162,11 +158,19 @@ export function Euclid2View(props: Euclid2ViewProps) {
   const ink = createMemo(() => strokes().filter((n) => n.kind !== "point"));
   const points = createMemo(() => strokes().filter((n) => n.kind === "point"));
   const handles = createMemo(() => strokes().filter((n) => n.editable && n.kind === "point"));
+  const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
 
   return (
     <div
       ref={setPaneEl}
-      class={[styles.paper, { [styles.grabbing]: grabbing(), [styles.placing]: !!props.placing }]}
+      class={[
+        styles.paper,
+        {
+          [styles.grabbing]: grabbing(),
+          [styles.grab]: grabbingHover() && !grabbing() && !props.placing,
+          [styles.placing]: !!props.placing,
+        },
+      ]}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -214,8 +218,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
               camera={camera()}
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
-              onEnter={() => props.onHoverId?.(n.id)}
-              onLeave={() => props.onHoverId?.(null)}
             />
           )}
         </For>
