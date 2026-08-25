@@ -1,6 +1,6 @@
 # Design programs, viewed in scenes
 
-TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `offsetLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
+TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `parallelLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
 Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 6](./docs/prototypes/6.md).
 

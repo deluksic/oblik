@@ -31,11 +31,11 @@ const SEG = {
 } as TraceNode;
 
 const OFFSET = {
-  id: "o_off",
+  id: "o_par",
   occ: 0,
-  kind: "offsetLine",
+  kind: "parallelLine",
   value: {
-    kind: "offsetLine",
+    kind: "parallelLine",
     line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
     distance: 1.76,
   },
@@ -44,7 +44,7 @@ const OFFSET = {
 } as TraceNode;
 
 describe("isGrabbable", () => {
-  test("editable points, circles, and offset lines", () => {
+  test("editable points, circles, and parallel lines", () => {
     expect(isGrabbable(A)).toBe(true);
     expect(isGrabbable(CIRCLE)).toBe(true);
     expect(isGrabbable(OFFSET)).toBe(true);

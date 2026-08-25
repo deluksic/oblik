@@ -1,10 +1,11 @@
 import type { TraceNode } from "../../eval/context";
-import type { Circle, Line, OffsetLine, Point } from "../../geom";
+import type { Circle, Line, ParallelLine, Point } from "../../geom";
 import { lineBasis, signedDist } from "../../geom/ops";
 import { mul, perp, sub } from "../../geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
-import { hitsNear, movedPastClick } from "../pick";
+import { hitsNear, movedPastClick, snapLineCarrier } from "../pick";
 import { placeSnapWorld, resolvePlacePoint, type PlacePoint } from "../place";
+import type { ToolSession, PlaceHit } from "../tool";
 
 export type Drag =
   | {
@@ -39,7 +40,7 @@ export type Drag =
       moved: boolean;
     }
   | {
-      kind: "offset";
+      kind: "parallel";
       id: string;
       node: TraceNode;
       startD: number;
@@ -97,7 +98,7 @@ export function radiusDrag(node: TraceNode, w: { x: number; y: number }, e: Poin
   };
 }
 
-function carrierLine(ol: OffsetLine): Line {
+function carrierLine(ol: ParallelLine): Line {
   const { origin, dir } = lineBasis(ol);
   return {
     kind: "line",
@@ -106,11 +107,11 @@ function carrierLine(ol: OffsetLine): Line {
   };
 }
 
-export function offsetDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
-  const ol = node.value as OffsetLine;
+export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
+  const ol = node.value as ParallelLine;
   const base = carrierLine(ol);
   return {
-    kind: "offset",
+    kind: "parallel",
     id: node.id,
     node,
     startD: ol.distance,
@@ -139,7 +140,8 @@ export function placeFromEvent(
   camera: Camera2,
   size: PaneSize,
   trace: TraceNode[],
-): { world: { x: number; y: number }; point: PlacePoint } {
+  tool?: ToolSession | null,
+): PlaceHit {
   const w = worldOf(e, el, camera, size);
   let point = resolvePlacePoint(trace, w, placeSnapWorld(camera.scale));
   const t = e.target;
@@ -155,7 +157,12 @@ export function placeFromEvent(
       };
     }
   }
-  return { world: w, point };
+  const hit: PlaceHit = { world: w, point };
+  if (tool?.verb === "parallelLine" && !tool.carrier) {
+    const carrier = snapLineCarrier(trace, w, camera, size);
+    if (carrier) hit.carrier = carrier;
+  }
+  return hit;
 }
 
 export function applyDrag(
@@ -183,7 +190,7 @@ export function applyDrag(
       },
     };
   }
-  if (drag.kind === "offset") {
+  if (drag.kind === "parallel") {
     const signed = signedDist(w, drag.base);
     return { draft: { id: drag.id, values: [round(drag.startD + (signed - drag.grabSigned))] } };
   }

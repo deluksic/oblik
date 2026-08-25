@@ -14,7 +14,7 @@ export const BIND_PREFIX: Record<string, string> = {
   lineIntersection: "x",
   circleLineIntersection: "x",
   circleCircleIntersection: "x",
-  offsetLine: "off",
+  parallelLine: "par",
 };
 
 const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;

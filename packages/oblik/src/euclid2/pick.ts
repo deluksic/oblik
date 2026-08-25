@@ -1,6 +1,7 @@
 import type { TraceNode } from "../eval/context";
+import type { LineLike } from "../geom";
 import { lineBasis } from "../geom/ops";
-import type { Circle, Line, OffsetLine, Point, Segment } from "../geom";
+import type { Circle, Line, ParallelLine, Point, Segment } from "../geom";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
@@ -21,7 +22,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "circle") return Number.isFinite(v.radius) && Number.isFinite(v.center.x);
   if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
   if (v.kind === "line") return Number.isFinite(v.origin.x);
-  if (v.kind === "offsetLine") return Number.isFinite(v.distance);
+  if (v.kind === "parallelLine") return Number.isFinite(v.distance);
   return false;
 }
 
@@ -36,8 +37,8 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     const l = v as Line;
     return distToLine(world, l.origin, l.direction);
   }
-  if (v.kind === "offsetLine") {
-    const { origin, dir } = lineBasis(v as OffsetLine);
+  if (v.kind === "parallelLine") {
+    const { origin, dir } = lineBasis(v as ParallelLine);
     return distToLine(world, origin, dir);
   }
   if (v.kind === "circle") {
@@ -111,4 +112,25 @@ export const PICK_CLICK_PX = 4;
 
 export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
   return Math.hypot(toX - fromX, toY - fromY) >= PICK_CLICK_PX;
+}
+
+const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
+
+/** Nearest named line-like stroke under the pointer (ignores points). */
+export function snapLineCarrier(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  camera: Camera2,
+  size: PaneSize,
+  maxPx = GEOM_PX,
+): { bind: string; geom: LineLike } | null {
+  let best: { bind: string; geom: LineLike; d: number } | null = null;
+  for (const n of trace) {
+    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (!LINE_LIKE.has(n.value.kind)) continue;
+    const d = geomDistWorld(world, n);
+    if (d > pickRadiusWorld(n, camera, maxPx)) continue;
+    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
+  }
+  return best ? { bind: best.bind, geom: best.geom } : null;
 }

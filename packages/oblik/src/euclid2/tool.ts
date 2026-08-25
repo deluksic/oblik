@@ -1,9 +1,11 @@
 import { printExpr, type Expr } from "../source/expr";
 import { hoistIntersections, printHoist, takeBind } from "../source/hoist";
+import type { LineLike } from "../geom";
+import { signedDist } from "../geom/ops";
 import { isCrossing, type PlacePoint } from "./place";
 import type { Vec2 } from "./pick";
 
-export type ToolId = "point" | "circle" | "line" | "segment";
+export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine";
 
 export type ToolSpec = {
   id: ToolId;
@@ -22,29 +24,44 @@ export const TOOLS: readonly ToolSpec[] = [
   },
   { id: "line", title: "Line", hint: "Two points — infinite.", prefix: "l" },
   { id: "segment", title: "Segment", hint: "Two points — finite.", prefix: "s" },
+  {
+    id: "parallelLine",
+    title: "Parallel line",
+    hint: "Click a line or segment, then set the signed offset distance.",
+    prefix: "par",
+  },
 ];
 
 export function filterTools(query: string): ToolSpec[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...TOOLS];
-  return TOOLS.filter((t) => t.title.toLowerCase().includes(q) || t.id.includes(q));
+  return TOOLS.filter(
+    (t) =>
+      t.title.toLowerCase().includes(q) ||
+      t.id.includes(q) ||
+      (q.includes("parallel") && t.id === "parallelLine") ||
+      (q.includes("offset") && t.id === "parallelLine"),
+  );
 }
 
 export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
+  carrier?: { bind: string; geom: LineLike };
 };
 
 export type ToolSession =
   | { verb: "point" }
   | { verb: "circle"; center?: { expr: Expr; at: Vec2 } }
   | { verb: "line"; a?: { expr: Expr; at: Vec2 } }
-  | { verb: "segment"; a?: { expr: Expr; at: Vec2 } };
+  | { verb: "segment"; a?: { expr: Expr; at: Vec2 } }
+  | { verb: "parallelLine"; carrier?: { expr: Expr; geom: LineLike } };
 
 export type Ghost =
   | { kind: "point"; at: Vec2 }
   | { kind: "circle"; center: Vec2; radius: number }
-  | { kind: "line" | "segment"; a: Vec2; b: Vec2 };
+  | { kind: "line" | "segment"; a: Vec2; b: Vec2 }
+  | { kind: "parallelLine"; geom: LineLike; distance: number };
 
 export type InsertJob = {
   from: ToolId | "lineIntersection" | "circleLineIntersection" | "circleCircleIntersection";
@@ -116,6 +133,13 @@ function radiusExpr(center: { expr: Expr; at: Vec2 }, hit: PlaceHit): Expr {
   return { kind: "num", value: round(r) };
 }
 
+function parallelDistExpr(carrier: Expr, geom: LineLike, hit: PlaceHit): Expr {
+  if (hit.point.kind === "free") {
+    return { kind: "num", value: round(signedDist(hit.world, geom)) };
+  }
+  return { kind: "call", name: "signedDist", args: [exprOfPlace(hit.point), carrier] };
+}
+
 function sameRef(center: Expr, p: PlacePoint): boolean {
   return center.kind === "ref" && p.kind === "ref" && center.name === p.bind;
 }
@@ -151,11 +175,29 @@ export function clickTool(session: ToolSession, hit: PlaceHit): { session: ToolS
     if (!session.center) return { session: { verb: "circle", center: asPoint(hit) } };
     return { insert: { from: "circle", args: [session.center.expr, radiusExpr(session.center, hit)] } };
   }
+  if (session.verb === "parallelLine") {
+    if (!session.carrier) {
+      if (!hit.carrier) return { session };
+      return {
+        session: {
+          verb: "parallelLine",
+          carrier: { expr: { kind: "ref", name: hit.carrier.bind }, geom: hit.carrier.geom },
+        },
+      };
+    }
+    return {
+      insert: {
+        from: "parallelLine",
+        args: [session.carrier.expr, parallelDistExpr(session.carrier.expr, session.carrier.geom, hit)],
+      },
+    };
+  }
   if (!session.a) return { session: { ...session, a: asPoint(hit) } };
   return { insert: { from: session.verb, args: [session.a.expr, asPoint(hit).expr] } };
 }
 
-export function ghostOf(session: ToolSession, cursor: Vec2 | null): Ghost | null {
+export function ghostOf(session: ToolSession, place: PlaceHit | null): Ghost | null {
+  const cursor = place?.point.at ?? null;
   if (!cursor) {
     if (session.verb === "circle" && session.center) {
       return { kind: "circle", center: session.center.at, radius: 0.05 };
@@ -170,6 +212,12 @@ export function ghostOf(session: ToolSession, cursor: Vec2 | null): Ghost | null
       center: session.center.at,
       radius: Math.max(0.05, Math.hypot(cursor.x - session.center.at.x, cursor.y - session.center.at.y)),
     };
+  }
+  if (session.verb === "parallelLine") {
+    const geom = session.carrier?.geom ?? place?.carrier?.geom;
+    if (!geom) return null;
+    const at = place?.world ?? cursor;
+    return { kind: "parallelLine", geom, distance: signedDist(at, geom) };
   }
   if (!session.a) return { kind: "point", at: cursor };
   return { kind: session.verb, a: session.a.at, b: cursor };
@@ -189,37 +237,38 @@ function previewCall(
 
 export function previewOf(
   session: ToolSession,
-  place: PlacePoint | null = null,
+  place: PlaceHit | null = null,
   usedNames: readonly string[] = [],
 ): { line: string; hint: string } {
   const spec = TOOLS.find((t) => t.id === session.verb)!;
+  const point = place?.point ?? null;
   if (session.verb === "point") {
-    if (place?.kind === "ref") {
-      return { line: `${place.bind}`, hint: "Already a named point — click does nothing." };
+    if (point?.kind === "ref") {
+      return { line: `${point.bind}`, hint: "Already a named point — click does nothing." };
     }
-    if (place && isCrossing(place)) {
+    if (point && isCrossing(point)) {
       const used = new Set(usedNames);
-      const { hoists } = hoistIntersections([exprOfPlace(place)], used);
-      const line = hoists.map(printHoist).join("\n") || `const ${spec.prefix} = ${printExpr(exprOfPlace(place))}`;
+      const { hoists } = hoistIntersections([exprOfPlace(point)], used);
+      const line = hoists.map(printHoist).join("\n") || `const ${spec.prefix} = ${printExpr(exprOfPlace(point))}`;
       return { line, hint: "Click to insert the crossing." };
     }
     return { line: `const ${spec.prefix} = point(x, y)`, hint: spec.hint };
   }
   if (session.verb === "circle") {
     if (!session.center) {
-      if (place && place.kind !== "free") {
+      if (point && point.kind !== "free") {
         return {
-          line: previewCall("circle", [exprOfPlace(place)], usedNames, ([c]) => `circle(${c}, radius)`),
+          line: previewCall("circle", [exprOfPlace(point)], usedNames, ([c]) => `circle(${c}, radius)`),
           hint: "Click to set the center. A crossing is inserted as its own named point.",
         };
       }
       return { line: `const ${spec.prefix} = circle(center, radius)`, hint: spec.hint };
     }
-    if (place && place.kind !== "free" && !sameRef(session.center.expr, place)) {
+    if (point && point.kind !== "free" && !sameRef(session.center.expr, point)) {
       return {
         line: previewCall(
           "circle",
-          [session.center.expr, exprOfPlace(place)],
+          [session.center.expr, exprOfPlace(point)],
           usedNames,
           ([c, p]) => `circle(${c}, dist(${c}, ${p}))`,
         ),
@@ -231,20 +280,51 @@ export function previewOf(
       hint: "Click the radius, or a point / crossing to pin dist().",
     };
   }
-  if (!session.a) {
-    if (place && place.kind !== "free") {
+  if (session.verb === "parallelLine") {
+    if (!session.carrier) {
+      if (place?.carrier) {
+        return {
+          line: previewCall(
+            "parallelLine",
+            [{ kind: "ref", name: place.carrier.bind }],
+            usedNames,
+            ([g]) => `parallelLine(${g}, distance)`,
+          ),
+          hint: "Click the carrier line, then set the signed offset.",
+        };
+      }
+      return { line: `const ${spec.prefix} = parallelLine(carrier, distance)`, hint: spec.hint };
+    }
+    if (point && point.kind !== "free") {
       return {
-        line: previewCall(session.verb, [exprOfPlace(place)], usedNames, ([a]) => `${session.verb}(${a}, b)`),
+        line: previewCall(
+          "parallelLine",
+          [session.carrier.expr, exprOfPlace(point)],
+          usedNames,
+          ([g, p]) => `parallelLine(${g}, signedDist(${p}, ${g}))`,
+        ),
+        hint: "Click to pin the offset to signedDist from that point.",
+      };
+    }
+    return {
+      line: previewCall("parallelLine", [session.carrier.expr], usedNames, ([g]) => `parallelLine(${g}, distance)`),
+      hint: "Click the signed offset distance from the carrier.",
+    };
+  }
+  if (!session.a) {
+    if (point && point.kind !== "free") {
+      return {
+        line: previewCall(session.verb, [exprOfPlace(point)], usedNames, ([a]) => `${session.verb}(${a}, b)`),
         hint: spec.hint,
       };
     }
     return { line: `const ${spec.prefix} = ${session.verb}(a, b)`, hint: spec.hint };
   }
-  if (place && place.kind !== "free") {
+  if (point && point.kind !== "free") {
     return {
       line: previewCall(
         session.verb,
-        [session.a.expr, exprOfPlace(place)],
+        [session.a.expr, exprOfPlace(point)],
         usedNames,
         ([a, b]) => `${session.verb}(${a}, ${b})`,
       ),

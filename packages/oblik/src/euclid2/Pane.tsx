@@ -7,7 +7,6 @@ import type { Annotation } from "../source/analyze";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
 import { traceKey } from "./pick";
-import type { PlacePoint } from "./place";
 import { Palette } from "./Palette";
 import {
   clickTool,
@@ -32,7 +31,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
   const [picker, setPicker] = createSignal(() => (props.scene, false));
   const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
-  const [place, setPlace] = createSignal<PlacePoint | null>(() => (props.scene, null));
+  const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.scene, null));
 
@@ -116,7 +115,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   function onPlace(hit: PlaceHit) {
     const session = tool();
     if (!session) return;
-    setPlace(hit.point);
+    setPlace(hit);
     const next = clickTool(session, hit);
     if ("insert" in next) void insert(next.insert);
     else setTool(next.session);
@@ -130,7 +129,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const ghost = createMemo(() => {
     const t = tool();
     const p = place();
-    return t ? ghostOf(t, p?.at ?? null) : null;
+    return t ? ghostOf(t, p) : null;
   });
   const prompt = createMemo(() => {
     const t = tool();
@@ -157,6 +156,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           placing={tool() != null}
           ghost={ghost()}
           place={place()}
+          toolSession={tool()}
           hoverId={hoverId()}
           selectedKey={selectedKey()}
           onHoverId={setHoverId}

@@ -4,13 +4,14 @@ import {
   dist as distVec,
   isFiniteVec,
   lineIntersectionValue,
-  offsetLineValue,
+  parallelLineValue,
+  signedDist as signedDistValue,
   type Branch,
   type Circle,
   type Geom,
   type Line,
   type LineLike,
-  type OffsetLine,
+  type ParallelLine,
   type Point,
   type Segment,
   type Vec2,
@@ -64,8 +65,8 @@ function isFiniteValue(v: { kind: string }): boolean {
       const c = v as Circle;
       return isFiniteVec(c.center) && Number.isFinite(c.radius);
     }
-    case "offsetLine": {
-      const o = v as OffsetLine;
+    case "parallelLine": {
+      const o = v as ParallelLine;
       return isFiniteVec(o.line.origin) && isFiniteVec(o.line.direction) && Number.isFinite(o.distance);
     }
     default:
@@ -101,10 +102,14 @@ export const line = mark((a: Vec2, b: Vec2, id?: string): Line => {
   return traced({ kind: "line", origin: a, direction }, id);
 }, { dof: [] });
 
-export const offsetLine = mark((geom: LineLike, signedD: number, id?: string): OffsetLine => {
+export const parallelLine = mark((geom: LineLike, signedD: number, id?: string): ParallelLine => {
   const d = draftAt(id, 0, signedD);
-  return traced(offsetLineValue(geom, d), id);
+  return traced(parallelLineValue(geom, d), id);
 }, { dof: [1] });
+
+export function signedDist(p: Vec2, geom: LineLike): number {
+  return signedDistValue(p, geom);
+}
 
 export const lineIntersection = mark((a: LineLike, b: LineLike, id?: string): Point => {
   const p = lineIntersectionValue(a, b);
@@ -136,7 +141,7 @@ export const constructors = {
   circle,
   segment,
   line,
-  offsetLine,
+  parallelLine,
   lineIntersection,
   circleLineIntersection,
   circleCircleIntersection,

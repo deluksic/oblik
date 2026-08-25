@@ -67,12 +67,12 @@ function boundOf(
   );
 }
 
-const LINE_LIKE = new Set(["line", "segment", "offsetLine"]);
+const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
 const CIRCLE = new Set(["circle"]);
 
 function asLineLike(n: TraceNode): LineLike | null {
   const v = n.value;
-  if (v.kind === "line" || v.kind === "segment" || v.kind === "offsetLine") return v;
+  if (v.kind === "line" || v.kind === "segment" || v.kind === "parallelLine") return v;
   return null;
 }
 

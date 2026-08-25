@@ -90,6 +90,17 @@ describe("insertCall", () => {
     expect(next).toContain('const s = segment(A, point(4, 1), "o_s");');
   });
 
+  test("inserts a parallel line with a numeric offset", () => {
+    const next = insertCall(src, {
+      from: "parallelLine",
+      bind: "shelf",
+      args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 1.76 }],
+      id: "o_par",
+    });
+    expect(next).toContain('const shelf = parallelLine(ground, 1.76, "o_par");');
+    expect(next).toMatch(/import \{ point, parallelLine \} from "oblik"/);
+  });
+
   test("inserts a circle whose radius is dist to an intersection", () => {
     let n = 0;
     const next = insertCall(

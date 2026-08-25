@@ -1,4 +1,4 @@
-import type { Branch, Circle, LineLike, OffsetLine } from "./types";
+import type { Branch, Circle, LineLike, ParallelLine } from "./types";
 import {
   add,
   cross2,
@@ -15,7 +15,7 @@ import {
 
 export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   if (g.kind === "line") return { origin: g.origin, dir: g.direction };
-  if (g.kind === "offsetLine") return { origin: g.line.origin, dir: g.line.direction };
+  if (g.kind === "parallelLine") return { origin: g.line.origin, dir: g.line.direction };
   return { origin: g.a, dir: norm(sub(g.b, g.a)) };
 }
 
@@ -24,12 +24,12 @@ export function signedDist(p: Vec2, geom: LineLike): number {
   return dot(sub(p, origin), perp(dir));
 }
 
-export function offsetLineValue(geom: LineLike, signedD: number): OffsetLine {
+export function parallelLineValue(geom: LineLike, signedD: number): ParallelLine {
   const { origin, dir } = lineBasis(geom);
   const n = perp(dir);
   const p = add(origin, mul(n, signedD));
   return {
-    kind: "offsetLine",
+    kind: "parallelLine",
     line: { kind: "line", origin: p, direction: dir },
     distance: signedD,
   };

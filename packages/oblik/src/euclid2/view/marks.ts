@@ -12,7 +12,7 @@ export function isSelected(node: TraceNode, selectedKey: string | null | undefin
 export function isGrabbable(node: TraceNode | null | undefined): boolean {
   return (
     !!node?.editable &&
-    (node.kind === "point" || node.kind === "circle" || node.kind === "offsetLine")
+    (node.kind === "point" || node.kind === "circle" || node.kind === "parallelLine")
   );
 }
 

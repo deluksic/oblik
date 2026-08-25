@@ -154,6 +154,29 @@ describe("clickTool", () => {
     });
   });
 
+  test("parallel line picks a carrier then inserts signed distance", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const mid = clickTool(startTool("parallelLine"), {
+      world: { x: 1, y: 0.05 },
+      point: free(1, 0.05),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid) || mid.session.verb !== "parallelLine" || !mid.session.carrier) {
+      throw new Error("expected carrier session");
+    }
+    const done = clickTool(mid.session, { world: { x: 0, y: 1.76 }, point: free(0, 1.76) });
+    expect(done).toEqual({
+      insert: {
+        from: "parallelLine",
+        args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 1.76 }],
+      },
+    });
+  });
+
   test("segment second click can nest a free point", () => {
     const mid = clickTool(startTool("segment"), { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in mid)) throw new Error("expected session");
@@ -169,35 +192,53 @@ describe("clickTool", () => {
 
 describe("ghostOf", () => {
   test("rubber-bands a circle after the center", () => {
-    const g = ghostOf({ verb: "circle", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, { x: 0, y: 2 });
+    const g = ghostOf(
+      { verb: "circle", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      { world: { x: 0, y: 2 }, point: free(0, 2) },
+    );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2 });
+  });
+
+  test("previews a parallel line after picking the carrier", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const g = ghostOf(
+      { verb: "parallelLine", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      { world: { x: 0, y: 1.5 }, point: free(0, 1.5) },
+    );
+    expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.5 });
   });
 });
 
 describe("previewOf", () => {
   test("shows the intersection constructor while hovering a crossing", () => {
-    const p = previewOf(startTool("point"), ll);
+    const p = previewOf(startTool("point"), { world: ll.at, point: ll });
     expect(p.line).toBe("const x = lineIntersection(ground, wall)");
-    expect(previewOf(startTool("point"), cc).line).toBe("const x = circleCircleIntersection(reach, lamp, 1)");
+    expect(previewOf(startTool("point"), { world: cc.at, point: cc }).line).toBe(
+      "const x = circleCircleIntersection(reach, lamp, 1)",
+    );
   });
 
   test("shows dist() when a circle radius hovers a point", () => {
     const p = previewOf(
       { verb: "circle", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
-      namedP,
+      { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const c = circle(A, dist(A, P))");
   });
 
   test("previews a crossing center as its own named point", () => {
-    const p = previewOf(startTool("circle"), ll);
+    const p = previewOf(startTool("circle"), { world: ll.at, point: ll });
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, radius)");
   });
 
   test("hoists a stored crossing center when pinning dist()", () => {
     const p = previewOf(
       { verb: "circle", center: { expr: exprOfPlace(ll), at: ll.at } },
-      namedP,
+      { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");
   });

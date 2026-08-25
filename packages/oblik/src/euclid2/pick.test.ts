@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { hitTest, hitsNear, snapBoundPoint } from "./pick";
+import { hitTest, hitsNear, snapBoundPoint, snapLineCarrier } from "./pick";
 
 const A = {
   id: "o_a",
@@ -79,5 +79,21 @@ describe("hitTest", () => {
     } as TraceNode;
     const hits = hitsNear([CIRCLE, LINE, P], { x: 2, y: 0 }, camera, size);
     expect(hits[0]?.id).toBe("o_p");
+  });
+});
+
+describe("snapLineCarrier", () => {
+  test("snaps to the nearest named line-like stroke", () => {
+    const ground = {
+      id: "o_g",
+      occ: 0,
+      kind: "line",
+      bind: "ground",
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const hit = snapLineCarrier([ground, A], { x: 1, y: 0.05 }, camera, size);
+    expect(hit).toEqual({ bind: "ground", geom: ground.value });
   });
 });

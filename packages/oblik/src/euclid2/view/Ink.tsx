@@ -1,7 +1,7 @@
 import { createMemo } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
-import type { Circle, Line, OffsetLine, Segment } from "../../geom";
+import type { Circle, Line, ParallelLine, Segment } from "../../geom";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 
 import styles from "./View.module.css";
@@ -30,7 +30,7 @@ export function Stroke(props: {
       {kind() === "segment" ? (
         <SegmentStroke node={props.node} hot={props.hot} selected={props.selected} />
       ) : null}
-      {kind() === "line" || kind() === "offsetLine" ? (
+      {kind() === "line" || kind() === "parallelLine" ? (
         <InfiniteStroke
           node={props.node}
           hot={props.hot}
@@ -84,15 +84,15 @@ function InfiniteStroke(props: {
 }) {
   const ends = createMemo(() => {
     const v = props.node.value;
-    const origin = v.kind === "offsetLine" ? (v as OffsetLine).line.origin : (v as Line).origin;
-    const dir = v.kind === "offsetLine" ? (v as OffsetLine).line.direction : (v as Line).direction;
+    const origin = v.kind === "parallelLine" ? (v as ParallelLine).line.origin : (v as Line).origin;
+    const dir = v.kind === "parallelLine" ? (v as ParallelLine).line.direction : (v as Line).direction;
     return infiniteClip(origin, dir, props.camera, props.size);
   });
   return (
     <>
       <line class={styles.hit} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
-        class={inkClass(props.hot, props.selected, props.node.value.kind === "offsetLine" && props.node.editable)}
+        class={inkClass(props.hot, props.selected, props.node.value.kind === "parallelLine" && props.node.editable)}
         x1={ends().a.x}
         y1={ends().a.y}
         x2={ends().b.x}

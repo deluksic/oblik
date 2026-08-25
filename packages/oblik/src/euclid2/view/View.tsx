@@ -3,8 +3,7 @@ import { For, createEffect, createMemo, createSignal } from "solid-js";
 import type { TraceNode } from "../../eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
-import type { PlacePoint } from "../place";
-import type { Ghost, PlaceHit } from "../tool";
+import type { Ghost, PlaceHit, ToolSession } from "../tool";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
@@ -15,7 +14,7 @@ import {
   dragMoved,
   panDrag,
   placeFromEvent,
-  offsetDrag,
+  parallelDrag,
   pointDrag,
   radiusDrag,
   topHit,
@@ -32,7 +31,8 @@ export type Euclid2ViewProps = {
   initialCamera?: Camera2;
   placing?: boolean;
   ghost?: Ghost | null;
-  place?: PlacePoint | null;
+  place?: PlaceHit | null;
+  toolSession?: ToolSession | null;
   hoverId?: string | null;
   selectedKey?: string | null;
   onHoverId?: (id: string | null) => void;
@@ -40,7 +40,7 @@ export type Euclid2ViewProps = {
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
   onPlace?: (hit: PlaceHit) => void;
-  onCursor?: (place: PlacePoint | null) => void;
+  onCursor?: (hit: PlaceHit | null) => void;
 };
 
 function readPaneSize(el: Element): PaneSize | null {
@@ -92,7 +92,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const el = paneEl();
     if (!el) return;
     if (props.placing) {
-      props.onPlace?.(placeFromEvent(e, el, camera(), size(), props.trace));
+      props.onPlace?.(placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession));
       return;
     }
     const w = worldOf(e, el, camera(), size());
@@ -106,8 +106,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
       drag = radiusDrag(hit, w, e);
       return;
     }
-    if (hit && isGrabbable(hit) && hit.value.kind === "offsetLine") {
-      drag = offsetDrag(hit, w, e);
+    if (hit && isGrabbable(hit) && hit.value.kind === "parallelLine") {
+      drag = parallelDrag(hit, w, e);
       return;
     }
     drag = panDrag(e, camera());
@@ -127,8 +127,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   function onPointerMove(e: PointerEvent) {
-    if (props.placing) props.onCursor?.(placeFromEvent(e, paneEl(), camera(), size(), props.trace).point);
-    else noteHover(e);
+    if (props.placing) {
+      props.onCursor?.(placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession));
+    } else noteHover(e);
     if (!drag) return;
     if (!drag.moved) {
       if (!dragMoved(drag, e)) return;
@@ -226,8 +227,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             />
           )}
         </For>
-        {props.placing && props.place && props.place.kind !== "free" ? (
-          <PlaceSnap point={props.place} camera={camera()} size={size()} />
+        {props.placing && props.place && props.place.point.kind !== "free" ? (
+          <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
         ) : null}
       </svg>
     </div>

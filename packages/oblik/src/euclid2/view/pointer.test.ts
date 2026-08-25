@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../../eval/context";
-import { applyDrag, offsetDrag, panDrag, radiusDrag, round } from "./pointer";
+import { applyDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 
 const camera = { x: 0, y: 0, scale: 48 };
 const size = { w: 800, h: 600 };
@@ -16,11 +16,11 @@ const CIRCLE = {
 } as TraceNode;
 
 const OFFSET = {
-  id: "o_off",
+  id: "o_par",
   occ: 0,
-  kind: "offsetLine",
+  kind: "parallelLine",
   value: {
-    kind: "offsetLine",
+    kind: "parallelLine",
     line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
     distance: 1.76,
   },
@@ -57,9 +57,9 @@ describe("applyDrag", () => {
       getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
     } as HTMLDivElement;
     const down = { clientX: 400, clientY: 300 - 1.76 * 48 } as PointerEvent;
-    const drag = offsetDrag(OFFSET, { x: 0, y: 1.76 }, down);
-    expect(drag.kind).toBe("offset");
-    if (drag.kind !== "offset") return;
+    const drag = parallelDrag(OFFSET, { x: 0, y: 1.76 }, down);
+    expect(drag.kind).toBe("parallel");
+    if (drag.kind !== "parallel") return;
     expect(drag.grabSigned).toBeCloseTo(1.76);
     drag.moved = true;
     const same = applyDrag(drag, down, el, camera, size);

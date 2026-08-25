@@ -35,10 +35,10 @@ const wall = node({
 });
 
 const shelf = node({
-  id: "o_off",
+  id: "o_par",
   bind: "shelf",
   value: {
-    kind: "offsetLine",
+    kind: "parallelLine",
     line: { kind: "line", origin: { x: 0, y: 1.8 }, direction: { x: 1, y: 0 } },
     distance: 1.8,
   },
@@ -93,7 +93,7 @@ describe("resolvePlacePoint", () => {
     });
   });
 
-  test("circle-line works with an offset carrier", () => {
+  test("circle-line works with a parallel carrier", () => {
     const p = resolvePlacePoint([reach, shelf], { x: 0.87, y: 1.8 }, 0.4);
     expect(p.kind).toBe("circleLineIntersection");
     if (p.kind !== "circleLineIntersection") return;
