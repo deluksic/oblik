@@ -276,6 +276,22 @@ describe("previewOf", () => {
     expect(p.line).toBe("const c = circle(A, dist(A, P))");
   });
 
+  test("hoists a paper center so dist() reuses one point", () => {
+    const center = {
+      kind: "call" as const,
+      name: "point",
+      args: [
+        { kind: "num" as const, value: 1 },
+        { kind: "num" as const, value: 2 },
+      ],
+    };
+    const p = previewOf(
+      { verb: "circle", center: { expr: center, at: { x: 1, y: 2 } } },
+      { world: namedP.at, point: namedP },
+    );
+    expect(p.line).toBe("const p = point(1, 2)\nconst c = circle(p, dist(p, P))");
+  });
+
   test("previews a crossing center as its own named point", () => {
     const p = previewOf(startTool("circle"), { world: ll.at, point: ll });
     expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, radius)");

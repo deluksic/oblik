@@ -101,6 +101,37 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, parallelLine \} from "oblik"/);
   });
 
+  test("hoists a free circle center so dist() does not stamp a second point", () => {
+    const pt = {
+      kind: "call" as const,
+      name: "point",
+      args: [
+        { kind: "num" as const, value: 1.2 },
+        { kind: "num" as const, value: 3 },
+      ],
+    };
+    const next = insertCall(
+      src,
+      {
+        from: "circle",
+        bind: "reach",
+        args: [
+          pt,
+          {
+            kind: "call",
+            name: "dist",
+            args: [pt, { kind: "ref", name: "A" }],
+          },
+        ],
+        id: "o_r",
+      },
+      () => "o_p",
+    );
+    expect(next).toContain('const p = point(1.2, 3, "o_p");');
+    expect(next).toContain('const reach = circle(p, dist(p, A), "o_r");');
+    expect(next).not.toContain("dist(point(");
+  });
+
   test("inserts a circle whose radius is dist to an intersection", () => {
     let n = 0;
     const next = insertCall(

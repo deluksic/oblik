@@ -52,9 +52,12 @@ export const circle: Tool<CircleSession> = {
       return {
         line: previewCall(
           "circle",
-          [session.center.expr, exprOfPlace(p)],
+          [
+            session.center.expr,
+            { kind: "call", name: "dist", args: [session.center.expr, exprOfPlace(p)] },
+          ],
           usedNames,
-          ([c, q]) => `circle(${c}, dist(${c}, ${q}))`,
+          ([c, d]) => `circle(${c}, ${d})`,
         ),
         hint: "Click to pin the radius to that distance.",
       };
