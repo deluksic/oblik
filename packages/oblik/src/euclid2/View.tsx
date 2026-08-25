@@ -402,6 +402,13 @@ function Stroke(props: {
   );
 }
 
+function circleClass(hot: boolean, selected: boolean, editable: boolean) {
+  return [
+    styles.stroke,
+    { [styles.editableCircle]: editable, [styles.hot]: hot && !selected, [styles.selected]: selected },
+  ];
+}
+
 function strokeClass(hot: boolean, selected: boolean) {
   return [styles.stroke, { [styles.hot]: hot && !selected, [styles.selected]: selected }];
 }

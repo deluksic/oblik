@@ -96,6 +96,10 @@
   stroke-width: 2.25;
 }
 
+.editableCircle {
+  stroke: #e8876a;
+}
+
 .point {
   fill: #d7d2c4;
   stroke: #0e1016;
