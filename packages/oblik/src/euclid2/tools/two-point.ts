@@ -1,5 +1,5 @@
 import { printExpr } from "../../source/expr";
-import { asPoint, exprOfPlace, previewCall } from "./common";
+import { asPoint, exprOfPlace, hoverPlace, previewCall } from "./common";
 import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
 import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
 
@@ -26,6 +26,9 @@ export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPoi
     fields,
     focus: (s) => s.focus,
     setFocus: (s, id) => ({ ...s, focus: id as TwoPointSession["focus"] }),
+    hover(_session, hit, trace) {
+      return hoverPlace(hit.point, trace);
+    },
     click(session, hit, scope) {
       const a = resolvePoint(session.aRef, session.a, scope);
       if (!a) {

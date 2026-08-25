@@ -121,7 +121,6 @@ export function movedPastClick(fromX: number, fromY: number, toX: number, toY: n
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
-const CIRCLE_KIND = "circle";
 
 /** Nearest named line-like stroke under the pointer (ignores points). */
 export function snapLineCarrier(
@@ -138,25 +137,6 @@ export function snapLineCarrier(
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
-  }
-  return best ? { bind: best.bind, geom: best.geom } : null;
-}
-
-/** Nearest named circle under the pointer. */
-export function snapCircleCarrier(
-  trace: readonly TraceNode[],
-  world: Vec2,
-  camera: Camera2,
-  size: PaneSize,
-  maxPx = GEOM_PX,
-): { bind: string; geom: Circle } | null {
-  let best: { bind: string; geom: Circle; d: number } | null = null;
-  for (const n of trace) {
-    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
-    if (n.value.kind !== CIRCLE_KIND) continue;
-    const d = geomDistWorld(world, n);
-    if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as Circle, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

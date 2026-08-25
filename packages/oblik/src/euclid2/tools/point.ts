@@ -1,8 +1,8 @@
 import type { Expr } from "../../source/expr";
 import { printExpr } from "../../source/expr";
 import { hoistIntersections, printHoist } from "../../source/hoist";
-import { isCrossing } from "../place";
-import { exprOfPlace, intersectionInsert, round } from "./common";
+import { isConstructed } from "../place";
+import { constructedInsert, exprOfPlace, hoverBind, hoverPlace, round } from "./common";
 import {
   attachLengthHit,
   hasNumberBinding,
@@ -50,8 +50,9 @@ export const point: Tool<PointSession> = {
   spec: {
     id: "point",
     title: "Point",
-    hint: "Click to place, or snap to a named point or crossing.",
+    hint: "Click to place, or snap to a named point, a crossing, or a line, segment, or circle.",
     prefix: "p",
+    aliases: ["glider", "pointOn", "onLine", "onCircle"],
   },
   start: () => ({ verb: "point", focus: "x", x: "", y: "", name: "" }),
   fields,
@@ -62,9 +63,10 @@ export const point: Tool<PointSession> = {
     return attachLengthHit(hit, ctx);
   },
   hover(session, hit, trace) {
-    if (session.focus !== "x" && session.focus !== "y") return null;
-    if (!hit.length) return null;
-    return trace.find((n) => n.bind === hit.length!.bind && n.occ === 0)?.id ?? null;
+    if (hit.length && (session.focus === "x" || session.focus === "y")) {
+      return hoverBind(trace, hit.length.bind);
+    }
+    return hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {
     if (hit.point.kind === "ref") return { session };
@@ -75,8 +77,8 @@ export const point: Tool<PointSession> = {
     }
     const locked = hasNumberBinding(session.x, scope) || hasNumberBinding(session.y, scope);
     if (!locked) {
-      const crossing = intersectionInsert(hit.point);
-      if (crossing) return { insert: withBind(session, crossing) };
+      const constructed = constructedInsert(hit.point);
+      if (constructed) return { insert: withBind(session, constructed) };
     }
     return { insert: withBind(session, { from: "point", args: pointArgs(session, hit.point.at, scope) }) };
   },
@@ -105,7 +107,7 @@ export const point: Tool<PointSession> = {
     if (p?.kind === "ref" && !hasNumberBinding(session.x, scope) && !hasNumberBinding(session.y, scope)) {
       return { line: `${p.bind}`, hint: "Already a named point — click does nothing." };
     }
-    if (p && isCrossing(p) && !hasNumberBinding(session.x, scope) && !hasNumberBinding(session.y, scope)) {
+    if (p && isConstructed(p) && !hasNumberBinding(session.x, scope) && !hasNumberBinding(session.y, scope)) {
       const used = new Set(scope.used);
       const { hoists } = hoistIntersections([exprOfPlace(p)], used);
       const line = hoists.map(printHoist).join("\n") || `const ${bind} = ${printExpr(exprOfPlace(p))}`;
@@ -113,14 +115,16 @@ export const point: Tool<PointSession> = {
         line: line.replace(/const (\S+) = ([^\n]*)$/, (_m, id: string, call: string) =>
           `const ${inSlot(session.focus === "name", previewName(session, id))} = ${call}`,
         ),
-        hint: "Click to insert the crossing. Tab to name it.",
+        hint: p.kind.startsWith("pointOn")
+          ? "Click to place a point on that geometry. Tab to name it."
+          : "Click to insert the crossing. Tab to name it.",
       };
     }
     const x = session.x.trim() || "x";
     const y = session.y.trim() || "y";
     return {
       line: `const ${inSlot(session.focus === "name", bind)} = point(${inSlot(session.focus === "x", x)}, ${inSlot(session.focus === "y", y)})`,
-      hint: "Click to place. Type x / y or a slider name. Tab for name. Enter if both are set.",
+      hint: "Click to place. Snap to a line, circle, or crossing. Type x / y or a slider name. Tab for name.",
     };
   },
 };

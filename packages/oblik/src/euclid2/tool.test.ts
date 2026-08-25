@@ -267,21 +267,60 @@ describe("clickTool", () => {
     });
   });
 
-  test("glider on a segment inserts pointOnSegment", () => {
-    const span = { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 4, y: 0 } };
-    const mid = clickTool(startTool("glider"), {
-      world: { x: 2, y: 0 },
-      point: free(2, 0),
-      carrier: { bind: "span", geom: span },
+  test("point on a line inserts pointOnLine", () => {
+    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const r = clickTool(startTool("point"), { world: onGround.at, point: onGround });
+    expect(r).toEqual({
+      insert: {
+        from: "pointOnLine",
+        args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 2.2 }],
+      },
     });
-    if (!("session" in mid) || mid.session.verb !== "glider" || !mid.session.carrier) {
-      throw new Error("expected glider carrier session");
-    }
-    const done = clickTool(mid.session, { world: { x: 3, y: 0 }, point: free(3, 0) });
-    expect(done).toEqual({
+  });
+
+  test("point on a segment inserts pointOnSegment", () => {
+    const onSpan: PlacePoint = { kind: "pointOnSegment", bind: "span", t: 0.75, at: { x: 3, y: 0 } };
+    const r = clickTool(startTool("point"), { world: onSpan.at, point: onSpan });
+    expect(r).toEqual({
       insert: {
         from: "pointOnSegment",
         args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.75 }],
+      },
+    });
+  });
+
+  test("point on a circle inserts pointOnCircle", () => {
+    const onReach: PlacePoint = { kind: "pointOnCircle", bind: "reach", ux: 0, uy: 1, at: { x: 0, y: 2 } };
+    const r = clickTool(startTool("point"), { world: onReach.at, point: onReach });
+    expect(r).toEqual({
+      insert: {
+        from: "pointOnCircle",
+        args: [
+          { kind: "ref", name: "reach" },
+          { kind: "num", value: 0 },
+          { kind: "num", value: 1 },
+        ],
+      },
+    });
+  });
+
+  test("line first click on a glider stores the constructor", () => {
+    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const mid = clickTool(startTool("line"), { world: onGround.at, point: onGround });
+    if (!("session" in mid) || mid.session.verb !== "line") throw new Error("expected session");
+    expect(mid.session.a?.expr).toEqual({
+      kind: "call",
+      name: "pointOnLine",
+      args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 2.2 }],
+    });
+    const done = clickTool(mid.session, { world: namedA.at, point: namedA });
+    expect(done).toMatchObject({
+      insert: {
+        from: "line",
+        args: [
+          { kind: "call", name: "pointOnLine" },
+          { kind: "ref", name: "A" },
+        ],
       },
     });
   });
@@ -307,6 +346,35 @@ describe("clickTool", () => {
         args: [
           { kind: "ref", name: "ground" },
           { kind: "call", name: "point", args: [{ kind: "num", value: 0 }, { kind: "num", value: 2 }] },
+        ],
+      },
+    });
+  });
+
+  test("perpendicular line through a glider nests pointOnLine", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const mid = clickTool(startTool("perpendicularLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid)) throw new Error("expected session");
+    const onShelf: PlacePoint = { kind: "pointOnLine", bind: "shelf", s: 1.5, at: { x: 1.5, y: 1.8 } };
+    const done = clickTool(mid.session, { world: onShelf.at, point: onShelf });
+    expect(done).toEqual({
+      insert: {
+        from: "perpendicularLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          {
+            kind: "call",
+            name: "pointOnLine",
+            args: [{ kind: "ref", name: "shelf" }, { kind: "num", value: 1.5 }],
+          },
         ],
       },
     });
@@ -443,6 +511,12 @@ describe("previewOf", () => {
     );
   });
 
+  test("shows a glider constructor while hovering a line", () => {
+    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const p = previewOf(startTool("point"), { world: onGround.at, point: onGround });
+    expect(p.line).toBe("const g = pointOnLine(ground, 2.2)");
+  });
+
   test("shows dist() when a circle radius hovers a point", () => {
     const p = previewOf(
       { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
@@ -509,8 +583,9 @@ describe("filterTools", () => {
     expect(filterTools("perpendicular").map((t) => t.id)).toEqual(["perpendicularLine"]);
   });
 
-  test("matches glider by alias", () => {
-    expect(filterTools("pointOn").map((t) => t.id)).toEqual(["glider"]);
+  test("matches glider by alias on the point tool", () => {
+    expect(filterTools("glider").map((t) => t.id)).toEqual(["point"]);
+    expect(filterTools("pointOn").map((t) => t.id)).toEqual(["point"]);
   });
 
   test("matches slider by name", () => {

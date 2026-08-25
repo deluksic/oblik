@@ -4,7 +4,7 @@ import { defineScene } from "oblik";
 export default defineScene({
   kind: "euclid2",
   title: "Shelf",
-    hint: "Space: Point snaps to crossings. Circle radius can pin dist() to a point.",
+    hint: "Space: Point snaps to crossings and slides on lines, segments, and circles.",
   camera: { x: 2.5, y: 1.2, scale: 72 },
   build() {
     const A = point(0, 0, "o_a");

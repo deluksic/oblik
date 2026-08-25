@@ -158,4 +158,45 @@ describe("resolvePlacePoint", () => {
     const p = resolvePlacePoint([reach, far], { x: 5, y: 0 }, 0.3);
     expect(p.kind).toBe("free");
   });
+
+  test("snaps to a glider on a line", () => {
+    const p = resolvePlacePoint([ground], { x: 2.2, y: 0.05 }, 0.3);
+    expect(p.kind).toBe("pointOnLine");
+    if (p.kind !== "pointOnLine") return;
+    expect(p.bind).toBe("ground");
+    expect(p.s).toBeCloseTo(2.2);
+    expect(p.at.x).toBeCloseTo(2.2);
+    expect(p.at.y).toBeCloseTo(0);
+  });
+
+  test("snaps to a glider on a circle", () => {
+    const p = resolvePlacePoint([reach], { x: 0, y: 2.05 }, 0.3);
+    expect(p.kind).toBe("pointOnCircle");
+    if (p.kind !== "pointOnCircle") return;
+    expect(p.bind).toBe("reach");
+    expect(p.ux).toBeCloseTo(0);
+    expect(p.uy).toBeCloseTo(1);
+    expect(p.at.x).toBeCloseTo(0);
+    expect(p.at.y).toBeCloseTo(2);
+  });
+
+  test("snaps to a glider on a segment", () => {
+    const span = node({
+      id: "o_s",
+      bind: "span",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
+    });
+    const p = resolvePlacePoint([span], { x: 3, y: 0.1 }, 0.3);
+    expect(p.kind).toBe("pointOnSegment");
+    if (p.kind !== "pointOnSegment") return;
+    expect(p.bind).toBe("span");
+    expect(p.t).toBeCloseTo(0.75);
+    expect(p.at.x).toBeCloseTo(3);
+    expect(p.at.y).toBeCloseTo(0);
+  });
+
+  test("prefers a named point over a glider on the same stroke", () => {
+    const p = resolvePlacePoint([A, ground], { x: 0.1, y: 0 }, 0.3);
+    expect(p).toMatchObject({ kind: "ref", bind: "A" });
+  });
 });

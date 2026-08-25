@@ -1,7 +1,6 @@
 import type { TraceNode } from "../../eval/context";
 import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
 import { circle } from "./circle";
-import { glider } from "./glider";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
@@ -36,11 +35,10 @@ const byId = {
   segment,
   parallelLine,
   perpendicularLine,
-  glider,
   slider,
 } as const satisfies Record<ToolId, Tool>;
 
-export const TOOLS = [point.spec, circle.spec, line.spec, segment.spec, parallelLine.spec, perpendicularLine.spec, glider.spec, slider.spec] as const;
+export const TOOLS = [point.spec, circle.spec, line.spec, segment.spec, parallelLine.spec, perpendicularLine.spec, slider.spec] as const;
 
 function of(session: ToolSession): Tool {
   return byId[session.verb];

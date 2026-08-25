@@ -5,12 +5,7 @@ import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
-export type GliderCarrier =
-  | { kind: "segment"; expr: Expr; geom: import("../../geom").Segment }
-  | { kind: "line"; expr: Expr; geom: LineLike }
-  | { kind: "circle"; expr: Expr; geom: Circle };
-
-export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine" | "perpendicularLine" | "glider" | "slider";
+export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine" | "perpendicularLine" | "slider";
 
 export type ToolSpec = {
   id: ToolId;
@@ -39,7 +34,7 @@ export type Scope = {
   used: readonly string[];
   points: Readonly<Record<string, Placed>>;
   carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
-  circles: Readonly<Record<string, { expr: Expr; geom: import("../../geom").Circle }>>;
+  circles: Readonly<Record<string, { expr: Expr; geom: Circle }>>;
   /** Slider binds → live value (for length reuse). */
   lengths: Readonly<Record<string, number>>;
 };
@@ -59,7 +54,6 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike };
-  circle?: { bind: string; geom: import("../../geom").Circle };
   length?: { bind: string; value: number };
 };
 
@@ -99,13 +93,6 @@ export type ToolSession =
       carrierRef: string;
       through?: Placed;
       throughRef: string;
-      name: string;
-    }
-  | {
-      verb: "glider";
-      focus: "carrier" | "name";
-      carrier?: GliderCarrier;
-      carrierRef: string;
       name: string;
     }
   | {

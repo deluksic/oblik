@@ -1,5 +1,5 @@
 import { printExpr } from "../../source/expr";
-import { asPoint, dist, exprOfPlace, hoverBind, previewCall, round, sameRef } from "./common";
+import { asPoint, dist, exprOfPlace, hoverBind, hoverPlace, previewCall, round, sameRef } from "./common";
 import {
   attachLengthHit,
   lengthLabel,
@@ -75,9 +75,9 @@ export const circle: Tool<CircleSession> = {
     return attachLengthHit(hit, ctx);
   },
   hover(session, hit, trace) {
-    if (!centerOf(session, scopeFromTrace(trace))) return null;
+    if (!centerOf(session, scopeFromTrace(trace))) return hoverPlace(hit.point, trace);
     if (hit.length) return hoverBind(trace, hit.length.bind);
-    return null;
+    return hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {
     const center = centerOf(session, scope);

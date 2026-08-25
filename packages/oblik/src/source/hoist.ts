@@ -5,6 +5,9 @@ export const HOIST_CTORS = new Set([
   "lineIntersection",
   "circleLineIntersection",
   "circleCircleIntersection",
+  "pointOnSegment",
+  "pointOnLine",
+  "pointOnCircle",
 ]);
 
 export const BIND_PREFIX: Record<string, string> = {

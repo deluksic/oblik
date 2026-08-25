@@ -1,6 +1,6 @@
 import { printExpr, type Expr } from "../../source/expr";
 import { hoistIntersections, printHoist, takeBind } from "../../source/hoist";
-import { isCrossing, type PlacePoint } from "../place";
+import { isConstructed, isGliderPlace, type PlacePoint } from "../place";
 import type { Vec2 } from "../pick";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
@@ -42,6 +42,37 @@ export function exprOfPlace(p: PlacePoint): Expr {
       ],
     };
   }
+  if (p.kind === "pointOnSegment") {
+    return {
+      kind: "call",
+      name: "pointOnSegment",
+      args: [
+        { kind: "ref", name: p.bind },
+        { kind: "num", value: round(p.t) },
+      ],
+    };
+  }
+  if (p.kind === "pointOnLine") {
+    return {
+      kind: "call",
+      name: "pointOnLine",
+      args: [
+        { kind: "ref", name: p.bind },
+        { kind: "num", value: round(p.s) },
+      ],
+    };
+  }
+  if (p.kind === "pointOnCircle") {
+    return {
+      kind: "call",
+      name: "pointOnCircle",
+      args: [
+        { kind: "ref", name: p.bind },
+        { kind: "num", value: round(p.ux) },
+        { kind: "num", value: round(p.uy) },
+      ],
+    };
+  }
   return {
     kind: "call",
     name: "point",
@@ -65,11 +96,19 @@ export function sameRef(center: Expr, p: PlacePoint): boolean {
   return center.kind === "ref" && p.kind === "ref" && center.name === p.bind;
 }
 
-export function intersectionInsert(p: PlacePoint): InsertJob | null {
-  if (!isCrossing(p)) return null;
+export function constructedInsert(p: PlacePoint): InsertJob | null {
+  if (!isConstructed(p)) return null;
   const e = exprOfPlace(p);
   if (e.kind !== "call") return null;
   return { from: p.kind, args: e.args };
+}
+
+export function hoverPlace(p: PlacePoint, trace: readonly { occ: number; bind?: string; id: string }[]): string | null {
+  if (p.kind === "ref" || isGliderPlace(p)) return hoverBind(trace, p.bind);
+  if (p.kind === "lineIntersection") return hoverBind(trace, p.a);
+  if (p.kind === "circleLineIntersection") return hoverBind(trace, p.circle);
+  if (p.kind === "circleCircleIntersection") return hoverBind(trace, p.a);
+  return null;
 }
 
 export function previewCall(

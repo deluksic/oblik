@@ -3,7 +3,7 @@ import { lineBasis } from "../../geom/ops";
 import { add, perp } from "../../geom/vec";
 import { printExpr } from "../../source/expr";
 import { snapLineCarrier } from "../pick";
-import { asPoint, exprOfPlace, hoverBind, previewCall } from "./common";
+import { asPoint, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, refField, resolveCarrier, resolvePoint, withBind } from "./draft";
 import { scopeFromTrace } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
@@ -83,8 +83,7 @@ export const perpendicularLine: Tool<PerpSession> = {
       if (!hit.carrier) return null;
       return hoverBind(trace, hit.carrier.bind);
     }
-    if (hit.point.kind === "ref") return hoverBind(trace, hit.point.bind);
-    return null;
+    return hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {
     const carrier = carrierOf(session, scope);

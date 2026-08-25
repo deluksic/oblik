@@ -124,6 +124,27 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, pointOnSegment \} from "oblik"/);
   });
 
+  test("hoists a nested glider before a line", () => {
+    const next = insertCall(src, {
+      from: "line",
+      args: [
+        {
+          kind: "call",
+          name: "pointOnLine",
+          args: [
+            { kind: "ref", name: "ground" },
+            { kind: "num", value: 2.2 },
+          ],
+        },
+        { kind: "ref", name: "A" },
+      ],
+      id: "o_l",
+    });
+    expect(next).toContain('const g = pointOnLine(ground, 2.2,');
+    expect(next).toContain('const l = line(g, A, "o_l");');
+    expect(next).toMatch(/import \{ point, pointOnLine, line \} from "oblik"/);
+  });
+
   test("hoists a free circle center before a numeric radius", () => {
     const next = insertCall(
       src,

@@ -98,4 +98,21 @@ describe("hoistIntersections", () => {
     const { hoists } = hoistIntersections([crossing], new Set(["x"]));
     expect(hoists[0]?.bind).toBe("x2");
   });
+
+  test("hoists a nested glider so a line can attach to it", () => {
+    const glider: Expr = {
+      kind: "call",
+      name: "pointOnLine",
+      args: [
+        { kind: "ref", name: "ground" },
+        { kind: "num", value: 2.2 },
+      ],
+    };
+    const { exprs, hoists } = hoistIntersections([glider, { kind: "ref", name: "A" }], new Set(["A", "ground"]));
+    expect(hoists).toEqual([{ bind: "g", from: "pointOnLine", args: glider.args }]);
+    expect(exprs).toEqual([
+      { kind: "ref", name: "g" },
+      { kind: "ref", name: "A" },
+    ]);
+  });
 });
