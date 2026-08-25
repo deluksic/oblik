@@ -190,7 +190,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
     const next = applyDrag(d, e, paneEl(), camera(), size(), props.trace);
     if (next.draft) props.onCommit(next.draft.id, next.draft.values);
-    props.onPick?.([d.node]);
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
