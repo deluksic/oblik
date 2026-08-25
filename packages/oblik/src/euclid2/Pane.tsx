@@ -4,8 +4,8 @@ import { evaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import { Inspect } from "../host/Inspect";
-import { EMPTY_INSPECT, inspectForNode } from "../host/inspect";
+import { SelectionSidebar } from "../host/SelectionSidebar";
+import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
 import { pickAmong, traceKey } from "./pick";
 import { Palette } from "./Palette";
 import {
@@ -48,10 +48,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return world().trace.find((n) => traceKey(n) === key) ?? null;
   });
 
-  const inspect = createMemo(async () => {
+  const selectionDetail = createMemo(async () => {
     const node = selectedNode();
-    if (!node) return EMPTY_INSPECT;
-    return inspectForNode(node, peekCache);
+    if (!node) return EMPTY_SELECTION_DETAIL;
+    return selectionDetailForNode(node, peekCache);
   });
 
   createEffect(
@@ -174,8 +174,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onClosePicker={() => setPicker(false)}
         />
       </div>
-      <Loading fallback={<Inspect state={EMPTY_INSPECT} />}>
-        <Inspect state={inspect()} />
+      <Loading fallback={<SelectionSidebar detail={EMPTY_SELECTION_DETAIL} />}>
+        <SelectionSidebar detail={selectionDetail()} />
       </Loading>
     </div>
   );

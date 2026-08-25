@@ -1,23 +1,23 @@
 import { For, Show } from "solid-js";
 
-import type { InspectState, OriginDisplayLine, OriginView } from "./inspect";
+import type { OriginDisplayLine, OriginView, SelectionDetail } from "./selection-detail";
 
-import styles from "./Inspect.module.css";
+import styles from "./SelectionSidebar.module.css";
 
-export type InspectProps = {
-  state: InspectState;
+export type SelectionSidebarProps = {
+  detail: SelectionDetail;
 };
 
-export function Inspect(props: InspectProps) {
+export function SelectionSidebar(props: SelectionSidebarProps) {
   return (
-    <aside class={styles.inspect}>
+    <aside class={styles.sidebar}>
       <div class={styles.head}>
         <p class={styles.kicker}>Identity</p>
-        <h2 class={styles.crumb}>{props.state.crumb}</h2>
-        <p class={styles.meta}>{props.state.meta}</p>
+        <h2 class={styles.crumb}>{props.detail.crumb}</h2>
+        <p class={styles.meta}>{props.detail.meta}</p>
       </div>
       <p class={styles.kicker}>Origin</p>
-      <OriginPane origin={props.state.origin} />
+      <OriginPane origin={props.detail.origin} />
     </aside>
   );
 }

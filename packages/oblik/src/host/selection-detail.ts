@@ -22,13 +22,13 @@ export type OriginView =
   | { kind: "empty"; message: string }
   | { kind: "origin"; frames: OriginFrame[] };
 
-export type InspectState = {
+export type SelectionDetail = {
   crumb: string;
   meta: string;
   origin: OriginView;
 };
 
-export const EMPTY_INSPECT: InspectState = {
+export const EMPTY_SELECTION_DETAIL: SelectionDetail = {
   crumb: "Nothing selected",
   meta: "Hover or click geometry to inspect it.",
   origin: { kind: "empty", message: "Select something to see where it comes from." },
@@ -156,7 +156,7 @@ export function stackForNode(node: TraceNode): CallSite[] {
   return [];
 }
 
-export function inspectMeta(node: TraceNode): string {
+function selectionMeta(node: TraceNode): string {
   const stack = pinConstructorSite(
     stackForNode(node),
     node.at && node.module
@@ -169,16 +169,16 @@ export function inspectMeta(node: TraceNode): string {
   return `${node.kind} · occ ${node.occ}`;
 }
 
-export function inspectCrumb(node: TraceNode): string {
+function selectionCrumb(node: TraceNode): string {
   if (node.bind) return node.bind;
   if (node.occ > 0) return `${node.id} #${node.occ}`;
   return node.id || node.kind;
 }
 
-export async function inspectForNode(
+export async function selectionDetailForNode(
   node: TraceNode,
   cache: Map<string, string>,
-): Promise<InspectState> {
+): Promise<SelectionDetail> {
   const stack = pinConstructorSite(
     stackForNode(node),
     node.at && node.module
@@ -186,8 +186,8 @@ export async function inspectForNode(
       : undefined,
   );
   return {
-    crumb: inspectCrumb(node),
-    meta: inspectMeta(node),
+    crumb: selectionCrumb(node),
+    meta: selectionMeta(node),
     origin: await originFromStack(stack, cache),
   };
 }
