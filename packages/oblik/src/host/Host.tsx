@@ -2,28 +2,38 @@ import { Errored, createMemo, createSignal, onSettled } from "solid-js";
 import { render } from "@solidjs/web";
 
 import { evaluate, type Draft } from "../eval/evaluate";
-import type { Euclid2Scene } from "../eval/scene";
+import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
-import type { Camera2 } from "./camera";
-import { Euclid2View } from "./View";
-import { Palette } from "./Palette";
-import { clickTool, ghostOf, previewOf, startTool, type PlaceHit, type ToolId, type ToolSession } from "./tool";
+import {
+  Euclid2View,
+  Palette,
+  clickTool,
+  ghostOf,
+  previewOf,
+  startTool,
+  type Camera2,
+  type PlaceHit,
+  type ToolId,
+  type ToolSession,
+} from "../euclid2";
 import styles from "./Host.module.css";
 
-export type Euclid2Mount = {
-  setScene: (scene: Euclid2Scene) => void;
+const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
+
+export type OblikMount = {
+  setScene: (scene: Scene) => void;
   setAnnotations: (annotations: Record<string, Annotation>) => void;
 };
 
-export type Euclid2MountOpts = {
+export type OblikMountOpts = {
   el: HTMLElement;
-  scene: Euclid2Scene;
+  scene: Scene;
   file: string;
   annotations: Record<string, Annotation>;
 };
 
-export function mountEuclid2(opts: Euclid2MountOpts): Euclid2Mount {
-  const slots: { current: Euclid2Mount | null } = { current: null };
+export function mountOblik(opts: OblikMountOpts): OblikMount {
+  const slots: { current: OblikMount | null } = { current: null };
   render(() => <Host opts={opts} slots={slots} />, opts.el);
   return {
     setScene: (scene) => slots.current?.setScene(scene),
@@ -31,12 +41,14 @@ export function mountEuclid2(opts: Euclid2MountOpts): Euclid2Mount {
   };
 }
 
-function Host(props: { opts: Euclid2MountOpts; slots: { current: Euclid2Mount | null } }) {
+function Host(props: { opts: OblikMountOpts; slots: { current: OblikMount | null } }) {
   const file = props.opts.file;
   const [mod, setMod] = createSignal(props.opts.scene);
   const [anno, setAnno] = createSignal(props.opts.annotations);
   const [draft, setDraft] = createSignal<Draft>(new Map());
-  const [camera, setCamera] = createSignal<Camera2>(props.opts.scene.camera ?? { x: 0, y: 0, scale: 48 });
+  const [camera, setCamera] = createSignal<Camera2>(
+    props.opts.scene.kind === "euclid2" ? (props.opts.scene.camera ?? DEFAULT_CAMERA) : DEFAULT_CAMERA,
+  );
   const [picker, setPicker] = createSignal(false);
   const [tool, setTool] = createSignal<ToolSession | null>(null);
   const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(null);
@@ -105,7 +117,7 @@ function Host(props: { opts: Euclid2MountOpts; slots: { current: Euclid2Mount | 
         return;
       }
       if (typing) return;
-      if (e.code === "Space" && !tool()) {
+      if (e.code === "Space" && !tool() && mod().kind === "euclid2") {
         e.preventDefault();
         setPicker((p) => !p);
       }
@@ -124,6 +136,37 @@ function Host(props: { opts: Euclid2MountOpts; slots: { current: Euclid2Mount | 
     return t ? previewOf(t) : null;
   });
 
+  const pane = createMemo(() => {
+    const scene = mod();
+    const w = world();
+    return scene.kind === "euclid2" ? (
+      <>
+        <Euclid2View
+          trace={w.trace}
+          camera={camera()}
+          placing={tool() != null}
+          ghost={ghost()}
+          onCamera={setCamera}
+          onDraft={mergeDraft}
+          onCommit={(id, values) => void commit(id, values)}
+          onPlace={onPlace}
+          onCursor={setCursor}
+        />
+        <Palette
+          picker={picker()}
+          prompt={prompt()}
+          onPick={(id: ToolId) => {
+            setPicker(false);
+            setTool(startTool(id));
+          }}
+          onClosePicker={() => setPicker(false)}
+        />
+      </>
+    ) : (
+      <p class={styles.err}>Unknown scene kind</p>
+    );
+  });
+
   return (
     <div class={styles.shell}>
       <header class={styles.head}>
@@ -139,28 +182,7 @@ function Host(props: { opts: Euclid2MountOpts; slots: { current: Euclid2Mount | 
         </p>
       </header>
       <div class={styles.stage}>
-        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
-          <Euclid2View
-            trace={world().trace}
-            camera={camera()}
-            placing={tool() != null}
-            ghost={ghost()}
-            onCamera={setCamera}
-            onDraft={mergeDraft}
-            onCommit={(id, values) => void commit(id, values)}
-            onPlace={onPlace}
-            onCursor={setCursor}
-          />
-        </Errored>
-        <Palette
-          picker={picker()}
-          prompt={prompt()}
-          onPick={(id: ToolId) => {
-            setPicker(false);
-            setTool(startTool(id));
-          }}
-          onClosePicker={() => setPicker(false)}
-        />
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>{pane()}</Errored>
       </div>
     </div>
   );

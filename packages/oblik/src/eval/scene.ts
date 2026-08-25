@@ -6,6 +6,9 @@ export type Euclid2Scene = {
   build: () => unknown;
 };
 
-export function defineScene<T extends Euclid2Scene>(scene: T): T {
+/** Discriminated union. Add a member when a scene kind ships — not a host registry. */
+export type Scene = Euclid2Scene;
+
+export function defineScene<T extends Scene>(scene: T): T {
   return scene;
 }

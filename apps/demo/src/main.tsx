@@ -1,11 +1,11 @@
-import { mountEuclid2 } from "oblik/euclid2";
+import { mountOblik } from "oblik/host";
 
 import scene from "./scenes/shelf.ts";
 import annotations from "virtual:oblik-annotations?file=apps/demo/src/scenes/shelf.ts";
 
 const FILE = "apps/demo/src/scenes/shelf.ts";
 
-const host = mountEuclid2({
+const host = mountOblik({
   el: document.getElementById("app")!,
   scene,
   file: FILE,

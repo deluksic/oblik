@@ -1,6 +1,6 @@
 # oblik-demo
 
-Greenfield paper for Prototype 6. This app is scenes plus a Vite entry that mounts `oblik/euclid2`. Chrome, draft, Space, and patch live in the package.
+Greenfield paper for Prototype 6. This app is scenes plus a Vite entry that mounts `oblik/host`. The host switches on `scene.kind` (`euclid2` today).
 
 ```sh
 pnpm demo

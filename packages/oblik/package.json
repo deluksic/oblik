@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./host": "./src/host/index.ts",
     "./euclid2": "./src/euclid2/index.ts",
     "./plugin": "./src/source/vite-plugin.ts"
   },

@@ -1,5 +1,5 @@
 import type { Annotation } from "../source/analyze";
-import type { Euclid2Scene } from "./scene";
+import type { Scene } from "./scene";
 import { currentEval, nodeOf, withEval, type EvalCtx, type TraceNode } from "./context";
 
 export type Draft = Map<string, number[]>;
@@ -16,7 +16,7 @@ function asMap(a?: EvaluateOpts["annotations"]): Map<string, Annotation> {
   return new Map(Object.entries(a));
 }
 
-export function evaluate(mod: Euclid2Scene, opts: EvaluateOpts = {}): { value: unknown; trace: TraceNode[] } {
+export function evaluate(mod: Scene, opts: EvaluateOpts = {}): { value: unknown; trace: TraceNode[] } {
   const ctx: EvalCtx = {
     draft: opts.draft ?? new Map(),
     trace: [],
