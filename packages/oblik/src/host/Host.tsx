@@ -101,15 +101,6 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
     },
   });
 
-  onSettled(() => {
-    const onPop = () => {
-      const id = currentSceneId();
-      if (id && id !== sceneId()) setSceneId(id);
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  });
-
   function selectScene(id: string) {
     openScene(id);
     setSceneId(id);
@@ -126,6 +117,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
         loading={loading()}
         error={error()}
         onSelect={selectScene}
+        onSyncSceneId={setSceneId}
       />
     ),
     opts.el,
@@ -148,7 +140,17 @@ function Host(props: {
   loading: boolean;
   error: string | null;
   onSelect: (id: string) => void;
+  onSyncSceneId: (id: string) => void;
 }) {
+  onSettled(() => {
+    const onPop = () => {
+      const id = currentSceneId();
+      if (id && id !== props.sceneId) props.onSyncSceneId(id);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  });
+
   return (
     <div class={styles.shell}>
       <header class={styles.head}>
