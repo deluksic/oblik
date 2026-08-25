@@ -137,4 +137,21 @@ describe("insertCall", () => {
     );
     expect(next).toContain('const x = lineIntersection(ground, wall, "o_x");');
   });
+
+  test("inserts circleCircleIntersection", () => {
+    const next = insertCall(
+      src,
+      {
+        from: "circleCircleIntersection",
+        args: [
+          { kind: "ref", name: "reach" },
+          { kind: "ref", name: "lamp" },
+          { kind: "num", value: 1 },
+        ],
+        id: "o_x",
+      },
+      () => "o_x",
+    );
+    expect(next).toContain('const x = circleCircleIntersection(reach, lamp, 1, "o_x");');
+  });
 });

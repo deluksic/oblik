@@ -1,4 +1,5 @@
 import {
+  circleCircleIntersectionValue,
   circleLineIntersectionValue,
   dist as distVec,
   isFiniteVec,
@@ -118,6 +119,14 @@ export const circleLineIntersection = mark(
   { dof: [] },
 );
 
+export const circleCircleIntersection = mark(
+  (a: Circle, b: Circle, k: Branch, id?: string): Point => {
+    const p = circleCircleIntersectionValue(a, b, k);
+    return traced({ kind: "point", x: p.x, y: p.y }, id);
+  },
+  { dof: [] },
+);
+
 export function dist(a: Vec2, b: Vec2): number {
   return distVec(a, b);
 }
@@ -130,4 +139,5 @@ export const constructors = {
   offsetLine,
   lineIntersection,
   circleLineIntersection,
+  circleCircleIntersection,
 } as const;

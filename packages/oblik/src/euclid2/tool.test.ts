@@ -19,6 +19,13 @@ const cl: PlacePoint = {
   k: 1,
   at: { x: 0.87, y: 1.8 },
 };
+const cc: PlacePoint = {
+  kind: "circleCircleIntersection",
+  a: "reach",
+  b: "lamp",
+  k: 1,
+  at: { x: 1, y: Math.sqrt(3) },
+};
 
 describe("clickTool", () => {
   test("point click inserts numeric literals", () => {
@@ -60,6 +67,20 @@ describe("clickTool", () => {
         args: [
           { kind: "ref", name: "reach" },
           { kind: "ref", name: "shelf" },
+          { kind: "num", value: 1 },
+        ],
+      },
+    });
+  });
+
+  test("point on a circle-circle crossing inserts circleCircleIntersection", () => {
+    const r = clickTool(startTool("point"), { world: cc.at, point: cc });
+    expect(r).toEqual({
+      insert: {
+        from: "circleCircleIntersection",
+        args: [
+          { kind: "ref", name: "reach" },
+          { kind: "ref", name: "lamp" },
           { kind: "num", value: 1 },
         ],
       },
@@ -157,6 +178,7 @@ describe("previewOf", () => {
   test("shows the intersection constructor while hovering a crossing", () => {
     const p = previewOf(startTool("point"), ll);
     expect(p.line).toBe("const x = lineIntersection(ground, wall)");
+    expect(previewOf(startTool("point"), cc).line).toBe("const x = circleCircleIntersection(reach, lamp, 1)");
   });
 
   test("shows dist() when a circle radius hovers a point", () => {

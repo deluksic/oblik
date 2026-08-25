@@ -1,0 +1,31 @@
+import { describe, expect, test } from "vitest";
+
+import { circleCircleIntersectionValue } from "./ops";
+import type { Circle } from "./types";
+
+const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
+const b: Circle = { kind: "circle", center: { x: 2, y: 0 }, radius: 2 };
+
+describe("circleCircleIntersectionValue", () => {
+  test("freezes k as the side of the center line", () => {
+    const plus = circleCircleIntersectionValue(a, b, 1);
+    const minus = circleCircleIntersectionValue(a, b, -1);
+    expect(plus.x).toBeCloseTo(1);
+    expect(plus.y).toBeCloseTo(Math.sqrt(3));
+    expect(minus.x).toBeCloseTo(1);
+    expect(minus.y).toBeCloseTo(-Math.sqrt(3));
+  });
+
+  test("misses are NaN, not a hop to the other root", () => {
+    const far: Circle = { kind: "circle", center: { x: 10, y: 0 }, radius: 1 };
+    const p = circleCircleIntersectionValue(a, far, 1);
+    expect(p.x).toBeNaN();
+    expect(p.y).toBeNaN();
+  });
+
+  test("coincident centers are NaN", () => {
+    const same: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 3 };
+    const p = circleCircleIntersectionValue(a, same, 1);
+    expect(p.x).toBeNaN();
+  });
+});

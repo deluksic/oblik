@@ -116,4 +116,36 @@ describe("resolvePlacePoint", () => {
     const p = resolvePlacePoint([A, ground, wall], { x: 2, y: 0 }, 0.3);
     expect(p.kind).toBe("lineIntersection");
   });
+
+  test("freezes circle-circle k from the nearer root", () => {
+    const other = node({
+      id: "o_c2",
+      bind: "lamp",
+      value: { kind: "circle", center: { x: 2, y: 0 }, radius: 2 },
+    });
+    const plus = resolvePlacePoint([reach, other], { x: 1, y: Math.sqrt(3) }, 0.3);
+    expect(plus).toMatchObject({
+      kind: "circleCircleIntersection",
+      a: "reach",
+      b: "lamp",
+      k: 1,
+    });
+    const minus = resolvePlacePoint([reach, other], { x: 1, y: -Math.sqrt(3) }, 0.3);
+    expect(minus).toMatchObject({
+      kind: "circleCircleIntersection",
+      a: "reach",
+      b: "lamp",
+      k: -1,
+    });
+  });
+
+  test("skips disjoint circles", () => {
+    const far = node({
+      id: "o_far",
+      bind: "far",
+      value: { kind: "circle", center: { x: 10, y: 0 }, radius: 1 },
+    });
+    const p = resolvePlacePoint([reach, far], { x: 5, y: 0 }, 0.3);
+    expect(p.kind).toBe("free");
+  });
 });

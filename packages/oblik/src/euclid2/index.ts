@@ -21,5 +21,6 @@ export {
   isCrossing,
   PLACE_SNAP_PX,
   type PlacePoint,
+  type Crossing,
 } from "./place";
 export type { Camera2 } from "./camera";

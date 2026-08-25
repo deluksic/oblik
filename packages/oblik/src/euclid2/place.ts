@@ -1,6 +1,10 @@
 import type { TraceNode } from "../eval/context";
 import type { Branch, Circle, LineLike } from "../geom";
-import { circleLineIntersectionValue, lineIntersectionValue } from "../geom/ops";
+import {
+  circleCircleIntersectionValue,
+  circleLineIntersectionValue,
+  lineIntersectionValue,
+} from "../geom/ops";
 import { dist } from "../geom/vec";
 import { isFiniteTrace, snapBoundPoint, type Vec2 } from "./pick";
 
@@ -8,7 +12,10 @@ export type PlacePoint =
   | { kind: "free"; at: Vec2 }
   | { kind: "ref"; bind: string; id: string; at: Vec2 }
   | { kind: "lineIntersection"; a: string; b: string; at: Vec2 }
-  | { kind: "circleLineIntersection"; circle: string; line: string; k: Branch; at: Vec2 };
+  | { kind: "circleLineIntersection"; circle: string; line: string; k: Branch; at: Vec2 }
+  | { kind: "circleCircleIntersection"; a: string; b: string; k: Branch; at: Vec2 };
+
+export type Crossing = Exclude<PlacePoint, { kind: "free" } | { kind: "ref" }>;
 
 export const PLACE_SNAP_PX = 16;
 
@@ -16,8 +23,12 @@ export function placeSnapWorld(scale: number): number {
   return PLACE_SNAP_PX / Math.max(8, scale);
 }
 
-export function isCrossing(p: PlacePoint): boolean {
-  return p.kind === "lineIntersection" || p.kind === "circleLineIntersection";
+export function isCrossing(p: PlacePoint): p is Crossing {
+  return (
+    p.kind === "lineIntersection" ||
+    p.kind === "circleLineIntersection" ||
+    p.kind === "circleCircleIntersection"
+  );
 }
 
 type Cand = { point: PlacePoint; d: number; rank: number };
@@ -37,6 +48,8 @@ export function resolvePlacePoint(
       rank: 0,
     });
   }
+  const cc = nearestCircleCircle(trace, world, maxDist);
+  if (cc) cands.push({ point: cc.point, d: cc.d, rank: 1 });
   const cl = nearestCircleLine(trace, world, maxDist);
   if (cl) cands.push({ point: cl.point, d: cl.d, rank: 1 });
   const ll = nearestLineLine(trace, world, maxDist);
@@ -121,6 +134,42 @@ function nearestCircleLine(
               kind: "circleLineIntersection",
               circle: c.bind!,
               line: ln.bind!,
+              k,
+              at,
+            },
+            d,
+          };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function nearestCircleCircle(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  maxDist: number,
+): { point: PlacePoint; d: number } | null {
+  const circs = boundOf(trace, CIRCLE);
+  let best: { point: PlacePoint; d: number } | null = null;
+  for (let i = 0; i < circs.length; i++) {
+    const a = circs[i]!;
+    if (a.value.kind !== "circle") continue;
+    for (let j = i + 1; j < circs.length; j++) {
+      const b = circs[j]!;
+      if (a.bind === b.bind || b.value.kind !== "circle") continue;
+      for (const k of [1, -1] as const) {
+        const at = circleCircleIntersectionValue(a.value, b.value, k);
+        if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) continue;
+        const d = dist(world, at);
+        if (d > maxDist) continue;
+        if (!best || d < best.d) {
+          best = {
+            point: {
+              kind: "circleCircleIntersection",
+              a: a.bind!,
+              b: b.bind!,
               k,
               at,
             },

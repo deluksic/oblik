@@ -57,4 +57,21 @@ export function circleLineIntersectionValue(c: Circle, l: LineLike, k: Branch): 
   return isFiniteVec(p) ? p : vec(Number.NaN, Number.NaN);
 }
 
+/** Circle/circle hits. `k` is the side of the center line. No hit → NaN. */
+export function circleCircleIntersectionValue(a: Circle, b: Circle, k: Branch): Vec2 {
+  if (!isFiniteVec(a.center) || !isFiniteVec(b.center)) return vec(Number.NaN, Number.NaN);
+  if (!Number.isFinite(a.radius) || !Number.isFinite(b.radius)) return vec(Number.NaN, Number.NaN);
+  const dvec = sub(b.center, a.center);
+  const d = Math.hypot(dvec.x, dvec.y);
+  if (d < 1e-12) return vec(Number.NaN, Number.NaN);
+  const aa = (a.radius * a.radius - b.radius * b.radius + d * d) / (2 * d);
+  const h2 = a.radius * a.radius - aa * aa;
+  if (!(h2 >= 0) || !Number.isFinite(h2)) return vec(Number.NaN, Number.NaN);
+  const h = Math.sqrt(h2);
+  const mid = add(a.center, mul(dvec, aa / d));
+  const n = perp({ x: dvec.x / d, y: dvec.y / d });
+  const p = add(mid, mul(n, k * h));
+  return isFiniteVec(p) ? p : vec(Number.NaN, Number.NaN);
+}
+
 export { dist };

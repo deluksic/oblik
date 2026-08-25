@@ -10,6 +10,7 @@ export {
   offsetLine,
   lineIntersection,
   circleLineIntersection,
+  circleCircleIntersection,
   dist,
   constructors,
 } from "./eval/constructors";

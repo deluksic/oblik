@@ -46,7 +46,7 @@ export type Ghost =
   | { kind: "line" | "segment"; a: Vec2; b: Vec2 };
 
 export type InsertJob = {
-  from: ToolId | "lineIntersection" | "circleLineIntersection";
+  from: ToolId | "lineIntersection" | "circleLineIntersection" | "circleCircleIntersection";
   args: Expr[];
 };
 
@@ -73,6 +73,17 @@ export function exprOfPlace(p: PlacePoint): Expr {
       args: [
         { kind: "ref", name: p.circle },
         { kind: "ref", name: p.line },
+        { kind: "num", value: p.k },
+      ],
+    };
+  }
+  if (p.kind === "circleCircleIntersection") {
+    return {
+      kind: "call",
+      name: "circleCircleIntersection",
+      args: [
+        { kind: "ref", name: p.a },
+        { kind: "ref", name: p.b },
         { kind: "num", value: p.k },
       ],
     };
@@ -109,7 +120,7 @@ function sameRef(center: Expr, p: PlacePoint): boolean {
 }
 
 function intersectionInsert(p: PlacePoint): InsertJob | null {
-  if (p.kind !== "lineIntersection" && p.kind !== "circleLineIntersection") return null;
+  if (!isCrossing(p)) return null;
   const e = exprOfPlace(p);
   if (e.kind !== "call") return null;
   return { from: p.kind, args: e.args };
