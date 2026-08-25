@@ -122,12 +122,9 @@ export function sceneLoadersModule(keys: string[]): string {
   const entries = keys
     .map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)}),`)
     .join("\n");
-  const lit = JSON.stringify(keys);
-  return `import type { Scene } from "oblik";
-
-export const sceneLoaders = {
+  return `export const sceneLoaders = {
 ${entries}
-} satisfies Record<string, () => Promise<{ default: Scene }>>;
+};
 ${sceneLoadersAcceptTail(keys)}
 `;
 }
