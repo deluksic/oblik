@@ -2,7 +2,6 @@ import { render } from "@solidjs/web";
 import { Errored, Loading, createMemo, createSignal, onSettled } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import { evaluate } from "../eval/evaluate";
 import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import { sceneLoaderKey, type OblikSceneEntry } from "../source/catalog";
@@ -83,7 +82,6 @@ function Host(props: {
     const loader = loaders[sceneLoaderKey(e.file)];
     if (!loader) throw new Error(`No loader for ${e.file}`);
     const sceneMod = await loader();
-    evaluate(sceneMod.default, { module: e.path });
     return sceneMod.default;
   });
 
@@ -96,9 +94,6 @@ function Host(props: {
     registerSceneHot({
       currentPath: () => entry()?.path ?? "",
       onHot(scene) {
-        const path = entry()?.path;
-        if (!path) return;
-        evaluate(scene, { module: path });
         setHot(scene);
       },
     });
