@@ -344,6 +344,28 @@ describe("keyTool", () => {
     });
   });
 
+  test("perpendicular line types a point and Enter commits", () => {
+    const ground = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+    const scope = pointScope({ bind: "P", x: 0, y: 2 });
+    const mid = asSession(
+      clickTool(startTool("perpendicularLine"), {
+        world: { x: 1, y: 0 },
+        point: { kind: "free", at: { x: 1, y: 0 } },
+        carrier: { bind: "ground", geom: ground },
+      }),
+    );
+    expect(mid).toMatchObject({ verb: "perpendicularLine", focus: "through" });
+    expect(keyTool(typeChars(mid, "P"), { key: "Enter" }, null, { ...scope, carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } } })).toEqual({
+      insert: {
+        from: "perpendicularLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "ref", name: "P" },
+        ],
+      },
+    });
+  });
+
   test("ignores modifier chords", () => {
     expect(keyTool(startTool("point"), { key: "a", ctrl: true })).toBeUndefined();
   });

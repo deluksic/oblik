@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
+import { clickTool, commitTool, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
 import type { PlacePoint } from "./place";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
@@ -264,6 +264,59 @@ describe("clickTool", () => {
       },
     });
   });
+
+  test("perpendicular line picks a carrier then inserts through a point", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const mid = clickTool(startTool("perpendicularLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid) || mid.session.verb !== "perpendicularLine" || !mid.session.carrier) {
+      throw new Error("expected carrier session");
+    }
+    const done = clickTool(mid.session, { world: { x: 0, y: 2 }, point: free(0, 2) });
+    expect(done).toEqual({
+      insert: {
+        from: "perpendicularLine",
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "call", name: "point", args: [{ kind: "num", value: 0 }, { kind: "num", value: 2 }] },
+        ],
+      },
+    });
+  });
+
+  test("perpendicular line typed point commits on Enter", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const scope = {
+      used: ["ground", "P"],
+      points: { P: { expr: { kind: "ref", name: "P" }, at: { x: 0, y: 2 } } },
+      carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      lengths: {},
+    };
+    const mid = clickTool(startTool("perpendicularLine"), {
+      world: { x: 1, y: 0 },
+      point: free(1, 0),
+      carrier: { bind: "ground", geom: ground },
+    });
+    if (!("session" in mid)) throw new Error("expected session");
+    const typed = typeTool(mid.session, "P");
+    expect(commitTool(typed, null, scope)).toEqual({
+      insert: {
+        from: "perpendicularLine",
+        args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "P" }],
+      },
+    });
+  });
 });
 
 describe("ghostOf", () => {
@@ -337,6 +390,26 @@ describe("ghostOf", () => {
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 0 });
   });
+
+  test("previews a perpendicular line after picking the carrier", () => {
+    const ground = {
+      kind: "line" as const,
+      origin: { x: 0, y: 0 },
+      direction: { x: 1, y: 0 },
+    };
+    const g = ghostOf(
+      {
+        verb: "perpendicularLine",
+        focus: "through",
+        throughRef: "",
+        name: "",
+        carrierRef: "",
+        carrier: { expr: { kind: "ref", name: "ground" }, geom: ground },
+      },
+      { world: { x: 0, y: 2 }, point: free(0, 2) },
+    );
+    expect(g).toEqual({ kind: "line", a: { x: 0, y: 2 }, b: { x: 0, y: 3 } });
+  });
 });
 
 describe("previewOf", () => {
@@ -408,6 +481,10 @@ describe("previewOf", () => {
 describe("filterTools", () => {
   test("matches parallel line by offset alias", () => {
     expect(filterTools("offset").map((t) => t.id)).toEqual(["parallelLine"]);
+  });
+
+  test("matches perpendicular line by alias", () => {
+    expect(filterTools("perpendicular").map((t) => t.id)).toEqual(["perpendicularLine"]);
   });
 
   test("matches slider by name", () => {

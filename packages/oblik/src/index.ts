@@ -8,6 +8,7 @@ export {
   segment,
   line,
   parallelLine,
+  perpendicularLine,
   signedDist,
   lineIntersection,
   circleLineIntersection,

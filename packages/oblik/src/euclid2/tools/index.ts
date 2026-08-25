@@ -3,6 +3,7 @@ import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSl
 import { circle } from "./circle";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
+import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
 import { segment } from "./segment";
 import { slider } from "./slider";
@@ -33,10 +34,11 @@ const byId = {
   line,
   segment,
   parallelLine,
+  perpendicularLine,
   slider,
 } as const satisfies Record<ToolId, Tool>;
 
-export const TOOLS = [point.spec, circle.spec, line.spec, segment.spec, parallelLine.spec, slider.spec] as const;
+export const TOOLS = [point.spec, circle.spec, line.spec, segment.spec, parallelLine.spec, perpendicularLine.spec, slider.spec] as const;
 
 function of(session: ToolSession): Tool {
   return byId[session.verb];

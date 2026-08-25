@@ -5,6 +5,7 @@ import {
   isFiniteVec,
   lineIntersectionValue,
   parallelLineValue,
+  perpendicularLineValue,
   signedDist as signedDistValue,
   type Branch,
   type Circle,
@@ -107,6 +108,10 @@ export const parallelLine = mark((geom: LineLike, signedD: number, id?: string):
   return traced(parallelLineValue(geom, d), id);
 }, { dof: [1] });
 
+export const perpendicularLine = mark((geom: LineLike, through: Vec2, id?: string): Line => {
+  return traced(perpendicularLineValue(geom, through), id);
+}, { dof: [] });
+
 export function signedDist(p: Vec2, geom: LineLike): number {
   return signedDistValue(p, geom);
 }
@@ -185,6 +190,7 @@ export const constructors = {
   segment,
   line,
   parallelLine,
+  perpendicularLine,
   lineIntersection,
   circleLineIntersection,
   circleCircleIntersection,

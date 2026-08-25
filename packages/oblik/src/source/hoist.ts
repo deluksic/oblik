@@ -16,6 +16,7 @@ export const BIND_PREFIX: Record<string, string> = {
   circleLineIntersection: "x",
   circleCircleIntersection: "x",
   parallelLine: "par",
+  perpendicularLine: "perp",
   slider: "n",
 };
 

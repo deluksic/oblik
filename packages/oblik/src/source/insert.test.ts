@@ -102,6 +102,17 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, parallelLine \} from "oblik"/);
   });
 
+  test("inserts a perpendicular line through a point", () => {
+    const next = insertCall(src, {
+      from: "perpendicularLine",
+      bind: "normal",
+      args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "P" }],
+      id: "o_perp",
+    });
+    expect(next).toContain('const normal = perpendicularLine(ground, P, "o_perp");');
+    expect(next).toMatch(/import \{ point, perpendicularLine \} from "oblik"/);
+  });
+
   test("hoists a free circle center before a numeric radius", () => {
     const next = insertCall(
       src,

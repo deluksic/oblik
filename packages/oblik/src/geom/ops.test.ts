@@ -6,6 +6,23 @@ import type { Circle } from "./types";
 const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const b: Circle = { kind: "circle", center: { x: 2, y: 0 }, radius: 2 };
 
+import { dot, perp } from "./vec";
+import { lineBasis, perpendicularLineValue } from "./ops";
+import type { Line } from "./types";
+
+const ground: Line = { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+
+describe("perpendicularLineValue", () => {
+  test("passes through the point and is normal to the carrier", () => {
+    const through = { x: 2, y: 3 };
+    const perpLn = perpendicularLineValue(ground, through);
+    expect(perpLn.origin).toEqual(through);
+    const { dir } = lineBasis(ground);
+    expect(dot(perpLn.direction, dir)).toBeCloseTo(0);
+    expect(dot(perpLn.direction, perp(dir))).toBeGreaterThan(0);
+  });
+});
+
 describe("circleCircleIntersectionValue", () => {
   test("freezes k as the side of the center line", () => {
     const plus = circleCircleIntersectionValue(a, b, 1);

@@ -1,4 +1,4 @@
-import type { Branch, Circle, LineLike, ParallelLine } from "./types";
+import type { Branch, Circle, Line, LineLike, ParallelLine } from "./types";
 import {
   add,
   cross2,
@@ -33,6 +33,12 @@ export function parallelLineValue(geom: LineLike, signedD: number): ParallelLine
     line: { kind: "line", origin: p, direction: dir },
     distance: signedD,
   };
+}
+
+/** Infinite line through `through`, perpendicular to the carrier of `geom`. */
+export function perpendicularLineValue(geom: LineLike, through: Vec2): Line {
+  const { dir } = lineBasis(geom);
+  return { kind: "line", origin: through, direction: perp(dir) };
 }
 
 export function lineIntersectionValue(a: LineLike, b: LineLike): Vec2 {
