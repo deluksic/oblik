@@ -225,10 +225,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
               />
             )}
           </For>
-          {props.ghost ? <GhostMark ghost={props.ghost} camera={camera()} size={size()} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
+        {props.ghost ? <GhostMark ghost={props.ghost} camera={camera()} size={size()} /> : null}
         <For each={points()}>
           {(n) => (
             <PointMark
