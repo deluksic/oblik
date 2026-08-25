@@ -1,5 +1,5 @@
 import { render } from "@solidjs/web";
-import { createEffect, Loading, createMemo, createSignal } from "solid-js";
+import { createEffect, Errored, Loading, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
@@ -71,48 +71,30 @@ function Host(props: {
   const [sceneRev, setSceneRev] = createSignal(0);
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
-  const [loadedScene, setLoadedScene] = createSignal<Scene | undefined>(undefined);
-  const [loadErr, setLoadErr] = createSignal<unknown>(undefined);
 
-  createEffect(() => {
+  const loaded = createMemo(() => {
     sceneRev();
     const e = entry();
     const loaders = props.loaders;
-    if (!e) {
-      setLoadedScene(undefined);
-      setLoadErr(new Error(`Unknown scene "${sceneId()}"`));
-      return;
-    }
-    if (e.error) {
-      setLoadedScene(undefined);
-      setLoadErr(new Error(e.error));
-      return;
-    }
+    if (!e) throw new Error(`Unknown scene "${sceneId()}"`);
+    if (e.error) throw new Error(e.error);
     const key = sceneLoaderKey(e.file);
     const cached = sceneCache.get(key);
-    if (cached) {
-      setLoadedScene(cached);
-      setLoadErr(undefined);
-      return;
-    }
+    if (cached) return cached;
     const loader = loaders[key];
-    if (!loader) {
-      setLoadedScene(undefined);
-      setLoadErr(new Error(`No loader for ${e.file}`));
-      return;
-    }
-    setLoadedScene(undefined);
-    let active = true;
-    void loader().then((sceneMod) => {
-      if (!active) return;
-      sceneCache.set(key, sceneMod.default);
-      setLoadedScene(sceneMod.default);
-      setLoadErr(undefined);
+    if (!loader) throw new Error(`No loader for ${e.file}`);
+    let cancelled = false;
+    onCleanup(() => {
+      cancelled = true;
     });
-    return () => {
-      active = false;
-    };
+    return loader().then((sceneMod) => {
+      if (cancelled) return sceneMod.default;
+      sceneCache.set(key, sceneMod.default);
+      return sceneMod.default;
+    });
   });
+
+  const scene = createMemo(() => loaded());
 
   const anno = createMemo(() => {
     const path = entry()?.path;
@@ -151,11 +133,9 @@ function Host(props: {
 
   const pane = createMemo(() => {
     const e = entry();
-    const s = loadedScene();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
-    if (!s) return null;
-    return s.kind === "euclid2" ? (
-      <Euclid2Pane scene={s} file={e.path} annotations={anno()} />
+    return scene().kind === "euclid2" ? (
+      <Euclid2Pane scene={scene()} file={e.path} annotations={anno()} />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );
@@ -170,15 +150,13 @@ function Host(props: {
         </div>
         <h1>{entry()?.title ?? "…"}</h1>
         <Loading fallback={null}>
-          <p>{loadedScene()?.hint}</p>
+          <p>{scene().hint}</p>
         </Loading>
       </header>
       <div class={styles.stage}>
-        {loadErr() ? (
-          <p class={styles.err}>{String(loadErr())}</p>
-        ) : (
+        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
           <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
-        )}
+        </Errored>
       </div>
     </div>
   );

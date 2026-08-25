@@ -38,7 +38,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
   const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
-  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.scene, null));
+  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
 
   const world = createMemo(() =>
     evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
