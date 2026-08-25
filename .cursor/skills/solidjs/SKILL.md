@@ -81,6 +81,8 @@ Read under `<Loading>`; rejected loads → `<Errored>`. `host.mount()` → `rend
 - Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks and stable local readers (`commands` in `Pane`).
 - **Do not read `props` or signals in imperative code** (`For` map bodies, `if` branches before `return`, helper calls). Use JSX expressions, `createMemo`, or a child component whose template reads props.
 - **Do not write signals in `createEffect` apply** — derive with `createMemo`; scene-driven reset uses **function-form** `createSignal(() => …)` (writable memo).
+- **A memo that returns JSX owns child identity.** If it re-runs, children remount (camera / selection / local signals die). Branch on a **stable** derived value (e.g. `sceneKind` memo of `scene().kind`). Put updating props in JSX (`scene={scene()}`) so they compile to getters on the *existing* instance. Do **not** read `scene()` in that memo’s JS just to pick a kind.
+- **`<Loading>` does not remount** because an async memo re-ran. Fallback only when that memo has no resolved value yet. Do not replace an async `createMemo` with an effect that writes a signal.
 - **Imperative cross-pane refs** (e.g. `handles` `Map` for `refreshOthers`) — plain mutation; palette commands come from the pane’s async handle memo.
 - Internal imports use `@/` → `packages/shell/src/` (e.g. `@/types`, `@/ui/App`). Colocated `.module.css` stays relative.
 
