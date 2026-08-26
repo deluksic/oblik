@@ -32,6 +32,8 @@ import {
 } from "./vec";
 
 const EPS = 1e-9;
+/** Angular slop: concentric offset hits can sit a hair past the original end. */
+const ANG = 1e-6;
 
 function cloneProfile(p: Profile): Profile {
   return {
@@ -208,13 +210,13 @@ function arcWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
   if (k === 1) {
     while (delta < 0) delta += 2 * Math.PI;
     while (delta >= 2 * Math.PI) delta -= 2 * Math.PI;
-    if (delta < EPS || delta > 2 * Math.PI - EPS) return 0;
+    if (delta < ANG || delta > 2 * Math.PI - ANG) return 0;
     return delta;
   }
   while (delta > 0) delta -= 2 * Math.PI;
   while (delta <= -2 * Math.PI) delta += 2 * Math.PI;
   const cw = -delta;
-  if (cw < EPS || cw > 2 * Math.PI - EPS) return 0;
+  if (cw < ANG || cw > 2 * Math.PI - ANG) return 0;
   return cw;
 }
 
@@ -226,7 +228,7 @@ function originalForward(e: ProfileEdge, a: Vec2, b: Vec2): boolean {
     if (!(full > EPS)) return false;
     const ta = arcWalk(e.carrier, e.a, a, e.k);
     const tb = arcWalk(e.carrier, e.a, b, e.k);
-    return ta + EPS < tb && tb <= full + EPS;
+    return ta + EPS < tb && tb <= full + ANG;
   }
   return dot(sub(b, a), sub(e.b, e.a)) > EPS;
 }
