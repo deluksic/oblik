@@ -3,8 +3,8 @@ import { For, createEffect, createMemo, createSignal } from "solid-js";
 import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
-import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
-import { profileEligibleCarriers, profileHidesExisting } from "../tools/profile";
+import { hoverTool, toolChrome, type Ghost, type PlaceHit, type ToolSession } from "../tool";
+import { profileEligibleCarriers } from "../tools/profile";
 import { isGlider } from "@/geom/gliders";
 import { isProfile } from "@/geom/profile";
 import { GhostMark } from "./Ghost";
@@ -195,16 +195,22 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
-  const placingProfile = createMemo(() => !!props.placing && profileHidesExisting(props.toolSession));
+  const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : null));
   const fills = createMemo(() =>
-    placingProfile() ? [] : strokes().filter((n) => isProfile(n.value)),
+    chrome().hideFills ? [] : strokes().filter((n) => isProfile(n.value)),
   );
   const ink = createMemo(() =>
-    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
+    chrome().hideStrokes
+      ? []
+      : strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
   );
-  const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
+  const points = createMemo(() =>
+    chrome().hidePoints ? [] : strokes().filter((n) => n.kind === "point" || isGlider(n.value)),
+  );
   const handles = createMemo(() =>
-    strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+    chrome().hidePoints
+      ? []
+      : strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
   );
   const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
@@ -299,7 +305,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
             />
           )}
         </For>
-        {props.placing && props.place && props.place.point.kind !== "free" ? (
+        {props.placing && !chrome().hideSnap && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
         ) : null}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />

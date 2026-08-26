@@ -173,6 +173,7 @@ export const profile: Tool<ProfileSession> = {
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id === "name" ? "name" : "cycle" }),
+  chrome: () => ({ hideFills: true }),
   tab(session, dir) {
     if (session.focus === "name") return { ...session, focus: "cycle" };
     if (dir === 1 && lastCircle(session)) return flipLastK(session);

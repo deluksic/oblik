@@ -22,6 +22,7 @@ export type {
   Preview,
   Scope,
   Tool,
+  ToolChrome,
   ToolId,
   ToolKey,
   ToolSession,
@@ -151,4 +152,22 @@ export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): P
 
 export function hoverTool(session: ToolSession, hit: PlaceHit, trace: readonly TraceNode[]): string | null {
   return of(session).hover?.(session as never, hit, trace) ?? null;
+}
+
+const CHROME_OFF = {
+  hideFills: false,
+  hideStrokes: false,
+  hidePoints: false,
+  hideSnap: false,
+};
+
+export function toolChrome(session: ToolSession | null | undefined) {
+  if (!session) return CHROME_OFF;
+  const c = of(session).chrome?.(session as never);
+  return {
+    hideFills: !!c?.hideFills,
+    hideStrokes: !!c?.hideStrokes,
+    hidePoints: !!c?.hidePoints,
+    hideSnap: !!c?.hideSnap,
+  };
 }

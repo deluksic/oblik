@@ -128,6 +128,10 @@ export const fillet: Tool<FilletSession> = {
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as FilletSession["focus"] }),
+  chrome(session) {
+    if (vertexOf(session)) return {};
+    return { hideStrokes: true, hidePoints: true, hideSnap: true };
+  },
   hit(session, hit, ctx) {
     if (!vertexOf(session)) {
       const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size);
@@ -187,7 +191,7 @@ export const fillet: Tool<FilletSession> = {
     const geom = faceGeom(session, scope);
     if (!vertex) {
       const at = place?.corner?.at ?? (place?.profile ? closestCorner(place.profile.geom, place.world)?.at : undefined);
-      return at ? { kind: "point", at } : null;
+      return at ? { kind: "corner" as const, at } : null;
     }
     if (!geom) return null;
     const r = radiusNumber(session, place, scope);

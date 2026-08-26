@@ -149,6 +149,7 @@ export type ToolSession =
 
 export type Ghost =
   | { kind: "point"; at: Vec2 }
+  | { kind: "corner"; at: Vec2 }
   | { kind: "circle"; center: Vec2; radius: number }
   | { kind: "line" | "segment"; a: Vec2; b: Vec2 }
   | { kind: "parallelLine"; geom: LineLike; distance: number }
@@ -187,6 +188,13 @@ export type Preview = {
 
 export type ToolKey = { key: string; shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean };
 
+export type ToolChrome = {
+  hideFills?: boolean;
+  hideStrokes?: boolean;
+  hidePoints?: boolean;
+  hideSnap?: boolean;
+};
+
 /**
  * One Space verb. Click / ghost / preview / fields / commit live with the spec.
  * Pane only routes pointer and keys — it must not switch on `verb`.
@@ -206,4 +214,6 @@ export type Tool<S extends ToolSession = ToolSession> = {
   hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[]): string | null;
   /** If set, Tab uses this instead of cycling fields. */
   tab?(session: S, dir: 1 | -1): S;
+  /** Dim construction chrome while this verb is live. */
+  chrome?(session: S): ToolChrome;
 };

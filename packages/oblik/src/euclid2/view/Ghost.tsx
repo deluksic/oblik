@@ -7,6 +7,8 @@ import type { Ghost } from "../tool";
 import styles from "./View.module.css";
 
 const GHOST_POINT_R = 4;
+const CORNER_R = 5;
+const CORNER_RING_R = 11;
 
 function screenOf(
   world: { x: number; y: number },
@@ -26,6 +28,7 @@ function screenEnds(
 
 export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
   const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : null));
+  const corner = createMemo(() => (props.ghost.kind === "corner" ? props.ghost.at : null));
   const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : null));
   const line = createMemo(() => (props.ghost.kind === "line" ? props.ghost : null));
   const segment = createMemo(() => (props.ghost.kind === "segment" ? props.ghost : null));
@@ -53,6 +56,10 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
     const p = point();
     return p ? screenOf(p, props.camera, props.size) : null;
   });
+  const cornerPos = createMemo(() => {
+    const p = corner();
+    return p ? screenOf(p, props.camera, props.size) : null;
+  });
   const circlePos = createMemo(() => {
     const c = circle();
     if (!c) return null;
@@ -68,6 +75,12 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
   });
   return (
     <g pointer-events="none">
+      {cornerPos() ? (
+        <>
+          <circle class={styles.ghostCornerRing} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_RING_R} />
+          <circle class={styles.ghostCorner} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_R} />
+        </>
+      ) : null}
       {pointPos() ? (
         <circle class={styles.ghostPoint} cx={pointPos()!.x} cy={pointPos()!.y} r={GHOST_POINT_R} />
       ) : null}

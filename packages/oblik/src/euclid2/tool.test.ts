@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, hoverTool, previewOf, startTool, tabTool, typeTool } from "./tool";
+import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, hoverTool, previewOf, startTool, tabTool, toolChrome, typeTool } from "./tool";
 import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
 import type { PlacePoint } from "./place";
 import type { TraceNode } from "../eval/context";
@@ -1387,6 +1387,30 @@ describe("fillet tool", () => {
     expect(hit.corner?.index).toBe(0);
     expect(hit.corner?.at.x).toBeCloseTo(0);
     expect(hit.corner?.at.y).toBeCloseTo(0);
+  });
+
+  test("hides points and strokes while picking a corner, not fills", () => {
+    expect(toolChrome(startTool("fillet"))).toEqual({
+      hideFills: false,
+      hideStrokes: true,
+      hidePoints: true,
+      hideSnap: true,
+    });
+    const mid = clickTool(startTool("fillet"), faceHit, scope);
+    if (!("session" in mid)) throw new Error("expected session");
+    expect(toolChrome(mid.session)).toEqual({
+      hideFills: false,
+      hideStrokes: false,
+      hidePoints: false,
+      hideSnap: false,
+    });
+    expect(toolChrome(startTool("profile")).hideFills).toBe(true);
+    expect(toolChrome(startTool("line")).hideFills).toBe(false);
+  });
+
+  test("ghosts the closest corner, not the whole face", () => {
+    const g = ghostOf(startTool("fillet"), { ...faceHit, corner: { index: 2, at: { x: 1, y: 1 } } }, scope);
+    expect(g).toEqual({ kind: "corner", at: { x: 1, y: 1 } });
   });
 
   test("ghosts the filleted face from a length pick", () => {
