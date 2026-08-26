@@ -198,7 +198,8 @@ function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): Pro
 
 /**
  * Distance along `k` from `from` to `p`, in `[0, 2π)`. Same ray as `from`
- * is 0, not a full turn — `circleDelta` uses `(0, 2π]` and would wrap.
+ * is 0, not a full turn — a tiny negative atan2 would wrap to 2π and fall
+ * off the original span.
  */
 function arcWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
   const ua = circleUnitAt(c, from);
@@ -207,11 +208,14 @@ function arcWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
   if (k === 1) {
     while (delta < 0) delta += 2 * Math.PI;
     while (delta >= 2 * Math.PI) delta -= 2 * Math.PI;
+    if (delta < EPS || delta > 2 * Math.PI - EPS) return 0;
     return delta;
   }
   while (delta > 0) delta -= 2 * Math.PI;
   while (delta <= -2 * Math.PI) delta += 2 * Math.PI;
-  return -delta;
+  const cw = -delta;
+  if (cw < EPS || cw > 2 * Math.PI - EPS) return 0;
+  return cw;
 }
 
 /** True when `a→b` walks the same way as `e`, and both points sit on `e`. */
