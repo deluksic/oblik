@@ -12,11 +12,11 @@ import {
   pointOnSegmentValue,
   signedDist as signedDistValue,
   alongValue,
-  insetValue,
   isFiniteProfile,
   isProfile,
   nanProfile,
   profileValue,
+  roundOffsetValue,
   type Along,
   type Branch,
   type Circle,
@@ -181,10 +181,10 @@ export const profile = mark((cycle: readonly unknown[], id?: string): Profile =>
   return traced(profileValue(cycle), id);
 }, { dof: [] });
 
-export const inset = mark((face: Profile, dist: number, id?: string): Profile => {
+export const roundOffset = mark((face: Profile, dist: number, id?: string): Profile => {
   const d = draftAt(id, 0, dist);
   if (!face || typeof face !== "object" || !isProfile(face)) return nanProfile();
-  return traced(insetValue(face, d), id);
+  return traced(roundOffsetValue(face, d)[0] ?? nanProfile(), id);
 }, { dof: [1] });
 
 export type SliderOpts = {
@@ -245,5 +245,5 @@ export const constructors = {
   circleCircleIntersection,
   slider,
   profile,
-  inset,
+  roundOffset,
 } as const;

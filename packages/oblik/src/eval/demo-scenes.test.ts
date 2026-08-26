@@ -73,9 +73,9 @@ describe("migrated demo scenes", () => {
     expect(face?.kind).toBe("profile");
     if (face?.value.kind === "profile") expect(face.value.outer).toHaveLength(2);
     expect(trace.some((n) => n.bind === "chord" && n.kind === "segment")).toBe(true);
-    const inner = trace.find((n) => n.bind === "inner");
+    const inner = trace.find((n) => n.bind === "offset");
     expect(inner?.kind).toBe("profile");
-    if (inner?.value.kind === "profile") expect(inner.value.outer).toHaveLength(2);
+    if (inner?.value.kind === "profile") expect(inner.value.outer).toHaveLength(4);
     expect(trace.filter((n) => n.kind === "profile")).toHaveLength(2);
     expect(trace.some((n) => n.bind === "n" && n.kind === "slider")).toBe(true);
   });

@@ -9,7 +9,6 @@ import {
   alongK,
   circleDelta,
   isFiniteProfile,
-  nanProfile,
   projectOnCircle,
   projectOnLine,
   tessellateProfile,
@@ -175,21 +174,22 @@ type Join =
   | { kind: "arc"; start: Vec2; end: Vec2; carrier: Circle; k: Branch };
 
 /**
- * Local round offset. Positive `d` is inward (from winding). Convex inset
- * miters; convex outset (and concave inset) take a join arc of radius `|d|`
- * about the original vertex. Reverse, `r' ≤ 0`, or a missed hit → `[]`.
- * Does not split islands or clip non-adjacent swallows.
+ * Local round offset. Positive `d` grows (outward from winding); negative
+ * shrinks. Convex outset and concave inset take a join arc of radius `|d|`
+ * about the original vertex; convex inset miters. Reverse, `r' ≤ 0`, or a
+ * missed hit → `[]`. Does not split islands or clip non-adjacent swallows.
  */
-export function roundOffset(p: Profile, d: number): Profile[] {
+export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
   if (Math.abs(d) < EPS) return [cloneProfile(p)];
+  const inward = -d;
   const w = winding(p);
   if (w === 0) return [];
   const edges = p.outer;
   const n = edges.length;
   const off: Array<LineLike | Circle> = [];
   for (const e of edges) {
-    const c = offsetCarrier(e, d, w);
+    const c = offsetCarrier(e, inward, w);
     if (!c) return [];
     off.push(c);
   }
@@ -201,20 +201,20 @@ export function roundOffset(p: Profile, d: number): Profile[] {
     const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
     const convex = w * turn > EPS;
     const concave = w * turn < -EPS;
-    const gap = (convex && d < 0) || (concave && d > 0);
+    const gap = (convex && inward < 0) || (concave && inward > 0);
     if (gap) {
-      const start = offsetPoint(prev, prev.b, d, w);
-      const end = offsetPoint(next, next.a, d, w);
+      const start = offsetPoint(prev, prev.b, inward, w);
+      const end = offsetPoint(next, next.a, inward, w);
       if (!isFiniteVec(start) || !isFiniteVec(end) || dist(start, v) < EPS) return [];
       if (dist(start, end) < EPS) {
         joins.push({ kind: "miter", p: start });
         continue;
       }
-      const carrier: Circle = { kind: "circle", center: v, radius: Math.abs(d) };
+      const carrier: Circle = { kind: "circle", center: v, radius: Math.abs(inward) };
       joins.push({ kind: "arc", start, end, carrier, k: alongK(carrier, start, end) });
       continue;
     }
-    const hint = miterHint(prev, next, v, d, w);
+    const hint = miterHint(prev, next, v, inward, w);
     const hit = closestHit(carrierHits(off[(i + n - 1) % n]!, off[i]!), hint);
     if (!hit) return [];
     joins.push({ kind: "miter", p: hit });
@@ -239,8 +239,4 @@ export function roundOffset(p: Profile, d: number): Profile[] {
   }
   const out: Profile = { kind: "profile", outer };
   return isFiniteProfile(out) ? [out] : [];
-}
-
-export function insetValue(p: Profile, d: number): Profile {
-  return roundOffset(p, d)[0] ?? nanProfile();
 }

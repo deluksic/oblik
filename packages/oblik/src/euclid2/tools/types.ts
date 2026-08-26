@@ -1,5 +1,5 @@
 import type { TraceNode } from "@/eval/context";
-import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
+import type { Branch, Circle, LineLike, Profile, ProfileEdge } from "@/geom";
 import type { Expr } from "@/source/expr";
 import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
@@ -13,7 +13,8 @@ export type ToolId =
   | "parallelLine"
   | "perpendicularLine"
   | "slider"
-  | "profile";
+  | "profile"
+  | "roundOffset";
 
 export type ToolSpec = {
   id: ToolId;
@@ -30,8 +31,8 @@ export type Field<S extends ToolSession = ToolSession> = {
   id: string;
   kind: FieldKind;
   placeholder: string;
-  /** For `ref`: existing point vs line/segment/parallel. For `length`: slider bind. */
-  looks?: "point" | "carrier" | "length";
+  /** For `ref`: existing point vs line/segment/parallel vs profile. For `length`: slider bind. */
+  looks?: "point" | "carrier" | "profile" | "length";
   open: (session: S) => boolean;
   get: (session: S) => string;
   set: (session: S, raw: string) => S;
@@ -43,6 +44,7 @@ export type Scope = {
   points: Readonly<Record<string, Placed>>;
   carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
   circles: Readonly<Record<string, { expr: Expr; geom: Circle }>>;
+  profiles: Readonly<Record<string, { expr: Expr; geom: Profile }>>;
   /** Slider binds → live value (for length reuse). */
   lengths: Readonly<Record<string, number>>;
 };
@@ -62,6 +64,7 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike | Circle };
+  profile?: { bind: string; geom: Profile };
   length?: { expr: Expr; value: number };
 };
 
@@ -119,6 +122,15 @@ export type ToolSession =
       vertices: Placed[];
       carriers: Array<{ expr: Expr; geom: LineLike | Circle; k?: Branch }>;
       name: string;
+    }
+  | {
+      verb: "roundOffset";
+      focus: "face" | "typed" | "name";
+      face?: { expr: Expr; geom: Profile };
+      faceRef: string;
+      typed: string;
+      name: string;
+      lengthPick?: Expr;
     };
 
 export type Ghost =

@@ -201,15 +201,27 @@ function distToArc(e: ProfileEdge, q: Vec2): number {
   return Math.min(dist(q, e.a), dist(q, e.b));
 }
 
-export function distToProfile(p: Profile, q: Vec2): number {
-  if (!isFiniteProfile(p)) return Infinity;
-  if (profileContains(p, q)) return 0;
+function distToProfileBoundary(p: Profile, q: Vec2): number {
   let best = Infinity;
   for (const e of p.outer) {
     const d = e.carrier.kind === "circle" ? distToArc(e, q) : distToSegment(q, e.a, e.b);
     if (d < best) best = d;
   }
   return best;
+}
+
+export function distToProfile(p: Profile, q: Vec2): number {
+  if (!isFiniteProfile(p)) return Infinity;
+  if (profileContains(p, q)) return 0;
+  return distToProfileBoundary(p, q);
+}
+
+/** Positive is outside (grows a round offset); negative is inside. */
+export function signedDistToProfile(p: Profile, q: Vec2): number {
+  if (!isFiniteProfile(p) || !isFiniteVec(q)) return Number.NaN;
+  const d = distToProfileBoundary(p, q);
+  if (!Number.isFinite(d)) return Number.NaN;
+  return profileContains(p, q) ? -d : d;
 }
 
 /** SVG path in world (y-up) user space. Arc sweep 1 is CCW. */

@@ -25,7 +25,7 @@ export const BIND_PREFIX: Record<string, string> = {
   pointOnCircle: "g",
   slider: "n",
   profile: "pr",
-  inset: "inn",
+  roundOffset: "off",
 };
 
 const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;

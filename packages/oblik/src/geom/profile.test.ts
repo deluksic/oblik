@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { alongValue, profileContains, profileValue } from "./profile";
+import { alongValue, profileContains, profileValue, signedDistToProfile } from "./profile";
 import type { Circle, Segment } from "./types";
 
 const A = { x: 2, y: 0 };
@@ -37,5 +37,13 @@ describe("profileValue", () => {
 
   test("odd cycle is empty, not a throw", () => {
     expect(profileValue([A, chord, B]).outer).toHaveLength(0);
+  });
+});
+
+describe("signedDistToProfile", () => {
+  test("outside is positive, inside is negative", () => {
+    const slice = profileValue([A, chord, B, alongValue(c, -1)]);
+    expect(signedDistToProfile(slice, { x: 0.2, y: 0.2 })).toBeGreaterThan(0);
+    expect(signedDistToProfile(slice, { x: 1.4, y: 1.4 })).toBeLessThan(0);
   });
 });

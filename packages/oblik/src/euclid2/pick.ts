@@ -1,9 +1,8 @@
 import type { TraceNode } from "../eval/context";
-import type { LineLike } from "../geom";
 import { gliderAt, isGlider } from "../geom/gliders";
 import { distToProfile, isFiniteProfile, isProfile } from "../geom/profile";
 import { lineBasis } from "../geom/ops";
-import type { Circle, Line, ParallelLine, Point, Segment } from "../geom";
+import type { Circle, Line, LineLike, ParallelLine, Point, Profile, Segment } from "../geom";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
@@ -147,6 +146,35 @@ export function snapLineCarrier(
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
+  }
+  return best ? { bind: best.bind, geom: best.geom } : null;
+}
+
+/** Nearest named profile under the pointer (ignores points and strokes). Inside a fill always wins. */
+export function snapProfile(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  camera: Camera2,
+  _size: PaneSize,
+  maxPx = GEOM_PX,
+): { bind: string; geom: Profile } | null {
+  let best: { bind: string; geom: Profile; inside: boolean; d: number; i: number } | null = null;
+  let i = 0;
+  for (const n of trace) {
+    const idx = i++;
+    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (!isProfile(n.value)) continue;
+    const d = geomDistWorld(world, n);
+    const inside = d === 0;
+    if (!inside && d > pickRadiusWorld(n, camera, maxPx)) continue;
+    if (
+      !best ||
+      (inside && !best.inside) ||
+      (inside === best.inside && d < best.d) ||
+      (inside === best.inside && d === best.d && idx > best.i)
+    ) {
+      best = { bind: n.bind, geom: n.value, inside, d, i: idx };
+    }
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

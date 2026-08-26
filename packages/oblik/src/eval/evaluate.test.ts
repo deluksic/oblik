@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { along, circle, inset, point, pointOnCircle, pointOnSegment, profile, segment, slider } from "./constructors";
+import { along, circle, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -183,8 +183,8 @@ describe("evaluate", () => {
     if (p?.value.kind === "profile") expect(p.value.outer).toHaveLength(2);
   });
 
-  test("inset is traced with dof on the distance", () => {
-    expect(siteOf(inset)?.dof).toEqual([1]);
+  test("roundOffset is traced with dof on the distance", () => {
+    expect(siteOf(roundOffset)?.dof).toEqual([1]);
     const scene = defineScene({
       kind: "euclid2",
       title: "t",
@@ -195,22 +195,22 @@ describe("evaluate", () => {
         const B = pointOnCircle(c, 0, 1, "b");
         const ch = segment(A, B, "ch");
         const face = profile([A, ch, B, along(c, -1)], "pr");
-        return inset(face, 0.12, "inn");
+        return roundOffset(face, -0.12, "off");
       },
     });
     const { trace } = evaluate(scene, {
       annotations: analyze(
-        `const face = profile([A, ch, B, along(c, -1)], "pr");\ninset(face, 0.12, "inn");\n`,
+        `const face = profile([A, ch, B, along(c, -1)], "pr");\nroundOffset(face, -0.12, "off");\n`,
       ),
     });
-    const inn = trace.find((n) => n.id === "inn");
-    expect(inn?.kind).toBe("profile");
-    expect(inn?.editable).toBe(true);
-    if (inn?.value.kind === "profile") expect(inn.value.outer).toHaveLength(2);
+    const off = trace.find((n) => n.id === "off");
+    expect(off?.kind).toBe("profile");
+    expect(off?.editable).toBe(true);
+    if (off?.value.kind === "profile") expect(off.value.outer).toHaveLength(2);
     const drafted = evaluate(scene, {
-      annotations: analyze(`inset(face, 0.12, "inn");\n`),
-      draft: new Map([["inn", [0.5]]]),
-    }).trace.find((n) => n.id === "inn");
+      annotations: analyze(`roundOffset(face, -0.12, "off");\n`),
+      draft: new Map([["off", [-0.5]]]),
+    }).trace.find((n) => n.id === "off");
     expect(drafted).toBeUndefined();
   });
 });

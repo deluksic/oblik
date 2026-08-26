@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { alongValue, profileContains, profileValue } from "./profile";
-import { roundOffset } from "./offset";
+import { roundOffsetValue } from "./offset";
 import type { Circle, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -28,9 +28,9 @@ const chord: Segment = { kind: "segment", a: A, b: B };
 const reach: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const slice = profileValue([A, chord, B, alongValue(reach, -1)]);
 
-describe("roundOffset", () => {
+describe("roundOffsetValue", () => {
   test("d === 0 is a copy", () => {
-    const out = roundOffset(square, 0);
+    const out = roundOffsetValue(square, 0);
     expect(out).toHaveLength(1);
     expect(out[0]?.outer).toHaveLength(4);
     expect(out[0]).not.toBe(square);
@@ -38,7 +38,7 @@ describe("roundOffset", () => {
   });
 
   test("CCW square inset miters to four edges", () => {
-    const out = roundOffset(square, 0.2);
+    const out = roundOffsetValue(square, -0.2);
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
@@ -53,7 +53,7 @@ describe("roundOffset", () => {
   });
 
   test("CCW square outset is four offsets plus four quarter joins", () => {
-    const out = roundOffset(square, -0.2);
+    const out = roundOffsetValue(square, 0.2);
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(8);
@@ -67,21 +67,21 @@ describe("roundOffset", () => {
   });
 
   test("square inset past half-side collapses", () => {
-    expect(roundOffset(square, 0.5)).toEqual([]);
-    expect(roundOffset(square, 0.6)).toEqual([]);
+    expect(roundOffsetValue(square, -0.5)).toEqual([]);
+    expect(roundOffsetValue(square, -0.6)).toEqual([]);
   });
 
-  test("slice inset keeps a point in the cap; large d empties", () => {
-    const small = roundOffset(slice, 0.12);
+  test("slice inset keeps a point in the cap; large |d| empties", () => {
+    const small = roundOffsetValue(slice, -0.12);
     expect(small).toHaveLength(1);
     expect(small[0]?.outer).toHaveLength(2);
     expect(profileContains(small[0]!, { x: 1.25, y: 1.25 })).toBe(true);
     expect(profileContains(small[0]!, { x: 0.2, y: 0.2 })).toBe(false);
-    expect(roundOffset(slice, 0.5)).toEqual([]);
+    expect(roundOffsetValue(slice, -0.5)).toEqual([]);
   });
 
   test("slice outset rounds the tips", () => {
-    const out = roundOffset(slice, -0.15);
+    const out = roundOffsetValue(slice, 0.15);
     expect(out).toHaveLength(1);
     expect(out[0]?.outer).toHaveLength(4);
     expect(out[0]?.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
@@ -97,7 +97,7 @@ describe("roundOffset", () => {
       { x: 1, y: 2 },
       { x: 0, y: 2 },
     ]);
-    const out = roundOffset(ell, 0.15);
+    const out = roundOffsetValue(ell, -0.15);
     expect(out).toHaveLength(1);
     const arcs = out[0]!.outer.filter((e) => e.carrier.kind === "circle");
     expect(out[0]?.outer).toHaveLength(7);

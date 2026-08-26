@@ -65,10 +65,13 @@ export function fieldError<S extends ToolSession>(field: Field<S>, session: S, s
   if (field.kind === "length") return lengthError(raw, scope);
   if (field.kind === "number") return numError(raw);
   if (field.kind === "ident") return identError(raw, scope.used);
-  const names = field.looks === "carrier"
-    ? Object.keys(scope.carriers)
-    : Object.keys(scope.points);
-  const label = field.looks === "carrier" ? "line" : "point";
+  const names =
+    field.looks === "carrier"
+      ? Object.keys(scope.carriers)
+      : field.looks === "profile"
+        ? Object.keys(scope.profiles)
+        : Object.keys(scope.points);
+  const label = field.looks === "carrier" ? "line" : field.looks === "profile" ? "profile" : "point";
   return refError(raw, names, label);
 }
 
@@ -101,6 +104,17 @@ export function resolveCarrier(
   const t = ref.trim();
   if (!t) return placed;
   if (scope.carriers[t]) return scope.carriers[t];
+  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+}
+
+export function resolveProfile(
+  ref: string,
+  placed: Scope["profiles"][string] | undefined,
+  scope: Scope,
+) {
+  const t = ref.trim();
+  if (!t) return placed;
+  if (scope.profiles[t]) return scope.profiles[t];
   if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
 }
 
@@ -147,7 +161,7 @@ export { numberField } from "./length";
 export function refField<S extends ToolSession>(
   id: string,
   placeholder: string,
-  looks: "point" | "carrier",
+  looks: "point" | "carrier" | "profile",
   get: (session: S) => string,
   set: (session: S, raw: string) => S,
 ): Field<S> {

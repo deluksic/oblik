@@ -21,7 +21,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Shared loop | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle |
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
 | Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
-| Slice | `profile([A, chord, B, along(reach, -1)])` fill; `inset(slice, n)` round offset; two gliders on a circle + named chord |
+| Slice | `profile([A, chord, B, along(reach, -1)])` fill; `roundOffset(slice, n)` (positive grows); two gliders on a circle + named chord |
 | Triangle | three free points |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), plate **fillets/slots**, **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.
@@ -39,7 +39,7 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `ap
 - Scene module: `export default defineScene({ kind, title, camera?, build })`.
 - Trailing call arg is the uuid: `circle(A, 2.5, "o_ab12")`.
 - `draft` is an override until the new module’s `build()` has run.
-- Space inserts Point / Circle / Line / Segment / Parallel / Perpendicular / Slider / Profile via `Expr` (snap from the tape). Each verb owns click, ghost, preview, Tab fields, and Enter. Pane only routes keys — there is no `session.ts`. Type a number to lock a length or axis; Tab names the bind. Length slots reuse sliders and fields (`reach.radius`, `-shelf.distance`); a named point or crossing in that slot writes `dist` / `signedDist` instead. Gliders are Point-only (other tools consume them, they do not create them). Profile is point → carrier → point until close; circles write `along(c, k)`; the insert is `profile([...], id)`.
+- Space inserts Point / Circle / Line / Segment / Parallel / Perpendicular / Slider / Profile / Round offset via `Expr` (snap from the tape). Each verb owns click, ghost, preview, Tab fields, and Enter. Pane only routes keys — there is no `session.ts`. Type a number to lock a length or axis; Tab names the bind. Length slots reuse sliders and fields (`reach.radius`, `-shelf.distance`); a named point or crossing in that slot writes `dist` / `signedDist` instead. Gliders are Point-only (other tools consume them, they do not create them). Profile is point → carrier → point until close; circles write `along(c, k)`; the insert is `profile([...], id)`. Round offset is a profile, then a length (`reach.radius`, `shelf.distance`, a slider, or a click).
 - Euclid2 camera is a group transform over aspect-correct NDC `viewBox` (y-up via `scale(1,-1)`). Handles move by relative Δ. Click selects; drag commits and leaves the current pick alone.
 - What we learned by using it (Tab, gliders vs `.distance`, Solid 2 pane identity, scene-loader HMR): [Prototype 6](./docs/prototypes/6.md#learned-from-using-it).
 

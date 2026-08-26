@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { hitTest, hitsNear, namedStrokesThrough, snapBoundPoint, snapLineCarrier, snapStrokeCarrier } from "./pick";
+import { hitTest, hitsNear, namedStrokesThrough, snapBoundPoint, snapLineCarrier, snapProfile, snapStrokeCarrier } from "./pick";
 
 const A = {
   id: "o_a",
@@ -206,5 +206,11 @@ describe("profile pick", () => {
     expect(onAb?.bind).toBe("ab");
     const onBc = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size);
     expect(onBc?.bind).toBe("bc");
+  });
+
+  test("snapProfile picks a fill and ignores a nearby point", () => {
+    expect(snapProfile([FACE, A], { x: 1, y: 1 }, camera, size)?.bind).toBe("face");
+    expect(snapProfile([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
+    expect(snapProfile([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });
 });
