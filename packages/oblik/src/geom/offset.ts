@@ -7,7 +7,6 @@ import {
 } from "./ops";
 import {
   alongK,
-  circleDelta,
   isFiniteProfile,
   nanProfile,
   projectOnCircle,
@@ -68,11 +67,18 @@ function unitRadial(c: Circle, p: Vec2): Vec2 {
 
 function edgeMid(e: ProfileEdge): Vec2 {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
-    const delta = circleDelta(e.carrier, e.a, e.b, e.k);
-    const ua = circleUnitAt(e.carrier, e.a);
-    const a0 = Math.atan2(ua.uy, ua.ux);
-    const ang = a0 + 0.5 * delta;
-    return add(e.carrier.center, mul(vec(Math.cos(ang), Math.sin(ang)), Math.abs(e.carrier.radius)));
+    const c = e.carrier;
+    const ua = unitRadial(c, e.a);
+    const ub = unitRadial(c, e.b);
+    const s = add(ua, ub);
+    let dir: Vec2;
+    if (len2(s) < 1e-12) {
+      if (dot(ua, ub) > 0) return { x: e.a.x, y: e.a.y };
+      dir = e.k === 1 ? perp(ua) : mul(perp(ua), -1);
+    } else {
+      dir = e.k * cross2(ua, ub) > 0 ? norm(s) : mul(norm(s), -1);
+    }
+    return add(c.center, mul(dir, Math.abs(c.radius)));
   }
   return lerp(e.a, e.b, 0.5);
 }
