@@ -154,7 +154,7 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
           ref={setInputEl}
           type="search"
           class={styles.input}
-          placeholder="Point, circle, line, segment, parallel, slider"
+          placeholder="Point, circle, line, segment, parallel, slider, profile"
           autocomplete="off"
           value={query()}
           onInput={(e) => {

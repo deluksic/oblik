@@ -101,6 +101,9 @@ function indentAt(source: string, pos: number): string {
 
 function callees(expr: Expr): string[] {
   if (expr.kind === "call") return [expr.name, ...expr.args.flatMap(callees)];
+  if (expr.kind === "array") return expr.items.flatMap(callees);
+  if (expr.kind === "neg") return callees(expr.expr);
+  if (expr.kind === "props") return Object.values(expr.props).flatMap(callees);
   return [];
 }
 

@@ -78,6 +78,20 @@
   pointer-events: stroke;
 }
 
+.fill {
+  fill: color-mix(in srgb, var(--oblik-ink) 16%, transparent);
+  stroke: none;
+  pointer-events: none;
+}
+
+.fillHot {
+  fill: color-mix(in srgb, var(--oblik-hover) 22%, transparent);
+}
+
+.fillSelected {
+  fill: color-mix(in srgb, var(--oblik-accent) 28%, transparent);
+}
+
 .handle {
   fill: var(--oblik-accent);
   stroke: var(--oblik-paper);
@@ -108,13 +122,9 @@
   fill: var(--oblik-accent);
 }
 
-.ghost {
-  fill: none;
-  stroke: var(--oblik-accent);
-  stroke-width: var(--oblik-stroke);
-  stroke-dasharray: 5 4;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
+.ghostFill {
+  fill: color-mix(in srgb, var(--oblik-accent) 12%, transparent);
+  stroke: none;
   pointer-events: none;
 }
 

@@ -9,6 +9,7 @@ import { evaluate } from "./evaluate";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
+import slice from "../../../../apps/demo/src/scenes/slice.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import type { Euclid2Scene } from "./scene";
 
@@ -64,5 +65,14 @@ describe("migrated demo scenes", () => {
     expect(trace.filter((n) => n.kind === "circle")).toHaveLength(4);
     expect(trace.every((n) => n.module === "apps/demo/src/layout/mounting-plate.ts")).toBe(true);
     expect(trace.some((n) => n.bind === "drill" && n.editable)).toBe(true);
+  });
+
+  test("slice traces a profile over a named chord and along(reach)", () => {
+    const { trace } = run(slice, ["apps/demo/src/scenes/slice.ts"]);
+    const face = trace.find((n) => n.bind === "slice");
+    expect(face?.kind).toBe("profile");
+    if (face?.value.kind === "profile") expect(face.value.outer).toHaveLength(2);
+    expect(trace.some((n) => n.bind === "chord" && n.kind === "segment")).toBe(true);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(1);
   });
 });

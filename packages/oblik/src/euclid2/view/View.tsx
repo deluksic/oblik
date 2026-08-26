@@ -5,11 +5,12 @@ import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
 import { isGlider } from "../../geom/gliders";
+import { isProfile } from "../../geom/profile";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { NumberSliders } from "./NumberSliders";
-import { Stroke } from "./Ink";
+import { ProfileFill, ProfileGhost, Stroke } from "./Ink";
 import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
 import { hitSlider, sliderNodes } from "./sliderHud";
 import {
@@ -193,7 +194,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
-  const ink = createMemo(() => strokes().filter((n) => n.kind !== "point" && !isGlider(n.value)));
+  const fills = createMemo(() => strokes().filter((n) => isProfile(n.value)));
+  const ink = createMemo(() =>
+    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
+  );
   const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
   const handles = createMemo(() =>
     strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
@@ -225,6 +229,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
+          <For each={fills()}>
+            {(n) => (
+              <ProfileFill
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+              />
+            )}
+          </For>
           <For each={ink()}>
             {(n) => (
               <Stroke
@@ -236,10 +249,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
               />
             )}
           </For>
+          {props.ghost?.kind === "profile" ? <ProfileGhost ghost={props.ghost} /> : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
-        {props.ghost ? <GhostMark ghost={props.ghost} camera={camera()} size={size()} /> : null}
+        {props.ghost && props.ghost.kind !== "profile" ? (
+          <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
+        ) : null}
         <For each={points()}>
           {(n) => (
             <PointMark

@@ -9,6 +9,7 @@ export type Expr =
   | { kind: "member"; object: string; field: ProductField }
   | { kind: "neg"; expr: Expr }
   | { kind: "props"; props: Record<string, Expr> }
+  | { kind: "array"; items: Expr[] }
   | { kind: "call"; name: string; args: Expr[] };
 
 export function printExpr(expr: Expr): string {
@@ -21,6 +22,7 @@ export function printExpr(expr: Expr): string {
     const parts = Object.entries(expr.props).map(([k, v]) => `${k}: ${printExpr(v)}`);
     return `{ ${parts.join(", ")} }`;
   }
+  if (expr.kind === "array") return `[${expr.items.map(printExpr).join(", ")}]`;
   return `${expr.name}(${expr.args.map(printExpr).join(", ")})`;
 }
 

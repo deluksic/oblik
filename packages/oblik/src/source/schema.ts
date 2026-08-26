@@ -33,6 +33,10 @@ const exprSchema: v.GenericSchema<Expr> = v.lazy(() =>
       props: v.record(v.string(), exprSchema),
     }),
     v.object({
+      kind: v.literal("array"),
+      items: v.array(exprSchema),
+    }),
+    v.object({
       kind: v.literal("call"),
       name: v.pipe(v.string(), v.minLength(1)),
       args: v.array(exprSchema),

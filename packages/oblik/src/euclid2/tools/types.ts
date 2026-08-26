@@ -1,11 +1,19 @@
 import type { TraceNode } from "../../eval/context";
-import type { Circle, LineLike } from "../../geom";
+import type { Branch, Circle, LineLike, ProfileEdge } from "../../geom";
 import type { Expr } from "../../source/expr";
 import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
-export type ToolId = "point" | "circle" | "line" | "segment" | "parallelLine" | "perpendicularLine" | "slider";
+export type ToolId =
+  | "point"
+  | "circle"
+  | "line"
+  | "segment"
+  | "parallelLine"
+  | "perpendicularLine"
+  | "slider"
+  | "profile";
 
 export type ToolSpec = {
   id: ToolId;
@@ -53,7 +61,7 @@ export type Placed = { expr: Expr; at: Vec2 };
 export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
-  carrier?: { bind: string; geom: LineLike };
+  carrier?: { bind: string; geom: LineLike | Circle };
   length?: { expr: Expr; value: number };
 };
 
@@ -104,16 +112,36 @@ export type ToolSession =
       max: string;
       step: string;
       name: string;
+    }
+  | {
+      verb: "profile";
+      focus: "cycle" | "name";
+      vertices: Placed[];
+      carriers: Array<{ expr: Expr; geom: LineLike | Circle; k?: Branch }>;
+      name: string;
     };
 
 export type Ghost =
   | { kind: "point"; at: Vec2 }
   | { kind: "circle"; center: Vec2; radius: number }
   | { kind: "line" | "segment"; a: Vec2; b: Vec2 }
-  | { kind: "parallelLine"; geom: LineLike; distance: number };
+  | { kind: "parallelLine"; geom: LineLike; distance: number }
+  | {
+      kind: "profile";
+      edges: ProfileEdge[];
+      hover?: ProfileEdge;
+      arrow?: { at: Vec2; tx: number; ty: number };
+    };
 
 export type InsertJob = {
-  from: ToolId | "lineIntersection" | "circleLineIntersection" | "circleCircleIntersection" | "pointOnSegment" | "pointOnLine" | "pointOnCircle";
+  from:
+    | ToolId
+    | "lineIntersection"
+    | "circleLineIntersection"
+    | "circleCircleIntersection"
+    | "pointOnSegment"
+    | "pointOnLine"
+    | "pointOnCircle";
   args: Expr[];
   bind?: string;
 };
@@ -149,4 +177,6 @@ export type Tool<S extends ToolSession = ToolSession> = {
   commit?(session: S, place: PlaceHit | null, scope: Scope): ToolStep | null;
   hit?(session: S, hit: PlaceHit, ctx: PlaceCtx): PlaceHit;
   hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[]): string | null;
+  /** If set, Tab uses this instead of cycling fields. */
+  tab?(session: S, dir: 1 | -1): S;
 };

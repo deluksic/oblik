@@ -5,6 +5,7 @@ import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
+import { profile } from "./profile";
 import { segment } from "./segment";
 import { slider } from "./slider";
 import { scopeFromTrace, scopeOf } from "./scope";
@@ -36,9 +37,19 @@ const byId = {
   parallelLine,
   perpendicularLine,
   slider,
+  profile,
 } as const satisfies Record<ToolId, Tool>;
 
-export const TOOLS = [point.spec, circle.spec, line.spec, segment.spec, parallelLine.spec, perpendicularLine.spec, slider.spec] as const;
+export const TOOLS = [
+  point.spec,
+  circle.spec,
+  line.spec,
+  segment.spec,
+  parallelLine.spec,
+  perpendicularLine.spec,
+  slider.spec,
+  profile.spec,
+] as const;
 
 function of(session: ToolSession): Tool {
   return byId[session.verb];

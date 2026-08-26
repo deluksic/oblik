@@ -844,6 +844,10 @@ describe("filterTools", () => {
   test("matches slider by name", () => {
     expect(filterTools("slider").map((t) => t.id)).toEqual(["slider"]);
   });
+
+  test("matches profile by face alias", () => {
+    expect(filterTools("face").map((t) => t.id)).toEqual(["profile"]);
+  });
 });
 
 describe("slider tool", () => {
@@ -886,5 +890,84 @@ describe("slider tool", () => {
     const p = previewOf(startTool("slider"));
     expect(p.line).toBe("const n = slider(<value>, { min: <min>, max: <max>, step: <step> })");
     expect(p.token).toBe("<value>");
+  });
+});
+
+describe("profile tool", () => {
+  const namedB: PlacePoint = { kind: "ref", bind: "B", id: "o_b", at: { x: 0, y: 2 } };
+  const chord = { kind: "segment" as const, a: { x: 2, y: 0 }, b: { x: 0, y: 2 } };
+  const reach = { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2 };
+
+  test("closes as profile([A, chord, B, along(c, k)], id) without extra constructors", () => {
+    let s = startTool("profile");
+    const a = clickTool(s, { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in a)) throw new Error("expected A");
+    const c1 = clickTool(a.session, {
+      world: { x: 1, y: 1 },
+      point: free(1, 1),
+      carrier: { bind: "chord", geom: chord },
+    });
+    if (!("session" in c1)) throw new Error("expected chord");
+    const b = clickTool(c1.session, { world: { x: 0, y: 2 }, point: namedB });
+    if (!("session" in b)) throw new Error("expected B");
+    const c2 = clickTool(b.session, {
+      world: { x: 1.4, y: 1.4 },
+      point: free(1.4, 1.4),
+      carrier: { bind: "reach", geom: reach },
+    });
+    if (!("session" in c2)) throw new Error("expected along");
+    const done = clickTool(c2.session, { world: { x: 2, y: 0 }, point: namedA });
+    expect(done).toEqual({
+      insert: {
+        from: "profile",
+        args: [
+          {
+            kind: "array",
+            items: [
+              { kind: "ref", name: "A" },
+              { kind: "ref", name: "chord" },
+              { kind: "ref", name: "B" },
+              {
+                kind: "call",
+                name: "along",
+                args: [
+                  { kind: "ref", name: "reach" },
+                  { kind: "num", value: -1 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  test("ignores a free click in a point slot", () => {
+    const r = clickTool(startTool("profile"), { world: { x: 1, y: 1 }, point: free(1, 1) });
+    expect(r).toEqual({ session: startTool("profile") });
+  });
+
+  test("Tab flips along k on the last circle", () => {
+    let s = startTool("profile");
+    const a = clickTool(s, { world: { x: 2, y: 0 }, point: namedA });
+    if (!("session" in a)) throw new Error("expected A");
+    const c1 = clickTool(a.session, {
+      world: { x: 1, y: 1 },
+      point: free(1, 1),
+      carrier: { bind: "chord", geom: chord },
+    });
+    if (!("session" in c1)) throw new Error("expected chord");
+    const b = clickTool(c1.session, { world: { x: 0, y: 2 }, point: namedB });
+    if (!("session" in b)) throw new Error("expected B");
+    const c2 = clickTool(b.session, {
+      world: { x: 1.4, y: 1.4 },
+      point: free(1.4, 1.4),
+      carrier: { bind: "reach", geom: reach },
+    });
+    if (!("session" in c2) || c2.session.verb !== "profile") throw new Error("expected along");
+    expect(c2.session.carriers[1]?.k).toBe(-1);
+    const flipped = tabTool(c2.session);
+    if (flipped.verb !== "profile") throw new Error("expected profile");
+    expect(flipped.carriers[1]?.k).toBe(1);
   });
 });

@@ -24,6 +24,7 @@ export const BIND_PREFIX: Record<string, string> = {
   pointOnLine: "g",
   pointOnCircle: "g",
   slider: "n",
+  profile: "pr",
 };
 
 const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -65,6 +66,13 @@ export function hoistIntersections(
   const seen = new Map<string, string>();
   const hoists: HoistedCall[] = [];
   const rewrite = (expr: Expr): Expr => {
+    if (expr.kind === "array") return { kind: "array", items: expr.items.map(rewrite) };
+    if (expr.kind === "neg") return { kind: "neg", expr: rewrite(expr.expr) };
+    if (expr.kind === "props") {
+      const props: Record<string, Expr> = {};
+      for (const [k, v] of Object.entries(expr.props)) props[k] = rewrite(v);
+      return { kind: "props", props };
+    }
     if (expr.kind !== "call") return expr;
     const args = expr.args.map(rewrite);
     const next: Expr = { kind: "call", name: expr.name, args };

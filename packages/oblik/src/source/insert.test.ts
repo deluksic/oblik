@@ -55,6 +55,24 @@ describe("printExpr", () => {
       printExpr({ kind: "neg", expr: { kind: "member", object: "shelf", field: "distance" } }),
     ).toBe("-shelf.distance");
     expect(printExpr({ kind: "neg", expr: { kind: "ref", name: "reach" } })).toBe("-reach");
+    expect(
+      printExpr({
+        kind: "array",
+        items: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "chord" },
+          { kind: "ref", name: "B" },
+          {
+            kind: "call",
+            name: "along",
+            args: [
+              { kind: "ref", name: "c" },
+              { kind: "num", value: 1 },
+            ],
+          },
+        ],
+      }),
+    ).toBe("[A, chord, B, along(c, 1)]");
   });
 });
 
@@ -325,5 +343,33 @@ describe("insertCall", () => {
     );
     expect(next).toContain('const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");');
     expect(next).toMatch(/import \{ point, slider \} from "oblik"/);
+  });
+
+  test("inserts profile as profile([...], id) and imports along", () => {
+    const next = insertCall(src, {
+      from: "profile",
+      bind: "slice",
+      args: [
+        {
+          kind: "array",
+          items: [
+            { kind: "ref", name: "A" },
+            { kind: "ref", name: "chord" },
+            { kind: "ref", name: "B" },
+            {
+              kind: "call",
+              name: "along",
+              args: [
+                { kind: "ref", name: "c" },
+                { kind: "num", value: -1 },
+              ],
+            },
+          ],
+        },
+      ],
+      id: "o_slice",
+    });
+    expect(next).toContain('const slice = profile([A, chord, B, along(c, -1)], "o_slice");');
+    expect(next).toMatch(/import \{ point, profile, along \} from "oblik"/);
   });
 });

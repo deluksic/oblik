@@ -125,3 +125,45 @@ describe("snapLineCarrier", () => {
     expect(hit).toEqual({ bind: "ground", geom: ground.value });
   });
 });
+
+describe("profile pick", () => {
+  const Pa = { x: 0, y: 0 };
+  const Pb = { x: 4, y: 0 };
+  const Pc = { x: 0, y: 3 };
+  const ab = { kind: "segment" as const, a: Pa, b: Pb };
+  const bc = { kind: "segment" as const, a: Pb, b: Pc };
+  const ca = { kind: "segment" as const, a: Pc, b: Pa };
+  const FACE = {
+    id: "o_pr",
+    occ: 0,
+    kind: "profile",
+    bind: "face",
+    value: {
+      kind: "profile",
+      outer: [
+        { a: Pa, b: Pb, carrier: ab },
+        { a: Pb, b: Pc, carrier: bc },
+        { a: Pc, b: Pa, carrier: ca },
+      ],
+    },
+    editable: false,
+    stack: [],
+  } as TraceNode;
+
+  test("fill is last behind a point and a stroke", () => {
+    const hits = hitsNear([FACE, SEG, A], { x: 0.05, y: 0.04 }, camera, size);
+    expect(hits[0]?.kind).toBe("point");
+    expect(hits[hits.length - 1]?.kind).toBe("profile");
+  });
+
+  test("fill is last behind a stroke in the interior-adjacent edge", () => {
+    const hits = hitsNear([FACE, SEG], { x: 2, y: 0.04 }, camera, size);
+    expect(hits[0]?.kind).toBe("segment");
+    expect(hits[hits.length - 1]?.kind).toBe("profile");
+  });
+
+  test("empty interior still picks the profile", () => {
+    const hit = hitTest([FACE], { x: 1, y: 1 }, camera, size);
+    expect(hit?.id).toBe("o_pr");
+  });
+});

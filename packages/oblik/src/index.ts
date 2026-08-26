@@ -18,6 +18,8 @@ export {
   circleCircleIntersection,
   dist,
   slider,
+  along,
+  profile,
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";

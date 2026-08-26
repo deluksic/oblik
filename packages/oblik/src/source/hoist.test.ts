@@ -115,4 +115,26 @@ describe("hoistIntersections", () => {
       { kind: "ref", name: "A" },
     ]);
   });
+
+  test("rewrites nested calls inside an array expr", () => {
+    const { exprs, hoists } = hoistIntersections(
+      [
+        {
+          kind: "array",
+          items: [{ kind: "ref", name: "A" }, crossing],
+        },
+      ],
+      new Set(["A", "ground", "wall"]),
+    );
+    expect(hoists).toEqual([{ bind: "x", from: "lineIntersection", args: crossing.args }]);
+    expect(exprs).toEqual([
+      {
+        kind: "array",
+        items: [
+          { kind: "ref", name: "A" },
+          { kind: "ref", name: "x" },
+        ],
+      },
+    ]);
+  });
 });

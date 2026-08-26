@@ -196,6 +196,7 @@ export function focusedDraft<S extends ToolSession>(tool: Tool<S>, session: S, s
 }
 
 export function tabSession<S extends ToolSession>(tool: Tool<S>, session: S, dir: 1 | -1): S {
+  if (tool.tab) return tool.tab(session, dir);
   const open = openFields(tool, session);
   if (open.length === 0 || !tool.setFocus) return session;
   const ids = open.map((f) => f.id);

@@ -1,27 +1,28 @@
 import {
   circleCircleIntersectionValue,
   circleLineIntersectionValue,
-  circleUnitAt,
   dist as distVec,
   isFiniteVec,
   isGlider,
   lineIntersectionValue,
-  lineSAt,
   parallelLineValue,
   perpendicularLineValue,
   pointOnCircleValue,
   pointOnLineValue,
   pointOnSegmentValue,
-  segmentTAt,
   signedDist as signedDistValue,
+  alongValue,
+  isFiniteProfile,
+  profileValue,
+  type Along,
   type Branch,
   type Circle,
   type Geom,
-  type Glider,
   type Line,
   type LineLike,
   type ParallelLine,
   type Point,
+  type Profile,
   type Segment,
   type Vec2,
 } from "../geom";
@@ -78,6 +79,8 @@ function isFiniteValue(v: { kind: string }): boolean {
       const o = v as ParallelLine;
       return isFiniteVec(o.line.origin) && isFiniteVec(o.line.direction) && Number.isFinite(o.distance);
     }
+    case "profile":
+      return isFiniteProfile(v as Profile);
     default:
       if (isGlider(v)) return isFiniteVec(v);
       return false;
@@ -166,6 +169,15 @@ export function dist(a: Vec2, b: Vec2): number {
   return distVec(a, b);
 }
 
+/** Unmarked walk witness on a circle. Not a tape node. */
+export function along(carrier: Circle, k: Branch): Along {
+  return alongValue(carrier, k);
+}
+
+export const profile = mark((cycle: readonly unknown[], id?: string): Profile => {
+  return traced(profileValue(cycle), id);
+}, { dof: [] });
+
 export type SliderOpts = {
   min?: number;
   max?: number;
@@ -223,4 +235,5 @@ export const constructors = {
   circleLineIntersection,
   circleCircleIntersection,
   slider,
+  profile,
 } as const;

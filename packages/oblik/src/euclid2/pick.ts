@@ -1,6 +1,7 @@
 import type { TraceNode } from "../eval/context";
 import type { LineLike } from "../geom";
 import { gliderAt, isGlider } from "../geom/gliders";
+import { distToProfile, isFiniteProfile, isProfile } from "../geom/profile";
 import { lineBasis } from "../geom/ops";
 import type { Circle, Line, ParallelLine, Point, Segment } from "../geom";
 import { dist, distToLine, distToSegment } from "../geom/vec";
@@ -25,6 +26,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
   if (v.kind === "line") return Number.isFinite(v.origin.x);
   if (v.kind === "parallelLine") return Number.isFinite(v.distance);
+  if (isProfile(v)) return isFiniteProfile(v);
   if (isGlider(v)) return Number.isFinite(v.x) && Number.isFinite(v.y);
   return false;
 }
@@ -49,6 +51,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     const c = v as Circle;
     return Math.abs(dist(world, c.center) - Math.abs(c.radius));
   }
+  if (isProfile(v)) return distToProfile(v, world);
   if (isGlider(v)) return dist(world, gliderAt(v));
   return Infinity;
 }
@@ -73,7 +76,13 @@ function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
   return px / Math.max(8, camera.scale);
 }
 
-/** All trace nodes within pick radius of `world`, nearest first. Points always sort ahead of ink. */
+function pickRank(n: TraceNode): number {
+  if (n.value.kind === "point" || isGlider(n.value)) return 0;
+  if (isProfile(n.value)) return 2;
+  return 1;
+}
+
+/** All trace nodes within pick radius of `world`, nearest first. Points, then ink, then fills. */
 export function hitsNear(
   trace: readonly TraceNode[],
   world: Vec2,
@@ -85,12 +94,13 @@ export function hitsNear(
   for (const n of trace) {
     if (!isFiniteTrace(n)) continue;
     const d = geomDistWorld(world, n);
-    if (d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
+    const insideFill = isProfile(n.value) && d === 0;
+    if (insideFill || d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
   }
   out.sort((a, b) => {
-    const pa = a.node.value.kind === "point" || isGlider(a.node.value) ? 0 : 1;
-    const pb = b.node.value.kind === "point" || isGlider(b.node.value) ? 0 : 1;
-    if (pa !== pb) return pa - pb;
+    const ra = pickRank(a.node);
+    const rb = pickRank(b.node);
+    if (ra !== rb) return ra - rb;
     if (a.d !== b.d) return a.d - b.d;
     return stackRank(a.node) - stackRank(b.node);
   });
@@ -137,6 +147,27 @@ export function snapLineCarrier(
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
+  }
+  return best ? { bind: best.bind, geom: best.geom } : null;
+}
+
+const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);
+
+/** Nearest named stroke or circle under the pointer (ignores points and fills). */
+export function snapStrokeCarrier(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  camera: Camera2,
+  size: PaneSize,
+  maxPx = GEOM_PX,
+): { bind: string; geom: LineLike | Circle } | null {
+  let best: { bind: string; geom: LineLike | Circle; d: number } | null = null;
+  for (const n of trace) {
+    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (!STROKE.has(n.value.kind)) continue;
+    const d = geomDistWorld(world, n);
+    if (d > pickRadiusWorld(n, camera, maxPx)) continue;
+    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike | Circle, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

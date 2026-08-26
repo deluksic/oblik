@@ -1,8 +1,10 @@
 import { createMemo } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
-import type { Circle, Line, ParallelLine, Segment } from "../../geom";
+import type { Circle, Line, ParallelLine, Profile, Segment } from "../../geom";
+import { edgesSvgPath, profileSvgPath } from "../../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
+import type { Ghost } from "../tool";
 
 import styles from "./View.module.css";
 
@@ -102,5 +104,60 @@ function InfiniteStroke(props: {
         y2={ends().b.y}
       />
     </>
+  );
+}
+
+export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+  const d = createMemo(() => profileSvgPath(props.node.value as Profile));
+  return (
+    <path
+      class={[
+        styles.fill,
+        {
+          [styles.fillHot]: props.hot && !props.selected,
+          [styles.fillSelected]: props.selected,
+        },
+      ]}
+      data-ink={props.node.id}
+      d={d()}
+    />
+  );
+}
+
+export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }> }) {
+  const chain = createMemo(() => {
+    const g = props.ghost;
+    const edges = g.hover ? [...g.edges, g.hover] : g.edges;
+    return edgesSvgPath(edges, false);
+  });
+  const fill = createMemo(() => {
+    const g = props.ghost;
+    if (g.edges.length < 2) return "";
+    return edgesSvgPath(g.edges, true);
+  });
+  const arrow = createMemo(() => {
+    const a = props.ghost.arrow;
+    if (!a) return null;
+    const len = 0.28;
+    const n = Math.hypot(a.tx, a.ty) || 1;
+    const ux = a.tx / n;
+    const uy = a.ty / n;
+    const tip = { x: a.at.x + ux * len, y: a.at.y + uy * len };
+    const left = { x: a.at.x + ux * len * 0.2 - uy * len * 0.38, y: a.at.y + uy * len * 0.2 + ux * len * 0.38 };
+    const right = { x: a.at.x + ux * len * 0.2 + uy * len * 0.38, y: a.at.y + uy * len * 0.2 - ux * len * 0.38 };
+    return { tip, left, right, at: a.at };
+  });
+  return (
+    <g pointer-events="none">
+      {fill() ? <path class={styles.ghostFill} d={fill()} /> : null}
+      {chain() ? <path class={styles.ghost} d={chain()} fill="none" /> : null}
+      {arrow() ? (
+        <polyline
+          class={styles.ghost}
+          fill="none"
+          points={`${arrow()!.left.x},${arrow()!.left.y} ${arrow()!.tip.x},${arrow()!.tip.y} ${arrow()!.right.x},${arrow()!.right.y}`}
+        />
+      ) : null}
+    </g>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { circle, point, pointOnSegment, segment, slider } from "./constructors";
+import { along, circle, point, pointOnCircle, pointOnSegment, profile, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
 import { emit, evaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -161,5 +161,25 @@ describe("evaluate", () => {
     });
     expect(trace.map((n) => n.id)).toEqual(["h"]);
     expect(trace[0]?.module).toBe("apps/demo/src/layout/plate.ts");
+  });
+
+  test("profile is traced; along is not", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const O = point(0, 0, "o");
+        const c = circle(O, 2, "c");
+        const A = pointOnCircle(c, 1, 0, "a");
+        const B = pointOnCircle(c, 0, 1, "b");
+        const ch = segment(A, B, "ch");
+        return profile([A, ch, B, along(c, -1)], "pr");
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.map((n) => n.kind)).toEqual(["point", "circle", "gliderCircle", "gliderCircle", "segment", "profile"]);
+    const p = trace.find((n) => n.id === "pr");
+    expect(p?.value.kind).toBe("profile");
+    if (p?.value.kind === "profile") expect(p.value.outer).toHaveLength(2);
   });
 });
