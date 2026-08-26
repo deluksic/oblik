@@ -132,6 +132,11 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
   );
 }
 
+export function ProfileOutline(props: { node: TraceNode }) {
+  const d = createMemo(() => profileSvgPath(props.node.value as Profile));
+  return <path class={styles.fillOutline} d={d()} />;
+}
+
 export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>; camera: Camera2 }) {
   const chain = createMemo(() => {
     const g = props.ghost;

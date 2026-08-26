@@ -92,6 +92,16 @@
   fill: color-mix(in srgb, var(--oblik-accent) 28%, transparent);
 }
 
+.fillOutline {
+  fill: none;
+  stroke: var(--oblik-accent);
+  stroke-width: var(--oblik-stroke-selected);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .handle {
   fill: var(--oblik-accent);
   stroke: var(--oblik-paper);

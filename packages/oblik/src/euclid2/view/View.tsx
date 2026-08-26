@@ -11,7 +11,7 @@ import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { NumberSliders } from "./NumberSliders";
-import { ProfileFill, ProfileGhost, Stroke } from "./Ink";
+import { ProfileFill, ProfileGhost, ProfileOutline, Stroke } from "./Ink";
 import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
 import { hitSlider, sliderNodes } from "./sliderHud";
 import {
@@ -258,6 +258,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 size={size()}
               />
             )}
+          </For>
+          <For each={fills()}>
+            {(n) => (isSelected(n, props.selectedKey) ? <ProfileOutline node={n} /> : null)}
           </For>
           {props.ghost?.kind === "profile" ? (
             <ProfileGhost ghost={props.ghost} camera={camera()} />
