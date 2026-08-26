@@ -260,11 +260,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
             )}
           </For>
           <For each={fills()}>
-            {(n) =>
-              isHot(n, props.hoverId, props.selectedKey) ? (
-                <ProfileOutline node={n} selected={isSelected(n, props.selectedKey)} />
-              ) : null
-            }
+            {(n) => (
+              <ProfileOutline
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+              />
+            )}
           </For>
           {props.ghost?.kind === "profile" ? (
             <ProfileGhost ghost={props.ghost} camera={camera()} />

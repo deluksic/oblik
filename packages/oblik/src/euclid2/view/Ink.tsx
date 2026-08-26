@@ -133,11 +133,17 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
   );
 }
 
-export function ProfileOutline(props: { node: TraceNode; selected: boolean }) {
+export function ProfileOutline(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
   return (
     <path
-      class={[styles.fillOutline, { [styles.fillOutlineSelected]: props.selected }]}
+      class={[
+        styles.fillOutline,
+        {
+          [styles.fillOutlineSelected]: props.selected,
+          [styles.fillOutlineHidden]: !props.hot && !props.selected,
+        },
+      ]}
       d={d()}
     />
   );
