@@ -13,6 +13,7 @@ Prototypes (charter + what we learned):
 - [3 — insert from the canvas](./prototypes/3.md)
 - [4 — types, introductions, resolvers](./prototypes/4.md) — closed; Point + Distance slice
 - [5 — construction graph](./prototypes/5.md) — closed; constructors + named fields + Space tools
-- [6 — oblik: tape, draft, SVG](./prototypes/6.md) — open; greenfield runtime next to paper. [Learned from using it](./prototypes/6.md#learned-from-using-it) (Tab, gliders, length reuse, Solid 2 pane identity).
+- [6 — oblik: tape, draft, SVG](./prototypes/6.md) — open; greenfield runtime next to paper. [Learned from using it](./prototypes/6.md#learned-from-using-it) (Tab, gliders, length reuse, Solid 2 pane identity). Style sheet was a failed experiment — see P7.
+- [7 — profiles on the euclid2 tape](./prototypes/7.md) — **design only** (not a go-ahead). Horizon: paper inks a sketch; common language is curves/profiles. Next build slice: `profile` primitive + Space tool in euclid2.
 
 [Critique](./critique.md) records why unmarked-literal CAD and a single kernel were dropped.
