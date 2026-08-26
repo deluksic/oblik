@@ -7,9 +7,9 @@ import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
+import pie from "../../../../apps/demo/src/scenes/pie.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
-import slice from "../../../../apps/demo/src/scenes/slice.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import type { Euclid2Scene } from "./scene";
 
@@ -67,16 +67,14 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "drill" && n.editable)).toBe(true);
   });
 
-  test("slice traces a profile over a named chord and along(reach)", () => {
-    const { trace } = run(slice, ["apps/demo/src/scenes/slice.ts"]);
-    const face = trace.find((n) => n.bind === "slice");
-    expect(face?.kind).toBe("profile");
-    if (face?.value.kind === "profile") expect(face.value.outer).toHaveLength(2);
-    expect(trace.some((n) => n.bind === "chord" && n.kind === "segment")).toBe(true);
-    const inner = trace.find((n) => n.bind === "offset");
-    expect(inner?.kind).toBe("profile");
-    if (inner?.value.kind === "profile") expect(inner.value.outer).toHaveLength(4);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(2);
-    expect(trace.some((n) => n.bind === "n" && n.kind === "slider")).toBe(true);
+  test("pie traces three roundOffset slices from one gap slider", () => {
+    const { trace } = run(pie, ["apps/demo/src/scenes/pie.ts"]);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(3);
+    expect(trace.filter((n) => n.kind === "segment")).toHaveLength(3);
+    expect(trace.filter((n) => n.value.kind === "gliderCircle")).toHaveLength(3);
+    expect(trace.some((n) => n.bind === "gap" && n.kind === "slider")).toBe(true);
+    const one = trace.find((n) => n.bind === "one");
+    expect(one?.kind).toBe("profile");
+    if (one?.value.kind === "profile") expect(one.value.outer).toHaveLength(3);
   });
 });

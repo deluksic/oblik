@@ -11,7 +11,7 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `slice`, `triangle`, `shared-loop`, `truss`, `mounting-plate`. Drag a handle; release writes the scene file.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `triangle`, `shared-loop`, `truss`, `mounting-plate`. Drag a handle; release writes the scene file.
 
 Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 
@@ -21,7 +21,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Shared loop | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle |
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
 | Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
-| Slice | `profile([A, chord, B, along(reach, -1)])` fill; `roundOffset(slice, n)` (positive grows); two gliders on a circle + named chord |
+| Pie | Three sectors on one circle; `roundOffset(wedge, -gap)` opens the cuts |
 | Triangle | three free points |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), plate **fillets/slots**, **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.
