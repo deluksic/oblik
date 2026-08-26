@@ -122,6 +122,16 @@
   fill: var(--oblik-accent);
 }
 
+.ghost {
+  fill: none;
+  stroke: var(--oblik-accent);
+  stroke-width: var(--oblik-stroke);
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .ghostFill {
   fill: color-mix(in srgb, var(--oblik-accent) 12%, transparent);
   stroke: none;
