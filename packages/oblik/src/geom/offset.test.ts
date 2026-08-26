@@ -130,7 +130,8 @@ describe("roundOffsetValue", () => {
     const out = roundOffsetValue(sector(200), -0.12);
     expect(out).toHaveLength(1);
     const p = out[0]!;
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(p.outer).toHaveLength(4);
+    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
     expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
     expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
   });

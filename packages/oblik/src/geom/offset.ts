@@ -196,20 +196,32 @@ function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): Pro
   return { a: aa, b: bb, carrier };
 }
 
-function arcParam(e: ProfileEdge, p: Vec2, full: number): number {
-  if (dist(p, e.a) <= EPS) return 0;
-  if (dist(p, e.b) <= EPS) return full;
-  return Math.abs(circleDelta(e.carrier as Circle, e.a, p, e.k === -1 ? -1 : 1));
+/**
+ * Distance along `k` from `from` to `p`, in `[0, 2π)`. Same ray as `from`
+ * is 0, not a full turn — `circleDelta` uses `(0, 2π]` and would wrap.
+ */
+function arcWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
+  const ua = circleUnitAt(c, from);
+  const up = circleUnitAt(c, p);
+  let delta = Math.atan2(up.uy, up.ux) - Math.atan2(ua.uy, ua.ux);
+  if (k === 1) {
+    while (delta < 0) delta += 2 * Math.PI;
+    while (delta >= 2 * Math.PI) delta -= 2 * Math.PI;
+    return delta;
+  }
+  while (delta > 0) delta -= 2 * Math.PI;
+  while (delta <= -2 * Math.PI) delta += 2 * Math.PI;
+  return -delta;
 }
 
 /** True when `a→b` walks the same way as `e`, and both points sit on `e`. */
 function originalForward(e: ProfileEdge, a: Vec2, b: Vec2): boolean {
   if (e.carrier.kind === "circle") {
     if (e.k !== 1 && e.k !== -1) return false;
-    const full = Math.abs(circleDelta(e.carrier, e.a, e.b, e.k));
+    const full = arcWalk(e.carrier, e.a, e.b, e.k);
     if (!(full > EPS)) return false;
-    const ta = arcParam(e, a, full);
-    const tb = arcParam(e, b, full);
+    const ta = arcWalk(e.carrier, e.a, a, e.k);
+    const tb = arcWalk(e.carrier, e.a, b, e.k);
     return ta + EPS < tb && tb <= full + EPS;
   }
   return dot(sub(b, a), sub(e.b, e.a)) > EPS;
