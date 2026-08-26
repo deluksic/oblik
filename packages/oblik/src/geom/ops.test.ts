@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { circleCircleIntersectionValue } from "./ops";
+import { circleCircleIntersectionValue, circleLineIntersectionValue } from "./ops";
 import type { Circle } from "./types";
 
 const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
@@ -44,5 +44,15 @@ describe("circleCircleIntersectionValue", () => {
     const same: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 3 };
     const p = circleCircleIntersectionValue(a, same, 1);
     expect(p.x).toBeNaN();
+  });
+});
+
+describe("circleLineIntersectionValue", () => {
+  test("a numerically shy tangent still hits", () => {
+    const c: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 1 };
+    const line = { kind: "line" as const, origin: { x: 1 + 1e-12, y: 0 }, direction: { x: 0, y: 1 } };
+    const p = circleLineIntersectionValue(c, line, 1);
+    expect(p.x).toBeCloseTo(1, 6);
+    expect(p.y).toBeCloseTo(0, 6);
   });
 });

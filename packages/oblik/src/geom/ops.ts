@@ -57,8 +57,9 @@ export function circleLineIntersectionValue(c: Circle, l: LineLike, k: Branch): 
   const w = sub(origin, c.center);
   const dw = dot(dir, w);
   const disc = dw * dw - (dot(w, w) - c.radius * c.radius);
-  if (!(disc >= 0) || !Number.isFinite(disc)) return vec(Number.NaN, Number.NaN);
-  const t = -dw + k * Math.sqrt(disc);
+  const d = Number.isFinite(disc) && disc > -1e-9 ? Math.max(0, disc) : Number.NaN;
+  if (!(d >= 0)) return vec(Number.NaN, Number.NaN);
+  const t = -dw + k * Math.sqrt(d);
   const p = add(origin, mul(dir, t));
   return isFiniteVec(p) ? p : vec(Number.NaN, Number.NaN);
 }
@@ -72,8 +73,9 @@ export function circleCircleIntersectionValue(a: Circle, b: Circle, k: Branch): 
   if (d < 1e-12) return vec(Number.NaN, Number.NaN);
   const aa = (a.radius * a.radius - b.radius * b.radius + d * d) / (2 * d);
   const h2 = a.radius * a.radius - aa * aa;
-  if (!(h2 >= 0) || !Number.isFinite(h2)) return vec(Number.NaN, Number.NaN);
-  const h = Math.sqrt(h2);
+  const h2c = Number.isFinite(h2) && h2 > -1e-9 ? Math.max(0, h2) : Number.NaN;
+  if (!(h2c >= 0)) return vec(Number.NaN, Number.NaN);
+  const h = Math.sqrt(h2c);
   const mid = add(a.center, mul(dvec, aa / d));
   const n = perp({ x: dvec.x / d, y: dvec.y / d });
   const p = add(mid, mul(n, k * h));
