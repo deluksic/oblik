@@ -22,7 +22,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
 | Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
 | Pie | Three sectors on one circle; `roundOffset(wedge, -gap)` opens the cuts |
-| Fillet | One profile; `fillet(A, r)` / `fillet(C, r)` in the cycle, B and D sharp |
+| Fillet | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise |
 | Triangle | three free points |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), plate **fillets/slots**, **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.

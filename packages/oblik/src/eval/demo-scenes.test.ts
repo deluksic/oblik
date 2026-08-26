@@ -79,16 +79,31 @@ describe("migrated demo scenes", () => {
     if (one?.value.kind === "profile") expect(one.value.outer).toHaveLength(3);
   });
 
-  test("fillet scene traces one profile with two join arcs", () => {
+  test("fillet scene traces the challenge cases from one radius slider", () => {
     const { trace } = run(fillet, ["apps/demo/src/scenes/fillet.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(1);
-    expect(trace.filter((n) => n.kind === "segment")).toHaveLength(4);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(8);
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
-    const face = trace.find((n) => n.bind === "face");
-    expect(face?.kind).toBe("profile");
-    if (face?.value.kind === "profile") {
-      expect(face.value.outer).toHaveLength(6);
-      expect(face.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
+    expect(trace.find((n) => n.bind === "flat")).toBeUndefined();
+    const mix = trace.find((n) => n.bind === "mix");
+    expect(mix?.kind).toBe("profile");
+    if (mix?.value.kind === "profile") {
+      expect(mix.value.outer).toHaveLength(6);
+      expect(mix.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
+    }
+    const ell = trace.find((n) => n.bind === "ell");
+    if (ell?.value.kind === "profile") {
+      expect(ell.value.outer).toHaveLength(7);
+      expect(ell.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    }
+    const rim = trace.find((n) => n.bind === "rim");
+    if (rim?.value.kind === "profile") expect(rim.value.outer).toHaveLength(5);
+    const tip = trace.find((n) => n.bind === "tip");
+    if (tip?.value.kind === "profile") expect(tip.value.outer).toHaveLength(4);
+    const adj = trace.find((n) => n.bind === "adj");
+    if (adj?.value.kind === "profile") expect(adj.value.outer).toHaveLength(6);
+    const inset = trace.find((n) => n.bind === "inset");
+    if (inset?.value.kind === "profile") {
+      expect(inset.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
     }
   });
 });
