@@ -300,8 +300,9 @@ export function roundOffsetValue(p: Profile, d: number): Profile[] {
 
 type FilletJoin = { t0: Vec2; t1: Vec2; carrier: Circle; k: Branch };
 
-function filletJoin(prev: ProfileEdge, next: ProfileEdge, v: Vec2, r: number, w: 1 | -1): FilletJoin | null {
+function filletJoin(prev: ProfileEdge, next: ProfileEdge, v: Vec2, r: number, w: 1 | -1): FilletJoin | "sharp" | null {
   const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
+  if (Math.abs(turn) <= EPS) return "sharp";
   const into = w * turn < -EPS ? -r : r;
   const offPrev = offsetCarrier(prev, into, w);
   const offNext = offsetCarrier(next, into, w);
@@ -321,7 +322,8 @@ function filletJoin(prev: ProfileEdge, next: ProfileEdge, v: Vec2, r: number, w:
 
 /**
  * Replace sharp vertices with tangent join arcs. `radii[i]` is the fillet at
- * `outer[i].a`. Zero / omitted keeps the corner. Too-large `r` → empty profile.
+ * `outer[i].a`. Zero / omitted / a flat (180°) vertex keeps the corner.
+ * Too-large `r` → empty profile.
  */
 export function filletVertices(p: Profile, radii: readonly number[]): Profile {
   if (!isFiniteProfile(p)) return nanProfile();
@@ -341,6 +343,10 @@ export function filletVertices(p: Profile, radii: readonly number[]): Profile {
     const prev = p.outer[(i + n - 1) % n]!;
     const next = p.outer[i]!;
     const join = filletJoin(prev, next, next.a, r, w);
+    if (join === "sharp") {
+      joins.push(null);
+      continue;
+    }
     if (!join) return nanProfile();
     joins.push(join);
   }

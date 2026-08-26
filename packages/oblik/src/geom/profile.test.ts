@@ -183,19 +183,18 @@ describe("profileValue", () => {
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
   });
 
-  test("fillet at a 180° sector origin collapses (collinear radii)", () => {
+  test("fillet at a 180° sector origin is a no-op (already flat)", () => {
     const O = { x: 0, y: 0 };
     const P = { x: 2, y: 0 };
     const Q = { x: -2, y: 0 };
-    const p = profileValue([
-      filletValue(O, 0.2),
-      seg(O, P),
-      P,
-      alongValue(c, 1),
-      Q,
-      seg(O, Q),
-    ]);
-    expect(p.outer).toHaveLength(0);
+    const cycle = [O, seg(O, P), P, alongValue(c, 1), Q, seg(O, Q)];
+    const p = profileValue([filletValue(O, 0.2), ...cycle.slice(1)]);
+    const sharp = profileValue(cycle);
+    expect(p.outer).toHaveLength(3);
+    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(p.outer).toHaveLength(sharp.outer.length);
+    expect(profileContains(p, { x: 0, y: 1 })).toBe(true);
+    expect(profileContains(p, { x: 0.1, y: 0.1 })).toBe(true);
   });
 
   test("clockwise square fillet still cuts the corner", () => {

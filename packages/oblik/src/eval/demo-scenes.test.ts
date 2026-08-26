@@ -81,9 +81,14 @@ describe("migrated demo scenes", () => {
 
   test("fillet scene traces the challenge cases from one radius slider", () => {
     const { trace } = run(fillet, ["apps/demo/src/scenes/fillet.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(8);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(9);
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
-    expect(trace.find((n) => n.bind === "flat")).toBeUndefined();
+    const flat = trace.find((n) => n.bind === "flat");
+    expect(flat?.kind).toBe("profile");
+    if (flat?.value.kind === "profile") {
+      expect(flat.value.outer).toHaveLength(3);
+      expect(flat.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    }
     const mix = trace.find((n) => n.bind === "mix");
     expect(mix?.kind).toBe("profile");
     if (mix?.value.kind === "profile") {
