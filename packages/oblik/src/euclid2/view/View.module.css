@@ -94,12 +94,16 @@
 
 .fillOutline {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-hover);
   stroke-width: var(--oblik-stroke-selected);
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+.fillOutlineSelected {
+  stroke: var(--oblik-accent);
 }
 
 .handle {

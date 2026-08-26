@@ -128,13 +128,19 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
       ]}
       data-ink={props.node.id}
       d={d()}
+      stroke="none"
     />
   );
 }
 
-export function ProfileOutline(props: { node: TraceNode }) {
+export function ProfileOutline(props: { node: TraceNode; selected: boolean }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  return <path class={styles.fillOutline} d={d()} />;
+  return (
+    <path
+      class={[styles.fillOutline, { [styles.fillOutlineSelected]: props.selected }]}
+      d={d()}
+    />
+  );
 }
 
 export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>; camera: Camera2 }) {
