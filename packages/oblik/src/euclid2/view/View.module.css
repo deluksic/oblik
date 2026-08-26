@@ -122,6 +122,10 @@
   fill: var(--oblik-accent);
 }
 
+.muted {
+  opacity: 0.32;
+}
+
 .ghost {
   fill: none;
   stroke: var(--oblik-accent);
@@ -134,6 +138,22 @@
 
 .ghostFill {
   fill: color-mix(in srgb, var(--oblik-accent) 12%, transparent);
+  stroke: none;
+  pointer-events: none;
+}
+
+.ghostArrow {
+  fill: none;
+  stroke: var(--oblik-accent);
+  stroke-width: var(--oblik-stroke-selected);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.ghostArrowHead {
+  fill: var(--oblik-accent);
   stroke: none;
   pointer-events: none;
 }

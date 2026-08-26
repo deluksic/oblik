@@ -4,6 +4,7 @@ import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
+import { profileEligibleCarriers } from "../tools/profile";
 import { isGlider } from "@/geom/gliders";
 import { isProfile } from "@/geom/profile";
 import { GhostMark } from "./Ghost";
@@ -204,6 +205,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
   );
   const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
+  const eligibleCarriers = createMemo(() =>
+    props.placing ? profileEligibleCarriers(props.toolSession, props.trace, camera()) : null,
+  );
 
   return (
     <div
@@ -244,12 +248,17 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
+                muted={
+                  eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))
+                }
                 camera={camera()}
                 size={size()}
               />
             )}
           </For>
-          {props.ghost?.kind === "profile" ? <ProfileGhost ghost={props.ghost} /> : null}
+          {props.ghost?.kind === "profile" ? (
+            <ProfileGhost ghost={props.ghost} camera={camera()} />
+          ) : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">

@@ -8,13 +8,14 @@ import type { Ghost } from "../tool";
 
 import styles from "./View.module.css";
 
-function inkClass(hot: boolean, selected: boolean, editable: boolean) {
+function inkClass(hot: boolean, selected: boolean, editable: boolean, muted = false) {
   return [
     styles.ink,
     {
       [styles.editable]: editable,
       [styles.hot]: hot && !selected,
       [styles.selected]: selected,
+      [styles.muted]: muted && !hot && !selected,
     },
   ];
 }
@@ -23,6 +24,7 @@ export function Stroke(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
+  muted?: boolean;
   camera: Camera2;
   size: PaneSize;
 }) {
@@ -30,48 +32,48 @@ export function Stroke(props: {
   return (
     <>
       {kind() === "segment" ? (
-        <SegmentStroke node={props.node} hot={props.hot} selected={props.selected} />
+        <SegmentStroke node={props.node} hot={props.hot} selected={props.selected} muted={props.muted} />
       ) : null}
       {kind() === "line" || kind() === "parallelLine" ? (
         <InfiniteStroke
           node={props.node}
           hot={props.hot}
           selected={props.selected}
+          muted={props.muted}
           camera={props.camera}
           size={props.size}
         />
       ) : null}
       {kind() === "circle" ? (
-        <CircleStroke node={props.node} hot={props.hot} selected={props.selected} />
+        <CircleStroke node={props.node} hot={props.hot} selected={props.selected} muted={props.muted} />
       ) : null}
     </>
   );
 }
 
-function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean; muted?: boolean }) {
   const s = () => props.node.value as Segment;
   return (
     <>
       <line class={styles.hit} data-ink={props.node.id} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
-      <line class={inkClass(props.hot, props.selected, false)} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
+      <line
+        class={inkClass(props.hot, props.selected, false, props.muted)}
+        x1={s().a.x}
+        y1={s().a.y}
+        x2={s().b.x}
+        y2={s().b.y}
+      />
     </>
   );
 }
 
-function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean; muted?: boolean }) {
   const c = () => props.node.value as Circle;
   return (
     <>
       <circle class={styles.hit} data-ink={props.node.id} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
       <circle
-        class={[
-          styles.ink,
-          {
-            [styles.editable]: props.node.editable,
-            [styles.hot]: props.hot && !props.selected,
-            [styles.selected]: props.selected,
-          },
-        ]}
+        class={inkClass(props.hot, props.selected, props.node.editable, props.muted)}
         cx={c().center.x}
         cy={c().center.y}
         r={Math.abs(c().radius)}
@@ -84,6 +86,7 @@ function InfiniteStroke(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
+  muted?: boolean;
   camera: Camera2;
   size: PaneSize;
 }) {
@@ -97,7 +100,12 @@ function InfiniteStroke(props: {
     <>
       <line class={styles.hit} data-ink={props.node.id} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
-        class={inkClass(props.hot, props.selected, props.node.value.kind === "parallelLine" && props.node.editable)}
+        class={inkClass(
+          props.hot,
+          props.selected,
+          props.node.value.kind === "parallelLine" && props.node.editable,
+          props.muted,
+        )}
         x1={ends().a.x}
         y1={ends().a.y}
         x2={ends().b.x}
@@ -124,7 +132,7 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
   );
 }
 
-export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }> }) {
+export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>; camera: Camera2 }) {
   const chain = createMemo(() => {
     const g = props.ghost;
     const edges = g.hover ? [...g.edges, g.hover] : g.edges;
@@ -138,25 +146,37 @@ export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>
   const arrow = createMemo(() => {
     const a = props.ghost.arrow;
     if (!a) return null;
-    const len = 0.28;
     const n = Math.hypot(a.tx, a.ty) || 1;
     const ux = a.tx / n;
     const uy = a.ty / n;
-    const tip = { x: a.at.x + ux * len, y: a.at.y + uy * len };
-    const left = { x: a.at.x + ux * len * 0.2 - uy * len * 0.38, y: a.at.y + uy * len * 0.2 + ux * len * 0.38 };
-    const right = { x: a.at.x + ux * len * 0.2 + uy * len * 0.38, y: a.at.y + uy * len * 0.2 - ux * len * 0.38 };
-    return { tip, left, right, at: a.at };
+    const scale = Math.max(8, props.camera.scale);
+    const pad = 10 / scale;
+    const shaft = 20 / scale;
+    const head = 7 / scale;
+    const tail = { x: a.at.x + ux * pad, y: a.at.y + uy * pad };
+    const tip = { x: tail.x + ux * shaft, y: tail.y + uy * shaft };
+    const left = { x: tip.x - ux * head - uy * head * 0.62, y: tip.y - uy * head + ux * head * 0.62 };
+    const right = { x: tip.x - ux * head + uy * head * 0.62, y: tip.y - uy * head - ux * head * 0.62 };
+    return { tail, tip, left, right };
   });
   return (
     <g pointer-events="none">
       {fill() ? <path class={styles.ghostFill} d={fill()} /> : null}
       {chain() ? <path class={styles.ghost} d={chain()} fill="none" /> : null}
       {arrow() ? (
-        <polyline
-          class={styles.ghost}
-          fill="none"
-          points={`${arrow()!.left.x},${arrow()!.left.y} ${arrow()!.tip.x},${arrow()!.tip.y} ${arrow()!.right.x},${arrow()!.right.y}`}
-        />
+        <>
+          <line
+            class={styles.ghostArrow}
+            x1={arrow()!.tail.x}
+            y1={arrow()!.tail.y}
+            x2={arrow()!.tip.x}
+            y2={arrow()!.tip.y}
+          />
+          <polygon
+            class={styles.ghostArrowHead}
+            points={`${arrow()!.tip.x},${arrow()!.tip.y} ${arrow()!.left.x},${arrow()!.left.y} ${arrow()!.right.x},${arrow()!.right.y}`}
+          />
+        </>
       ) : null}
     </g>
   );

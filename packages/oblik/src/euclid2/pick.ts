@@ -153,18 +153,44 @@ export function snapLineCarrier(
 
 const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);
 
+export type StrokeCarrier = { bind: string; geom: LineLike | Circle };
+
+function isNamedStroke(n: TraceNode): n is TraceNode & { bind: string } {
+  return n.occ === 0 && !!n.bind && isFiniteTrace(n) && STROKE.has(n.value.kind);
+}
+
+function strokeWithin(n: TraceNode, at: Vec2, camera: Camera2, maxPx: number): boolean {
+  return geomDistWorld(at, n) <= pickRadiusWorld(n, camera, maxPx);
+}
+
+/** Named strokes/circles that pass near `at` (same pick radius as a hover). */
+export function namedStrokesThrough(
+  trace: readonly TraceNode[],
+  at: Vec2,
+  camera: Camera2,
+  maxPx = GEOM_PX,
+): Set<string> {
+  const out = new Set<string>();
+  for (const n of trace) {
+    if (!isNamedStroke(n)) continue;
+    if (strokeWithin(n, at, camera, maxPx)) out.add(n.bind);
+  }
+  return out;
+}
+
 /** Nearest named stroke or circle under the pointer (ignores points and fills). */
 export function snapStrokeCarrier(
   trace: readonly TraceNode[],
   world: Vec2,
   camera: Camera2,
-  size: PaneSize,
-  maxPx = GEOM_PX,
-): { bind: string; geom: LineLike | Circle } | null {
+  _size: PaneSize,
+  opts?: { maxPx?: number; through?: Vec2 },
+): StrokeCarrier | null {
+  const maxPx = opts?.maxPx ?? GEOM_PX;
   let best: { bind: string; geom: LineLike | Circle; d: number } | null = null;
   for (const n of trace) {
-    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
-    if (!STROKE.has(n.value.kind)) continue;
+    if (!isNamedStroke(n)) continue;
+    if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike | Circle, d };

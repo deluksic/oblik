@@ -1,8 +1,10 @@
+import type { TraceNode } from "@/eval/context";
 import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
 import { printExpr, type Expr } from "@/source/expr";
+import type { Camera2 } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
-import { snapStrokeCarrier } from "../pick";
+import { namedStrokesThrough, snapStrokeCarrier } from "../pick";
 import { dist, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
@@ -116,6 +118,7 @@ function hoverK(c: Circle, from: { x: number; y: number }, world: { x: number; y
   return alongK(c, from, projectOnCircle(c, world));
 }
 
+/** Tail sits on the carrier at the current vertex; `tx,ty` is the walk direction. */
 function arrowAt(
   carrier: LineLike | Circle,
   from: { x: number; y: number },
@@ -123,7 +126,7 @@ function arrowAt(
   k?: Branch,
 ): { at: { x: number; y: number }; tx: number; ty: number } {
   if (carrier.kind === "circle") {
-    const at = projectOnCircle(carrier, world);
+    const at = projectOnCircle(carrier, from);
     const radial = { x: at.x - carrier.center.x, y: at.y - carrier.center.y };
     const len = Math.hypot(radial.x, radial.y) || 1;
     const u = { x: radial.x / len, y: radial.y / len };
@@ -132,12 +135,25 @@ function arrowAt(
     const ty = kk === 1 ? u.x : -u.x;
     return { at, tx, ty };
   }
-  const { origin, dir } = lineBasis(carrier);
-  const at = projectOnLine(carrier, world);
-  const fromP = projectOnLine(carrier, from);
-  const along = (at.x - fromP.x) * dir.x + (at.y - fromP.y) * dir.y;
+  const { dir } = lineBasis(carrier);
+  const at = projectOnLine(carrier, from);
+  const to = projectOnLine(carrier, world);
+  const along = (to.x - at.x) * dir.x + (to.y - at.y) * dir.y;
   const sign = along < 0 ? -1 : 1;
   return { at, tx: dir.x * sign, ty: dir.y * sign };
+}
+
+/** Named strokes through the current vertex, or `null` when not picking a carrier. */
+export function profileEligibleCarriers(
+  session: ToolSession | null | undefined,
+  trace: readonly TraceNode[],
+  camera: Camera2,
+): ReadonlySet<string> | null {
+  if (!session || session.verb !== "profile") return null;
+  if (!needCarrier(session)) return null;
+  const from = session.vertices[session.vertices.length - 1];
+  if (!from) return null;
+  return namedStrokesThrough(trace, from.at, camera);
 }
 
 export const profile: Tool<ProfileSession> = {
@@ -159,7 +175,10 @@ export const profile: Tool<ProfileSession> = {
   },
   hit(session, hit, ctx) {
     if (needCarrier(session)) {
-      const carrier = snapStrokeCarrier(ctx.trace, hit.world, ctx.camera, ctx.size);
+      const from = session.vertices[session.vertices.length - 1];
+      const carrier = snapStrokeCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, {
+        through: from?.at,
+      });
       return carrier
         ? { ...hit, carrier, point: { kind: "free", at: hit.world } }
         : { ...hit, carrier: undefined, point: { kind: "free", at: hit.world } };
@@ -224,6 +243,7 @@ export const profile: Tool<ProfileSession> = {
     } else if (needPoint(session) && from && session.carriers.length > 0 && place) {
       const c = session.carriers[session.carriers.length - 1]!;
       hover = edgeOn(c.geom, from.at, place.world, c.k);
+      arrow = arrowAt(c.geom, from.at, place.world, c.k);
     }
     if (edges.length === 0 && !hover && session.vertices[0]) {
       return { kind: "point", at: session.vertices[0].at };

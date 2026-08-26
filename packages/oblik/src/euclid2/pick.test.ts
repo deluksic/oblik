@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { hitTest, hitsNear, snapBoundPoint, snapLineCarrier } from "./pick";
+import { hitTest, hitsNear, namedStrokesThrough, snapBoundPoint, snapLineCarrier, snapStrokeCarrier } from "./pick";
 
 const A = {
   id: "o_a",
@@ -133,6 +133,33 @@ describe("profile pick", () => {
   const ab = { kind: "segment" as const, a: Pa, b: Pb };
   const bc = { kind: "segment" as const, a: Pb, b: Pc };
   const ca = { kind: "segment" as const, a: Pc, b: Pa };
+  const AB = {
+    id: "o_ab",
+    occ: 0,
+    kind: "segment",
+    bind: "ab",
+    value: ab,
+    editable: false,
+    stack: [],
+  } as TraceNode;
+  const BC = {
+    id: "o_bc",
+    occ: 0,
+    kind: "segment",
+    bind: "bc",
+    value: bc,
+    editable: false,
+    stack: [],
+  } as TraceNode;
+  const CA = {
+    id: "o_ca",
+    occ: 0,
+    kind: "segment",
+    bind: "ca",
+    value: ca,
+    editable: false,
+    stack: [],
+  } as TraceNode;
   const FACE = {
     id: "o_pr",
     occ: 0,
@@ -165,5 +192,19 @@ describe("profile pick", () => {
   test("empty interior still picks the profile", () => {
     const hit = hitTest([FACE], { x: 1, y: 1 }, camera, size);
     expect(hit?.id).toBe("o_pr");
+  });
+
+  test("namedStrokesThrough keeps only strokes that pass the vertex", () => {
+    expect([...namedStrokesThrough([AB, BC, CA], Pa, camera)].sort()).toEqual(["ab", "ca"]);
+    expect([...namedStrokesThrough([AB, BC, CA], Pb, camera)].sort()).toEqual(["ab", "bc"]);
+  });
+
+  test("snapStrokeCarrier ignores a nearby stroke that misses the vertex", () => {
+    const throughA = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size, { through: Pa });
+    expect(throughA).toBeNull();
+    const onAb = snapStrokeCarrier([AB, BC], { x: 2, y: 0.02 }, camera, size, { through: Pa });
+    expect(onAb?.bind).toBe("ab");
+    const onBc = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size);
+    expect(onBc?.bind).toBe("bc");
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 
 import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
+import { profileEligibleCarriers } from "./tools/profile";
 import type { PlacePoint } from "./place";
+import type { TraceNode } from "../eval/context";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -1038,5 +1040,53 @@ describe("profile tool", () => {
     const flipped = tabTool(c2.session);
     if (flipped.verb !== "profile") throw new Error("expected profile");
     expect(flipped.carriers[1]?.k).toBe(1);
+  });
+
+  test("carrier snap ignores a stroke that misses the current vertex", () => {
+    const axis = {
+      id: "o_x",
+      occ: 0,
+      kind: "line",
+      bind: "axis",
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const far = {
+      id: "o_far",
+      occ: 0,
+      kind: "segment",
+      bind: "far",
+      value: { kind: "segment", a: { x: 0, y: 3 }, b: { x: 4, y: 3 } },
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const ctx = {
+      trace: [axis, far],
+      camera: { x: 0, y: 0, scale: 48 },
+      size: { w: 800, h: 600 },
+    };
+    const a = clickTool(startTool("profile"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected A");
+    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["axis"]);
+    const miss = enrichHit(a.session, { world: { x: 2, y: 3 }, point: free(2, 3) }, ctx);
+    expect(miss.carrier).toBeUndefined();
+    const hit = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
+    expect(hit.carrier?.bind).toBe("axis");
+  });
+
+  test("ghost arrow sits on the carrier at the vertex, pointing along it", () => {
+    const a = clickTool(startTool("profile"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in a)) throw new Error("expected A");
+    const xAxis = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+    const g = ghostOf(a.session, {
+      world: { x: 2, y: 0.4 },
+      point: free(2, 0.4),
+      carrier: { bind: "axis", geom: xAxis },
+    });
+    expect(g).toMatchObject({
+      kind: "profile",
+      arrow: { at: { x: 0, y: 0 }, tx: 1, ty: 0 },
+    });
   });
 });
