@@ -232,4 +232,86 @@ describe("resolvePlacePoint", () => {
     expect(p.bind).toBe("shelf");
     expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toMatchObject({ kind: "pointOnLine", bind: "shelf" });
   });
+
+  test("does not snap to a crossing past a segment's endpoints", () => {
+    const ab = node({
+      id: "o_ab",
+      bind: "ab",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
+    });
+    const cd = node({
+      id: "o_cd",
+      bind: "cd",
+      value: { kind: "segment", a: { x: 2, y: 1 }, b: { x: 2, y: 2 } },
+    });
+    const p = resolvePlacePoint([ab, cd], { x: 2, y: 0 }, 0.3);
+    expect(p.kind).toBe("free");
+  });
+
+  test("snaps when two segments actually cross", () => {
+    const ab = node({
+      id: "o_ab",
+      bind: "ab",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 2, y: 0 } },
+    });
+    const cd = node({
+      id: "o_cd",
+      bind: "cd",
+      value: { kind: "segment", a: { x: 1, y: -1 }, b: { x: 1, y: 1 } },
+    });
+    const p = resolvePlacePoint([ab, cd], { x: 1.05, y: 0.02 }, 0.3);
+    expect(p.kind).toBe("lineIntersection");
+    if (p.kind !== "lineIntersection") return;
+    expect(p.at.x).toBeCloseTo(1);
+    expect(p.at.y).toBeCloseTo(0);
+  });
+
+  test("snaps a T-junction at a segment endpoint", () => {
+    const ab = node({
+      id: "o_ab",
+      bind: "ab",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 2, y: 0 } },
+    });
+    const stem = node({
+      id: "o_st",
+      bind: "stem",
+      value: { kind: "segment", a: { x: 1, y: 0 }, b: { x: 1, y: 1 } },
+    });
+    const p = resolvePlacePoint([ab, stem], { x: 1, y: 0 }, 0.3);
+    expect(p.kind).toBe("lineIntersection");
+  });
+
+  test("circle-line snap ignores a hit past a segment", () => {
+    const span = node({
+      id: "o_s",
+      bind: "span",
+      value: { kind: "segment", a: { x: 3, y: 0 }, b: { x: 4, y: 0 } },
+    });
+    const miss = resolvePlacePoint([reach, span], { x: 2, y: 0 }, 0.3);
+    expect(miss.kind).toBe("free");
+    const on = node({
+      id: "o_on",
+      bind: "on",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 3, y: 0 } },
+    });
+    const hit = resolvePlacePoint([reach, on], { x: 2, y: 0 }, 0.3);
+    expect(hit).toMatchObject({ kind: "circleLineIntersection", line: "on", k: 1 });
+  });
+
+  test("line vs segment still snaps when the hit is on the span", () => {
+    const span = node({
+      id: "o_s",
+      bind: "span",
+      value: { kind: "segment", a: { x: 1, y: -1 }, b: { x: 1, y: 1 } },
+    });
+    const p = resolvePlacePoint([ground, span], { x: 1, y: 0 }, 0.3);
+    expect(p.kind).toBe("lineIntersection");
+    const past = node({
+      id: "o_p",
+      bind: "past",
+      value: { kind: "segment", a: { x: 1, y: 1 }, b: { x: 1, y: 2 } },
+    });
+    const miss = resolvePlacePoint([ground, past], { x: 1, y: 0 }, 0.3);
+    expect(miss.kind).toBe("free");
+  });
 });

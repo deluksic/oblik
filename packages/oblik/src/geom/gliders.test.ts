@@ -6,6 +6,7 @@ import {
   pointOnLineValue,
   pointOnSegmentValue,
   segmentTAt,
+  segmentTUnclamped,
 } from "./gliders";
 import type { Circle, Segment } from "./types";
 
@@ -36,6 +37,8 @@ describe("gliders", () => {
 
   test("segmentTAt and circleUnitAt measure from a world point", () => {
     expect(segmentTAt(span, { x: 2, y: 0 })).toBe(0.5);
+    expect(segmentTUnclamped(span, { x: 6, y: 0 })).toBe(1.5);
+    expect(segmentTUnclamped(span, { x: -2, y: 0 })).toBe(-0.5);
     const u = circleUnitAt(reach, { x: 2, y: 0 });
     expect(u.ux).toBeCloseTo(1);
     expect(u.uy).toBeCloseTo(0);

@@ -67,11 +67,15 @@ export function pointOnCircleValue(c: Circle, ux: number, uy: number): GliderCir
   return { kind: "gliderCircle", center: c.center, radius: c.radius, ux: uu, uy: vv, x: p.x, y: p.y };
 }
 
-export function segmentTAt(seg: Segment, p: Vec2): number {
+export function segmentTUnclamped(seg: Segment, p: Vec2): number {
   const ab = sub(seg.b, seg.a);
   const l2 = dot(ab, ab);
   if (l2 < 1e-12) return 0;
-  return clamp01(dot(sub(p, seg.a), ab) / l2);
+  return dot(sub(p, seg.a), ab) / l2;
+}
+
+export function segmentTAt(seg: Segment, p: Vec2): number {
+  return clamp01(segmentTUnclamped(seg, p));
 }
 
 export function lineSAt(geom: LineLike, p: Vec2): number {

@@ -7,6 +7,7 @@ import {
   pointOnLineValue,
   pointOnSegmentValue,
   segmentTAt,
+  segmentTUnclamped,
 } from "../geom/gliders";
 import {
   circleCircleIntersectionValue,
@@ -125,6 +126,15 @@ function asLineLike(n: TraceNode): LineLike | null {
   return null;
 }
 
+const ON_SPAN = 1e-9;
+
+/** Infinite line/parallel: yes. Segment: only if `at` sits on the finite span. */
+function liesOnLineLike(geom: LineLike, at: Vec2): boolean {
+  if (geom.kind !== "segment") return true;
+  const t = segmentTUnclamped(geom, at);
+  return t >= -ON_SPAN && t <= 1 + ON_SPAN;
+}
+
 function lineDist(world: Vec2, geom: LineLike): number {
   if (geom.kind === "segment") return distToSegment(world, geom.a, geom.b);
   const { origin, dir } = lineBasis(geom);
@@ -199,6 +209,7 @@ function nearestLineLine(
       if (!lb) continue;
       const at = lineIntersectionValue(la, lb);
       if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) continue;
+      if (!liesOnLineLike(la, at) || !liesOnLineLike(lb, at)) continue;
       const d = dist(world, at);
       if (d > maxDist) continue;
       if (!best || d < best.d) {
@@ -230,6 +241,7 @@ function nearestCircleLine(
       for (const k of [1, -1] as const) {
         const at = circleLineIntersectionValue(circle, line, k);
         if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) continue;
+        if (!liesOnLineLike(line, at)) continue;
         const d = dist(world, at);
         if (d > maxDist) continue;
         if (!best || d < best.d) {
