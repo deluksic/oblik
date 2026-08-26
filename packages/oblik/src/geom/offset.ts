@@ -150,6 +150,36 @@ function miterHint(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 
   return add(v, mul(norm(s), d));
 }
 
+/**
+ * Line/line miter from the two offset constraints `n·(p−v) = d`.
+ * When the vertex is flat (collinear radii, a 180° sector) the normals
+ * agree and this is `v + n d` — intersecting the offset lines is singular.
+ */
+function lineMiter(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 1 | -1): Vec2 | null {
+  const nIn = inwardNormal(prev, prev.b, w);
+  const nOut = inwardNormal(next, next.a, w);
+  const denom = 1 + dot(nIn, nOut);
+  if (Math.abs(denom) < 1e-12) return null;
+  const p = add(v, mul(add(nIn, nOut), d / denom));
+  return isFiniteVec(p) ? p : null;
+}
+
+function miterJoin(
+  prev: ProfileEdge,
+  next: ProfileEdge,
+  v: Vec2,
+  d: number,
+  w: 1 | -1,
+  offPrev: LineLike | Circle,
+  offNext: LineLike | Circle,
+): Vec2 | null {
+  if (prev.carrier.kind !== "circle" && next.carrier.kind !== "circle") {
+    return lineMiter(prev, next, v, d, w);
+  }
+  const hint = miterHint(prev, next, v, d, w);
+  return closestHit(carrierHits(offPrev, offNext), hint);
+}
+
 function len2(p: Vec2): number {
   return p.x * p.x + p.y * p.y;
 }
@@ -176,8 +206,9 @@ type Join =
 /**
  * Local round offset. Positive `d` grows (outward from winding); negative
  * shrinks. Convex outset and concave inset take a join arc of radius `|d|`
- * about the original vertex; convex inset miters. Reverse, `r' ≤ 0`, or a
- * missed hit → `[]`. Does not split islands or clip non-adjacent swallows.
+ * about the original vertex; convex inset miters. A flat (180°) vertex
+ * offsets along the shared normal. Reverse, `r' ≤ 0`, or a missed hit → `[]`.
+ * Does not split islands or clip non-adjacent swallows.
  */
 export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
@@ -214,8 +245,7 @@ export function roundOffsetValue(p: Profile, d: number): Profile[] {
       joins.push({ kind: "arc", start, end, carrier, k: alongK(carrier, start, end) });
       continue;
     }
-    const hint = miterHint(prev, next, v, inward, w);
-    const hit = closestHit(carrierHits(off[(i + n - 1) % n]!, off[i]!), hint);
+    const hit = miterJoin(prev, next, v, inward, w, off[(i + n - 1) % n]!, off[i]!);
     if (!hit) return [];
     joins.push({ kind: "miter", p: hit });
   }

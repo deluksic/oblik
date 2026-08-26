@@ -28,6 +28,18 @@ const chord: Segment = { kind: "segment", a: A, b: B };
 const reach: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const slice = profileValue([A, chord, B, alongValue(reach, -1)]);
 
+function sector(deg: number): Profile {
+  const r = 2;
+  const a = (deg * Math.PI) / 180;
+  const O = { x: 0, y: 0 };
+  const P = { x: r, y: 0 };
+  const Q = { x: r * Math.cos(a), y: r * Math.sin(a) };
+  const oa: Segment = { kind: "segment", a: O, b: P };
+  const ob: Segment = { kind: "segment", a: O, b: Q };
+  const c: Circle = { kind: "circle", center: O, radius: r };
+  return profileValue([O, oa, P, alongValue(c, 1), Q, ob]);
+}
+
 describe("roundOffsetValue", () => {
   test("d === 0 is a copy", () => {
     const out = roundOffsetValue(square, 0);
@@ -78,6 +90,24 @@ describe("roundOffsetValue", () => {
     expect(profileContains(small[0]!, { x: 1.25, y: 1.25 })).toBe(true);
     expect(profileContains(small[0]!, { x: 0.2, y: 0.2 })).toBe(false);
     expect(roundOffsetValue(slice, -0.5)).toEqual([]);
+  });
+
+  test("180° sector inset offsets the diameter instead of missing the miter", () => {
+    const out = roundOffsetValue(sector(180), -0.12);
+    expect(out).toHaveLength(1);
+    const p = out[0]!;
+    expect(p.outer).toHaveLength(3);
+    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(profileContains(p, { x: 0, y: 1 })).toBe(true);
+    expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
+    expect(profileContains(p, { x: 0, y: 0.05 })).toBe(false);
+    expect(p.outer[0]?.a.y).toBeCloseTo(0.12);
+    expect(p.outer[0]?.b.y).toBeCloseTo(0.12);
+  });
+
+  test("sectors just under and over 180° still inset", () => {
+    expect(roundOffsetValue(sector(179.5), -0.12)).toHaveLength(1);
+    expect(roundOffsetValue(sector(180.5), -0.12)).toHaveLength(1);
   });
 
   test("slice outset rounds the tips", () => {
