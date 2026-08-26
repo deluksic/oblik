@@ -955,6 +955,67 @@ describe("profile tool", () => {
     expect(r).toEqual({ session: startTool("profile") });
   });
 
+  test("point slot accepts a line crossing and hoists it on insert", () => {
+    let s = startTool("profile");
+    const x = clickTool(s, { world: { x: 2, y: 0 }, point: ll });
+    if (!("session" in x) || x.session.verb !== "profile") throw new Error("expected crossing");
+    expect(x.session.vertices[0]?.expr).toEqual({
+      kind: "call",
+      name: "lineIntersection",
+      args: [
+        { kind: "ref", name: "ground" },
+        { kind: "ref", name: "wall" },
+      ],
+    });
+    const c1 = clickTool(x.session, {
+      world: { x: 1, y: 1 },
+      point: free(1, 1),
+      carrier: { bind: "chord", geom: chord },
+    });
+    if (!("session" in c1)) throw new Error("expected chord");
+    const b = clickTool(c1.session, { world: { x: 0, y: 2 }, point: namedB });
+    if (!("session" in b)) throw new Error("expected B");
+    const c2 = clickTool(b.session, {
+      world: { x: 1.4, y: 1.4 },
+      point: free(1.4, 1.4),
+      carrier: { bind: "reach", geom: reach },
+    });
+    if (!("session" in c2)) throw new Error("expected along");
+    const done = clickTool(c2.session, { world: { x: 2, y: 0 }, point: ll });
+    expect(done).toMatchObject({
+      insert: {
+        from: "profile",
+        args: [
+          {
+            kind: "array",
+            items: [
+              {
+                kind: "call",
+                name: "lineIntersection",
+                args: [
+                  { kind: "ref", name: "ground" },
+                  { kind: "ref", name: "wall" },
+                ],
+              },
+              { kind: "ref", name: "chord" },
+              { kind: "ref", name: "B" },
+              { kind: "call", name: "along" },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  test("point slot accepts circle-line and circle-circle crossings", () => {
+    const clHit = clickTool(startTool("profile"), { world: cl.at, point: cl });
+    if (!("session" in clHit) || clHit.session.verb !== "profile") throw new Error("expected cl");
+    expect(clHit.session.vertices[0]?.expr).toMatchObject({ kind: "call", name: "circleLineIntersection" });
+    const ccHit = clickTool(startTool("profile"), { world: cc.at, point: cc });
+    if (!("session" in ccHit) || ccHit.session.verb !== "profile") throw new Error("expected cc");
+    expect(ccHit.session.vertices[0]?.expr).toMatchObject({ kind: "call", name: "circleCircleIntersection" });
+  });
+
   test("Tab flips along k on the last circle", () => {
     let s = startTool("profile");
     const a = clickTool(s, { world: { x: 2, y: 0 }, point: namedA });

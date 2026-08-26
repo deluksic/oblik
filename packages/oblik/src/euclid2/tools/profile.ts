@@ -1,8 +1,9 @@
 import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
-import type { Expr } from "@/source/expr";
+import { printExpr, type Expr } from "@/source/expr";
+import { isCrossing, type PlacePoint } from "../place";
 import { snapStrokeCarrier } from "../pick";
-import { dist, hoverBind, hoverPlace, previewCall } from "./common";
+import { dist, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -26,14 +27,44 @@ function canClose(s: ProfileSession): boolean {
   return needPoint(s) && s.vertices.length >= 2 && s.carriers.length >= 2;
 }
 
-function startBind(s: ProfileSession): string | null {
+function startLabel(s: ProfileSession): string {
   const e = s.vertices[0]?.expr;
-  return e?.kind === "ref" ? e.name : null;
+  return e ? printExpr(e) : "start";
 }
 
-function namedPoint(hit: PlaceHit, scope: Scope): Placed | null {
-  if (hit.point.kind !== "ref") return null;
-  return scope.points[hit.point.bind] ?? { expr: { kind: "ref", name: hit.point.bind }, at: hit.point.at };
+function sameVertex(a: Expr, b: Expr): boolean {
+  if (a.kind === "ref" && b.kind === "ref") return a.name === b.name;
+  return printExpr(a) === printExpr(b);
+}
+
+function vertexOf(hit: PlaceHit, scope: Scope): Placed | null {
+  if (hit.point.kind === "ref") {
+    return scope.points[hit.point.bind] ?? { expr: { kind: "ref", name: hit.point.bind }, at: hit.point.at };
+  }
+  if (isCrossing(hit.point)) return { expr: exprOfPlace(hit.point), at: hit.point.at };
+  return null;
+}
+
+function placeFromVertex(v: Placed, trace: readonly { occ: number; bind?: string; id: string }[]): PlacePoint | null {
+  const e = v.expr;
+  if (e.kind === "ref") {
+    const node = trace.find((n) => n.bind === e.name && n.occ === 0);
+    return { kind: "ref", bind: e.name, id: node?.id ?? e.name, at: v.at };
+  }
+  if (e.kind !== "call") return null;
+  const refs = e.args.filter((a): a is Extract<Expr, { kind: "ref" }> => a.kind === "ref").map((a) => a.name);
+  const kArg = e.args.find((a) => a.kind === "num");
+  const k = kArg && kArg.kind === "num" && (kArg.value === 1 || kArg.value === -1) ? kArg.value : undefined;
+  if (e.name === "lineIntersection" && refs[0] && refs[1]) {
+    return { kind: "lineIntersection", a: refs[0], b: refs[1], at: v.at };
+  }
+  if (e.name === "circleLineIntersection" && refs[0] && refs[1] && k != null) {
+    return { kind: "circleLineIntersection", circle: refs[0], line: refs[1], k, at: v.at };
+  }
+  if (e.name === "circleCircleIntersection" && refs[0] && refs[1] && k != null) {
+    return { kind: "circleCircleIntersection", a: refs[0], b: refs[1], k, at: v.at };
+  }
+  return null;
 }
 
 function carrierExpr(c: CycleCarrier): Expr {
@@ -113,7 +144,7 @@ export const profile: Tool<ProfileSession> = {
   spec: {
     id: "profile",
     title: "Profile",
-    hint: "Named points and existing strokes until the start point. Circles need a direction.",
+    hint: "Named points or crossings, then existing strokes until the start. Circles need a direction.",
     prefix: "pr",
     aliases: ["face", "region", "loop", "fill"],
   },
@@ -137,14 +168,8 @@ export const profile: Tool<ProfileSession> = {
       const start = session.vertices[0]!;
       const max = PROFILE_CLOSE_PX / Math.max(8, ctx.camera.scale);
       if (dist(hit.world, start.at) <= max) {
-        const bind = startBind(session);
-        if (bind) {
-          const node = ctx.trace.find((n) => n.bind === bind && n.occ === 0);
-          return {
-            ...hit,
-            point: { kind: "ref", bind, id: node?.id ?? bind, at: start.at },
-          };
-        }
+        const point = placeFromVertex(start, ctx.trace);
+        if (point) return { ...hit, point };
       }
     }
     return hit;
@@ -155,10 +180,10 @@ export const profile: Tool<ProfileSession> = {
   },
   click(session, hit, scope) {
     if (needPoint(session)) {
-      const p = namedPoint(hit, scope);
+      const p = vertexOf(hit, scope);
       if (!p) return { session };
-      const start = startBind(session);
-      if (canClose(session) && p.expr.kind === "ref" && p.expr.name === start) {
+      const start = session.vertices[0];
+      if (canClose(session) && start && sameVertex(p.expr, start.expr)) {
         return { insert: withBind(session, { from: "profile", args: [{ kind: "array", items: cycleItems(session) }] }) };
       }
       return { session: { ...session, vertices: [...session.vertices, p], focus: "cycle" } };
@@ -222,7 +247,7 @@ export const profile: Tool<ProfileSession> = {
         }),
       );
     } else if (needPoint(session) && place) {
-      const p = namedPoint(place, scope);
+      const p = vertexOf(place, scope);
       if (p) extra.push(p.expr);
     }
     const items = cycleItems(session, extra);
@@ -235,7 +260,13 @@ export const profile: Tool<ProfileSession> = {
       name,
     );
     if (!session.vertices[0]) {
-      return { line, hint: place?.point.kind === "ref" ? `Click ${place.point.bind} to start.` : spec.hint };
+      if (place?.point.kind === "ref") {
+        return { line, hint: `Click ${place.point.bind} to start.` };
+      }
+      if (place && isCrossing(place.point)) {
+        return { line, hint: "Click the crossing to start." };
+      }
+      return { line, hint: spec.hint };
     }
     if (needCarrier(session)) {
       return {
@@ -246,7 +277,7 @@ export const profile: Tool<ProfileSession> = {
       };
     }
     if (canClose(session)) {
-      const start = startBind(session);
+      const start = startLabel(session);
       return {
         line,
         hint: lastCircle(session)
@@ -254,6 +285,6 @@ export const profile: Tool<ProfileSession> = {
           : `Click ${start} to close. Tab to name it.`,
       };
     }
-    return { line, hint: "Click a named point on that carrier." };
+    return { line, hint: "Click a named point or crossing on that carrier." };
   },
 };
