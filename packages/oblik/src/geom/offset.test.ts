@@ -1,0 +1,110 @@
+import { describe, expect, test } from "vitest";
+
+import { alongValue, profileContains, profileValue } from "./profile";
+import { roundOffset } from "./offset";
+import type { Circle, Profile, Segment } from "./types";
+import type { Vec2 } from "./vec";
+
+function poly(pts: readonly Vec2[]): Profile {
+  const cycle: unknown[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % pts.length]!;
+    cycle.push(a, { kind: "segment", a, b } satisfies Segment);
+  }
+  return profileValue(cycle);
+}
+
+const square = poly([
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+]);
+
+const A = { x: 2, y: 0 };
+const B = { x: 0, y: 2 };
+const chord: Segment = { kind: "segment", a: A, b: B };
+const reach: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
+const slice = profileValue([A, chord, B, alongValue(reach, -1)]);
+
+describe("roundOffset", () => {
+  test("d === 0 is a copy", () => {
+    const out = roundOffset(square, 0);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.outer).toHaveLength(4);
+    expect(out[0]).not.toBe(square);
+    expect(profileContains(out[0]!, { x: 0.5, y: 0.5 })).toBe(true);
+  });
+
+  test("CCW square inset miters to four edges", () => {
+    const out = roundOffset(square, 0.2);
+    expect(out).toHaveLength(1);
+    const p = out[0]!;
+    expect(p.outer).toHaveLength(4);
+    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(profileContains(p, { x: 1, y: 1 })).toBe(false);
+    expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
+    expect(p.outer[0]?.a.x).toBeCloseTo(0.2);
+    expect(p.outer[0]?.a.y).toBeCloseTo(0.2);
+    expect(p.outer[0]?.b.x).toBeCloseTo(0.8);
+    expect(p.outer[0]?.b.y).toBeCloseTo(0.2);
+  });
+
+  test("CCW square outset is four offsets plus four quarter joins", () => {
+    const out = roundOffset(square, -0.2);
+    expect(out).toHaveLength(1);
+    const p = out[0]!;
+    expect(p.outer).toHaveLength(8);
+    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
+    expect(p.outer.filter((e) => e.carrier.kind === "circle").every((e) => e.k === 1)).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(profileContains(p, { x: 1, y: 1 })).toBe(true);
+    expect(profileContains(p, { x: 1.1, y: 0.5 })).toBe(true);
+    expect(profileContains(p, { x: 1.1, y: 1.1 })).toBe(true);
+    expect(profileContains(p, { x: 1.2, y: 1.2 })).toBe(false);
+  });
+
+  test("square inset past half-side collapses", () => {
+    expect(roundOffset(square, 0.5)).toEqual([]);
+    expect(roundOffset(square, 0.6)).toEqual([]);
+  });
+
+  test("slice inset keeps a point in the cap; large d empties", () => {
+    const small = roundOffset(slice, 0.12);
+    expect(small).toHaveLength(1);
+    expect(small[0]?.outer).toHaveLength(2);
+    expect(profileContains(small[0]!, { x: 1.25, y: 1.25 })).toBe(true);
+    expect(profileContains(small[0]!, { x: 0.2, y: 0.2 })).toBe(false);
+    expect(roundOffset(slice, 0.5)).toEqual([]);
+  });
+
+  test("slice outset rounds the tips", () => {
+    const out = roundOffset(slice, -0.15);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.outer).toHaveLength(4);
+    expect(out[0]?.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+    expect(profileContains(out[0]!, { x: 1.4, y: 1.4 })).toBe(true);
+  });
+
+  test("concave inset of an L gets a join arc at the notch", () => {
+    const ell = poly([
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 1, y: 1 },
+      { x: 1, y: 2 },
+      { x: 0, y: 2 },
+    ]);
+    const out = roundOffset(ell, 0.15);
+    expect(out).toHaveLength(1);
+    const arcs = out[0]!.outer.filter((e) => e.carrier.kind === "circle");
+    expect(out[0]?.outer).toHaveLength(7);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0]?.carrier.kind === "circle" && arcs[0].carrier.center.x).toBeCloseTo(1);
+    expect(arcs[0]?.carrier.kind === "circle" && arcs[0].carrier.center.y).toBeCloseTo(1);
+    expect(profileContains(out[0]!, { x: 0.4, y: 0.4 })).toBe(true);
+    expect(profileContains(out[0]!, { x: 1.5, y: 1.5 })).toBe(false);
+  });
+});

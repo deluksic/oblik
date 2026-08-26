@@ -21,7 +21,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Shared loop | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle |
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
 | Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
-| Slice | `profile([A, chord, B, along(reach, -1)])` fill; two gliders on a circle + named chord |
+| Slice | `profile([A, chord, B, along(reach, -1)])` fill; `inset(slice, n)` round offset; two gliders on a circle + named chord |
 | Triangle | three free points |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), plate **fillets/slots**, **slider labels**, style/fill/`drawPlate`, sdf2 / 3D.

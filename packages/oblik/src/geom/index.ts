@@ -3,3 +3,4 @@ export * from "./types";
 export * from "./ops";
 export * from "./gliders";
 export * from "./profile";
+export * from "./offset";

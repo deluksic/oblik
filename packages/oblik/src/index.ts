@@ -20,6 +20,7 @@ export {
   slider,
   along,
   profile,
+  inset,
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
