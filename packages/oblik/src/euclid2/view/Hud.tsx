@@ -1,7 +1,6 @@
 import { createMemo } from "solid-js";
 
 import type { TraceNode } from "../../eval/context";
-import { matchedStyle, svgPaint, type StyleSheet } from "../../eval/style";
 import { gliderAt, isGlider } from "../../geom/gliders";
 import type { Point } from "../../geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
@@ -15,7 +14,6 @@ const SNAP_R = 9;
 
 export function PointMark(props: {
   node: TraceNode;
-  sheet?: StyleSheet;
   size: PaneSize;
   camera: Camera2;
   hot: boolean;
@@ -26,10 +24,6 @@ export function PointMark(props: {
     const at = v.kind === "point" ? (v as Point) : isGlider(v) ? gliderAt(v) : { x: 0, y: 0 };
     return worldToScreen(at, props.camera, props.size);
   });
-  const restFill = createMemo(() => {
-    if (props.hot || props.selected) return undefined;
-    return svgPaint(matchedStyle(props.sheet ?? {}, props.node.id, props.node.kind)).fill;
-  });
   return (
     <>
       <circle
@@ -37,7 +31,6 @@ export function PointMark(props: {
           styles.point,
           { [styles.hotFill]: props.hot && !props.selected, [styles.selectedFill]: props.selected },
         ]}
-        style={restFill() ? { fill: restFill() } : undefined}
         cx={pos().x}
         cy={pos().y}
         r={POINT_R}

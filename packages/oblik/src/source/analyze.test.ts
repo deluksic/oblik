@@ -22,8 +22,6 @@ describe("analyze", () => {
     expect(map.get("o_aa")?.literals).toEqual([0, 0]);
     expect(map.get("o_bb")?.literals).toEqual([2.5]);
     expect(map.get("o_cc")?.editable).toBe(false);
-    expect(map.get("o_aa")?.kind).toBe("point");
-    expect(map.get("o_bb")?.kind).toBe("circle");
   });
 
   test("lists every constructor site even when ids collide", () => {

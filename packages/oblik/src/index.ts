@@ -29,12 +29,4 @@ export { printExpr, type Expr } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";
 export type { Camera2 } from "./euclid2/camera";
-export type {
-  StyleKind,
-  NodeStyle,
-  StyleSheet,
-  SheetEntry,
-  StyleMismatch,
-} from "./eval/style";
-export { parseStyleSheet, findStyleMismatches } from "./eval/style";
 export * from "./geom";

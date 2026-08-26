@@ -3,12 +3,6 @@ import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 import { evaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
 import type { Euclid2Scene } from "../eval/scene";
-import {
-  matchedStyle,
-  patchStyleSheet,
-  type NodeStyle,
-  type StyleSheet,
-} from "../eval/style";
 import type { Annotation } from "../source/analyze";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
@@ -36,8 +30,6 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
-  sheet: StyleSheet;
-  onSheet?: (sheet: StyleSheet) => void;
 };
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -63,20 +55,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     const node = selectedNode();
     if (!node) return EMPTY_SELECTION_DETAIL;
     return selectionDetailForNode(node);
-  });
-
-  const selectedKind = createMemo(() => selectedNode()?.kind);
-  const selectedStyle = createMemo(() => {
-    const n = selectedNode();
-    if (!n) return undefined;
-    return matchedStyle(props.sheet, n.id, n.kind);
-  });
-  const selectedMismatch = createMemo(() => {
-    const n = selectedNode();
-    if (!n) return undefined;
-    const entry = props.sheet[n.id];
-    if (!entry || entry.style.kind === n.kind) return undefined;
-    return { kind: entry.style.kind, expected: n.kind };
   });
 
   function applyStep(next: ToolStep | undefined) {
@@ -163,21 +141,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setPlace(null);
   }
 
-  async function commitStyle(style: NodeStyle | null) {
-    const n = selectedNode();
-    if (!n) return;
-    props.onSheet?.(patchStyleSheet(props.sheet, n.id, style));
-    const res = await fetch("/__oblik-sheet", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: n.id, style }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `sheet failed (${res.status})`);
-    }
-  }
-
   function onPlace(hit: PlaceHit) {
     const session = tool();
     if (!session) return;
@@ -215,7 +178,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         <p class={styles.status}>{status()}</p>
         <Euclid2View
           trace={world().trace}
-          sheet={props.sheet}
           initialCamera={props.scene.camera}
           placing={tool() != null}
           ghost={ghost()}
@@ -255,13 +217,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         />
       </div>
       <Loading fallback={<SelectionSidebar detail={EMPTY_SELECTION_DETAIL} />}>
-        <SelectionSidebar
-          detail={selectionDetail()}
-          kind={selectedKind()}
-          style={selectedStyle()}
-          mismatch={selectedMismatch()}
-          onStyleChange={(style) => void commitStyle(style)}
-        />
+        <SelectionSidebar detail={selectionDetail()} />
       </Loading>
     </div>
   );

@@ -93,16 +93,16 @@ export const point = mark((x: number, y: number, id?: string): Point => {
   const px = draftAt(id, 0, x);
   const py = draftAt(id, 1, y);
   return traced({ kind: "point", x: px, y: py }, id);
-}, { dof: [0, 1], kind: "point" });
+}, { dof: [0, 1] });
 
 export const circle = mark((center: Vec2, radius: number, id?: string): Circle => {
   const r = draftAt(id, 0, radius);
   return traced({ kind: "circle", center, radius: r }, id);
-}, { dof: [1], kind: "circle" });
+}, { dof: [1] });
 
 export const segment = mark((a: Vec2, b: Vec2, id?: string): Segment => {
   return traced({ kind: "segment", a, b }, id);
-}, { dof: [], kind: "segment" });
+}, { dof: [] });
 
 export const line = mark((a: Vec2, b: Vec2, id?: string): Line => {
   const dx = b.x - a.x;
@@ -110,32 +110,32 @@ export const line = mark((a: Vec2, b: Vec2, id?: string): Line => {
   const l = Math.hypot(dx, dy);
   const direction = l < 1e-9 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
   return traced({ kind: "line", origin: a, direction }, id);
-}, { dof: [], kind: "line" });
+}, { dof: [] });
 
 export const parallelLine = mark((geom: LineLike, signedD: number, id?: string): ParallelLine => {
   const d = draftAt(id, 0, signedD);
   return traced(parallelLineValue(geom, d), id);
-}, { dof: [1], kind: "parallelLine" });
+}, { dof: [1] });
 
 export const perpendicularLine = mark((geom: LineLike, through: Vec2, id?: string): Line => {
   return traced(perpendicularLineValue(geom, through), id);
-}, { dof: [], kind: "line" });
+}, { dof: [] });
 
 export const pointOnSegment = mark((seg: Segment, t: number, id?: string): Glider => {
   const tt = draftAt(id, 0, t);
   return traced(pointOnSegmentValue(seg, tt), id);
-}, { dof: [1], kind: "gliderSegment" });
+}, { dof: [1] });
 
 export const pointOnLine = mark((geom: LineLike, s: number, id?: string): Glider => {
   const ss = draftAt(id, 0, s);
   return traced(pointOnLineValue(geom, ss), id);
-}, { dof: [1], kind: "gliderLine" });
+}, { dof: [1] });
 
 export const pointOnCircle = mark((c: Circle, ux: number, uy: number, id?: string): Glider => {
   const u = draftAt(id, 0, ux);
   const v = draftAt(id, 1, uy);
   return traced(pointOnCircleValue(c, u, v), id);
-}, { dof: [1, 2], kind: "gliderCircle" });
+}, { dof: [1, 2] });
 
 export function signedDist(p: Vec2, geom: LineLike): number {
   return signedDistValue(p, geom);
@@ -144,14 +144,14 @@ export function signedDist(p: Vec2, geom: LineLike): number {
 export const lineIntersection = mark((a: LineLike, b: LineLike, id?: string): Point => {
   const p = lineIntersectionValue(a, b);
   return traced({ kind: "point", x: p.x, y: p.y }, id);
-}, { dof: [], kind: "point" });
+}, { dof: [] });
 
 export const circleLineIntersection = mark(
   (c: Circle, l: LineLike, k: Branch, id?: string): Point => {
     const p = circleLineIntersectionValue(c, l, k);
     return traced({ kind: "point", x: p.x, y: p.y }, id);
   },
-  { dof: [], kind: "point" },
+  { dof: [] },
 );
 
 export const circleCircleIntersection = mark(
@@ -159,7 +159,7 @@ export const circleCircleIntersection = mark(
     const p = circleCircleIntersectionValue(a, b, k);
     return traced({ kind: "point", x: p.x, y: p.y }, id);
   },
-  { dof: [], kind: "point" },
+  { dof: [] },
 );
 
 export function dist(a: Vec2, b: Vec2): number {
@@ -207,7 +207,7 @@ export const slider = mark((n: number, opts?: SliderOpts, id?: string): number =
   const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
   const v = snapEditNumber(raw, min, max, step);
   return tracedSlider(v, { min, max, step }, id);
-}, { dof: [0], kind: "slider" });
+}, { dof: [0] });
 
 export const constructors = {
   point,

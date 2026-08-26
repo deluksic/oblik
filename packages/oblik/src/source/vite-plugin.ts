@@ -11,18 +11,11 @@ import {
   sceneGlobKeys,
   sceneLoadersModule,
 } from "./catalog";
-import {
-  parseStyleSheet,
-  parseSheetEntry,
-  patchStyleSheet,
-  pruneSheet,
-  type StyleSheet,
-} from "../eval/style";
 import { insertCall } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
-import { parseInsert, parseLiteralPatch, parseSheetPatch } from "./schema";
+import { parseInsert, parseLiteralPatch } from "./schema";
 import { freshSiteId, stamp } from "./stamp";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
@@ -31,8 +24,6 @@ const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
 const VIRTUAL_ANN_BUNDLE_RESOLVED = "\0virtual:oblik-annotations-bundle";
 const VIRTUAL_CATALOG = "virtual:oblik-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0" + VIRTUAL_CATALOG;
-const VIRTUAL_SHEET = "virtual:oblik-sheet";
-const VIRTUAL_SHEET_RESOLVED = "\0" + VIRTUAL_SHEET;
 
 export type OblikPluginOpts = {
   workspaceRoot: string;
@@ -96,29 +87,6 @@ function invalidateCatalogConsumers(server: ViteDevServer): void {
   const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
   if (!catalog) return;
   for (const importer of [...catalog.importers]) void server.reloadModule(importer);
-}
-
-function sheetAbs(appRoot: string): string {
-  return path.join(appRoot, "src/oblik-sheet.json");
-}
-
-function isSheetFile(appRoot: string, file: string): boolean {
-  return path.resolve(file) === path.resolve(sheetAbs(appRoot));
-}
-
-function readSheet(appRoot: string): StyleSheet {
-  const abs = sheetAbs(appRoot);
-  if (!fs.existsSync(abs)) return {};
-  try {
-    return pruneSheet(parseStyleSheet(JSON.parse(fs.readFileSync(abs, "utf8"))));
-  } catch {
-    return {};
-  }
-}
-
-function invalidateSheet(server: ViteDevServer): void {
-  const mod = server.moduleGraph.getModuleById(VIRTUAL_SHEET_RESOLVED);
-  if (mod) void server.reloadModule(mod);
 }
 
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
@@ -218,38 +186,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           }
           return;
         }
-        if (req.method === "POST" && req.url === "/__oblik-sheet") {
-          let body: unknown;
-          try {
-            body = JSON.parse(await readBody(req));
-          } catch {
-            json(res, 400, { ok: false, error: "invalid json" });
-            return;
-          }
-          const patch = parseSheetPatch(body);
-          if (typeof patch === "string") {
-            json(res, 400, { ok: false, error: patch });
-            return;
-          }
-          const parsed = patch.style == null ? null : parseSheetEntry({ style: patch.style });
-          if (patch.style != null && parsed == null) {
-            json(res, 400, { ok: false, error: "invalid style — expected { kind, ... }" });
-            return;
-          }
-          try {
-            const abs = sheetAbs(appRoot);
-            const next = patchStyleSheet(readSheet(appRoot), patch.id, parsed?.style ?? null);
-            await enqueue(abs, () => {
-              fs.mkdirSync(path.dirname(abs), { recursive: true });
-              fs.writeFileSync(abs, `${JSON.stringify(next, null, 2)}\n`);
-            });
-            invalidateSheet(server);
-            json(res, 200, { ok: true });
-          } catch (err) {
-            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
-          }
-          return;
-        }
         if (req.method === "GET" && req.url?.startsWith("/__peek?")) {
           const url = new URL(req.url, "http://localhost");
           const file = url.searchParams.get("file");
@@ -293,7 +229,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     },
     resolveId(id) {
       if (id === VIRTUAL_CATALOG) return VIRTUAL_CATALOG_RESOLVED;
-      if (id === VIRTUAL_SHEET) return VIRTUAL_SHEET_RESOLVED;
       if (id === VIRTUAL_ANN) return VIRTUAL_ANN_BUNDLE_RESOLVED;
       if (id.startsWith(`${VIRTUAL_ANN}?`)) {
         return VIRTUAL_ANN_RESOLVED + id.slice(VIRTUAL_ANN.length);
@@ -304,9 +239,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         const scenes = scanOblikCatalog(sceneDir, workspaceRoot);
         lastCatalog = JSON.stringify(scenes);
         return `export const scenes = ${JSON.stringify(scenes)};\n`;
-      }
-      if (id === VIRTUAL_SHEET_RESOLVED) {
-        return `export const sheet = ${JSON.stringify(readSheet(appRoot))};\n`;
       }
       if (id === VIRTUAL_ANN_BUNDLE_RESOLVED) {
         const { byPath, collisions } = scanAnnotationsBundle(listUserAppSources(appRoot), workspaceRoot);
@@ -341,11 +273,6 @@ export const annotationCollisions = ${JSON.stringify(collisions)};
     },
     handleHotUpdate(ctx) {
       const server = ctx.server;
-      if (isSheetFile(appRoot, ctx.file)) {
-        invalidateSheet(server);
-        const sheetMod = server.moduleGraph.getModuleById(VIRTUAL_SHEET_RESOLVED);
-        return sheetMod ? [...ctx.modules, sheetMod] : ctx.modules;
-      }
       if (!isUserAppSource(appRoot, ctx.file)) return;
       invalidateAnnotationsBundle(server);
       for (const mod of server.moduleGraph.idToModuleMap.values()) {

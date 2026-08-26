@@ -1,11 +1,10 @@
 import { mountOblik } from "oblik/host";
-import type { DuplicateId, OblikSceneEntry, StyleSheet } from "oblik";
+import type { DuplicateId, OblikSceneEntry } from "oblik";
 import {
   annotationCollisions as initialCollisions,
   annotationsByPath as initialAnnotations,
 } from "virtual:oblik-annotations";
 import { scenes as initialScenes } from "virtual:oblik-catalog";
-import { sheet as initialSheet } from "virtual:oblik-sheet";
 
 import { sceneLoaders as initialLoaders } from "./scene-loaders";
 
@@ -15,16 +14,12 @@ const host = mountOblik({
   loaders: initialLoaders,
   annotations: initialAnnotations,
   collisions: initialCollisions,
-  sheet: initialSheet,
 });
 
 const reloadLoaders = async () => (await import("./scene-loaders")).sceneLoaders;
 const reloadAnnotations = async () => import("virtual:oblik-annotations");
 
 if (import.meta.hot) {
-  import.meta.hot.accept("virtual:oblik-sheet", (mod) => {
-    if (mod) host.setSheet((mod as { sheet: StyleSheet }).sheet);
-  });
   import.meta.hot.accept(
     ["virtual:oblik-catalog", "virtual:oblik-annotations", "./scene-loaders"],
     async (mods) => {
