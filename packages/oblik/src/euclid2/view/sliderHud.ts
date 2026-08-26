@@ -1,4 +1,4 @@
-import type { TraceNode } from "../../eval/context";
+import type { TraceNode } from "@/eval/context";
 
 const MARGIN = 12;
 const PANEL_W = 200;

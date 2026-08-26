@@ -1,6 +1,6 @@
-import type { Expr } from "../../source/expr";
-import { printExpr } from "../../source/expr";
-import { hoistIntersections, printHoist } from "../../source/hoist";
+import type { Expr } from "@/source/expr";
+import { printExpr } from "@/source/expr";
+import { hoistIntersections, printHoist } from "@/source/hoist";
 import { isConstructed } from "../place";
 import { constructedInsert, exprOfPlace, hoverPlace, round } from "./common";
 import {

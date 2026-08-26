@@ -24,6 +24,11 @@ export default defineConfig({
     strictPort: true,
     fs: { allow: [workspaceRoot] },
   },
+  resolve: {
+    alias: {
+      "@": path.resolve(workspaceRoot, "packages/oblik/src"),
+    },
+  },
   optimizeDeps: {
     exclude: ["oblik"],
   },

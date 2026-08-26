@@ -1,5 +1,5 @@
-import { printExpr, type Expr } from "../../source/expr";
-import { hoistIntersections, printHoist, takeBind } from "../../source/hoist";
+import { printExpr, type Expr } from "@/source/expr";
+import { hoistIntersections, printHoist, takeBind } from "@/source/hoist";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { Vec2 } from "../pick";
 import type { InsertJob, PlaceHit, Placed } from "./types";

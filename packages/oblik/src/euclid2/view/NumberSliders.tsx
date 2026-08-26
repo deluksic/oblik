@@ -1,7 +1,7 @@
 import { createMemo } from "solid-js";
 
-import type { TraceNode } from "../../eval/context";
-import { formatNum } from "../../source/patch";
+import type { TraceNode } from "@/eval/context";
+import { formatNum } from "@/source/patch";
 import { layoutSliders } from "./sliderHud";
 
 import styles from "./View.module.css";

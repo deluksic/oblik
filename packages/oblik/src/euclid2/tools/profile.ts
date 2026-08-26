@@ -1,6 +1,6 @@
-import type { Branch, Circle, LineLike, ProfileEdge } from "../../geom";
-import { alongK, lineBasis, projectOnCircle, projectOnLine } from "../../geom";
-import type { Expr } from "../../source/expr";
+import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
+import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
+import type { Expr } from "@/source/expr";
 import { snapStrokeCarrier } from "../pick";
 import { dist, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";

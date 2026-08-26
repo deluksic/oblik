@@ -1,6 +1,6 @@
-import type { TraceNode } from "../../eval/context";
-import type { Circle, LineLike } from "../../geom";
-import { gliderAt, isGlider } from "../../geom/gliders";
+import type { TraceNode } from "@/eval/context";
+import type { Circle, LineLike } from "@/geom";
+import { gliderAt, isGlider } from "@/geom/gliders";
 import { isFiniteTrace } from "../pick";
 import type { Placed, Scope } from "./types";
 

@@ -1,6 +1,6 @@
-import type { TraceNode } from "../../eval/context";
-import type { Branch, Circle, LineLike, ProfileEdge } from "../../geom";
-import type { Expr } from "../../source/expr";
+import type { TraceNode } from "@/eval/context";
+import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
+import type { Expr } from "@/source/expr";
 import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";

@@ -1,8 +1,8 @@
 import { createMemo } from "solid-js";
 
-import type { TraceNode } from "../../eval/context";
-import type { Circle, Line, ParallelLine, Profile, Segment } from "../../geom";
-import { edgesSvgPath, profileSvgPath } from "../../geom/profile";
+import type { TraceNode } from "@/eval/context";
+import type { Circle, Line, ParallelLine, Profile, Segment } from "@/geom";
+import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import type { Ghost } from "../tool";
 

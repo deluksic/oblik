@@ -1,8 +1,8 @@
-import type { TraceNode } from "../../eval/context";
-import type { Circle, Glider, LineLike, ParallelLine, Point, Segment } from "../../geom";
-import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "../../geom/gliders";
-import { lineBasis, signedDist } from "../../geom/ops";
-import { mul, perp, sub } from "../../geom/vec";
+import type { TraceNode } from "@/eval/context";
+import type { Circle, Glider, LineLike, ParallelLine, Point, Segment } from "@/geom";
+import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "@/geom/gliders";
+import { lineBasis, signedDist } from "@/geom/ops";
+import { mul, perp, sub } from "@/geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick } from "../pick";
 import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeAllowsGliders, placeSnapWorld, resolvePlacePoint } from "../place";

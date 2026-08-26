@@ -1,7 +1,7 @@
-import type { LineLike } from "../../geom";
-import { lineBasis } from "../../geom/ops";
-import { add, perp } from "../../geom/vec";
-import { printExpr } from "../../source/expr";
+import type { LineLike } from "@/geom";
+import { lineBasis } from "@/geom/ops";
+import { add, perp } from "@/geom/vec";
+import { printExpr } from "@/source/expr";
 import { snapLineCarrier } from "../pick";
 import { asPoint, exprOfPlace, hoverBind, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { inSlot, nameField, previewName, refField, resolveCarrier, resolvePoint, withBind } from "./draft";

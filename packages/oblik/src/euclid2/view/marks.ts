@@ -1,5 +1,5 @@
-import type { TraceNode } from "../../eval/context";
-import { isGlider } from "../../geom/gliders";
+import type { TraceNode } from "@/eval/context";
+import { isGlider } from "@/geom/gliders";
 import { traceKey } from "../pick";
 
 export function isHot(node: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined): boolean {

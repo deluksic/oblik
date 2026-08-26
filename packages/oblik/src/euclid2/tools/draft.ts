@@ -1,4 +1,4 @@
-import { printExpr } from "../../source/expr";
+import { printExpr } from "@/source/expr";
 import type { InsertJob, Field, FieldKind, Draft, Scope, Tool, ToolKey, ToolSession, ToolStep } from "./types";
 import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";

@@ -1,11 +1,11 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
-import type { TraceNode } from "../../eval/context";
+import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
-import { isGlider } from "../../geom/gliders";
-import { isProfile } from "../../geom/profile";
+import { isGlider } from "@/geom/gliders";
+import { isProfile } from "@/geom/profile";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";

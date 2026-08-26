@@ -1,4 +1,4 @@
-import { printExpr } from "../../source/expr";
+import { printExpr } from "@/source/expr";
 import { asPoint, exprOfPlace, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
 import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";

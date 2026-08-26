@@ -1,8 +1,8 @@
 import { createMemo } from "solid-js";
 
-import type { TraceNode } from "../../eval/context";
-import { gliderAt, isGlider } from "../../geom/gliders";
-import type { Point } from "../../geom";
+import type { TraceNode } from "@/eval/context";
+import { gliderAt, isGlider } from "@/geom/gliders";
+import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 

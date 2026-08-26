@@ -1,4 +1,4 @@
-import type { TraceNode } from "../../eval/context";
+import type { TraceNode } from "@/eval/context";
 import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
 import { circle } from "./circle";
 import { line } from "./line";
@@ -9,7 +9,7 @@ import { profile } from "./profile";
 import { segment } from "./segment";
 import { slider } from "./slider";
 import { scopeFromTrace, scopeOf } from "./scope";
-import type { PlaceCtx, PlaceHit, Scope, Tool, ToolId, ToolKey, ToolSession } from "./types";
+import type { PlaceCtx, PlaceHit, Scope, Tool, ToolId, ToolKey, ToolSession, ToolSpec } from "./types";
 
 export type {
   Draft,
@@ -59,18 +59,26 @@ export function toolById(id: ToolId): Tool {
   return byId[id];
 }
 
+function titleMatch(t: ToolSpec, q: string): boolean {
+  return t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+}
+
+function descriptionMatch(t: ToolSpec, q: string): boolean {
+  if (t.hint.toLowerCase().includes(q)) return true;
+  return (
+    t.aliases?.some((a) => {
+      const alias = a.toLowerCase();
+      return alias.includes(q) || q.includes(alias);
+    }) ?? false
+  );
+}
+
 export function filterTools(query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return [...TOOLS];
-  return TOOLS.filter(
-    (t) =>
-      t.title.toLowerCase().includes(q) ||
-      t.id.toLowerCase().includes(q) ||
-      t.aliases?.some((a) => {
-        const alias = a.toLowerCase();
-        return alias.includes(q) || q.includes(alias);
-      }),
-  );
+  const byTitle = TOOLS.filter((t) => titleMatch(t, q));
+  if (byTitle.length > 0) return byTitle;
+  return TOOLS.filter((t) => descriptionMatch(t, q));
 }
 
 export function startTool(id: ToolId): ToolSession {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../../eval/context";
+import type { TraceNode } from "@/eval/context";
 import { hitSlider, layoutSliders, sliderValueFromPointer } from "./sliderHud";
 
 const SLIDER = {

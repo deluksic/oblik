@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../../eval/context";
+import type { TraceNode } from "@/eval/context";
 import { applyDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 
 const camera = { x: 0, y: 0, scale: 48 };

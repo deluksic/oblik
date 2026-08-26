@@ -1,5 +1,5 @@
-import type { LineLike } from "../../geom";
-import { signedDist } from "../../geom/ops";
+import type { LineLike } from "@/geom";
+import { signedDist } from "@/geom/ops";
 import { snapLineCarrier } from "../pick";
 import { exprOfPlace, hoverBind, hoverPlace, isPinnedPoint, previewCall, round } from "./common";
 import {

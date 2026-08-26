@@ -848,6 +848,14 @@ describe("filterTools", () => {
   test("matches profile by face alias", () => {
     expect(filterTools("face").map((t) => t.id)).toEqual(["profile"]);
   });
+
+  test("title hits beat description hits", () => {
+    expect(filterTools("line").map((t) => t.id)).toEqual(["line", "parallelLine", "perpendicularLine"]);
+  });
+
+  test("falls back to aliases when the title does not match", () => {
+    expect(filterTools("fill").map((t) => t.id)).toEqual(["profile"]);
+  });
 });
 
 describe("slider tool", () => {
