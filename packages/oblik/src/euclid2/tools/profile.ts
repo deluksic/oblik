@@ -143,6 +143,11 @@ function arrowAt(
   return { at, tx: dir.x * sign, ty: dir.y * sign };
 }
 
+/** True while Profile is the live tool — existing fills stay out of the way. */
+export function profileHidesExisting(session: ToolSession | null | undefined): boolean {
+  return session?.verb === "profile";
+}
+
 /** Named strokes through the current vertex, or `null` when not picking a carrier. */
 export function profileEligibleCarriers(
   session: ToolSession | null | undefined,

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
-import { profileEligibleCarriers } from "./tools/profile";
+import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
 import type { PlacePoint } from "./place";
 import type { TraceNode } from "../eval/context";
 
@@ -1073,6 +1073,12 @@ describe("profile tool", () => {
     expect(miss.carrier).toBeUndefined();
     const hit = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
     expect(hit.carrier?.bind).toBe("axis");
+  });
+
+  test("hides existing fills for the whole Profile session", () => {
+    expect(profileHidesExisting(startTool("profile"))).toBe(true);
+    expect(profileHidesExisting(startTool("line"))).toBe(false);
+    expect(profileHidesExisting(null)).toBe(false);
   });
 
   test("ghost arrow sits on the carrier at the vertex, pointing along it", () => {

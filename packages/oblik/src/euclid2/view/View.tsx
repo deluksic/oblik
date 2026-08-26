@@ -4,7 +4,7 @@ import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
 import { hoverTool, type Ghost, type PlaceHit, type ToolSession } from "../tool";
-import { profileEligibleCarriers } from "../tools/profile";
+import { profileEligibleCarriers, profileHidesExisting } from "../tools/profile";
 import { isGlider } from "@/geom/gliders";
 import { isProfile } from "@/geom/profile";
 import { GhostMark } from "./Ghost";
@@ -195,7 +195,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
-  const fills = createMemo(() => strokes().filter((n) => isProfile(n.value)));
+  const placingProfile = createMemo(() => !!props.placing && profileHidesExisting(props.toolSession));
+  const fills = createMemo(() =>
+    placingProfile() ? [] : strokes().filter((n) => isProfile(n.value)),
+  );
   const ink = createMemo(() =>
     strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
   );
