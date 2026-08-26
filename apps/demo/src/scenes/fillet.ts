@@ -14,7 +14,7 @@ import {
 export default defineScene({
   kind: "euclid2",
   title: "Fillet",
-  hint: "Every fillet(·, r) shares r. Drag r until the small square vanishes (adjacent overlap). The semicircle never fills (fillet at a flat origin).",
+  hint: "Every fillet(·, r) shares r. Drag r until the small square vanishes (adjacent overlap). Below r = 0.12 the inner offset is a sharp square (eaten fillet arcs). The semicircle never fills (fillet at a flat origin).",
   camera: { x: 6.4, y: 2.7, scale: 42 },
   build() {
     const r = slider(0.35, { min: 0, max: 0.8, step: 0.01 }, "o_fil_r");

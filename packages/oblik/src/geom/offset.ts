@@ -204,12 +204,41 @@ type Join =
   | { kind: "miter"; p: Vec2 }
   | { kind: "arc"; start: Vec2; end: Vec2; carrier: Circle; k: Branch };
 
+function vertexJoin(
+  prev: ProfileEdge,
+  next: ProfileEdge,
+  v: Vec2,
+  inward: number,
+  w: 1 | -1,
+  offPrev: LineLike | Circle,
+  offNext: LineLike | Circle,
+): Join | null {
+  const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
+  const convex = w * turn > EPS;
+  const concave = w * turn < -EPS;
+  const gap = (convex && inward < 0) || (concave && inward > 0);
+  if (gap) {
+    const start = offsetPoint(prev, prev.b, inward, w);
+    const end = offsetPoint(next, next.a, inward, w);
+    if (!isFiniteVec(start) || !isFiniteVec(end) || dist(start, v) < EPS) return null;
+    if (dist(start, end) < EPS) return { kind: "miter", p: start };
+    const carrier: Circle = { kind: "circle", center: v, radius: Math.abs(inward) };
+    return { kind: "arc", start, end, carrier, k: alongK(carrier, start, end) };
+  }
+  const hit = miterJoin(prev, next, v, inward, w, offPrev, offNext);
+  if (!hit) return null;
+  return { kind: "miter", p: hit };
+}
+
 /**
  * Local round offset. Positive `d` grows (outward from winding); negative
  * shrinks. Convex outset and concave inset take a join arc of radius `|d|`
  * about the original vertex; convex inset miters. A flat (180°) vertex
- * offsets along the shared normal. Reverse, `r' ≤ 0`, or a missed hit → `[]`.
- * Does not split islands or clip non-adjacent swallows.
+ * offsets along the shared normal. A carrier with `r' ≤ 0` is dropped and
+ * the surviving offsets are joined at their hit (a filleted square inset
+ * past `r` is a sharp inner square). Reverse, a missed hit, or fewer than
+ * two surviving edges → `[]`. Does not split islands or clip non-adjacent
+ * swallows.
  */
 export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
@@ -219,47 +248,44 @@ export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (w === 0) return [];
   const edges = p.outer;
   const n = edges.length;
-  const off: Array<LineLike | Circle> = [];
-  for (const e of edges) {
-    const c = offsetCarrier(e, inward, w);
-    if (!c) return [];
-    off.push(c);
-  }
+  const off: Array<LineLike | Circle | null> = [];
+  for (const e of edges) off.push(offsetCarrier(e, inward, w));
+  const kept: number[] = [];
+  for (let i = 0; i < n; i++) if (off[i]) kept.push(i);
+  const m = kept.length;
+  if (m < 2) return [];
   const joins: Join[] = [];
-  for (let i = 0; i < n; i++) {
-    const prev = edges[(i + n - 1) % n]!;
+  for (let ki = 0; ki < m; ki++) {
+    const iPrev = kept[(ki + m - 1) % m]!;
+    const i = kept[ki]!;
+    const prev = edges[iPrev]!;
     const next = edges[i]!;
-    const v = next.a;
-    const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
-    const convex = w * turn > EPS;
-    const concave = w * turn < -EPS;
-    const gap = (convex && inward < 0) || (concave && inward > 0);
-    if (gap) {
-      const start = offsetPoint(prev, prev.b, inward, w);
-      const end = offsetPoint(next, next.a, inward, w);
-      if (!isFiniteVec(start) || !isFiniteVec(end) || dist(start, v) < EPS) return [];
-      if (dist(start, end) < EPS) {
-        joins.push({ kind: "miter", p: start });
-        continue;
-      }
-      const carrier: Circle = { kind: "circle", center: v, radius: Math.abs(inward) };
-      joins.push({ kind: "arc", start, end, carrier, k: alongK(carrier, start, end) });
+    const offPrev = off[iPrev]!;
+    const offNext = off[i]!;
+    const adjacent = i === (iPrev + 1) % n;
+    if (adjacent) {
+      const j = vertexJoin(prev, next, next.a, inward, w, offPrev, offNext);
+      if (!j) return [];
+      joins.push(j);
       continue;
     }
-    const hit = miterJoin(prev, next, v, inward, w, off[(i + n - 1) % n]!, off[i]!);
+    // Dropped carriers between these two: do not miter from a G1 endpoint
+    // (that is not the original corner). Intersect the surviving offsets.
+    const hit = closestHit(carrierHits(offPrev, offNext), lerp(prev.b, next.a, 0.5));
     if (!hit) return [];
     joins.push({ kind: "miter", p: hit });
   }
   const outer: ProfileEdge[] = [];
-  for (let i = 0; i < n; i++) {
-    const j0 = joins[i]!;
-    const j1 = joins[(i + 1) % n]!;
+  for (let ki = 0; ki < m; ki++) {
+    const i = kept[ki]!;
+    const j0 = joins[ki]!;
+    const j1 = joins[(ki + 1) % m]!;
     const start = j0.kind === "miter" ? j0.p : j0.end;
     const end = j1.kind === "miter" ? j1.p : j1.start;
     const src = edges[i]!;
     if (!originalForward(src, start, end)) return [];
-    const k = src.carrier.kind === "circle" ? src.k : undefined;
-    const e = edgeFrom(off[i]!, start, end, k);
+    const branch = src.carrier.kind === "circle" ? src.k : undefined;
+    const e = edgeFrom(off[i]!, start, end, branch);
     if (!e) return [];
     outer.push(e);
     if (j1.kind === "arc") {
