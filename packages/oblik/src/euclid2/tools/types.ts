@@ -190,8 +190,8 @@ export type ToolKey = { key: string; shift?: boolean; ctrl?: boolean; meta?: boo
 
 export type ToolChrome = {
   hideFills?: boolean;
-  hideStrokes?: boolean;
-  hidePoints?: boolean;
+  muteStrokes?: boolean;
+  mutePoints?: boolean;
   hideSnap?: boolean;
 };
 

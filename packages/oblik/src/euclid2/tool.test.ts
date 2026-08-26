@@ -1389,19 +1389,19 @@ describe("fillet tool", () => {
     expect(hit.corner?.at.y).toBeCloseTo(0);
   });
 
-  test("hides points and strokes while picking a corner, not fills", () => {
+  test("subdues points and strokes while picking a corner, not fills", () => {
     expect(toolChrome(startTool("fillet"))).toEqual({
       hideFills: false,
-      hideStrokes: true,
-      hidePoints: true,
+      muteStrokes: true,
+      mutePoints: true,
       hideSnap: true,
     });
     const mid = clickTool(startTool("fillet"), faceHit, scope);
     if (!("session" in mid)) throw new Error("expected session");
     expect(toolChrome(mid.session)).toEqual({
       hideFills: false,
-      hideStrokes: false,
-      hidePoints: false,
+      muteStrokes: false,
+      mutePoints: false,
       hideSnap: false,
     });
     expect(toolChrome(startTool("profile")).hideFills).toBe(true);

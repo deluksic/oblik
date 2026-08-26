@@ -130,7 +130,7 @@ export const fillet: Tool<FilletSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as FilletSession["focus"] }),
   chrome(session) {
     if (vertexOf(session)) return {};
-    return { hideStrokes: true, hidePoints: true, hideSnap: true };
+    return { muteStrokes: true, mutePoints: true, hideSnap: true };
   },
   hit(session, hit, ctx) {
     if (!vertexOf(session)) {

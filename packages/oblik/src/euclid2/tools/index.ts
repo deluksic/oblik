@@ -156,8 +156,8 @@ export function hoverTool(session: ToolSession, hit: PlaceHit, trace: readonly T
 
 const CHROME_OFF = {
   hideFills: false,
-  hideStrokes: false,
-  hidePoints: false,
+  muteStrokes: false,
+  mutePoints: false,
   hideSnap: false,
 };
 
@@ -166,8 +166,8 @@ export function toolChrome(session: ToolSession | null | undefined) {
   const c = of(session).chrome?.(session as never);
   return {
     hideFills: !!c?.hideFills,
-    hideStrokes: !!c?.hideStrokes,
-    hidePoints: !!c?.hidePoints,
+    muteStrokes: !!c?.muteStrokes,
+    mutePoints: !!c?.mutePoints,
     hideSnap: !!c?.hideSnap,
   };
 }

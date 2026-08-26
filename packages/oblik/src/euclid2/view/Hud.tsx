@@ -18,6 +18,7 @@ export function PointMark(props: {
   camera: Camera2;
   hot: boolean;
   selected: boolean;
+  muted?: boolean;
 }) {
   const pos = createMemo(() => {
     const v = props.node.value;
@@ -29,14 +30,23 @@ export function PointMark(props: {
       <circle
         class={[
           styles.point,
-          { [styles.hotFill]: props.hot && !props.selected, [styles.selectedFill]: props.selected },
+          {
+            [styles.hotFill]: props.hot && !props.selected,
+            [styles.selectedFill]: props.selected,
+            [styles.muted]: !!props.muted && !props.hot && !props.selected,
+          },
         ]}
         cx={pos().x}
         cy={pos().y}
         r={POINT_R}
       />
       {props.node.bind ? (
-        <text class={styles.label} x={pos().x + 10} y={pos().y - 8} font-size="12">
+        <text
+          class={[styles.label, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]}
+          x={pos().x + 10}
+          y={pos().y - 8}
+          font-size="12"
+        >
           {props.node.bind}
         </text>
       ) : null}
@@ -50,6 +60,7 @@ export function Handle(props: {
   camera: Camera2;
   hot: boolean;
   selected: boolean;
+  muted?: boolean;
 }) {
   const pos = createMemo(() => {
     const v = props.node.value;
@@ -63,6 +74,7 @@ export function Handle(props: {
         {
           [styles.handleHot]: props.hot && !props.selected,
           [styles.handleSelected]: props.selected,
+          [styles.muted]: !!props.muted && !props.hot && !props.selected,
         },
       ]}
       data-handle={props.node.id}

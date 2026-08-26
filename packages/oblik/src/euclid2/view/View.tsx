@@ -200,17 +200,11 @@ export function Euclid2View(props: Euclid2ViewProps) {
     chrome().hideFills ? [] : strokes().filter((n) => isProfile(n.value)),
   );
   const ink = createMemo(() =>
-    chrome().hideStrokes
-      ? []
-      : strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
+    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
   );
-  const points = createMemo(() =>
-    chrome().hidePoints ? [] : strokes().filter((n) => n.kind === "point" || isGlider(n.value)),
-  );
+  const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
   const handles = createMemo(() =>
-    chrome().hidePoints
-      ? []
-      : strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+    strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
   );
   const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
@@ -258,7 +252,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
                 muted={
-                  eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))
+                  chrome().muteStrokes ||
+                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind)))
                 }
                 camera={camera()}
                 size={size()}
@@ -280,9 +275,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
-        {props.ghost && props.ghost.kind !== "profile" ? (
-          <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
-        ) : null}
         <For each={points()}>
           {(n) => (
             <PointMark
@@ -291,6 +283,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               camera={camera()}
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
+              muted={chrome().mutePoints}
             />
           )}
         </For>
@@ -302,11 +295,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
               camera={camera()}
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
+              muted={chrome().mutePoints}
             />
           )}
         </For>
         {props.placing && !chrome().hideSnap && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
+        ) : null}
+        {props.ghost && props.ghost.kind !== "profile" ? (
+          <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
         ) : null}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
