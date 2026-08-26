@@ -196,7 +196,22 @@ function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): Pro
   return { a: aa, b: bb, carrier };
 }
 
+function arcParam(e: ProfileEdge, p: Vec2, full: number): number {
+  if (dist(p, e.a) <= EPS) return 0;
+  if (dist(p, e.b) <= EPS) return full;
+  return Math.abs(circleDelta(e.carrier as Circle, e.a, p, e.k === -1 ? -1 : 1));
+}
+
+/** True when `a→b` walks the same way as `e`, and both points sit on `e`. */
 function originalForward(e: ProfileEdge, a: Vec2, b: Vec2): boolean {
+  if (e.carrier.kind === "circle") {
+    if (e.k !== 1 && e.k !== -1) return false;
+    const full = Math.abs(circleDelta(e.carrier, e.a, e.b, e.k));
+    if (!(full > EPS)) return false;
+    const ta = arcParam(e, a, full);
+    const tb = arcParam(e, b, full);
+    return ta + EPS < tb && tb <= full + EPS;
+  }
   return dot(sub(b, a), sub(e.b, e.a)) > EPS;
 }
 

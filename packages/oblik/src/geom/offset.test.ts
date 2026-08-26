@@ -126,6 +126,15 @@ describe("roundOffsetValue", () => {
     expect(roundOffsetValue(sector(180.5), -0.12)).toHaveLength(1);
   });
 
+  test("200° sector inset keeps the major arc", () => {
+    const out = roundOffsetValue(sector(200), -0.12);
+    expect(out).toHaveLength(1);
+    const p = out[0]!;
+    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
+    expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
+  });
+
   test("slice outset rounds the tips", () => {
     const out = roundOffsetValue(slice, 0.15);
     expect(out).toHaveLength(1);

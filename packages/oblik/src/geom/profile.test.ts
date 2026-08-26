@@ -175,6 +175,29 @@ describe("profileValue", () => {
     expect(profileContains(p, { x: 0.1, y: 0.1 })).toBe(true);
   });
 
+  test("rim fillets on a major arc follow k, not the chord", () => {
+    const O = { x: 0, y: 0 };
+    const R = 2;
+    const reach: Circle = { kind: "circle", center: O, radius: R };
+    const P = { x: R, y: 0 };
+    for (const deg of [200, 270]) {
+      const a = (deg * Math.PI) / 180;
+      const Q = { x: R * Math.cos(a), y: R * Math.sin(a) };
+      const p = profileValue([
+        O,
+        seg(O, P),
+        filletValue(P, 0.35),
+        alongValue(reach, 1),
+        filletValue(Q, 0.35),
+        seg(O, Q),
+      ]);
+      expect(p.outer).toHaveLength(5);
+      expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+      expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
+      expect(profileContains(p, { x: 1.95, y: 0.05 })).toBe(false);
+    }
+  });
+
   test("fillet at a sector origin rounds the tip", () => {
     const O = { x: 0, y: 0 };
     const p = profileValue([filletValue(O, 0.3), seg(O, A), A, alongValue(c, 1), B, seg(O, B)]);
