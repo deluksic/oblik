@@ -107,6 +107,57 @@ function callees(expr: Expr): string[] {
   return [];
 }
 
+function exprRefs(expr: Expr): string[] {
+  if (expr.kind === "ref") return [expr.name];
+  if (expr.kind === "member") return [expr.object];
+  if (expr.kind === "call") return expr.args.flatMap(exprRefs);
+  if (expr.kind === "array") return expr.items.flatMap(exprRefs);
+  if (expr.kind === "neg") return exprRefs(expr.expr);
+  if (expr.kind === "props") return Object.values(expr.props).flatMap(exprRefs);
+  return [];
+}
+
+function addBindingName(name: ts.BindingName, into: Set<string>) {
+  if (ts.isIdentifier(name)) {
+    into.add(name.text);
+    return;
+  }
+  for (const el of name.elements) {
+    if (ts.isBindingElement(el)) addBindingName(el.name, into);
+  }
+}
+
+/** Imports plus bindings declared directly in `build()` — not locals inside helpers. */
+export function namesInBuildScope(source: string): Set<string> {
+  const sf = parse(source);
+  const names = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (ts.isImportDeclaration(stmt)) {
+      const clause = stmt.importClause;
+      if (!clause) continue;
+      if (clause.name) names.add(clause.name.text);
+      const nb = clause.namedBindings;
+      if (nb && ts.isNamespaceImport(nb)) names.add(nb.name.text);
+      if (nb && ts.isNamedImports(nb)) {
+        for (const el of nb.elements) names.add(el.name.text);
+      }
+    }
+    if (ts.isVariableStatement(stmt)) {
+      for (const d of stmt.declarationList.declarations) addBindingName(d.name, names);
+    }
+    if (ts.isFunctionDeclaration(stmt) && stmt.name) names.add(stmt.name.text);
+  }
+  const body = findBuildBody(sf);
+  if (!body) return names;
+  for (const stmt of body.statements) {
+    if (ts.isVariableStatement(stmt)) {
+      for (const d of stmt.declarationList.declarations) addBindingName(d.name, names);
+    }
+    if (ts.isFunctionDeclaration(stmt) && stmt.name) names.add(stmt.name.text);
+  }
+  return names;
+}
+
 export function insertCall(source: string, job: Insert, nextId: () => string = freshSiteId): string {
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
@@ -120,6 +171,18 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
     ...hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() })),
     { bind, from: job.from, args, id: job.id ?? nextId() },
   ];
+  const introduced = new Set(statements.map((s) => s.bind));
+  const scope = namesInBuildScope(source);
+  const missing = [
+    ...new Set(statements.flatMap((s) => s.args.flatMap(exprRefs)).filter((n) => !scope.has(n) && !introduced.has(n))),
+  ];
+  if (missing.length > 0) {
+    const who = missing.join(", ");
+    const verb = missing.length === 1 ? "is" : "are";
+    throw new Error(
+      `${who} ${verb} not in build() — geometry constructed in a helper cannot be inserted yet.`,
+    );
+  }
   const names = [
     ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),
   ];

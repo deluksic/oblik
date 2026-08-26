@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 
-import { evaluate, type Draft } from "../eval/evaluate";
+import { tryEvaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
@@ -39,9 +39,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
+  const [writeError, setWriteError] = createSignal<string | null>(null);
 
   const world = createMemo(() =>
-    evaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
+    tryEvaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
   );
   const scope = createMemo(() => scopeFromTrace(world().trace));
 
@@ -75,6 +76,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           else if (tool()) {
             setTool(null);
             setPlace(null);
+            setWriteError(null);
           } else if (selectedKey()) setSelectedKey(null);
           return;
         }
@@ -123,8 +125,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `patch failed (${res.status})`);
+      setWriteError(body?.error ?? `patch failed (${res.status})`);
+      return;
     }
+    setWriteError(null);
   }
 
   async function insert(job: { from: string; args: unknown; bind?: string }) {
@@ -135,8 +139,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `insert failed (${res.status})`);
+      setWriteError(body?.error ?? `insert failed (${res.status})`);
+      return;
     }
+    setWriteError(null);
     setTool(null);
     setPlace(null);
   }
@@ -166,6 +172,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return previewOf(t, place(), scope());
   });
   const status = createMemo(() => {
+    const fail = writeError() ?? world().error;
+    if (fail) return fail;
     if (tool()) return "Type into the prompt, Tab between fields, Enter to commit. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
@@ -175,7 +183,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   return (
     <div class={styles.workspace}>
       <div class={styles.wrap}>
-        <p class={styles.status}>{status()}</p>
+        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
         <Euclid2View
           trace={world().trace}
           initialCamera={props.scene.camera}
@@ -198,6 +206,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onPick={(id: ToolId) => {
             setPicker(false);
             setPlace(null);
+            setWriteError(null);
             setTool(startTool(id));
           }}
           onClosePicker={() => setPicker(false)}

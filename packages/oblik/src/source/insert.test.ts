@@ -16,6 +16,11 @@ export default defineScene({
 });
 `;
 
+function withBinds(...names: string[]): string {
+  const extras = names.map((n) => `    const ${n} = A;\n`).join("");
+  return src.replace("    return { A };", `${extras}    return { A };`);
+}
+
 describe("printExpr", () => {
   test("prints nums, refs, and nested calls", () => {
     const e: Expr = {
@@ -118,7 +123,7 @@ describe("insertCall", () => {
   });
 
   test("inserts a parallel line with a numeric offset", () => {
-    const next = insertCall(src, {
+    const next = insertCall(withBinds("ground"), {
       from: "parallelLine",
       bind: "shelf",
       args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 1.76 }],
@@ -129,7 +134,7 @@ describe("insertCall", () => {
   });
 
   test("inserts a perpendicular line through a point", () => {
-    const next = insertCall(src, {
+    const next = insertCall(withBinds("ground", "P"), {
       from: "perpendicularLine",
       bind: "normal",
       args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "P" }],
@@ -140,7 +145,7 @@ describe("insertCall", () => {
   });
 
   test("inserts a glider on a segment", () => {
-    const next = insertCall(src, {
+    const next = insertCall(withBinds("span"), {
       from: "pointOnSegment",
       bind: "mid",
       args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.5 }],
@@ -151,7 +156,7 @@ describe("insertCall", () => {
   });
 
   test("hoists a nested glider before a line", () => {
-    const next = insertCall(src, {
+    const next = insertCall(withBinds("ground"), {
       from: "line",
       args: [
         {
@@ -230,7 +235,7 @@ describe("insertCall", () => {
   test("inserts a circle whose radius is dist to an intersection", () => {
     let n = 0;
     const next = insertCall(
-      src,
+      withBinds("ground", "wall"),
       {
         from: "circle",
         bind: "beam",
@@ -265,7 +270,7 @@ describe("insertCall", () => {
   test("hoists an intersection used as a circle center", () => {
     let n = 0;
     const next = insertCall(
-      src,
+      withBinds("reach", "shelf"),
       {
         from: "circle",
         args: [
@@ -290,7 +295,7 @@ describe("insertCall", () => {
 
   test("inserts lineIntersection as its own bind", () => {
     const next = insertCall(
-      src,
+      withBinds("ground", "wall"),
       {
         from: "lineIntersection",
         args: [
@@ -306,7 +311,7 @@ describe("insertCall", () => {
 
   test("inserts circleCircleIntersection", () => {
     const next = insertCall(
-      src,
+      withBinds("reach", "lamp"),
       {
         from: "circleCircleIntersection",
         args: [
@@ -346,7 +351,7 @@ describe("insertCall", () => {
   });
 
   test("inserts profile as profile([...], id) and imports along", () => {
-    const next = insertCall(src, {
+    const next = insertCall(withBinds("chord", "B", "c"), {
       from: "profile",
       bind: "slice",
       args: [
@@ -371,5 +376,34 @@ describe("insertCall", () => {
     });
     expect(next).toContain('const slice = profile([A, chord, B, along(c, -1)], "o_slice");');
     expect(next).toMatch(/import \{ point, profile, along \} from "oblik"/);
+  });
+
+  test("refuses refs that only exist inside a helper", () => {
+    const helperSrc = `import { defineScene } from "oblik";
+import { mountingPlateLayout } from "../layout/mounting-plate";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "plate",
+  build() {
+    return mountingPlateLayout();
+  },
+});
+`;
+    expect(() =>
+      insertCall(helperSrc, {
+        from: "profile",
+        args: [
+          {
+            kind: "array",
+            items: [
+              { kind: "ref", name: "left" },
+              { kind: "ref", name: "bottom" },
+            ],
+          },
+        ],
+        id: "o_pr",
+      }),
+    ).toThrow(/left.*not in build/);
   });
 });

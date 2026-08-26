@@ -28,6 +28,18 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): { value: unknown;
   return { value, trace: ctx.trace };
 }
 
+/** Same as `evaluate`, but a thrown `build()` becomes an error string instead of a crash. */
+export function tryEvaluate(
+  mod: Scene,
+  opts: EvaluateOpts = {},
+): { value: unknown; trace: TraceNode[]; error: string | null } {
+  try {
+    return { ...evaluate(mod, opts), error: null };
+  } catch (err) {
+    return { value: null, trace: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** Copy selected traced values onto the current tape (same ids). */
 export function emit(values: unknown | unknown[]): void {
   const cur = currentEval();

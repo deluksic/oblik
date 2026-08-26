@@ -22,3 +22,7 @@
   color: var(--oblik-accent);
   font-size: 0.78rem;
 }
+
+.statusError {
+  color: var(--oblik-accent);
+}

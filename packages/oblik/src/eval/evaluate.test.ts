@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { siteOf } from "./site";
 import { along, circle, point, pointOnCircle, pointOnSegment, profile, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
-import { emit, evaluate } from "./evaluate";
+import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
 
 describe("evaluate", () => {
@@ -181,5 +181,20 @@ describe("evaluate", () => {
     const p = trace.find((n) => n.id === "pr");
     expect(p?.value.kind).toBe("profile");
     if (p?.value.kind === "profile") expect(p.value.outer).toHaveLength(2);
+  });
+});
+
+describe("tryEvaluate", () => {
+  test("a thrown build becomes an error instead of a throw", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        throw new ReferenceError("left is not defined");
+      },
+    });
+    const out = tryEvaluate(scene);
+    expect(out.error).toBe("left is not defined");
+    expect(out.trace).toEqual([]);
   });
 });

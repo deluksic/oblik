@@ -1,5 +1,5 @@
 export { defineScene, type Euclid2Scene, type Scene } from "./eval/scene";
-export { evaluate, emit, type Draft, type EvaluateOpts } from "./eval/evaluate";
+export { evaluate, tryEvaluate, emit, type Draft, type EvaluateOpts } from "./eval/evaluate";
 export { nodeOf, type TraceNode } from "./eval/context";
 export { $site, $node } from "./eval/site";
 export {
