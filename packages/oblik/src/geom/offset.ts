@@ -32,8 +32,8 @@ import {
 } from "./vec";
 
 const EPS = 1e-9;
-/** Angular slop: concentric offset hits can sit a hair past the original end. */
-const ANG = 1e-6;
+/** Join points may sit a hair off the original ray. Complementary hits are O(1) rad away. */
+const ANG = 1e-4;
 
 function cloneProfile(p: Profile): Profile {
   return {
@@ -200,35 +200,37 @@ function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): Pro
 
 /**
  * Distance along `k` from `from` to `p`, in `[0, 2π)`. Same ray as `from`
- * is 0, not a full turn — a tiny negative atan2 would wrap to 2π and fall
- * off the original span.
+ * is 0, not a full turn.
  */
-function arcWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
+function polarWalk(c: Circle, from: Vec2, p: Vec2, k: Branch): number {
   const ua = circleUnitAt(c, from);
   const up = circleUnitAt(c, p);
   let delta = Math.atan2(up.uy, up.ux) - Math.atan2(ua.uy, ua.ux);
   if (k === 1) {
     while (delta < 0) delta += 2 * Math.PI;
     while (delta >= 2 * Math.PI) delta -= 2 * Math.PI;
-    if (delta < ANG || delta > 2 * Math.PI - ANG) return 0;
     return delta;
   }
   while (delta > 0) delta -= 2 * Math.PI;
   while (delta <= -2 * Math.PI) delta += 2 * Math.PI;
-  const cw = -delta;
-  if (cw < ANG || cw > 2 * Math.PI - ANG) return 0;
-  return cw;
+  return -delta;
+}
+
+/** A hair before the span start unwraps to ~2π; fold that back to a small negative. */
+function foldToSpan(t: number): number {
+  if (t > 2 * Math.PI - ANG) return t - 2 * Math.PI;
+  return t;
 }
 
 /** True when `a→b` walks the same way as `e`, and both points sit on `e`. */
 function originalForward(e: ProfileEdge, a: Vec2, b: Vec2): boolean {
   if (e.carrier.kind === "circle") {
     if (e.k !== 1 && e.k !== -1) return false;
-    const full = arcWalk(e.carrier, e.a, e.b, e.k);
-    if (!(full > EPS)) return false;
-    const ta = arcWalk(e.carrier, e.a, a, e.k);
-    const tb = arcWalk(e.carrier, e.a, b, e.k);
-    return ta + EPS < tb && tb <= full + ANG;
+    const full = polarWalk(e.carrier, e.a, e.b, e.k);
+    if (!(full > EPS) || full >= 2 * Math.PI - EPS) return false;
+    const ta = foldToSpan(polarWalk(e.carrier, e.a, a, e.k));
+    const tb = foldToSpan(polarWalk(e.carrier, e.a, b, e.k));
+    return ta + EPS < tb && ta >= -ANG && tb <= full + ANG;
   }
   return dot(sub(b, a), sub(e.b, e.a)) > EPS;
 }

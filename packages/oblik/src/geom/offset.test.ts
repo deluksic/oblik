@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { alongValue, filletValue, profileContains, profileValue } from "./profile";
 import { filletAtVertex, profileCorners, roundOffsetValue } from "./offset";
+import { pointOnCircleValue } from "./gliders";
 import type { Circle, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -220,6 +221,32 @@ describe("roundOffsetValue", () => {
     expect(arcs[0]?.carrier.kind === "circle" && arcs[0].carrier.center.y).toBeCloseTo(1);
     expect(profileContains(out[0]!, { x: 0.4, y: 0.4 })).toBe(true);
     expect(profileContains(out[0]!, { x: 1.5, y: 1.5 })).toBe(false);
+  });
+
+  test("growing a filleted ice-cream keeps a remnant when r' is a sliver", () => {
+    const O = { x: 3.69, y: 9.11 };
+    const c: Circle = { kind: "circle", center: O, radius: 0.41 };
+    const g = pointOnCircleValue(c, -0.52, 0.85);
+    const g2 = pointOnCircleValue(c, 0.51, 0.86);
+    const tip = { x: 3.76, y: 10.12 };
+    const left: Segment = { kind: "segment", a: { x: g.x, y: g.y }, b: tip };
+    const right: Segment = { kind: "segment", a: tip, b: { x: g2.x, y: g2.y } };
+    const face = profileValue([
+      tip,
+      left,
+      filletValue({ x: g.x, y: g.y }, 0.36),
+      alongValue(c, 1),
+      filletValue({ x: g2.x, y: g2.y }, 0.36),
+      right,
+    ]);
+    expect(face.outer.length).toBe(5);
+    const out = roundOffsetValue(face, 0.359);
+    expect(out).toHaveLength(1);
+    const p = out[0]!;
+    expect(p.outer.length).toBeGreaterThanOrEqual(4);
+    expect(profileContains(p, O)).toBe(true);
+    expect(profileContains(p, { x: 3.69, y: 8.61 })).toBe(true);
+    expect(profileContains(p, { x: 3.69, y: 8.2 })).toBe(false);
   });
 });
 
