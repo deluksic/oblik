@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, previewOf, startTool, tabTool, typeTool } from "./tool";
+import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, hoverTool, previewOf, startTool, tabTool, typeTool } from "./tool";
 import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
 import type { PlacePoint } from "./place";
 import type { TraceNode } from "../eval/context";
@@ -45,6 +45,82 @@ describe("enrichHit", () => {
   test("slider hit does not throw when the session has no typed field", () => {
     const hit = { world: { x: 1, y: 2 }, point: free(1, 2) };
     expect(enrichHit(startTool("slider"), hit, ctx)).toEqual(hit);
+  });
+
+  test("pending minus on a slider click keeps the negation", () => {
+    const gap = {
+      id: "o_pie_g",
+      occ: 0,
+      kind: "slider",
+      value: { kind: "slider", n: 0.12, min: 0, max: 0.4, step: 0.01 },
+      bind: "gap",
+      editable: true,
+      stack: [],
+    } as TraceNode;
+    const face = {
+      kind: "profile" as const,
+      outer: [
+        { a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } },
+        { a: { x: 1, y: 0 }, b: { x: 1, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } } },
+        { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
+        { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
+      ],
+    };
+    const session = {
+      verb: "roundOffset" as const,
+      focus: "typed" as const,
+      typed: "-",
+      name: "",
+      faceRef: "one",
+      face: { expr: { kind: "ref" as const, name: "one" }, geom: face },
+    };
+    const hit = {
+      world: { x: 0, y: 0 },
+      point: free(0, 0),
+      length: { expr: { kind: "ref" as const, name: "gap" }, value: 0.12 },
+    };
+    const next = enrichHit(session, hit, { ...ctx, trace: [gap] });
+    expect(next.length).toEqual({
+      expr: { kind: "neg", expr: { kind: "ref", name: "gap" } },
+      value: -0.12,
+    });
+    expect(hoverTool(session, next, [gap])).toBe("o_pie_g");
+    expect(clickTool(session, next, { used: ["one", "gap"], points: {}, carriers: {}, circles: {}, profiles: {}, lengths: { gap: 0.12 } })).toEqual({
+      insert: {
+        from: "roundOffset",
+        args: [{ kind: "ref", name: "one" }, { kind: "neg", expr: { kind: "ref", name: "gap" } }],
+      },
+    });
+  });
+
+  test("pending minus on a parallel-line slider click keeps the negation", () => {
+    const reach = {
+      id: "o_n",
+      occ: 0,
+      kind: "slider",
+      value: { kind: "slider", n: 1.25, min: 0, max: 4, step: 0.01 },
+      bind: "reach",
+      editable: true,
+      stack: [],
+    } as TraceNode;
+    const ground = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+    const session = {
+      verb: "parallelLine" as const,
+      focus: "typed" as const,
+      typed: "-",
+      name: "",
+      carrierRef: "ground",
+      carrier: { expr: { kind: "ref" as const, name: "ground" }, geom: ground },
+    };
+    const hit = {
+      world: { x: 0, y: 0 },
+      point: free(0, 0),
+      length: { expr: { kind: "ref" as const, name: "reach" }, value: 1.25 },
+    };
+    expect(enrichHit(session, hit, { ...ctx, trace: [reach] }).length).toEqual({
+      expr: { kind: "neg", expr: { kind: "ref", name: "reach" } },
+      value: -1.25,
+    });
   });
 });
 

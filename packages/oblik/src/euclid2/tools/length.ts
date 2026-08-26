@@ -16,7 +16,19 @@ export function lengthNegPending(raw: string | undefined): boolean {
 }
 
 export function wrapLengthNeg(expr: Expr, pending: boolean): Expr {
-  return pending ? { kind: "neg", expr } : expr;
+  if (!pending || expr.kind === "neg") return expr;
+  return { kind: "neg", expr };
+}
+
+function withPendingNeg(
+  length: NonNullable<PlaceHit["length"]>,
+  pending: boolean,
+  scope: Scope,
+): NonNullable<PlaceHit["length"]> {
+  const expr = wrapLengthNeg(length.expr, pending);
+  if (expr === length.expr) return length;
+  const value = evalLengthExpr(expr, scope) ?? -length.value;
+  return { expr, value };
 }
 
 export function memberExpr(object: string, field: ProductField): Expr {
@@ -182,9 +194,9 @@ export function attachLengthHit(
   draft: LengthDraft,
   accept: readonly LengthPickField[] = [],
 ): PlaceHit {
-  if (hit.length) return hit;
   const pending = lengthNegPending(draft.typed ?? "");
   const scope = scopeFromTrace(ctx.trace);
+  if (hit.length) return { ...hit, length: withPendingNeg(hit.length, pending, scope) };
   if (ctx.screen) {
     const slider = hitSlider(ctx.screen, sliderNodes(ctx.trace));
     if (slider?.bind && slider.value.kind === "slider") {
@@ -227,6 +239,9 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   }
   if (e.kind === "ref") {
     return trace.find((n) => n.bind === e.name && n.occ === 0)?.id ?? null;
+  }
+  if (e.kind === "neg" && e.expr.kind === "ref") {
+    return trace.find((n) => n.bind === e.expr.name && n.occ === 0)?.id ?? null;
   }
   return null;
 }
