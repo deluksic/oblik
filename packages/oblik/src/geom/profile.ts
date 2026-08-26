@@ -1,4 +1,5 @@
-import type { Along, Branch, Circle, LineLike, Profile, ProfileEdge } from "./types";
+import type { Along, Branch, Circle, Fillet, LineLike, Profile, ProfileEdge } from "./types";
+import { filletVertices } from "./offset";
 import { lineBasis } from "./ops";
 import { circleUnitAt } from "./gliders";
 import {
@@ -20,12 +21,20 @@ export function isAlong(v: unknown): v is Along {
   return !!v && typeof v === "object" && (v as { kind?: string }).kind === "along";
 }
 
+export function isFillet(v: unknown): v is Fillet {
+  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "fillet";
+}
+
 export function isProfile(v: { kind: string }): v is Profile {
   return v.kind === "profile";
 }
 
 export function alongValue(carrier: Circle, k: number): Along {
   return { kind: "along", carrier, k: k < 0 ? -1 : 1 };
+}
+
+export function filletValue(at: Vec2, r: number): Fillet {
+  return { kind: "fillet", at: { x: at.x, y: at.y }, r };
 }
 
 export function nanProfile(): Profile {
@@ -52,7 +61,7 @@ function isFiniteEdge(e: ProfileEdge): boolean {
 function asVec2(v: unknown): Vec2 | null {
   if (!v || typeof v !== "object") return null;
   const p = v as { x?: unknown; y?: unknown; kind?: string };
-  if (p.kind === "along" || p.kind === "circle" || p.kind === "line" || p.kind === "segment" || p.kind === "parallelLine") {
+  if (p.kind === "along" || p.kind === "fillet" || p.kind === "circle" || p.kind === "line" || p.kind === "segment" || p.kind === "parallelLine") {
     return null;
   }
   if (typeof p.x === "number" && typeof p.y === "number") return { x: p.x, y: p.y };
@@ -99,15 +108,29 @@ export function circleDelta(c: Circle, a: Vec2, b: Vec2, k: Branch): number {
   return delta;
 }
 
+function asVertex(v: unknown): { at: Vec2; r: number } | null {
+  if (isFillet(v)) {
+    if (!Number.isFinite(v.r) || v.r < 0) return null;
+    const at = asVec2(v.at);
+    if (!at || !isFiniteVec(at)) return null;
+    return { at, r: v.r };
+  }
+  const at = asVec2(v);
+  if (!at || !isFiniteVec(at)) return null;
+  return { at, r: 0 };
+}
+
 export function profileValue(cycle: readonly unknown[]): Profile {
   if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return nanProfile();
   const n = cycle.length / 2;
   const points: Vec2[] = [];
+  const radii: number[] = [];
   const carriers: Array<{ geom: LineLike | Circle; k?: Branch }> = [];
   for (let i = 0; i < n; i++) {
-    const p = asVec2(cycle[i * 2]);
-    if (!p || !isFiniteVec(p)) return nanProfile();
-    points.push(p);
+    const vtx = asVertex(cycle[i * 2]);
+    if (!vtx) return nanProfile();
+    points.push(vtx.at);
+    radii.push(vtx.r);
     const item = cycle[i * 2 + 1];
     if (isAlong(item)) {
       if (item.carrier.kind !== "circle") return nanProfile();
@@ -142,8 +165,9 @@ export function profileValue(cycle: readonly unknown[]): Profile {
       });
     }
   }
-  const profile: Profile = { kind: "profile", outer };
-  return isFiniteProfile(profile) ? profile : nanProfile();
+  const sharp: Profile = { kind: "profile", outer };
+  if (!isFiniteProfile(sharp)) return nanProfile();
+  return filletVertices(sharp, radii);
 }
 
 function sampleArc(e: ProfileEdge, steps = 24): Vec2[] {

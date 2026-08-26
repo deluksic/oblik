@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
+import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import pie from "../../../../apps/demo/src/scenes/pie.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
@@ -76,5 +77,18 @@ describe("migrated demo scenes", () => {
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("profile");
     if (one?.value.kind === "profile") expect(one.value.outer).toHaveLength(3);
+  });
+
+  test("fillet scene traces one profile with two join arcs", () => {
+    const { trace } = run(fillet, ["apps/demo/src/scenes/fillet.ts"]);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(1);
+    expect(trace.filter((n) => n.kind === "segment")).toHaveLength(4);
+    expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
+    const face = trace.find((n) => n.bind === "face");
+    expect(face?.kind).toBe("profile");
+    if (face?.value.kind === "profile") {
+      expect(face.value.outer).toHaveLength(6);
+      expect(face.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
+    }
   });
 });

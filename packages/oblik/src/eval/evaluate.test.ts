@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { along, circle, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider } from "./constructors";
+import { along, circle, fillet, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider } from "./constructors";
 import { defineScene } from "./scene";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -181,6 +181,30 @@ describe("evaluate", () => {
     const p = trace.find((n) => n.id === "pr");
     expect(p?.value.kind).toBe("profile");
     if (p?.value.kind === "profile") expect(p.value.outer).toHaveLength(2);
+  });
+
+  test("fillet is not a tape node", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(2, 0, "b");
+        const C = point(0, 2, "c");
+        const ab = segment(A, B, "ab");
+        const bc = segment(B, C, "bc");
+        const ca = segment(C, A, "ca");
+        return profile([fillet(A, 0.3), ab, B, bc, C, ca], "pr");
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.map((n) => n.kind)).toEqual(["point", "point", "point", "segment", "segment", "segment", "profile"]);
+    const p = trace.find((n) => n.id === "pr");
+    expect(p?.kind).toBe("profile");
+    if (p?.value.kind === "profile") {
+      expect(p.value.outer).toHaveLength(4);
+      expect(p.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    }
   });
 
   test("roundOffset is traced with dof on the distance", () => {

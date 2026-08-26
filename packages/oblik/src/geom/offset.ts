@@ -9,6 +9,7 @@ import {
   alongK,
   circleDelta,
   isFiniteProfile,
+  nanProfile,
   projectOnCircle,
   projectOnLine,
   tessellateProfile,
@@ -269,4 +270,72 @@ export function roundOffsetValue(p: Profile, d: number): Profile[] {
   }
   const out: Profile = { kind: "profile", outer };
   return isFiniteProfile(out) ? [out] : [];
+}
+
+type FilletJoin = { t0: Vec2; t1: Vec2; carrier: Circle; k: Branch };
+
+function filletJoin(prev: ProfileEdge, next: ProfileEdge, v: Vec2, r: number, w: 1 | -1): FilletJoin | null {
+  const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
+  const into = w * turn < -EPS ? -r : r;
+  const offPrev = offsetCarrier(prev, into, w);
+  const offNext = offsetCarrier(next, into, w);
+  if (!offPrev || !offNext) return null;
+  const c = miterJoin(prev, next, v, into, w, offPrev, offNext);
+  if (!c) return null;
+  const t0 = projectOnCarrier(prev.carrier, c);
+  const t1 = projectOnCarrier(next.carrier, c);
+  if (!isFiniteVec(t0) || !isFiniteVec(t1) || dist(t0, t1) < EPS) return null;
+  if (!originalForward(prev, prev.a, t0) || !originalForward(prev, t0, v)) return null;
+  if (!originalForward(next, v, t1) || !originalForward(next, t1, next.b)) return null;
+  const radius = dist(c, t0);
+  if (!(radius > EPS) || Math.abs(radius - dist(c, t1)) > 1e-6) return null;
+  const carrier: Circle = { kind: "circle", center: c, radius };
+  return { t0, t1, carrier, k: alongK(carrier, t0, t1) };
+}
+
+/**
+ * Replace sharp vertices with tangent join arcs. `radii[i]` is the fillet at
+ * `outer[i].a`. Zero / omitted keeps the corner. Too-large `r` → empty profile.
+ */
+export function filletVertices(p: Profile, radii: readonly number[]): Profile {
+  if (!isFiniteProfile(p)) return nanProfile();
+  const n = p.outer.length;
+  if (radii.length !== n) return nanProfile();
+  if (radii.every((r) => !(r > EPS))) return p;
+  const w = winding(p);
+  if (w === 0) return nanProfile();
+  const joins: Array<FilletJoin | null> = [];
+  for (let i = 0; i < n; i++) {
+    const r = radii[i]!;
+    if (!(r > EPS)) {
+      joins.push(null);
+      continue;
+    }
+    if (!Number.isFinite(r)) return nanProfile();
+    const prev = p.outer[(i + n - 1) % n]!;
+    const next = p.outer[i]!;
+    const join = filletJoin(prev, next, next.a, r, w);
+    if (!join) return nanProfile();
+    joins.push(join);
+  }
+  const outer: ProfileEdge[] = [];
+  for (let i = 0; i < n; i++) {
+    const src = p.outer[i]!;
+    const j0 = joins[i];
+    const j1 = joins[(i + 1) % n];
+    const start = j0 ? j0.t1 : src.a;
+    const end = j1 ? j1.t0 : src.b;
+    if (!originalForward(src, start, end)) return nanProfile();
+    const k = src.carrier.kind === "circle" ? src.k : undefined;
+    const e = edgeFrom(src.carrier, start, end, k);
+    if (!e) return nanProfile();
+    outer.push(e);
+    if (j1) {
+      const arc = edgeFrom(j1.carrier, j1.t0, j1.t1, j1.k);
+      if (!arc) return nanProfile();
+      outer.push(arc);
+    }
+  }
+  const out: Profile = { kind: "profile", outer };
+  return isFiniteProfile(out) ? out : nanProfile();
 }

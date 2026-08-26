@@ -19,6 +19,7 @@ export {
   dist,
   slider,
   along,
+  fillet,
   profile,
   roundOffset,
   constructors,

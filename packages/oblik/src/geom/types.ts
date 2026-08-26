@@ -11,6 +11,8 @@ export type ParallelLine = { kind: "parallelLine"; line: Line; distance: number 
 export type LineLike = Segment | Line | ParallelLine;
 
 export type Along = { kind: "along"; carrier: Circle; k: Branch };
+/** Unmarked vertex witness. `at` is the sharp corner; `r` is the join radius. */
+export type Fillet = { kind: "fillet"; at: Vec2; r: number };
 export type ProfileEdge = {
   a: Vec2;
   b: Vec2;

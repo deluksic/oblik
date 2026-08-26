@@ -12,6 +12,7 @@ import {
   pointOnSegmentValue,
   signedDist as signedDistValue,
   alongValue,
+  filletValue,
   isFiniteProfile,
   isProfile,
   nanProfile,
@@ -20,6 +21,7 @@ import {
   type Along,
   type Branch,
   type Circle,
+  type Fillet,
   type Geom,
   type Line,
   type LineLike,
@@ -175,6 +177,11 @@ export function dist(a: Vec2, b: Vec2): number {
 /** Unmarked walk witness on a circle. Not a tape node. */
 export function along(carrier: Circle, k: Branch): Along {
   return alongValue(carrier, k);
+}
+
+/** Unmarked vertex witness. Not a tape node. */
+export function fillet(at: Vec2, r: number): Fillet {
+  return filletValue(at, r);
 }
 
 export const profile = mark((cycle: readonly unknown[], id?: string): Profile => {
