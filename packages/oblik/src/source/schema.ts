@@ -50,6 +50,12 @@ export const insertSchema = v.object({
   bind: v.optional(v.string()),
   args: v.array(exprSchema),
   id: v.optional(v.string()),
+  patchVertex: v.optional(
+    v.object({
+      id: v.pipe(v.string(), v.minLength(1)),
+      index: v.pipe(v.number(), v.integer(), v.minValue(0)),
+    }),
+  ),
 });
 
 export type InsertBody = v.InferOutput<typeof insertSchema>;

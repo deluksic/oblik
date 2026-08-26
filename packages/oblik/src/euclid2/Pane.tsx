@@ -131,7 +131,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(null);
   }
 
-  async function insert(job: { from: string; args: unknown; bind?: string }) {
+  async function insert(job: { from: string; args: unknown; bind?: string; patchVertex?: { id: string; index: number } }) {
     const res = await fetch("/__oblik-insert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

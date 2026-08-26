@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { alongValue, filletValue, profileContains, profileValue } from "./profile";
-import { roundOffsetValue } from "./offset";
+import { filletAtVertex, profileCorners, roundOffsetValue } from "./offset";
 import type { Circle, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -220,5 +220,74 @@ describe("roundOffsetValue", () => {
     expect(arcs[0]?.carrier.kind === "circle" && arcs[0].carrier.center.y).toBeCloseTo(1);
     expect(profileContains(out[0]!, { x: 0.4, y: 0.4 })).toBe(true);
     expect(profileContains(out[0]!, { x: 1.5, y: 1.5 })).toBe(false);
+  });
+});
+
+describe("profileCorners / filletAtVertex", () => {
+  test("sharp square corners sit on the four vertices", () => {
+    const corners = profileCorners(square);
+    expect(corners).toHaveLength(4);
+    expect(corners.every((c) => c.r === 0)).toBe(true);
+    expect(corners.map((c) => [c.at.x, c.at.y])).toEqual([
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]);
+  });
+
+  test("filleted square recovers the original corner", () => {
+    const face = roundedSquare(0.2);
+    expect(face.outer).toHaveLength(8);
+    const corners = profileCorners(face);
+    expect(corners).toHaveLength(4);
+    expect(corners[0]?.at.x).toBeCloseTo(0);
+    expect(corners[0]?.at.y).toBeCloseTo(0);
+    expect(corners[0]?.r).toBeCloseTo(0.2);
+    expect(corners[1]?.at.x).toBeCloseTo(1);
+    expect(corners[1]?.at.y).toBeCloseTo(0);
+    expect(corners[1]?.r).toBeCloseTo(0.2);
+  });
+
+  test("filletAtVertex rounds one sharp corner and leaves the rest", () => {
+    const out = filletAtVertex(square, 0, 0.2);
+    expect(out.outer).toHaveLength(5);
+    expect(out.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(profileContains(out, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(profileContains(out, { x: 0.05, y: 0.05 })).toBe(false);
+    expect(profileContains(out, { x: 0.95, y: 0.95 })).toBe(true);
+  });
+
+  test("filletAtVertex r === 0 on a filleted corner is sharp again", () => {
+    const out = filletAtVertex(roundedSquare(0.2), 0, 0);
+    expect(profileContains(out, { x: 0.05, y: 0.05 })).toBe(true);
+    expect(out.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+  });
+
+  test("too-large filletAtVertex is empty", () => {
+    expect(filletAtVertex(square, 0, 1.1).outer).toHaveLength(0);
+    expect(filletAtVertex(square, 0, -0.2).outer).toHaveLength(0);
+  });
+
+  test("a pie along rim is not skipped as a join", () => {
+    const corners = profileCorners(sector(90));
+    expect(corners).toHaveLength(3);
+    expect(corners.every((c) => c.r === 0)).toBe(true);
+  });
+
+  test("a stadium semicircle is not skipped as a join", () => {
+    const A = { x: 0, y: 0 };
+    const B = { x: 2, y: 0 };
+    const C = { x: 2, y: 1 };
+    const D = { x: 0, y: 1 };
+    const bot: Segment = { kind: "segment", a: A, b: B };
+    const top: Segment = { kind: "segment", a: C, b: D };
+    const cR: Circle = { kind: "circle", center: { x: 2, y: 0.5 }, radius: 0.5 };
+    const cL: Circle = { kind: "circle", center: { x: 0, y: 0.5 }, radius: 0.5 };
+    const face = profileValue([B, alongValue(cR, 1), C, top, D, alongValue(cL, 1), A, bot]);
+    expect(face.outer).toHaveLength(4);
+    const corners = profileCorners(face);
+    expect(corners).toHaveLength(4);
+    expect(corners.every((c) => c.r === 0)).toBe(true);
   });
 });

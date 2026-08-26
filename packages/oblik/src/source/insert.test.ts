@@ -406,4 +406,150 @@ export default defineScene({
       }),
     ).toThrow(/left.*not in build/);
   });
+
+  test("patches fillet(A, r) into a profile array vertex", () => {
+    const faceSrc = `import { point, segment, profile } from "oblik";
+import { defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const A = point(0, 0, "o_a");
+    const B = point(1, 0, "o_b");
+    const C = point(1, 1, "o_c");
+    const ab = segment(A, B, "o_ab");
+    const bc = segment(B, C, "o_bc");
+    const ca = segment(C, A, "o_ca");
+    const mix = profile([A, ab, B, bc, C, ca], "o_mix");
+    return { mix };
+  },
+});
+`;
+    const next = insertCall(faceSrc, {
+      from: "fillet",
+      args: [{ kind: "num", value: 0.35 }],
+      patchVertex: { id: "o_mix", index: 1 },
+    });
+    expect(next).toContain("profile([A, ab, fillet(B, 0.35), bc, C, ca], \"o_mix\")");
+    expect(next).toMatch(/import \{ point, segment, profile, fillet \} from "oblik"/);
+    expect(next).not.toContain("const fillet");
+  });
+
+  test("replaces an existing fillet radius and unwraps r === 0", () => {
+    const faceSrc = `import { point, segment, profile, fillet } from "oblik";
+import { defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const A = point(0, 0, "o_a");
+    const B = point(1, 0, "o_b");
+    const C = point(1, 1, "o_c");
+    const ab = segment(A, B, "o_ab");
+    const bc = segment(B, C, "o_bc");
+    const ca = segment(C, A, "o_ca");
+    const mix = profile([fillet(A, 0.2), ab, B, bc, C, ca], "o_mix");
+    return { mix };
+  },
+});
+`;
+    const replaced = insertCall(faceSrc, {
+      from: "fillet",
+      args: [{ kind: "ref", name: "r" }],
+      patchVertex: { id: "o_mix", index: 0 },
+    });
+    expect(replaced).toContain("profile([fillet(A, r), ab, B, bc, C, ca], \"o_mix\")");
+    const unwrapped = insertCall(faceSrc, {
+      from: "fillet",
+      args: [{ kind: "num", value: 0 }],
+      patchVertex: { id: "o_mix", index: 0 },
+    });
+    expect(unwrapped).toContain("profile([A, ab, B, bc, C, ca], \"o_mix\")");
+    expect(unwrapped).not.toContain("fillet(A");
+  });
+
+  test("wraps a crossing vertex as fillet(lineIntersection(...), r)", () => {
+    const faceSrc = `import { point, line, profile } from "oblik";
+import { defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const ground = line({ x: 0, y: 0 }, { x: 1, y: 0 }, "o_g");
+    const wall = line({ x: 1, y: 0 }, { x: 1, y: 1 }, "o_w");
+    const A = point(0, 1, "o_a");
+    const mix = profile([lineIntersection(ground, wall), ground, A, wall], "o_mix");
+    return { mix };
+  },
+});
+`;
+    const next = insertCall(faceSrc, {
+      from: "fillet",
+      args: [{ kind: "num", value: 0.2 }],
+      patchVertex: { id: "o_mix", index: 0 },
+    });
+    expect(next).toContain("fillet(lineIntersection(ground, wall), 0.2)");
+  });
+
+  test("patches a helper-scope profile array by id", () => {
+    const helperSrc = `import { point, segment, profile } from "oblik";
+import { defineScene } from "oblik";
+
+function plate() {
+  const A = point(0, 0, "o_a");
+  const B = point(1, 0, "o_b");
+  const C = point(1, 1, "o_c");
+  const ab = segment(A, B, "o_ab");
+  const bc = segment(B, C, "o_bc");
+  const ca = segment(C, A, "o_ca");
+  return profile([A, ab, B, bc, C, ca], "o_p");
+}
+
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    return plate();
+  },
+});
+`;
+    const next = insertCall(helperSrc, {
+      from: "fillet",
+      args: [{ kind: "num", value: 0.1 }],
+      patchVertex: { id: "o_p", index: 0 },
+    });
+    expect(next).toContain("profile([fillet(A, 0.1), ab, B, bc, C, ca], \"o_p\")");
+  });
+
+  test("refuses a profile cycle that is not an array literal", () => {
+    const varSrc = `import { point, segment, profile } from "oblik";
+import { defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const A = point(0, 0, "o_a");
+    const B = point(1, 0, "o_b");
+    const C = point(1, 1, "o_c");
+    const ab = segment(A, B, "o_ab");
+    const bc = segment(B, C, "o_bc");
+    const ca = segment(C, A, "o_ca");
+    const cycle = [A, ab, B, bc, C, ca];
+    const mix = profile(cycle, "o_mix");
+    return { mix };
+  },
+});
+`;
+    expect(() =>
+      insertCall(varSrc, {
+        from: "fillet",
+        args: [{ kind: "num", value: 0.2 }],
+        patchVertex: { id: "o_mix", index: 0 },
+      }),
+    ).toThrow(/array literal/);
+  });
 });

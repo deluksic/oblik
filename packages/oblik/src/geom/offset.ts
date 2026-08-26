@@ -404,3 +404,95 @@ export function filletVertices(p: Profile, radii: readonly number[]): Profile {
   const out: Profile = { kind: "profile", outer };
   return isFiniteProfile(out) ? out : nanProfile();
 }
+
+/** Join circle G1 with both neighbors, whose original carriers still meet near the center. */
+function isFilletJoin(edges: readonly ProfileEdge[], i: number): boolean {
+  const e = edges[i]!;
+  if (e.carrier.kind !== "circle") return false;
+  const n = edges.length;
+  const prev = edges[(i + n - 1) % n]!;
+  const next = edges[(i + 1) % n]!;
+  if (dist(prev.b, e.a) > EPS || dist(e.b, next.a) > EPS) return false;
+  if (!tangentsG1(prev, e, e.a) || !tangentsG1(e, next, e.b)) return false;
+  const c = e.carrier.center;
+  const r = Math.abs(e.carrier.radius);
+  if (!(r > EPS)) return false;
+  const meet = closestHit(carrierHits(prev.carrier, next.carrier), c);
+  if (!meet) return false;
+  return dist(meet, c) <= 16 * r + EPS;
+}
+
+function tangentsG1(a: ProfileEdge, b: ProfileEdge, at: Vec2): boolean {
+  const ta = walkTangentAt(a, at);
+  const tb = walkTangentAt(b, at);
+  return dot(ta, tb) > 0.999;
+}
+
+function originalEdgeIndices(p: Profile): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < p.outer.length; i++) {
+    if (!isFilletJoin(p.outer, i)) out.push(i);
+  }
+  return out;
+}
+
+export type ProfileCorner = { at: Vec2; index: number; r: number };
+
+/**
+ * Logical vertices of a (possibly filleted) face. Join arcs are skipped so
+ * indices match the source cycle; a stadium rim and a pie `along` stay.
+ */
+export function profileCorners(p: Profile): ProfileCorner[] {
+  if (!isFiniteProfile(p)) return [];
+  const orig = originalEdgeIndices(p);
+  const n = orig.length;
+  if (n < 2) return [];
+  const corners: ProfileCorner[] = [];
+  for (let i = 0; i < n; i++) {
+    const iPrev = orig[(i + n - 1) % n]!;
+    const iNext = orig[i]!;
+    const prev = p.outer[iPrev]!;
+    const next = p.outer[iNext]!;
+    let r = 0;
+    const m = p.outer.length;
+    for (let j = (iPrev + 1) % m; j !== iNext; j = (j + 1) % m) {
+      const e = p.outer[j]!;
+      if (e.carrier.kind === "circle") r = Math.abs(e.carrier.radius);
+    }
+    let at: Vec2;
+    if (dist(prev.b, next.a) < 1e-6) {
+      at = { x: next.a.x, y: next.a.y };
+    } else {
+      const hint = lerp(prev.b, next.a, 0.5);
+      at = closestHit(carrierHits(prev.carrier, next.carrier), hint) ?? hint;
+    }
+    corners.push({ at, index: i, r });
+  }
+  return corners;
+}
+
+/**
+ * Rebuild the sharp cycle, then fillet `index` to `r` while keeping other
+ * corners. `r === 0` leaves that vertex sharp. Too-large / negative `r` → empty.
+ */
+export function filletAtVertex(p: Profile, index: number, r: number): Profile {
+  if (!Number.isFinite(r) || r < 0) return nanProfile();
+  const corners = profileCorners(p);
+  if (index < 0 || index >= corners.length) return nanProfile();
+  const orig = originalEdgeIndices(p);
+  if (orig.length !== corners.length) return nanProfile();
+  const outer: ProfileEdge[] = [];
+  for (let i = 0; i < orig.length; i++) {
+    const src = p.outer[orig[i]!]!;
+    const a = corners[i]!.at;
+    const b = corners[(i + 1) % orig.length]!.at;
+    const k = src.carrier.kind === "circle" ? src.k : undefined;
+    const e = edgeFrom(src.carrier, a, b, k);
+    if (!e) return nanProfile();
+    outer.push(e);
+  }
+  const sharp: Profile = { kind: "profile", outer };
+  if (!isFiniteProfile(sharp)) return nanProfile();
+  const radii = corners.map((c, i) => (i === index ? r : c.r));
+  return filletVertices(sharp, radii);
+}

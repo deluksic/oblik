@@ -157,8 +157,8 @@ export function snapProfile(
   camera: Camera2,
   _size: PaneSize,
   maxPx = GEOM_PX,
-): { bind: string; geom: Profile } | null {
-  let best: { bind: string; geom: Profile; inside: boolean; d: number; i: number } | null = null;
+): { bind: string; geom: Profile; id: string } | null {
+  let best: { bind: string; geom: Profile; id: string; inside: boolean; d: number; i: number } | null = null;
   let i = 0;
   for (const n of trace) {
     const idx = i++;
@@ -173,10 +173,10 @@ export function snapProfile(
       (inside === best.inside && d < best.d) ||
       (inside === best.inside && d === best.d && idx > best.i)
     ) {
-      best = { bind: n.bind, geom: n.value, inside, d, i: idx };
+      best = { bind: n.bind, geom: n.value, id: n.id, inside, d, i: idx };
     }
   }
-  return best ? { bind: best.bind, geom: best.geom } : null;
+  return best ? { bind: best.bind, geom: best.geom, id: best.id } : null;
 }
 
 const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);

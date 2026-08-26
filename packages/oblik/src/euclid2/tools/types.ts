@@ -14,7 +14,8 @@ export type ToolId =
   | "perpendicularLine"
   | "slider"
   | "profile"
-  | "roundOffset";
+  | "roundOffset"
+  | "fillet";
 
 export type ToolSpec = {
   id: ToolId;
@@ -64,7 +65,8 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike | Circle };
-  profile?: { bind: string; geom: Profile };
+  profile?: { bind: string; geom: Profile; id?: string };
+  corner?: { index: number; at: Vec2 };
   length?: { expr: Expr; value: number };
 };
 
@@ -131,6 +133,18 @@ export type ToolSession =
       typed: string;
       name: string;
       lengthPick?: Expr;
+    }
+  | {
+      verb: "fillet";
+      focus: "corner" | "typed";
+      faceId: string;
+      faceBind: string;
+      geom?: Profile;
+      vertex?: number;
+      at?: Vec2;
+      vertexExpr?: Expr;
+      typed: string;
+      lengthPick?: Expr;
     };
 
 export type Ghost =
@@ -156,6 +170,7 @@ export type InsertJob = {
     | "pointOnCircle";
   args: Expr[];
   bind?: string;
+  patchVertex?: { id: string; index: number };
 };
 
 export type ToolStep = { session: ToolSession } | { insert: InsertJob };

@@ -1,6 +1,7 @@
+import MagicString from "magic-string";
 import * as ts from "typescript";
 
-import { siteSpecs } from "./analyze";
+import { siteSpecs, trailingId } from "./analyze";
 import { printExpr, type Expr } from "./expr";
 import { hoistIntersections, takeBind } from "./hoist";
 import { freshSiteId } from "./stamp";
@@ -11,6 +12,7 @@ export type Insert = {
   bind?: string;
   args: Expr[];
   id?: string;
+  patchVertex?: { id: string; index: number };
 };
 
 function parse(source: string): ts.SourceFile {
@@ -158,7 +160,70 @@ export function namesInBuildScope(source: string): Set<string> {
   return names;
 }
 
+function isFilletCall(node: ts.Expression): node is ts.CallExpression {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "fillet" &&
+    node.arguments.length >= 2
+  );
+}
+
+function findProfileCall(sf: ts.SourceFile, id: string): ts.CallExpression | undefined {
+  let target: ts.CallExpression | undefined;
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "profile") {
+      if (trailingId(node).id === id) target = node;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return target;
+}
+
+function isZeroNum(expr: Expr): boolean {
+  return expr.kind === "num" && expr.value === 0;
+}
+
+function patchProfileVertex(source: string, job: Insert): string {
+  const patch = job.patchVertex;
+  if (!patch) throw new Error("missing patchVertex");
+  const radius = job.args[0];
+  if (!radius) throw new Error("fillet radius is required");
+  const names = isZeroNum(radius) ? callees(radius) : ["fillet", ...callees(radius)];
+  let next = names.length > 0 ? ensureNamedImport(source, "oblik", names) : source;
+  const sf = parse(next);
+  const call = findProfileCall(sf, patch.id);
+  if (!call) throw new Error(`no profile with id ${patch.id}`);
+  const { args } = trailingId(call);
+  const arr = args[0];
+  if (!arr || !ts.isArrayLiteralExpression(arr)) {
+    throw new Error("Fillet needs the profile cycle as an array literal.");
+  }
+  const elemIndex = 2 * patch.index;
+  const elem = arr.elements[elemIndex];
+  if (!elem || ts.isSpreadElement(elem) || ts.isOmittedExpression(elem)) {
+    throw new Error(`vertex index ${patch.index} is out of range`);
+  }
+  const ms = new MagicString(next);
+  const rText = printExpr(radius);
+  if (isFilletCall(elem)) {
+    if (isZeroNum(radius)) {
+      ms.overwrite(elem.getStart(sf), elem.getEnd(), elem.arguments[0]!.getText(sf));
+    } else {
+      const arg = elem.arguments[1]!;
+      ms.overwrite(arg.getStart(sf), arg.getEnd(), rText);
+    }
+  } else if (isZeroNum(radius)) {
+    return next;
+  } else {
+    ms.overwrite(elem.getStart(sf), elem.getEnd(), `fillet(${elem.getText(sf)}, ${rText})`);
+  }
+  return ms.toString();
+}
+
 export function insertCall(source: string, job: Insert, nextId: () => string = freshSiteId): string {
+  if (job.patchVertex) return patchProfileVertex(source, job);
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
   const used = usedIdentifiers(parse(source));

@@ -942,6 +942,12 @@ describe("filterTools", () => {
   test("falls back to aliases when the title does not match", () => {
     expect(filterTools("fill").map((t) => t.id)).toEqual(["profile"]);
   });
+
+  test("fillet matches fillet, fil, and the corner alias", () => {
+    expect(filterTools("fillet").map((t) => t.id)).toEqual(["fillet"]);
+    expect(filterTools("fil").map((t) => t.id)).toEqual(["fillet"]);
+    expect(filterTools("corner").map((t) => t.id)).toEqual(["fillet"]);
+  });
 });
 
 describe("slider tool", () => {
@@ -1295,5 +1301,106 @@ describe("roundOffset tool", () => {
     );
     expect(g?.kind).toBe("profile");
     if (g?.kind === "profile") expect(g.edges).toHaveLength(8);
+  });
+});
+
+describe("fillet tool", () => {
+  const square = {
+    kind: "profile" as const,
+    outer: [
+      { a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } },
+      { a: { x: 1, y: 0 }, b: { x: 1, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } } },
+      { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
+      { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
+    ],
+  };
+  const faceHit = {
+    world: { x: 0.95, y: 0.95 },
+    point: free(0.95, 0.95),
+    profile: { bind: "mix", geom: square, id: "o_fil_mix" },
+  };
+  const scope = {
+    used: ["mix", "r"],
+    points: {
+      C: { expr: { kind: "ref" as const, name: "C" }, at: { x: 1, y: 1 } },
+    },
+    carriers: {},
+    circles: {},
+    profiles: { mix: { expr: { kind: "ref" as const, name: "mix" }, geom: square } },
+    lengths: { r: 0.35 },
+  };
+
+  test("picks the closest corner then a slider", () => {
+    const mid = clickTool(startTool("fillet"), faceHit, scope);
+    if (!("session" in mid)) throw new Error("expected session");
+    expect(mid.session).toMatchObject({ verb: "fillet", vertex: 2, faceId: "o_fil_mix" });
+    expect(
+      clickTool(
+        mid.session,
+        { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "r" }, value: 0.35 } },
+        scope,
+      ),
+    ).toEqual({
+      insert: {
+        from: "fillet",
+        args: [{ kind: "ref", name: "r" }],
+        patchVertex: { id: "o_fil_mix", index: 2 },
+      },
+    });
+  });
+
+  test("typed radius commits on Enter and preview has no new const", () => {
+    const mid = clickTool(startTool("fillet"), faceHit, scope);
+    if (!("session" in mid)) throw new Error("expected session");
+    expect(commitTool(typeTool(mid.session, "0.2"), null, scope)).toEqual({
+      insert: {
+        from: "fillet",
+        args: [{ kind: "num", value: 0.2 }],
+        patchVertex: { id: "o_fil_mix", index: 2 },
+      },
+    });
+    const preview = previewOf(mid.session, null, scope);
+    expect(preview.line).toContain("profile([");
+    expect(preview.line).toContain("fillet(");
+    expect(preview.line).not.toMatch(/^const /);
+  });
+
+  test("enrichHit sets the closest vertex", () => {
+    const ctx = {
+      trace: [
+        {
+          id: "o_fil_mix",
+          occ: 0,
+          kind: "profile",
+          bind: "mix",
+          value: square,
+          editable: false,
+          stack: [],
+        } as TraceNode,
+      ],
+      camera: { x: 0, y: 0, scale: 48 },
+      size: { w: 800, h: 600 },
+      screen: { x: 10, y: 10 },
+    };
+    const hit = enrichHit(startTool("fillet"), { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) }, ctx);
+    expect(hit.profile?.id).toBe("o_fil_mix");
+    expect(hit.corner?.index).toBe(0);
+    expect(hit.corner?.at.x).toBeCloseTo(0);
+    expect(hit.corner?.at.y).toBeCloseTo(0);
+  });
+
+  test("ghosts the filleted face from a length pick", () => {
+    const mid = clickTool(startTool("fillet"), faceHit, scope);
+    if (!("session" in mid)) throw new Error("expected session");
+    const g = ghostOf(
+      mid.session,
+      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "r" }, value: 0.2 } },
+      scope,
+    );
+    expect(g?.kind).toBe("profile");
+    if (g?.kind === "profile") {
+      expect(g.edges).toHaveLength(5);
+      expect(g.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    }
   });
 });

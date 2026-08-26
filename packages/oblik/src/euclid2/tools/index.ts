@@ -5,6 +5,7 @@ import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
+import { fillet } from "./fillet";
 import { profile } from "./profile";
 import { roundOffset } from "./roundOffset";
 import { segment } from "./segment";
@@ -40,6 +41,7 @@ const byId = {
   slider,
   profile,
   roundOffset,
+  fillet,
 } as const satisfies Record<ToolId, Tool>;
 
 export const TOOLS = [
@@ -52,6 +54,7 @@ export const TOOLS = [
   slider.spec,
   profile.spec,
   roundOffset.spec,
+  fillet.spec,
 ] as const;
 
 function of(session: ToolSession): Tool {
@@ -63,7 +66,13 @@ export function toolById(id: ToolId): Tool {
 }
 
 function titleMatch(t: ToolSpec, q: string): boolean {
-  return t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+  if (t.prefix.toLowerCase() === q || t.id.toLowerCase() === q) return true;
+  const title = t.title.toLowerCase();
+  if (title === q) return true;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`\\b${escaped}\\b`).test(title)) return true;
+  const parts = t.id.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(" ");
+  return parts.includes(q);
 }
 
 function descriptionMatch(t: ToolSpec, q: string): boolean {

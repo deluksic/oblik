@@ -210,6 +210,7 @@ describe("profile pick", () => {
 
   test("snapProfile picks a fill and ignores a nearby point", () => {
     expect(snapProfile([FACE, A], { x: 1, y: 1 }, camera, size)?.bind).toBe("face");
+    expect(snapProfile([FACE, A], { x: 1, y: 1 }, camera, size)?.id).toBe("o_pr");
     expect(snapProfile([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
     expect(snapProfile([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });

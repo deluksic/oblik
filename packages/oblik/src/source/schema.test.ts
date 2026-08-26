@@ -33,4 +33,17 @@ describe("parseInsert", () => {
       },
     });
   });
+
+  test("accepts a fillet vertex patch", () => {
+    const job = parseInsert({
+      file: "apps/demo/src/scenes/fillet.ts",
+      from: "fillet",
+      args: [{ kind: "ref", name: "r" }],
+      patchVertex: { id: "o_fil_mix", index: 1 },
+    });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job.patchVertex).toEqual({ id: "o_fil_mix", index: 1 });
+    expect(job.from).toBe("fillet");
+  });
 });
