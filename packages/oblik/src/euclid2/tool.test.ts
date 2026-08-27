@@ -1169,6 +1169,40 @@ describe("profile tool", () => {
     expect(hit.carrier?.bind).toBe("axis");
   });
 
+  test("profile carrier pick follows the focused invocation, not occ 0", () => {
+    const namedC0 = { kind: "ref" as const, bind: "c0", id: "o_c0", at: { x: 10, y: 0 } };
+    const bot0 = {
+      id: "o_bot",
+      occ: 0,
+      kind: "segment",
+      bind: "bottom",
+      value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const bot1 = {
+      ...bot0,
+      occ: 1,
+      value: { kind: "segment", a: { x: 10, y: 0 }, b: { x: 14, y: 0 } },
+    } as TraceNode;
+    const filter = { keys: new Set(["o_c0:1", "o_bot:1"]), print: (n: TraceNode) => n.bind };
+    const ctx = {
+      trace: [bot0, bot1],
+      camera: { x: 0, y: 0, scale: 48 },
+      size: { w: 800, h: 600 },
+      keys: filter.keys,
+      print: filter.print,
+    };
+    const a = clickTool(startTool("profile"), { world: namedC0.at, point: namedC0 });
+    if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected c0");
+    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual([]);
+    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual(["bottom"]);
+    const miss = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
+    expect(miss.carrier).toBeUndefined();
+    const hit = enrichHit(a.session, { world: { x: 12, y: 0.02 }, point: free(12, 0.02) }, ctx);
+    expect(hit.carrier?.bind).toBe("bottom");
+  });
+
   test("hides existing fills for the whole Profile session", () => {
     expect(profileHidesExisting(startTool("profile"))).toBe(true);
     expect(profileHidesExisting(startTool("line"))).toBe(false);

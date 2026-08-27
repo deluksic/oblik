@@ -4,7 +4,7 @@ import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
 import { printExpr, parsePath, type Expr } from "@/source/expr";
 import type { Camera2 } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
-import { namedStrokesThrough, snapStrokeCarrier } from "../pick";
+import { namedStrokesThrough, snapStrokeCarrier, type SnapFilter } from "../pick";
 import { dist, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
@@ -153,12 +153,13 @@ export function profileEligibleCarriers(
   session: ToolSession | null | undefined,
   trace: readonly TraceNode[],
   camera: Camera2,
+  filter?: SnapFilter,
 ): ReadonlySet<string> | null {
   if (!session || session.verb !== "profile") return null;
   if (!needCarrier(session)) return null;
   const from = session.vertices[session.vertices.length - 1];
   if (!from) return null;
-  return namedStrokesThrough(trace, from.at, camera);
+  return namedStrokesThrough(trace, from.at, camera, undefined, filter);
 }
 
 export const profile: Tool<ProfileSession> = {
@@ -182,8 +183,10 @@ export const profile: Tool<ProfileSession> = {
   hit(session, hit, ctx) {
     if (needCarrier(session)) {
       const from = session.vertices[session.vertices.length - 1];
+      const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
       const carrier = snapStrokeCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, {
         through: from?.at,
+        filter,
       });
       return carrier
         ? { ...hit, carrier, point: { kind: "free", at: hit.world } }

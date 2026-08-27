@@ -210,6 +210,23 @@ describe("profile pick", () => {
     expect([...namedStrokesThrough([AB, BC, CA], Pb, camera)].sort()).toEqual(["ab", "bc"]);
   });
 
+  test("namedStrokesThrough with keys uses that invocation, not occ 0", () => {
+    const ab0 = { ...AB, occ: 0 };
+    const ab1 = {
+      ...AB,
+      occ: 1,
+      value: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 14, y: 0 } },
+    };
+    const at = { x: 10, y: 0 };
+    expect([...namedStrokesThrough([ab0, ab1], at, camera)]).toEqual([]);
+    expect([
+      ...namedStrokesThrough([ab0, ab1], at, camera, undefined, {
+        keys: new Set(["o_ab:1"]),
+        print: (n) => n.bind,
+      }),
+    ]).toEqual(["ab"]);
+  });
+
   test("snapStrokeCarrier ignores a nearby stroke that misses the vertex", () => {
     const throughA = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size, { through: Pa });
     expect(throughA).toBeNull();

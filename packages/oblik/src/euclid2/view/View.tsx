@@ -231,7 +231,14 @@ export function Euclid2View(props: Euclid2ViewProps) {
   const sliders = createMemo(() => sliderNodes(props.trace));
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
   const eligibleCarriers = createMemo(() =>
-    props.placing ? profileEligibleCarriers(props.toolSession, props.trace, camera()) : null,
+    props.placing
+      ? profileEligibleCarriers(
+          props.toolSession,
+          props.trace,
+          camera(),
+          props.scope ? snapFilterOf(props.scope) : undefined,
+        )
+      : null,
   );
 
   return (
