@@ -12,11 +12,11 @@ import {
   sceneGlobKeys,
   sceneLoadersModule,
 } from "./catalog";
-import { insertCall } from "./insert";
+import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
-import { parseInsert, parseLiteralPatch } from "./schema";
+import { parseExpose, parseInsert, parseLiteralPatch } from "./schema";
 import { freshSiteId, stamp } from "./stamp";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
@@ -180,6 +180,30 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
             const next = insertCall(src, job);
+            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            json(res, 200, { ok: true });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-expose") {
+          let body: unknown;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { ok: false, error: "invalid json" });
+            return;
+          }
+          const job = parseExpose(body);
+          if (typeof job === "string") {
+            json(res, 400, { ok: false, error: job });
+            return;
+          }
+          try {
+            const abs = resolveUnder(workspaceRoot, job.file);
+            const src = fs.readFileSync(abs, "utf8");
+            const next = exposeReturnBag(src, job.dest, job.bind);
             await enqueue(abs, () => fs.writeFileSync(abs, next));
             json(res, 200, { ok: true });
           } catch (err) {

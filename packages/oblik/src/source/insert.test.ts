@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { printExpr, type Expr } from "./expr";
-import { insertCall } from "./insert";
+import { insertCall, exposeReturnBag } from "./insert";
 
 const src = `import { point } from "oblik";
 import { defineScene } from "oblik";
@@ -411,7 +411,7 @@ export default defineScene({
         ],
         id: "o_pr",
       }),
-    ).toThrow(/left.*not in build/);
+    ).toThrow(/left.*not in build\(\) — this scope cannot refer/);
   });
 
   test("inserts into a named helper before its return", () => {
@@ -602,5 +602,62 @@ export default defineScene({
         patchVertex: { id: "o_mix", index: 0 },
       }),
     ).toThrow(/array literal/);
+  });
+});
+
+describe("exposeReturnBag", () => {
+  const plate = `import { point, parallelLine, segment } from "oblik";
+export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const edge = segment(origin, { x: 1, y: 0 }, "o_edge");
+  const hLeft = parallelLine(edge, 0.2, "o_inl");
+  return { origin };
+}
+`;
+
+  test("adds a shorthand field to a single-line return bag", () => {
+    const next = exposeReturnBag(plate, "plate", "hLeft");
+    expect(next).toContain("return { origin, hLeft };");
+  });
+
+  test("adds a field to a multiline return bag with a trailing comma", () => {
+    const src = `export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const hLeft = origin;
+  return {
+    origin,
+  };
+}
+`;
+    expect(exposeReturnBag(src, "plate", "hLeft")).toContain(`return {
+    origin,
+    hLeft,
+  };`);
+  });
+
+  test("is a no-op when the field is already on the return bag", () => {
+    expect(exposeReturnBag(plate, "plate", "origin")).toBe(plate);
+  });
+
+  test("adds return { bind } when the function has no return", () => {
+    const src = `export function plate() {
+  const origin = point(0, 0, "o_origin");
+}
+`;
+    expect(exposeReturnBag(src, "plate", "origin")).toContain("return { origin };");
+  });
+
+  test("refuses to wrap a single-value return", () => {
+    const src = `export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const hLeft = origin;
+  return origin;
+}
+`;
+    expect(() => exposeReturnBag(src, "plate", "hLeft")).toThrow(/return bag/);
+  });
+
+  test("refuses a bind that is not a local in dest", () => {
+    expect(() => exposeReturnBag(plate, "plate", "ground")).toThrow(/cannot refer to ground/);
   });
 });

@@ -36,6 +36,7 @@ export type ScopePick = {
 export type ExposeNote = {
   kind: "hint" | "blocked";
   text: string;
+  bind?: string;
 };
 
 export type OriginFrame = {
@@ -449,13 +450,15 @@ function exposeNote(fn: MentionFn | undefined, node: TraceNode): ExposeNote | un
   if (fn.return.kind === "value" || fn.return.kind === "other") {
     return {
       kind: "blocked",
-      text: "This function returns a single value, so it has no bag to add a field to. Change the return to an object literal first — oblik will not wrap it.",
+      text: "This function returns a single value, so it has no return bag to add a field to. Change the return to an object literal first — oblik will not wrap it.",
     };
   }
-  const bind = node.bind ?? node.id;
+  const bind = node.bind;
+  if (!bind || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(bind)) return undefined;
   return {
     kind: "hint",
-    text: `${bind} is constructed here and not on the return. Expose would add it to the bag so the caller can mention it.`,
+    bind,
+    text: `${bind} is constructed here and not on the return. Add it to the return bag so the caller can refer to it.`,
   };
 }
 

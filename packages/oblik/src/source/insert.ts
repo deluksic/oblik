@@ -266,6 +266,86 @@ function patchProfileVertex(source: string, job: Insert): string {
   return ms.toString();
 }
 
+const BIND_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function unwrapExpr(expr: ts.Expression): ts.Expression {
+  let e = expr;
+  while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isSatisfiesExpression(e)) {
+    e = e.expression;
+  }
+  return e;
+}
+
+function objectHasField(obj: ts.ObjectLiteralExpression, bind: string): boolean {
+  for (const p of obj.properties) {
+    if (ts.isShorthandPropertyAssignment(p) && p.name.text === bind) return true;
+    if (ts.isPropertyAssignment(p) && ident(p.name) === bind) return true;
+  }
+  return false;
+}
+
+function insertObjectField(source: string, sf: ts.SourceFile, obj: ts.ObjectLiteralExpression, bind: string): string {
+  const props = obj.properties;
+  if (props.length === 0) {
+    return source.slice(0, obj.getStart(sf)) + `{ ${bind} }` + source.slice(obj.getEnd());
+  }
+  const last = props[props.length - 1]!;
+  const afterLast = last.getEnd();
+  const close = obj.getEnd() - 1;
+  const gap = source.slice(afterLast, close);
+  const multiline = source.slice(obj.getStart(sf), obj.getEnd()).includes("\n");
+  const hasTrailingComma = gap.includes(",");
+  if (!multiline) {
+    if (hasTrailingComma) return source.slice(0, close) + ` ${bind}` + source.slice(close);
+    return source.slice(0, afterLast) + `, ${bind}` + source.slice(afterLast);
+  }
+  const indent = indentAt(source, last.getStart(sf));
+  if (hasTrailingComma) {
+    const commaAt = afterLast + gap.indexOf(",");
+    return source.slice(0, commaAt + 1) + `\n${indent}${bind},` + source.slice(commaAt + 1);
+  }
+  return source.slice(0, afterLast) + `,\n${indent}${bind}` + source.slice(afterLast);
+}
+
+/** Add `bind` as a shorthand field on `dest`'s object-literal return. Does not wrap a single-value return. */
+export function exposeReturnBag(source: string, dest: string, bind: string): string {
+  const name = dest.trim();
+  if (!BIND_IDENT.test(bind)) throw new Error("bind must be an identifier");
+  if (!name) throw new Error("no function to add a return bag field to");
+  const sf = parse(source);
+  const body = findFnBody(sf, name);
+  if (!body) throw new Error(`no function ${name}() with a block body`);
+  if (!namesInBuildScope(source, name).has(bind)) {
+    throw new Error(`${bind} is not in ${name}() — this scope cannot refer to ${bind}.`);
+  }
+  let ret: ts.ReturnStatement | undefined;
+  for (let i = body.statements.length - 1; i >= 0; i--) {
+    const s = body.statements[i];
+    if (s && ts.isReturnStatement(s)) {
+      ret = s;
+      break;
+    }
+  }
+  if (!ret) {
+    const indent = indentAt(source, body.statements[0]?.getStart(sf) ?? body.getStart(sf) + 1);
+    const close = body.getEnd() - 1;
+    const before = source.slice(0, close);
+    const prefix = before.endsWith("\n") ? "" : "\n";
+    return `${before}${prefix}${indent}return { ${bind} };\n${source.slice(close)}`;
+  }
+  if (!ret.expression) {
+    return `${source.slice(0, ret.getStart(sf))}return { ${bind} };${source.slice(ret.getEnd())}`;
+  }
+  const expr = unwrapExpr(ret.expression);
+  if (!ts.isObjectLiteralExpression(expr)) {
+    throw new Error(
+      "This function returns a single value, so it has no return bag to add a field to. Change the return to an object literal first — oblik will not wrap it.",
+    );
+  }
+  if (objectHasField(expr, bind)) return source;
+  return insertObjectField(source, sf, expr, bind);
+}
+
 export function insertCall(source: string, job: Insert, nextId: () => string = freshSiteId): string {
   if (job.patchVertex) return patchProfileVertex(source, job);
   const specs = siteSpecs();
@@ -291,7 +371,7 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   if (missing.length > 0) {
     const who = missing.join(", ");
     const verb = missing.length === 1 ? "is" : "are";
-    throw new Error(`${who} ${verb} not in ${dest}() — not mentionable in this scope.`);
+    throw new Error(`${who} ${verb} not in ${dest}() — this scope cannot refer to ${who}.`);
   }
   const names = [
     ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),

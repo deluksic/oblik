@@ -269,6 +269,91 @@ export default defineScene({
       globalThis.fetch = orig;
     }
   });
+
+  test("offers adding a private local to the return bag", async () => {
+    const helperFile = "apps/demo/src/layout/plate.ts";
+    const helperSrc = `export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const hLeft = parallelLine(edge, 0.2, "o_inl");
+  return { origin };
+}
+`;
+    const mentions = [analyzeMentions(helperSrc, helperFile)];
+    const node = {
+      id: "o_inl",
+      occ: 0,
+      kind: "line",
+      value: { kind: "parallelLine", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 }, distance: 0.2 },
+      bind: "hLeft",
+      editable: false,
+      at: { line: 3, column: 4 },
+      module: helperFile,
+      stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
+    } as TraceNode;
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
+      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: node.stack }), { status: 200 });
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const detail = await selectionDetailForScope({
+        node,
+        focus: { file: helperFile, name: "plate", serial: 0 },
+        mentions,
+      });
+      expect(detail.expose).toEqual({
+        kind: "hint",
+        bind: "hLeft",
+        text: "hLeft is constructed here and not on the return. Add it to the return bag so the caller can refer to it.",
+      });
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  test("blocks adding to a single-value return", async () => {
+    const helperFile = "apps/demo/src/layout/plate.ts";
+    const helperSrc = `export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const hLeft = parallelLine(edge, 0.2, "o_inl");
+  return origin;
+}
+`;
+    const mentions = [analyzeMentions(helperSrc, helperFile)];
+    const node = {
+      id: "o_inl",
+      occ: 0,
+      kind: "line",
+      value: { kind: "parallelLine", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 }, distance: 0.2 },
+      bind: "hLeft",
+      editable: false,
+      at: { line: 3, column: 4 },
+      module: helperFile,
+      stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
+    } as TraceNode;
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
+      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: node.stack }), { status: 200 });
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const detail = await selectionDetailForScope({
+        node,
+        focus: { file: helperFile, name: "plate", serial: 0 },
+        mentions,
+      });
+      expect(detail.expose).toEqual({
+        kind: "blocked",
+        text: "This function returns a single value, so it has no return bag to add a field to. Change the return to an object literal first — oblik will not wrap it.",
+      });
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
 });
 
 describe("scopeCallerChain", () => {

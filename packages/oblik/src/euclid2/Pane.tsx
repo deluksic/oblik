@@ -241,6 +241,22 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setToolLock(false);
   }
 
+  async function expose(bind: string) {
+    const dest = focus();
+    if (!dest.name) return;
+    const res = await fetch("/__oblik-expose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file: dest.file, dest: dest.name, bind }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      setWriteError(body?.error ?? `expose failed (${res.status})`);
+      return;
+    }
+    setWriteError(null);
+  }
+
   function onPlace(hit: PlaceHit) {
     const session = tool();
     if (!session) return;
@@ -327,7 +343,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         />
       </div>
       <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-        <SelectionSidebar detail={selectionDetail()} onPickScope={pickScope} />
+        <SelectionSidebar
+          detail={selectionDetail()}
+          onPickScope={pickScope}
+          onExpose={(bind) => void expose(bind)}
+        />
       </Loading>
     </div>
   );

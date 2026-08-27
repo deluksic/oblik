@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseInsert } from "./schema";
+import { parseExpose, parseInsert } from "./schema";
 
 describe("parseInsert", () => {
   test("accepts slider args with props", () => {
@@ -45,5 +45,22 @@ describe("parseInsert", () => {
     if (typeof job === "string") throw new Error(job);
     expect(job.patchVertex).toEqual({ id: "o_fil_mix", index: 1 });
     expect(job.from).toBe("fillet");
+  });
+});
+
+describe("parseExpose", () => {
+  test("accepts a return bag field", () => {
+    const job = parseExpose({
+      file: "apps/demo/src/layout/mounting-plate.ts",
+      dest: "mountingPlateLayout",
+      bind: "hLeft",
+    });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job).toEqual({
+      file: "apps/demo/src/layout/mounting-plate.ts",
+      dest: "mountingPlateLayout",
+      bind: "hLeft",
+    });
   });
 });

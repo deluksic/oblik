@@ -102,6 +102,23 @@
   line-height: 1.4;
 }
 
+.exposeBtn {
+  margin-top: 0.5rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--oblik-line);
+  border-radius: 0.28rem;
+  background: var(--oblik-raised);
+  color: var(--oblik-accent);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.exposeBtn:hover {
+  border-color: var(--oblik-hover);
+  color: var(--oblik-hover);
+}
+
 .originFile {
   margin: 0;
   padding: 0.35rem 0.55rem;

@@ -1,12 +1,13 @@
 import { For } from "solid-js";
 
-import type { OriginDisplayLine, OriginFrame, OriginView, ScopePick, SelectionDetail } from "./selection-detail";
+import type { ExposeNote, OriginDisplayLine, OriginFrame, OriginView, ScopePick, SelectionDetail } from "./selection-detail";
 
 import styles from "./SelectionSidebar.module.css";
 
 export type SelectionSidebarProps = {
   detail: SelectionDetail;
   onPickScope?: (pick: ScopePick) => void;
+  onExpose?: (bind: string) => void;
 };
 
 export function SelectionSidebar(props: SelectionSidebarProps) {
@@ -20,12 +21,31 @@ export function SelectionSidebar(props: SelectionSidebarProps) {
       <p class={styles.kicker}>Origin</p>
       <OriginPane origin={props.detail.origin} onPickScope={props.onPickScope} />
       {props.detail.expose ? (
-        <div class={[styles.expose, { [styles.exposeBlocked]: props.detail.expose.kind === "blocked" }]}>
-          <p class={styles.kicker}>Expose</p>
-          <p class={styles.exposeText}>{props.detail.expose.text}</p>
-        </div>
+        <ExposePane note={props.detail.expose} onExpose={props.onExpose} />
       ) : null}
     </aside>
+  );
+}
+
+function ExposePane(props: { note: ExposeNote; onExpose?: (bind: string) => void }) {
+  const canAdd = () => props.note.kind === "hint" && !!props.note.bind && !!props.onExpose;
+  return (
+    <div class={[styles.expose, { [styles.exposeBlocked]: props.note.kind === "blocked" }]}>
+      <p class={styles.kicker}>Return bag</p>
+      <p class={styles.exposeText}>{props.note.text}</p>
+      {canAdd() ? (
+        <button
+          type="button"
+          class={styles.exposeBtn}
+          onClick={() => {
+            const bind = props.note.bind;
+            if (bind) props.onExpose?.(bind);
+          }}
+        >
+          Add to return bag
+        </button>
+      ) : null}
+    </div>
   );
 }
 

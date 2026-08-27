@@ -66,3 +66,17 @@ export function parseInsert(raw: unknown): InsertBody | string {
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
 }
+
+export const exposeSchema = v.object({
+  file: v.string(),
+  dest: v.pipe(v.string(), v.minLength(1)),
+  bind: v.pipe(v.string(), v.minLength(1)),
+});
+
+export type ExposeBody = v.InferOutput<typeof exposeSchema>;
+
+export function parseExpose(raw: unknown): ExposeBody | string {
+  const r = v.safeParse(exposeSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}
