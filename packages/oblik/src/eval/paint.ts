@@ -12,6 +12,8 @@ export type FigureStyle = {
   point?: FigurePointMark;
 };
 
+export type StyleSpec = Omit<FigureStyle, "kind">;
+
 export type PaintTarget = { id: string; occ: number };
 
 export type PaintValue = {
@@ -22,6 +24,18 @@ export type PaintValue = {
 
 export function isStyle(value: unknown): value is FigureStyle {
   return !!value && typeof value === "object" && (value as FigureStyle).kind === "style";
+}
+
+/** A `style()` value or a plain look bag. Not geom. */
+export function isLook(value: unknown): value is FigureStyle | StyleSpec {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const kind = (value as { kind?: unknown }).kind;
+  return kind == null || kind === "style";
+}
+
+export function lookOf(value: unknown): FigureStyle {
+  if (!isLook(value)) throw new Error("paint needs a look object or a style()");
+  return cloneStyle(value);
 }
 
 export function isPaint(value: unknown): value is PaintValue {

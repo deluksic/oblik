@@ -708,7 +708,7 @@ export function plate() {
     expect(() => exposeReturnBag(plate, "plate", "ground")).toThrow(/cannot refer to ground/);
   });
 
-  test("inserts paint as a stamped constructor and imports style", () => {
+  test("inserts paint as a stamped constructor", () => {
     const fig = `import { defineScene } from "oblik";
 import { mountingPlateLayout } from "../layout/mounting-plate";
 
@@ -725,24 +725,19 @@ export default defineScene({
       args: [
         { kind: "member", object: { kind: "ref", name: "plate" }, field: "drill" },
         {
-          kind: "call",
-          name: "style",
-          args: [
-            {
-              kind: "props",
-              props: {
-                stroke: { kind: "str", value: "#1c1917" },
-                width: { kind: "num", value: 1.2 },
-              },
-            },
-          ],
+          kind: "props",
+          props: {
+            stroke: { kind: "str", value: "#1c1917" },
+            width: { kind: "num", value: 1.2 },
+          },
         },
       ],
       id: "o_p",
     });
-    expect(next).toContain('paint(plate.drill, style({ stroke: "#1c1917", width: 1.2 }), "o_p");');
+    expect(next).toContain('paint(plate.drill, { stroke: "#1c1917", width: 1.2 }, "o_p");');
     expect(next).not.toContain("const ink");
-    expect(next).toMatch(/import \{ defineScene, paint, style \} from "oblik"/);
+    expect(next).not.toContain("style(");
+    expect(next).toMatch(/import \{ defineScene, paint \} from "oblik"/);
   });
 
   test("paint insert refuses names the dest cannot refer to", () => {
@@ -760,7 +755,7 @@ export default defineScene({
         from: "paint",
         args: [
           { kind: "ref", name: "hLeft" },
-          { kind: "call", name: "style", args: [{ kind: "props", props: {} }] },
+          { kind: "props", props: {} },
         ],
         id: "o_p",
       }),

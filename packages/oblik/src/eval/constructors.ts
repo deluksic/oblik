@@ -34,10 +34,11 @@ import {
 import { brand, currentEval, type SliderValue, type TraceNode, type TraceValue } from "./context";
 import {
   cloneStyle,
+  lookOf,
   collectPaintTargets,
-  isStyle,
   type FigureStyle,
   type PaintValue,
+  type StyleSpec,
 } from "./paint";
 import { $site, type SiteSpec } from "./site";
 import { captureUserStack } from "./stack";
@@ -249,15 +250,14 @@ export const slider = mark((n: number, opts?: SliderOpts, id?: string): number =
   return tracedSlider(v, { min, max, step }, id);
 }, { dof: [0] });
 
-/** Presentation spec. On the tape when evaluated inside `build()` with a stamped id. */
+/** Register a shared look. Pass the value to `paint`, or pass a spec object instead. */
 export const style = mark((spec: Omit<FigureStyle, "kind"> = {}, id?: string): FigureStyle => {
   return traced(cloneStyle(spec), id);
 }, { dof: [] });
 
-/** Walk branded geom in `object` and record a paint. Last paint of an id:occ wins at draw. */
-export const paint = mark((object: unknown, spec: FigureStyle, id?: string): PaintValue => {
-  if (!isStyle(spec)) throw new Error("paint needs a style()");
-  const value: PaintValue = { kind: "paint", targets: collectPaintTargets(object), style: cloneStyle(spec) };
+/** Walk branded geom in `object` and record a paint. Look is a `style()` value or a spec object. */
+export const paint = mark((object: unknown, look: FigureStyle | StyleSpec, id?: string): PaintValue => {
+  const value: PaintValue = { kind: "paint", targets: collectPaintTargets(object), style: lookOf(look) };
   return traced(value, id);
 }, { dof: [] });
 

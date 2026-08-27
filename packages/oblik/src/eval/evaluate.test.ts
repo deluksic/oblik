@@ -241,24 +241,40 @@ describe("evaluate", () => {
 });
 
 describe("style and paint", () => {
-  test("are tape nodes inside evaluate", () => {
+  test("paint accepts a spec object without style()", () => {
     const scene = defineScene({
       kind: "figure",
       title: "t",
       build() {
         const A = point(0, 0, "a");
-        const ink = style({ stroke: "#1c1917", width: 1.2 }, "s");
-        paint(A, ink, "p");
+        paint(A, { stroke: "#1c1917", width: 1.2 }, "p");
       },
     });
     const { trace } = evaluate(scene);
-    expect(trace.map((n) => n.kind)).toEqual(["point", "style", "paint"]);
+    expect(trace.map((n) => n.kind)).toEqual(["point", "paint"]);
     const p = trace.find((n) => n.kind === "paint");
     expect(p?.value.kind).toBe("paint");
     if (p?.value.kind === "paint") {
       expect(p.value.targets).toEqual([{ id: "a", occ: 0 }]);
       expect(p.value.style.stroke).toBe("#1c1917");
     }
+  });
+
+  test("style() inside build is a tape node paint can reuse", () => {
+    const scene = defineScene({
+      kind: "figure",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(1, 0, "b");
+        const hole = style({ stroke: "#1c1917", width: 1.2 }, "s");
+        paint(A, hole, "p0");
+        paint(B, hole, "p1");
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.map((n) => n.kind)).toEqual(["point", "point", "style", "paint", "paint"]);
+    expect(trace.filter((n) => n.kind === "paint")).toHaveLength(2);
   });
 
   test("style() without eval ctx is an untraced value", () => {

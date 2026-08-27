@@ -20,7 +20,7 @@ import {
   DEFAULT_BRUSH,
   figureStyleFromBrush,
   previewLook,
-  styleExpr,
+  lookExpr,
   takesFill,
   type BrushSettings,
 } from "./chips";
@@ -210,7 +210,7 @@ export function FigurePane(props: FigurePaneProps) {
       file: dest.file,
       dest: dest.name,
       from: "paint",
-      args: [expr, styleExpr(lookFor(geom))],
+      args: [expr, lookExpr(lookFor(geom))],
     });
   }
 
@@ -220,7 +220,7 @@ export function FigurePane(props: FigurePaneProps) {
     await postJson("/__oblik-paint-style", {
       file,
       id: paint.id,
-      style: styleExpr(geom ? lookFor(geom) : figureStyleFromBrush(brush(), true)),
+      style: lookExpr(geom ? lookFor(geom) : figureStyleFromBrush(brush(), true)),
     });
   }
 

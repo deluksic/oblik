@@ -45,16 +45,16 @@ function callees(expr: Expr): string[] {
   return [];
 }
 
-/** Replace the style argument of `paint(geom, style, id)`. */
-export function patchPaintStyle(source: string, id: string, styleExpr: Expr): string {
-  const withImport = ensureNamedImport(source, "oblik", ["paint", ...callees(styleExpr)]);
+/** Replace the look argument of `paint(geom, look, id)`. */
+export function patchPaintStyle(source: string, id: string, look: Expr): string {
+  const withImport = ensureNamedImport(source, "oblik", ["paint", ...callees(look)]);
   const sf = parse(withImport);
   const call = paintCallWithId(sf, id);
   if (!call) throw new Error(`no paint(..., "${id}")`);
   const { args } = trailingId(call);
-  const styleArg = args[1];
-  if (!styleArg) throw new Error(`paint("${id}") has no style argument`);
-  return withImport.slice(0, styleArg.getStart(sf)) + printExpr(styleExpr) + withImport.slice(styleArg.getEnd());
+  const lookArg = args[1];
+  if (!lookArg) throw new Error(`paint("${id}") has no look argument`);
+  return withImport.slice(0, lookArg.getStart(sf)) + printExpr(look) + withImport.slice(lookArg.getEnd());
 }
 
 /** Remove the statement that owns `paint(..., id)`. Geom stays. */

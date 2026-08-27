@@ -1,11 +1,6 @@
-import { defineScene, paint, style } from "oblik";
+import { defineScene, paint } from "oblik";
 
 import { mountingPlateLayout } from "../layout/mounting-plate";
-
-const hole = style({ stroke: "#1c1917", width: 1.2, fill: "none" }, "o_fhole");
-const dash = style({ stroke: "#1c1917", width: 1.05, dash: [5, 3.5] }, "o_fdash");
-const open = style({ stroke: "#1c1917", width: 1.2, fill: "none", point: "open" }, "o_fopen");
-const dot = style({ stroke: "#1c1917", width: 1.2, point: "dot" }, "o_fdot");
 
 export default defineScene({
   kind: "figure",
@@ -16,9 +11,9 @@ export default defineScene({
   frame: { width: 5.2, height: 4.2 },
   build() {
     const plate = mountingPlateLayout();
-    paint(plate.drill, hole, "o_fpdrill");
-    paint(plate.origin, open, "o_fporig");
-    paint(plate.opp, dot, "o_fpopp");
-    paint(plate.hBottom, dash, "o_fpin");
+    paint(plate.drill, { stroke: "#1c1917", width: 1.2, fill: "none" }, "o_fpdrill");
+    paint(plate.origin, { stroke: "#1c1917", width: 1.2, fill: "none", point: "open" }, "o_fporig");
+    paint(plate.opp, { stroke: "#1c1917", width: 1.2, point: "dot" }, "o_fpopp");
+    paint(plate.hBottom, { stroke: "#1c1917", width: 1.05, dash: [5, 3.5] }, "o_fpin");
   },
 });

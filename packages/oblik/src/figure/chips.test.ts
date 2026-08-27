@@ -4,7 +4,7 @@ import {
   DEFAULT_BRUSH,
   figureStyleFromBrush,
   previewLook,
-  styleExpr,
+  lookExpr,
   takesFill,
 } from "./chips";
 
@@ -37,29 +37,23 @@ describe("figureStyleFromBrush", () => {
   });
 });
 
-describe("styleExpr", () => {
-  test("prints fill and dash into style({ … })", () => {
-    const expr = styleExpr(figureStyleFromBrush({ ...DEFAULT_BRUSH, fill: "none", line: "dash" }, true));
+describe("lookExpr", () => {
+  test("prints a plain look object, not style({ … })", () => {
+    const expr = lookExpr(figureStyleFromBrush({ ...DEFAULT_BRUSH, fill: "none", line: "dash" }, true));
     expect(expr).toEqual({
-      kind: "call",
-      name: "style",
-      args: [
-        {
-          kind: "props",
-          props: {
-            stroke: { kind: "str", value: "#1c1917" },
-            fill: { kind: "str", value: "none" },
-            width: { kind: "num", value: 2.8 },
-            dash: {
-              kind: "array",
-              items: [
-                { kind: "num", value: 19.6 },
-                { kind: "num", value: 14 },
-              ],
-            },
-          },
+      kind: "props",
+      props: {
+        stroke: { kind: "str", value: "#1c1917" },
+        fill: { kind: "str", value: "none" },
+        width: { kind: "num", value: 2.8 },
+        dash: {
+          kind: "array",
+          items: [
+            { kind: "num", value: 19.6 },
+            { kind: "num", value: 14 },
+          ],
         },
-      ],
+      },
     });
   });
 });
