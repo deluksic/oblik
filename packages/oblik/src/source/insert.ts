@@ -18,6 +18,9 @@ export type Insert = {
   patchVertex?: { id: string; index: number };
 };
 
+/** `paint` is a tape effect. Nothing refers to the value, so it is not a `const`. */
+const EFFECT_CTORS = new Set(["paint"]);
+
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
@@ -332,12 +335,15 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   for (const h of hoists) {
     if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
   }
-  const bind = takeBind(used, job.from, job.bind);
-  const statements = [
+  const statements: { bind?: string; from: string; args: Expr[]; id: string }[] = [
     ...hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() })),
-    { bind, from: job.from, args, id: job.id ?? nextId() },
   ];
-  const introduced = new Set(statements.map((s) => s.bind));
+  if (EFFECT_CTORS.has(job.from)) {
+    statements.push({ from: job.from, args, id: job.id ?? nextId() });
+  } else {
+    statements.push({ bind: takeBind(used, job.from, job.bind), from: job.from, args, id: job.id ?? nextId() });
+  }
+  const introduced = new Set(statements.flatMap((s) => (s.bind ? [s.bind] : [])));
   const scope = namesInFunctionScope(source, dest);
   const missing = [
     ...new Set(statements.flatMap((s) => s.args.flatMap(exprRefs)).filter((n) => !scope.has(n) && !introduced.has(n))),
@@ -358,7 +364,10 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   const last = stmts[stmts.length - 1];
   const indent = last ? indentAt(next, last.getStart(sf)) : "    ";
   const chunk = statements
-    .map((s) => `${indent}const ${s.bind} = ${s.from}(${s.args.map(printExpr).join(", ")}, "${s.id}");\n`)
+    .map((s) => {
+      const call = `${s.from}(${s.args.map(printExpr).join(", ")}, "${s.id}")`;
+      return s.bind ? `${indent}const ${s.bind} = ${call};\n` : `${indent}${call};\n`;
+    })
     .join("");
   if (last && ts.isReturnStatement(last)) {
     const lineStart = next.lastIndexOf("\n", last.getStart(sf) - 1) + 1;

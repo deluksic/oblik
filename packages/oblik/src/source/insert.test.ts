@@ -740,7 +740,8 @@ export default defineScene({
       ],
       id: "o_p",
     });
-    expect(next).toContain('const ink = paint(plate.drill, style({ stroke: "#1c1917", width: 1.2 }), "o_p");');
+    expect(next).toContain('paint(plate.drill, style({ stroke: "#1c1917", width: 1.2 }), "o_p");');
+    expect(next).not.toContain("const ink");
     expect(next).toMatch(/import \{ defineScene, paint, style \} from "oblik"/);
   });
 

@@ -27,7 +27,6 @@ export const BIND_PREFIX: Record<string, string> = {
   profile: "pr",
   roundOffset: "off",
   style: "sty",
-  paint: "ink",
 };
 
 const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;
