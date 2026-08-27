@@ -23,7 +23,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Mounting plate | Parent binds `const plate = mountingPlateLayout()`. Snap `plate.drill` from `build`; dive to insert in the layout file; Add to return for a private local |
 | Mounting plate grid | 3×2 `for` of the same helper. Dive one plate; siblings mute. Serial is once-id `occ`, not a second document |
 | Nested circles | Two-level helpers (`nestedCircles` → `petal`). Parent draws nested geometry; the inner bead is not referable there |
-| Plate figure | P9: same `mountingPlateLayout()` as Mounting plate. Cream paper, optional frame; `paint` / `style` on the tape. Outline not returned stays onioned |
+| Plate figure | P9: same `mountingPlateLayout()` as Mounting plate. Cream paper, page `frame`; `paint` / `style` on the tape. Outline not returned stays onioned |
 | Pie | Three sectors on one circle; `roundOffset(wedge, -gap)` opens the cuts |
 | Fillet | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise |
 | Triangle | three free points |

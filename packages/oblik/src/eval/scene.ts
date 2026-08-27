@@ -12,7 +12,7 @@ export type FigureScene = {
   hint?: string;
   camera?: { x: number; y: number; scale: number };
   paper?: "cream" | "white";
-  /** World-unit artboard. Letterboxed in the pane; omit to fill the view. */
+  /** World-unit artboard, drawn as a page. Omit for no crop marks. */
   frame?: { width: number; height: number };
   build: () => unknown;
 };

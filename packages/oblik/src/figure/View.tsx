@@ -159,25 +159,19 @@ export function FigureView(props: FigureViewProps) {
   }
 
   return (
-    <div class={[styles.mat, { [styles.flush]: !props.frame }]}>
+    <div class={styles.mat}>
       <div
         ref={setPaneEl}
         class={[
           styles.paper,
           props.paper === "white" ? styles.white : styles.cream,
           {
-            [styles.framed]: !!props.frame,
             [styles.grabbing]: grabbing(),
             [styles.grab]: !grabbing() && !props.tool,
             [styles.placing]: props.tool === "brush",
             [styles.erasing]: props.tool === "eraser",
           },
         ]}
-        style={
-          props.frame
-            ? { "--frame-w": String(props.frame.width), "--frame-h": String(props.frame.height) }
-            : undefined
-        }
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
