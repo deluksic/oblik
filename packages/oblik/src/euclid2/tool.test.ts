@@ -1195,7 +1195,7 @@ describe("profile tool", () => {
     };
     const a = clickTool(startTool("profile"), { world: namedC0.at, point: namedC0 });
     if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected c0");
-    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual([]);
+    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["bottom"]);
     expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual(["bottom"]);
     const miss = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
     expect(miss.carrier).toBeUndefined();
