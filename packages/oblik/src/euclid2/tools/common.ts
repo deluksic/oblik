@@ -1,7 +1,7 @@
 import { printExpr, parsePath, type Expr } from "@/source/expr";
 import { hoistIntersections, printHoist, takeBind } from "@/source/hoist";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
-import type { Vec2 } from "../pick";
+import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
 export { isConstructed, isGliderPlace, isPinnedPoint };
@@ -111,8 +111,16 @@ export function previewCall(
   return [...hoists.map(printHoist), `const ${id} = ${call(exprs.map((e) => printExpr(e)))}`].join("\n");
 }
 
-export function hoverBind(trace: readonly { occ: number; bind?: string; id: string }[], bind: string): string | null {
-  return trace.find((n) => n.bind === bind && n.occ === 0)?.id ?? null;
+export function exprOfPrint(print: string): Expr {
+  return parsePath(print);
+}
+
+export function hoverBind(
+  trace: readonly { occ: number; bind?: string; id: string }[],
+  bind: string,
+  filter?: SnapFilter,
+): string | null {
+  return nodeByPrint(trace, bind, filter)?.id ?? null;
 }
 
 export function dist(a: Vec2, b: Vec2): number {

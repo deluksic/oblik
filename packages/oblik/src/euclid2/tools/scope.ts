@@ -61,7 +61,10 @@ function childNodes(
   caller: MentionFn,
 ): TraceNode[] {
   const ofCallee = (n: TraceNode) =>
-    !!n.inv && isFiniteTrace(n) && n.inv.name === callee.name;
+    !!n.inv &&
+    isFiniteTrace(n) &&
+    n.inv.name === callee.name &&
+    sourceFileKey(n.inv.file) === sourceFileKey(callee.file);
   const all = trace.filter(ofCallee);
   const siblingCalls = caller.calls.filter((c) => c.callee === call.callee);
   const callIndex = siblingCalls.findIndex((c) => c.line === call.line && c.column === call.column);
@@ -231,6 +234,11 @@ export function snapFilterOf(scope: Scope): SnapFilter | undefined {
 export function mutedForScope(n: TraceNode, scope: Scope): boolean {
   if (!scope.liveKeys) return false;
   return !scope.liveKeys.has(traceKey(n));
+}
+
+/** Pane scope when present; never rebuild an unfocused occ-0 scope for tool hit/hover. */
+export function toolScope(ctx: { scope?: Scope; trace: readonly TraceNode[] }): Scope {
+  return ctx.scope ?? scopeFromTrace(ctx.trace);
 }
 
 export function scopeOf(x?: Scope | readonly string[]): Scope {

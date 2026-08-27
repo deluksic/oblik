@@ -4,6 +4,7 @@ import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 
 export function parseNum(raw: string | undefined): number | undefined {
   const t = raw?.trim() ?? "";
@@ -30,7 +31,7 @@ export function numError(raw: string): string | null {
 export function refError(raw: string, names: readonly string[], label: string): string | null {
   const t = raw.trim();
   if (t === "") return null;
-  if (!IDENT.test(t)) return "Name must be an identifier.";
+  if (!PATH.test(t)) return "Name must be an identifier or path.";
   if (names.length > 0 && !names.includes(t)) return `No ${label} named ${t}.`;
   return null;
 }
@@ -93,7 +94,7 @@ export function resolvePoint(ref: string, placed: import("./types").Placed | und
   const t = ref.trim();
   if (!t) return placed;
   if (scope.points[t]) return scope.points[t];
-  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+  if (placed && printExpr(placed.expr) === t) return placed;
 }
 
 export function resolveCarrier(
@@ -104,7 +105,7 @@ export function resolveCarrier(
   const t = ref.trim();
   if (!t) return placed;
   if (scope.carriers[t]) return scope.carriers[t];
-  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+  if (placed && printExpr(placed.expr) === t) return placed;
 }
 
 export function resolveProfile(
@@ -115,7 +116,7 @@ export function resolveProfile(
   const t = ref.trim();
   if (!t) return placed;
   if (scope.profiles[t]) return scope.profiles[t];
-  if (placed?.expr.kind === "ref" && placed.expr.name === t) return placed;
+  if (placed && printExpr(placed.expr) === t) return placed;
 }
 
 export function hitRef(hit: import("./types").PlaceHit): string {

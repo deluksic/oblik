@@ -1,7 +1,8 @@
 import type { LineLike } from "@/geom";
 import { signedDist } from "@/geom/ops";
+import { printExpr } from "@/source/expr";
 import { snapLineCarrier } from "../pick";
-import { exprOfPlace, hoverBind, hoverPlace, isPinnedPoint, previewCall, round } from "./common";
+import { exprOfPlace, exprOfPrint, hoverBind, hoverPlace, isPinnedPoint, previewCall, round } from "./common";
 import {
   attachLengthHit,
   lengthHover,
@@ -10,7 +11,7 @@ import {
   resolveLengthExpr,
 } from "./length";
 import { inSlot, lengthField, nameField, previewName, refField, resolveCarrier, withBind } from "./draft";
-import { scopeFromTrace } from "./scope";
+import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type ParallelSession = Extract<ToolSession, { verb: "parallelLine" }>;
@@ -56,7 +57,7 @@ function distExpr(session: ParallelSession, carrier: NonNullable<ReturnType<type
 function carrierLabel(session: ParallelSession, scope: Scope, place: PlaceHit | null): string {
   if (session.carrierRef.trim()) return session.carrierRef.trim();
   const c = carrierOf(session, scope);
-  if (c && c.expr.kind === "ref") return c.expr.name;
+  if (c) return printExpr(c.expr);
   if (place?.carrier) return place.carrier.bind;
   return "carrier";
 }
@@ -74,15 +75,15 @@ export const parallelLine: Tool<ParallelSession> = {
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as ParallelSession["focus"] }),
   hit(session, hit, ctx) {
-    if (!carrierOf(session, scopeFromTrace(ctx.trace))) {
+    if (!carrierOf(session, toolScope(ctx))) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
       const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       return carrier ? { ...hit, carrier } : hit;
     }
     return attachLengthHit(hit, ctx, session, ["distance"]);
   },
-  hover(session, hit, trace) {
-    if (!carrierOf(session, scopeFromTrace(trace))) {
+  hover(session, hit, trace, scope) {
+    if (!carrierOf(session, scope ?? scopeFromTrace(trace))) {
       if (!hit.carrier) return null;
       return hoverBind(trace, hit.carrier.bind);
     }
@@ -95,7 +96,7 @@ export const parallelLine: Tool<ParallelSession> = {
       return {
         session: {
           ...session,
-          carrier: { expr: { kind: "ref", name: hit.carrier.bind }, geom: hit.carrier.geom },
+          carrier: { expr: exprOfPrint(hit.carrier.bind), geom: hit.carrier.geom },
           carrierRef: hit.carrier.bind,
           focus: session.focus === "name" ? "name" : "typed",
         },

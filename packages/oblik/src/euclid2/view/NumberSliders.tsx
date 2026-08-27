@@ -2,6 +2,7 @@ import { createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
 import { formatNum } from "@/source/patch";
+import { traceKey } from "../pick";
 import { layoutSliders } from "./sliderHud";
 
 import styles from "./View.module.css";
@@ -22,7 +23,7 @@ export function NumberSliders(props: {
         return (
           <g
             class={styles.sliderPanel}
-            data-slider={L.node.id}
+            data-slider={traceKey(L.node)}
             transform={`translate(${L.panel.x} ${L.panel.y})`}
           >
             <rect

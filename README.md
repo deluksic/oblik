@@ -2,7 +2,7 @@
 
 TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `parallelLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
-Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 8](./docs/prototypes/8.md) (mentionable scopes — shipped; remaining is the `occ === 0` snap default). P7 geometry is still the running tape.
+Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 8](./docs/prototypes/8.md) (mentionable scopes — shipped). P7 geometry is still the running tape.
 
 ## Run
 

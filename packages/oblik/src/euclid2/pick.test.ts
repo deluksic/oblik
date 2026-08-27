@@ -218,7 +218,7 @@ describe("profile pick", () => {
       value: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 14, y: 0 } },
     };
     const at = { x: 10, y: 0 };
-    expect([...namedStrokesThrough([ab0, ab1], at, camera)]).toEqual([]);
+    expect([...namedStrokesThrough([ab0, ab1], at, camera)]).toEqual(["ab"]);
     expect([
       ...namedStrokesThrough([ab0, ab1], at, camera, undefined, {
         keys: new Set(["o_ab:1"]),
@@ -257,7 +257,7 @@ describe("profile pick", () => {
       },
     };
     const at = { x: 11, y: 1 };
-    expect(snapProfile([FACE, face1], at, camera, size)).toBeNull();
+    expect(snapProfile([FACE, face1], at, camera, size)?.id).toBe("o_pr");
     expect(
       snapProfile([FACE, face1], at, camera, size, undefined, {
         keys: new Set(["o_pr:1"]),

@@ -284,6 +284,9 @@ function helperBinding(call: ts.CallExpression): HelperBinding {
   return { kind: "none" };
 }
 
+/** Unmarked geom helpers (`$site`-less). Not user callees; recording them poisons nested live. */
+const GEOM_HELPERS = new Set(["fillet", "along", "dist", "signedDist"]);
+
 function callsInFn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
   sf: ts.SourceFile,
@@ -295,7 +298,12 @@ function callsInFn(
   const root: ts.Node = ts.isBlock(body) ? body : body;
   const visit = (node: ts.Node) => {
     if (node !== fn && isFnLike(node)) return;
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && !specs.has(node.expression.text)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      !specs.has(node.expression.text) &&
+      !GEOM_HELPERS.has(node.expression.text)
+    ) {
       const pos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
       out.push({
         callee: node.expression.text,

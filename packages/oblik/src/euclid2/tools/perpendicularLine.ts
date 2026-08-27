@@ -3,9 +3,9 @@ import { lineBasis } from "@/geom/ops";
 import { add, perp } from "@/geom/vec";
 import { printExpr } from "@/source/expr";
 import { snapLineCarrier } from "../pick";
-import { asPoint, exprOfPlace, hoverBind, hoverPlace, isPinnedPoint, previewCall } from "./common";
+import { asPoint, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { inSlot, nameField, previewName, refField, resolveCarrier, resolvePoint, withBind } from "./draft";
-import { scopeFromTrace } from "./scope";
+import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type PerpSession = Extract<ToolSession, { verb: "perpendicularLine" }>;
@@ -39,7 +39,7 @@ function throughOf(session: PerpSession, scope: Scope) {
 function carrierLabel(session: PerpSession, scope: Scope, place: PlaceHit | null): string {
   if (session.carrierRef.trim()) return session.carrierRef.trim();
   const c = carrierOf(session, scope);
-  if (c && c.expr.kind === "ref") return c.expr.name;
+  if (c) return printExpr(c.expr);
   if (place?.carrier) return place.carrier.bind;
   return "line";
 }
@@ -72,15 +72,15 @@ export const perpendicularLine: Tool<PerpSession> = {
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as PerpSession["focus"] }),
   hit(session, hit, ctx) {
-    if (!carrierOf(session, scopeFromTrace(ctx.trace))) {
+    if (!carrierOf(session, toolScope(ctx))) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
       const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       return carrier ? { ...hit, carrier } : hit;
     }
     return hit;
   },
-  hover(session, hit, trace) {
-    if (!carrierOf(session, scopeFromTrace(trace))) {
+  hover(session, hit, trace, scope) {
+    if (!carrierOf(session, scope ?? scopeFromTrace(trace))) {
       if (!hit.carrier) return null;
       return hoverBind(trace, hit.carrier.bind);
     }
@@ -93,7 +93,7 @@ export const perpendicularLine: Tool<PerpSession> = {
       return {
         session: {
           ...session,
-          carrier: { expr: { kind: "ref", name: hit.carrier.bind }, geom: hit.carrier.geom },
+          carrier: { expr: exprOfPrint(hit.carrier.bind), geom: hit.carrier.geom },
           carrierRef: hit.carrier.bind,
           focus: session.focus === "name" ? "name" : "through",
         },

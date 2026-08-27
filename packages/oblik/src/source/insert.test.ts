@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { printExpr, type Expr } from "./expr";
-import { insertCall, exposeReturnBag } from "./insert";
+import { insertCall, exposeReturnBag, namesInFunctionScope } from "./insert";
 
 const src = `import { point } from "oblik";
 import { defineScene } from "oblik";
@@ -436,6 +436,53 @@ export function plate() {
     expect(next).toMatch(/const s = segment\(origin, opp, "o_s"\);\n  return \{ origin, opp \}/);
   });
 
+  test("keeps build()'s return bag when inserting in front of it", () => {
+    const next = insertCall(src, {
+      from: "circle",
+      bind: "reach",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "num", value: 2.5 },
+      ],
+      id: "o_r",
+    });
+    expect(next).toMatch(/const reach = circle\(A, 2.5, "o_r"\);\n    return \{ A \}/);
+  });
+
+  test("insert into a helper can refer to a parameter", () => {
+    const src = `import { point, circle } from "oblik";
+export function plate(origin) {
+  return { origin };
+}
+`;
+    expect(namesInFunctionScope(src, "plate").has("origin")).toBe(true);
+    const next = insertCall(src, {
+      dest: "plate",
+      from: "circle",
+      args: [
+        { kind: "ref", name: "origin" },
+        { kind: "num", value: 0.2 },
+      ],
+      id: "o_d",
+    });
+    expect(next).toContain('const c = circle(origin, 0.2, "o_d");');
+    expect(next).toMatch(/const c = circle\(origin, 0.2, "o_d"\);\n  return \{ origin \}/);
+  });
+
+  test("misspelled dest does not fall back to build()", () => {
+    expect(() =>
+      insertCall(src, {
+        dest: "plat",
+        from: "circle",
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "num", value: 1 },
+        ],
+        id: "o_r",
+      }),
+    ).toThrow(/no function plat\(\) with a block body/);
+  });
+
   test("inserts plate.hBottom when that name is in build()", () => {
     const src = `import { point, defineScene } from "oblik";
 import { mountingPlateLayout } from "../layout/mounting-plate";
@@ -659,5 +706,13 @@ export function plate() {
 
   test("refuses a bind that is not a local in dest", () => {
     expect(() => exposeReturnBag(plate, "plate", "ground")).toThrow(/cannot refer to ground/);
+  });
+
+  test("adds a scene local to build()'s return bag", () => {
+    const next = exposeReturnBag(src, "build", "A");
+    expect(next).toBe(src);
+    const withExtra = src.replace("    const A = point(0, 0, \"o_a\");", '    const A = point(0, 0, "o_a");\n    const extra = A;');
+    const bag = exposeReturnBag(withExtra, "build", "extra");
+    expect(bag).toContain("return { A, extra };");
   });
 });

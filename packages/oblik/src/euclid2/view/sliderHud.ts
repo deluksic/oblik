@@ -1,4 +1,5 @@
 import type { TraceNode } from "@/eval/context";
+import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
 const MARGIN = 12;
 const PANEL_W = 200;
@@ -20,8 +21,15 @@ export function snapEditNumber(raw: number, min: number, max: number, step: numb
   return Math.round((clamped - min) / step) * step + min;
 }
 
-export function sliderNodes(trace: readonly TraceNode[]): TraceNode[] {
-  return trace.filter((n) => n.occ === 0 && n.kind === "slider" && n.value.kind === "slider" && n.editable);
+export function sliderNodes(trace: readonly TraceNode[], filter?: SnapFilter): TraceNode[] {
+  return trace.filter(
+    (n) =>
+      n.kind === "slider" &&
+      n.value.kind === "slider" &&
+      n.editable &&
+      isFiniteTrace(n) &&
+      (!filter || snapEligible(n, filter)),
+  );
 }
 
 /** Screen-space slots for number sliders, stacked from the top-left. */

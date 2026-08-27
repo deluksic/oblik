@@ -4,11 +4,12 @@ import * as ts from "typescript";
 import { siteSpecs, trailingId } from "./analyze";
 import { printExpr, exprRefs, type Expr } from "./expr";
 import { hoistIntersections, takeBind } from "./hoist";
+import { analyzeMentions, fnNamed, insertPointNames } from "./mention";
 import { freshSiteId } from "./stamp";
 
 export type Insert = {
   file?: string;
-  /** Function to insert into. Default: `build`, then any block-bodied function of that name. */
+  /** Function to insert into. Default `"build"` is the evaluate entry name, not a special kind of function. */
   dest?: string;
   from: string;
   bind?: string;
@@ -19,36 +20,6 @@ export type Insert = {
 
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-}
-
-function findBuildBody(sf: ts.SourceFile): ts.Block | null {
-  let body: ts.Block | null = null;
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "defineScene" &&
-      node.arguments[0] &&
-      ts.isObjectLiteralExpression(node.arguments[0])
-    ) {
-      for (const prop of node.arguments[0].properties) {
-        if (ts.isMethodDeclaration(prop) && ident(prop.name) === "build" && prop.body) {
-          body = prop.body;
-          return;
-        }
-        if (ts.isPropertyAssignment(prop) && ident(prop.name) === "build") {
-          const init = prop.initializer;
-          if ((ts.isFunctionExpression(init) || ts.isArrowFunction(init)) && init.body && ts.isBlock(init.body)) {
-            body = init.body;
-            return;
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return body;
 }
 
 function isFnLike(
@@ -73,6 +44,7 @@ function fnBlock(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.Arrow
 function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | null {
   let body: ts.Block | null = null;
   const visit = (node: ts.Node) => {
+    if (body) return;
     if (isFnLike(node) && fnLabel(node) === name) {
       const block = fnBlock(node);
       if (block) {
@@ -87,9 +59,7 @@ function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | null {
 }
 
 function findFnBody(sf: ts.SourceFile, dest?: string): ts.Block | null {
-  const name = dest?.trim() || "build";
-  if (name === "build") return findBuildBody(sf) ?? findNamedFnBody(sf, "build");
-  return findNamedFnBody(sf, name) ?? findBuildBody(sf);
+  return findNamedFnBody(sf, dest?.trim() || "build");
 }
 
 function usedInBody(body: ts.Block): Set<string> {
@@ -173,9 +143,7 @@ function addBindingName(name: ts.BindingName, into: Set<string>) {
   }
 }
 
-/** Imports plus bindings declared directly in `dest` (default `build`). */
-export function namesInBuildScope(source: string, dest?: string): Set<string> {
-  const sf = parse(source);
+function fileScopeNames(sf: ts.SourceFile): Set<string> {
   const names = new Set<string>();
   for (const stmt of sf.statements) {
     if (ts.isImportDeclaration(stmt)) {
@@ -193,15 +161,20 @@ export function namesInBuildScope(source: string, dest?: string): Set<string> {
     }
     if (ts.isFunctionDeclaration(stmt) && stmt.name) names.add(stmt.name.text);
   }
-  const body = findFnBody(sf, dest);
-  if (!body) return names;
-  for (const stmt of body.statements) {
-    if (ts.isVariableStatement(stmt)) {
-      for (const d of stmt.declarationList.declarations) addBindingName(d.name, names);
-    }
-    if (ts.isFunctionDeclaration(stmt) && stmt.name) names.add(stmt.name.text);
-  }
   return names;
+}
+
+/** File imports/top-level names plus insert-point names in `dest` (params, consts, closures). */
+export function namesInFunctionScope(source: string, dest?: string): Set<string> {
+  const names = fileScopeNames(parse(source));
+  const fn = fnNamed(analyzeMentions(source, "scene.ts"), dest?.trim() || "build");
+  if (fn) for (const n of insertPointNames(fn)) names.add(n);
+  return names;
+}
+
+/** @deprecated Same as `namesInFunctionScope`. */
+export function namesInBuildScope(source: string, dest?: string): Set<string> {
+  return namesInFunctionScope(source, dest);
 }
 
 function isFilletCall(node: ts.Expression): node is ts.CallExpression {
@@ -315,7 +288,7 @@ export function exposeReturnBag(source: string, dest: string, bind: string): str
   const sf = parse(source);
   const body = findFnBody(sf, name);
   if (!body) throw new Error(`no function ${name}() with a block body`);
-  if (!namesInBuildScope(source, name).has(bind)) {
+  if (!namesInFunctionScope(source, name).has(bind)) {
     throw new Error(`${bind} is not in ${name}() — this scope cannot refer to ${bind}.`);
   }
   let ret: ts.ReturnStatement | undefined;
@@ -353,7 +326,8 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   const dest = job.dest?.trim() || "build";
   const parsed = parse(source);
   const destBody = findFnBody(parsed, dest);
-  const used = destBody ? usedInBody(destBody) : usedIdentifiers(parsed);
+  if (!destBody) throw new Error(`no function ${dest}() with a block body`);
+  const used = usedInBody(destBody);
   const { exprs: args, hoists } = hoistIntersections(job.args, used);
   for (const h of hoists) {
     if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
@@ -364,7 +338,7 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
     { bind, from: job.from, args, id: job.id ?? nextId() },
   ];
   const introduced = new Set(statements.map((s) => s.bind));
-  const scope = namesInBuildScope(source, dest);
+  const scope = namesInFunctionScope(source, dest);
   const missing = [
     ...new Set(statements.flatMap((s) => s.args.flatMap(exprRefs)).filter((n) => !scope.has(n) && !introduced.has(n))),
   ];
@@ -379,10 +353,7 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   let next = ensureNamedImport(source, "oblik", names);
   const sf = parse(next);
   const body = findFnBody(sf, dest);
-  if (!body) {
-    if (dest === "build") throw new Error("no defineScene({ build() { … } })");
-    throw new Error(`no function ${dest}() with a block body`);
-  }
+  if (!body) throw new Error(`no function ${dest}() with a block body`);
   const stmts = body.statements;
   const last = stmts[stmts.length - 1];
   const indent = last ? indentAt(next, last.getStart(sf)) : "    ";

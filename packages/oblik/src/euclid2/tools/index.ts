@@ -157,8 +157,8 @@ export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): P
   return of(session).hit?.(session as never, hit, ctx) ?? hit;
 }
 
-export function hoverTool(session: ToolSession, hit: PlaceHit, trace: readonly TraceNode[]): string | null {
-  return of(session).hover?.(session as never, hit, trace) ?? null;
+export function hoverTool(session: ToolSession, hit: PlaceHit, trace: readonly TraceNode[], scope?: Scope): string | null {
+  return of(session).hover?.(session as never, hit, trace, scope) ?? null;
 }
 
 const CHROME_OFF = {

@@ -22,7 +22,7 @@ const POINT_PX = 12;
 export function snapEligible(n: TraceNode, filter?: SnapFilter): boolean {
   if (!isFiniteTrace(n)) return false;
   if (filter?.keys) return filter.keys.has(traceKey(n));
-  return n.occ === 0 && !!n.bind;
+  return !!n.bind;
 }
 
 export function snapPrint(n: TraceNode, filter?: SnapFilter): string {
@@ -31,6 +31,35 @@ export function snapPrint(n: TraceNode, filter?: SnapFilter): string {
 
 export function traceKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
+}
+
+/** Parse `id:occ` from a HUD attr. Bare `id` is legacy. */
+export function parseTraceAttr(attr: string): { id: string; occ?: number } {
+  const i = attr.lastIndexOf(":");
+  if (i <= 0) return { id: attr };
+  const rest = attr.slice(i + 1);
+  if (!/^\d+$/.test(rest)) return { id: attr };
+  return { id: attr.slice(0, i), occ: Number(rest) };
+}
+
+export function nodeByTraceAttr(trace: readonly TraceNode[], attr: string): TraceNode | undefined {
+  const p = parseTraceAttr(attr);
+  if (p.occ != null) return trace.find((n) => n.id === p.id && n.occ === p.occ);
+  return trace.find((n) => n.id === p.id);
+}
+
+/** First named node whose print or tape bind matches `print` (`plate.origin` or `origin`). */
+export function nodeByPrint(
+  trace: readonly { occ: number; bind?: string; id: string }[],
+  print: string,
+  filter?: SnapFilter,
+): { id: string } | undefined {
+  const last = print.includes(".") ? print.slice(print.lastIndexOf(".") + 1) : print;
+  return trace.find((n) => {
+    if (filter?.keys && !filter.keys.has(`${n.id}:${n.occ}`)) return false;
+    const shown = filter?.print?.(n as TraceNode) ?? n.bind;
+    return shown === print || n.bind === print || n.bind === last;
+  });
 }
 
 export function isFiniteTrace(n: TraceNode): boolean {

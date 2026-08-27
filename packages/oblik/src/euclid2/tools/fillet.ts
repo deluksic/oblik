@@ -10,7 +10,6 @@ import {
   resolveLengthExpr,
 } from "./length";
 import { inSlot, lengthField } from "./draft";
-import { scopeFromTrace } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type FilletSession = Extract<ToolSession, { verb: "fillet" }>;

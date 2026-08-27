@@ -1,8 +1,9 @@
 import type { Profile } from "@/geom";
 import { roundOffsetValue } from "@/geom/offset";
 import { signedDistToProfile } from "@/geom/profile";
+import { printExpr } from "@/source/expr";
 import { snapProfile } from "../pick";
-import { hoverBind, previewCall, round } from "./common";
+import { exprOfPrint, hoverBind, previewCall, round } from "./common";
 import {
   attachLengthHit,
   lengthHover,
@@ -11,7 +12,7 @@ import {
   resolveLengthExpr,
 } from "./length";
 import { inSlot, lengthField, nameField, previewName, refField, resolveProfile, withBind } from "./draft";
-import { scopeFromTrace } from "./scope";
+import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type OffsetSession = Extract<ToolSession, { verb: "roundOffset" }>;
@@ -48,7 +49,7 @@ function distExpr(session: OffsetSession, hit: PlaceHit, scope: Scope) {
 function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null): string {
   if (session.faceRef.trim()) return session.faceRef.trim();
   const face = faceOf(session, scope);
-  if (face && face.expr.kind === "ref") return face.expr.name;
+  if (face) return printExpr(face.expr);
   if (place?.profile) return place.profile.bind;
   return "profile";
 }
@@ -73,15 +74,15 @@ export const roundOffset: Tool<OffsetSession> = {
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as OffsetSession["focus"] }),
   hit(session, hit, ctx) {
-    if (!faceOf(session, scopeFromTrace(ctx.trace))) {
+    if (!faceOf(session, toolScope(ctx))) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
       const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       return profile ? { ...hit, profile } : hit;
     }
     return attachLengthHit(hit, ctx, session, ["radius", "distance"]);
   },
-  hover(session, hit, trace) {
-    if (!faceOf(session, scopeFromTrace(trace))) {
+  hover(session, hit, trace, scope) {
+    if (!faceOf(session, scope ?? scopeFromTrace(trace))) {
       if (!hit.profile) return null;
       return hoverBind(trace, hit.profile.bind);
     }
@@ -94,7 +95,7 @@ export const roundOffset: Tool<OffsetSession> = {
       return {
         session: {
           ...session,
-          face: { expr: { kind: "ref", name: hit.profile.bind }, geom: hit.profile.geom },
+          face: { expr: exprOfPrint(hit.profile.bind), geom: hit.profile.geom },
           faceRef: hit.profile.bind,
           focus: session.focus === "name" ? "name" : "typed",
         },

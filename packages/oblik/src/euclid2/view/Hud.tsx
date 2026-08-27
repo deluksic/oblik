@@ -5,6 +5,7 @@ import { gliderAt, isGlider } from "@/geom/gliders";
 import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
+import { traceKey } from "../pick";
 
 import styles from "./View.module.css";
 
@@ -77,7 +78,7 @@ export function Handle(props: {
           [styles.muted]: !!props.muted && !props.hot && !props.selected,
         },
       ]}
-      data-handle={props.node.id}
+      data-handle={traceKey(props.node)}
       data-kind="point"
       cx={pos().x}
       cy={pos().y}

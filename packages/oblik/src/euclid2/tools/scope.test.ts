@@ -261,7 +261,7 @@ export default defineScene({
     const helperFile = "apps/demo/src/layout/plate.ts";
     const parentFile = "apps/demo/src/scenes/t.ts";
     const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
-    expect(mentions[0]!.functions.find((f) => f.name === "plate")!.calls.map((c) => c.callee)).toEqual(["fillet"]);
+    expect(mentions[0]!.functions.find((f) => f.name === "plate")!.calls.map((c) => c.callee)).toEqual([]);
     const callA = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
     const scene = defineScene({
       kind: "euclid2",

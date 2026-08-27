@@ -17,7 +17,7 @@ import {
   resolvePoint,
   withBind,
 } from "./draft";
-import { scopeFromTrace } from "./scope";
+import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
 type CircleSession = Extract<ToolSession, { verb: "circle" }>;
@@ -74,11 +74,11 @@ export const circle: Tool<CircleSession> = {
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as CircleSession["focus"] }),
   hit(session, hit, ctx) {
-    if (!centerOf(session, scopeFromTrace(ctx.trace))) return hit;
+    if (!centerOf(session, toolScope(ctx))) return hit;
     return attachLengthHit(hit, ctx, session, ["radius"]);
   },
-  hover(session, hit, trace) {
-    if (!centerOf(session, scopeFromTrace(trace))) return hoverPlace(hit.point, trace);
+  hover(session, hit, trace, scope) {
+    if (!centerOf(session, scope ?? scopeFromTrace(trace))) return hoverPlace(hit.point, trace);
     return lengthHover(hit, trace) ?? hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {

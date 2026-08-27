@@ -1,12 +1,12 @@
 import type { TraceNode } from "@/eval/context";
 import type { Circle, ParallelLine } from "@/geom";
 import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "@/source/expr";
-import { hitsNear } from "../pick";
+import { hitsNear, nodeByPrint, nodeByTraceAttr } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
 import { round } from "./common";
 import { parseNum } from "./draft";
-import { scopeFromTrace } from "./scope";
+import { toolScope } from "./scope";
 import type { Field, PlaceCtx, PlaceHit, Scope } from "./types";
 
 export type LengthDraft = { typed: string; lengthPick?: Expr };
@@ -210,12 +210,12 @@ function isDomElement(t: EventTarget | null | undefined): t is Element {
 
 export function attachLengthHit(
   hit: PlaceHit,
-  ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target" | "keys" | "print">,
+  ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target" | "keys" | "print" | "scope">,
   draft: LengthDraft,
   accept: readonly LengthPickField[] = [],
 ): PlaceHit {
   const pending = lengthNegPending(draft.typed ?? "");
-  const scope = scopeFromTrace(ctx.trace);
+  const scope = toolScope(ctx);
   if (hit.length) return { ...hit, length: withPendingNeg(hit.length, pending, scope) };
   if (ctx.screen) {
     const slider = hitSlider(ctx.screen, sliderNodes(ctx.trace));
@@ -234,7 +234,7 @@ export function attachLengthHit(
   if (isDomElement(target)) {
     const inkEl = target.closest("[data-ink]");
     const id = inkEl?.getAttribute("data-ink");
-    if (id) node = ctx.trace.find((n) => n.id === id && n.occ === 0) ?? ctx.trace.find((n) => n.id === id);
+    if (id) node = nodeByTraceAttr(ctx.trace, id);
   }
   if (node && (!ctx.keys || ctx.keys.has(`${node.id}:${node.occ}`))) {
     const picked = lengthPickFromNode(node, accept, pending, scope, ctx.print?.(node));
@@ -256,17 +256,17 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   const e = hit.length.expr;
   if (e.kind === "member") {
     const name = rootRef(e);
-    return name ? trace.find((n) => n.bind === name && n.occ === 0)?.id ?? null : null;
+    return name ? nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? null : null;
   }
   if (e.kind === "neg" && e.expr.kind === "member") {
     const name = rootRef(e.expr);
-    return name ? trace.find((n) => n.bind === name && n.occ === 0)?.id ?? null : null;
+    return name ? nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? null : null;
   }
   if (e.kind === "ref") {
-    return trace.find((n) => n.bind === e.name && n.occ === 0)?.id ?? null;
+    return nodeByPrint(trace, e.name)?.id ?? null;
   }
   if (e.kind === "neg" && e.expr.kind === "ref") {
-    return trace.find((n) => n.bind === e.expr.name && n.occ === 0)?.id ?? null;
+    return nodeByPrint(trace, e.expr.name)?.id ?? null;
   }
   return null;
 }

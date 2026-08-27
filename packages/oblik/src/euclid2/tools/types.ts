@@ -51,8 +51,8 @@ export type Scope = {
   /** Mentionable constructor id → expr in this focus. */
   byId: Readonly<Record<string, Expr>>;
   /**
-   * Mentionable tape nodes (`id:occ`) → print. `undefined` is the legacy
-   * `occ === 0 && bind` path. An empty object means this scope has no snap.
+   * Mentionable tape nodes (`id:occ`) → print. An empty object means this
+   * scope has no snap. Unfiltered snap is any named node, not occurrence 0.
    */
   prints?: Readonly<Record<string, Expr>>;
   /**
@@ -92,6 +92,8 @@ export type PlaceCtx = {
   /** Mentionable tape keys (`id:occ`). When set, snap only those nodes. */
   keys?: ReadonlySet<string>;
   print?: (n: TraceNode) => string | undefined;
+  /** Pane scope for this place. Tools must not rebuild occ-0 scope from the tape. */
+  scope?: Scope;
 };
 
 export type ToolSession =
@@ -227,7 +229,7 @@ export type Tool<S extends ToolSession = ToolSession> = {
   /** Enter. `null` means the key was not a commit (stay in session). */
   commit?(session: S, place: PlaceHit | null, scope: Scope): ToolStep | null;
   hit?(session: S, hit: PlaceHit, ctx: PlaceCtx): PlaceHit;
-  hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[]): string | null;
+  hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[], scope?: Scope): string | null;
   /** If set, Tab uses this instead of cycling fields. */
   tab?(session: S, dir: 1 | -1): S;
   /** Dim construction chrome while this verb is live. */

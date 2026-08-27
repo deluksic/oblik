@@ -4,6 +4,7 @@ import type { TraceNode } from "@/eval/context";
 import type { Circle, Line, ParallelLine, Profile, Segment } from "@/geom";
 import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
+import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
 
 import styles from "./View.module.css";
@@ -55,7 +56,7 @@ function SegmentStroke(props: { node: TraceNode; hot: boolean; selected: boolean
   const s = () => props.node.value as Segment;
   return (
     <>
-      <line class={styles.hit} data-ink={props.node.id} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
+      <line class={styles.hit} data-ink={traceKey(props.node)} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
       <line
         class={inkClass(props.hot, props.selected, false, props.muted)}
         x1={s().a.x}
@@ -71,7 +72,7 @@ function CircleStroke(props: { node: TraceNode; hot: boolean; selected: boolean;
   const c = () => props.node.value as Circle;
   return (
     <>
-      <circle class={styles.hit} data-ink={props.node.id} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
+      <circle class={styles.hit} data-ink={traceKey(props.node)} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
       <circle
         class={inkClass(props.hot, props.selected, props.node.editable, props.muted)}
         cx={c().center.x}
@@ -98,7 +99,7 @@ function InfiniteStroke(props: {
   });
   return (
     <>
-      <line class={styles.hit} data-ink={props.node.id} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
+      <line class={styles.hit} data-ink={traceKey(props.node)} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
       <line
         class={inkClass(
           props.hot,
@@ -126,7 +127,7 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
           [styles.fillSelected]: props.selected,
         },
       ]}
-      data-ink={props.node.id}
+      data-ink={traceKey(props.node)}
       d={d()}
       stroke="none"
     />

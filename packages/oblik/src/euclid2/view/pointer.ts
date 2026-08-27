@@ -4,9 +4,9 @@ import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "
 import { lineBasis, signedDist } from "@/geom/ops";
 import { mul, perp, sub } from "@/geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
-import { hitsNear, movedPastClick, traceKey, type SnapFilter } from "../pick";
+import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
 import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeAllowsGliders, placeSnapWorld, resolvePlacePoint } from "../place";
-import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
+import { enrichHit, type PlaceHit, type Scope, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
 export type Drag =
@@ -246,6 +246,7 @@ export function placeFromEvent(
   trace: TraceNode[],
   tool?: ToolSession | null,
   filter?: SnapFilter,
+  scope?: Scope,
 ): PlaceHit {
   const w = worldOf(e, el, camera, size);
   const snap = placeSnapWorld(camera.scale);
@@ -258,7 +259,7 @@ export function placeFromEvent(
   const t = e.target;
   if (t instanceof Element && t.hasAttribute("data-handle")) {
     const id = t.getAttribute("data-handle")!;
-    const found = trace.find((n) => n.id === id && n.occ === 0) ?? trace.find((n) => n.id === id);
+    const found = nodeByTraceAttr(trace, id);
     if (found && (found.value.kind === "point" || isGlider(found.value))) {
       const allowed = !filter?.keys || filter.keys.has(traceKey(found));
       const bind = filter?.print?.(found) ?? found.bind;
@@ -276,7 +277,7 @@ export function placeFromEvent(
     const ink = t.closest("[data-ink]");
     const id = ink?.getAttribute("data-ink");
     if (id) {
-      const found = trace.find((n) => n.id === id && n.occ === 0) ?? trace.find((n) => n.id === id);
+      const found = nodeByTraceAttr(trace, id);
       const allowed = found && (!filter?.keys || filter.keys.has(traceKey(found)));
       const g = found && allowed ? gliderOnTraceNode(found, w, filter?.print?.(found)) : null;
       if (g) point = g;
@@ -287,7 +288,7 @@ export function placeFromEvent(
     const sliderEl = t.closest("[data-slider]");
     const sid = sliderEl?.getAttribute("data-slider");
     if (sid) {
-      const found = trace.find((n) => n.id === sid && n.kind === "slider");
+      const found = nodeByTraceAttr(trace, sid);
       if (found?.value.kind === "slider") {
         const name = filter?.print?.(found) ?? found.bind;
         if (name && (!filter?.keys || filter.keys.has(traceKey(found)))) {
@@ -317,6 +318,7 @@ export function placeFromEvent(
     target: t,
     keys: filter?.keys,
     print: filter?.print,
+    scope,
   };
   return tool ? enrichHit(tool, hit, ctx) : hit;
 }

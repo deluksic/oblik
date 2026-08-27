@@ -16,7 +16,7 @@ import {
   lineIntersectionValue,
 } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
-import { isFiniteTrace, snapBoundPoint, snapPrint, type SnapFilter, type Vec2 } from "./pick";
+import { snapBoundPoint, snapEligible, snapPrint, type SnapFilter, type Vec2 } from "./pick";
 
 export type GliderPlace =
   | { kind: "pointOnSegment"; bind: string; id?: string; t: number; at: Vec2 }
@@ -114,11 +114,7 @@ function boundOf(
   kinds: ReadonlySet<string>,
   filter?: SnapFilter,
 ): TraceNode[] {
-  return trace.filter((n) => {
-    if (!isFiniteTrace(n) || !kinds.has(n.value.kind)) return false;
-    if (filter?.keys) return filter.keys.has(`${n.id}:${n.occ}`);
-    return n.occ === 0 && !!n.bind;
-  });
+  return trace.filter((n) => kinds.has(n.value.kind) && snapEligible(n, filter));
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);

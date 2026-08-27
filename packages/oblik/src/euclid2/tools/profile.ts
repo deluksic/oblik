@@ -4,8 +4,8 @@ import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
 import { printExpr, parsePath, type Expr } from "@/source/expr";
 import type { Camera2 } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
-import { namedStrokesThrough, snapStrokeCarrier, type SnapFilter } from "../pick";
-import { dist, exprOfPlace, hoverBind, hoverPlace, previewCall } from "./common";
+import { namedStrokesThrough, nodeByPrint, snapStrokeCarrier, type SnapFilter } from "../pick";
+import { dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, previewCall } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -47,11 +47,12 @@ function vertexOf(hit: PlaceHit, scope: Scope): Placed | null {
   return null;
 }
 
-function placeFromVertex(v: Placed, trace: readonly { occ: number; bind?: string; id: string }[]): PlacePoint | null {
+function placeFromVertex(v: Placed, trace: readonly { occ: number; bind?: string; id: string }[], filter?: SnapFilter): PlacePoint | null {
   const e = v.expr;
-  if (e.kind === "ref") {
-    const node = trace.find((n) => n.bind === e.name && n.occ === 0);
-    return { kind: "ref", bind: e.name, id: node?.id ?? e.name, at: v.at };
+  if (e.kind === "ref" || e.kind === "member") {
+    const print = printExpr(e);
+    const node = nodeByPrint(trace, print, filter);
+    return { kind: "ref", bind: print, id: node?.id ?? print, at: v.at };
   }
   if (e.kind !== "call") return null;
   const refs = e.args.filter((a): a is Extract<Expr, { kind: "ref" }> => a.kind === "ref").map((a) => a.name);
@@ -196,7 +197,8 @@ export const profile: Tool<ProfileSession> = {
       const start = session.vertices[0]!;
       const max = PROFILE_CLOSE_PX / Math.max(8, ctx.camera.scale);
       if (dist(hit.world, start.at) <= max) {
-        const point = placeFromVertex(start, ctx.trace);
+        const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
+        const point = placeFromVertex(start, ctx.trace, filter);
         if (point) return { ...hit, point };
       }
     }
@@ -221,7 +223,7 @@ export const profile: Tool<ProfileSession> = {
     if (!from) return { session };
     const k = hit.carrier.geom.kind === "circle" ? hoverK(hit.carrier.geom, from.at, hit.world) : undefined;
     const next: CycleCarrier = {
-      expr: { kind: "ref", name: hit.carrier.bind },
+      expr: exprOfPrint(hit.carrier.bind),
       geom: hit.carrier.geom,
       ...(k != null ? { k } : {}),
     };

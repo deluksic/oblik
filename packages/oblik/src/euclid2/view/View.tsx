@@ -115,7 +115,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (!el) return;
     if (props.placing) {
       const filter = props.scope ? snapFilterOf(props.scope) : undefined;
-      const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter);
+      const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter, props.scope);
       const nearest = topHit(e, el, camera(), size(), props.trace)[0];
       if (
         nearest &&
@@ -181,10 +181,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
       const filter = props.scope ? snapFilterOf(props.scope) : undefined;
-      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession, filter);
+      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession, filter, props.scope);
       props.onCursor?.(hit);
       const session = props.toolSession;
-      props.onHoverId?.(session ? hoverTool(session, hit, props.trace) : null);
+      props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : null);
     } else noteHover(e);
     if (!drag) return;
     if (!drag.moved) {
