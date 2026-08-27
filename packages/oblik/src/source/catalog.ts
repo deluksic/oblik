@@ -4,6 +4,7 @@ import path from "node:path";
 import * as ts from "typescript";
 
 import { listAnnotationSites, type Annotation } from "./analyze";
+import { analyzeMentions, type MentionFile } from "./mention";
 
 export type OblikSceneEntry = {
   id: string;
@@ -182,4 +183,16 @@ export function scanAnnotationsBundle(
     byPath[rel] = Object.fromEntries(sites.map((s) => [s.id, s]));
   }
   return { byPath, collisions: findDuplicateIds(all) };
+}
+
+export function scanMentionsBundle(
+  files: readonly string[],
+  workspaceRoot: string,
+): Record<string, MentionFile> {
+  const byPath: Record<string, MentionFile> = {};
+  for (const abs of files) {
+    const rel = path.relative(workspaceRoot, abs).replace(/\\/g, "/");
+    byPath[rel] = analyzeMentions(fs.readFileSync(abs, "utf8"), rel);
+  }
+  return byPath;
 }

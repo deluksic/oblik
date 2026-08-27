@@ -63,6 +63,43 @@
   border-radius: 0.35rem;
   overflow: hidden;
   background: var(--oblik-paper);
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.scopePick {
+  cursor: pointer;
+}
+
+.scopePick:hover {
+  border-color: var(--oblik-hover);
+}
+
+.scopeCurrent {
+  border-color: color-mix(in srgb, var(--oblik-accent) 55%, var(--oblik-line));
+}
+
+.expose {
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--oblik-line);
+  border-radius: 0.35rem;
+  background: var(--oblik-paper);
+}
+
+.exposeBlocked {
+  border-color: color-mix(in srgb, var(--oblik-accent) 45%, var(--oblik-line));
+}
+
+.exposeText {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--oblik-muted);
+  line-height: 1.4;
 }
 
 .originFile {

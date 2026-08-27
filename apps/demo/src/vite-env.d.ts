@@ -12,8 +12,10 @@ declare module "virtual:oblik-catalog" {
 
 declare module "virtual:oblik-annotations" {
   import type { Annotation, DuplicateId } from "oblik";
+  import type { MentionFile } from "oblik";
   export const annotationsByPath: Record<string, Record<string, Annotation>>;
   export const annotationCollisions: DuplicateId[];
+  export const mentionsByPath: Record<string, MentionFile>;
 }
 
 declare module "virtual:oblik-annotations?*" {

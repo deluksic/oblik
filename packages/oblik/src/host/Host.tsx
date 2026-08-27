@@ -4,6 +4,7 @@ import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanu
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
+import type { MentionFile } from "../source/mention";
 import {
   sceneLoaderKey,
   mergeAnnotationBundle,
@@ -19,6 +20,7 @@ import "../theme.css";
 import styles from "./Host.module.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;
+export type MentionBundle = Record<string, MentionFile>;
 
 export type SceneLoaderMap = Record<string, () => Promise<{ default: Scene }>>;
 
@@ -26,6 +28,7 @@ export type OblikMount = {
   setScenes: (scenes: OblikSceneEntry[]) => void;
   setLoaders: (loaders: SceneLoaderMap) => void;
   setAnnotations: (annotations: AnnotationBundle) => void;
+  setMentions: (mentions: MentionBundle) => void;
   setCollisions: (collisions: DuplicateId[]) => void;
 };
 
@@ -34,6 +37,7 @@ export type OblikMountOpts = {
   scenes: OblikSceneEntry[];
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
+  mentions?: MentionBundle;
   collisions?: DuplicateId[];
 };
 
@@ -52,6 +56,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
   const [scenes, setScenes] = createSignal(opts.scenes);
   const [loaders, setLoaders] = createSignal(opts.loaders);
   const [annotations, setAnnotations] = createSignal(opts.annotations);
+  const [mentions, setMentions] = createSignal(opts.mentions ?? {});
   const [collisions, setCollisions] = createSignal(opts.collisions ?? []);
 
   render(
@@ -60,6 +65,7 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
         scenes={scenes()}
         loaders={loaders()}
         annotations={annotations()}
+        mentions={mentions()}
         collisions={collisions()}
         initialSceneId={initialSceneId}
       />
@@ -67,13 +73,14 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
     opts.el,
   );
 
-  return { setScenes, setLoaders, setAnnotations, setCollisions };
+  return { setScenes, setLoaders, setAnnotations, setMentions, setCollisions };
 }
 
 function Host(props: {
   scenes: OblikSceneEntry[];
   loaders: SceneLoaderMap;
   annotations: AnnotationBundle;
+  mentions: MentionBundle;
   collisions: DuplicateId[];
   initialSceneId: string;
 }) {
@@ -143,7 +150,12 @@ function Host(props: {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
     return sceneKind() === "euclid2" ? (
-      <Euclid2Pane scene={scene()} file={e.path} annotations={annotations()} />
+      <Euclid2Pane
+        scene={scene()}
+        file={e.path}
+        annotations={annotations()}
+        mentions={Object.values(props.mentions)}
+      />
     ) : (
       <p class={styles.err}>Unknown scene kind</p>
     );

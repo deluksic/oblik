@@ -2,22 +2,32 @@ import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
+import { assignInv, invMatches } from "../eval/inv";
+import { sourceFileKey } from "../eval/stack";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
+import type { MentionFile } from "../source/mention";
 import { SelectionSidebar } from "../host/SelectionSidebar";
-import { EMPTY_SELECTION_DETAIL, selectionDetailForNode } from "../host/selection-detail";
+import {
+  EMPTY_SELECTION_DETAIL,
+  emptyScopeDetail,
+  selectionDetailForScope,
+  type ScopePick,
+} from "../host/selection-detail";
 import { traceKey } from "./pick";
 import { Palette } from "./Palette";
 import {
   clickTool,
   ghostOf,
   keyTool,
+  mentionPrint,
   previewOf,
   scopeFromTrace,
   startTool,
   tabTool,
   typeTool,
   type PlaceHit,
+  type ScopeFocus,
   type ToolId,
   type ToolSession,
   type ToolStep,
@@ -30,7 +40,35 @@ export type Euclid2PaneProps = {
   scene: Euclid2Scene;
   file: string;
   annotations: Record<string, Annotation>;
+  mentions?: readonly MentionFile[];
 };
+
+function entryFocus(file: string): ScopeFocus {
+  return { file, name: "build", serial: 0 };
+}
+
+function parentFocus(
+  focus: ScopeFocus,
+  entry: ScopeFocus,
+  trace: readonly TraceNode[],
+  mentions: readonly MentionFile[],
+): ScopeFocus {
+  if (sourceFileKey(focus.file) === sourceFileKey(entry.file) && (focus.name ?? "build") === (entry.name ?? "build")) {
+    return entry;
+  }
+  const n = trace.find((node) => node.inv && invMatches(node, focus));
+  const inv = n?.inv;
+  if (!inv?.callerFile) return entry;
+  const key = sourceFileKey(inv.callerFile);
+  const fn = mentions
+    .flatMap((m) => m.functions)
+    .find((f) => sourceFileKey(f.file) === key && inv.callerLine >= f.startLine && inv.callerLine <= f.endLine);
+  if (!fn) return entry;
+  const parentNode = trace.find(
+    (node) => node.inv?.name === fn.name && sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
+  );
+  return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
+}
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
@@ -39,12 +77,25 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
   const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
+  const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
+  const [toolLock, setToolLock] = createSignal(false);
   const [writeError, setWriteError] = createSignal<string | null>(null);
 
-  const world = createMemo(() =>
-    tryEvaluate(props.scene, { draft: draft(), annotations: props.annotations, module: props.file }),
+  const mentions = createMemo(() => props.mentions ?? []);
+
+  const world = createMemo(() => {
+    const w = tryEvaluate(props.scene, {
+      draft: draft(),
+      annotations: props.annotations,
+      module: props.file,
+    });
+    if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
+    return w;
+  });
+
+  const scope = createMemo(() =>
+    scopeFromTrace(world().trace, { focus: focus(), mentions: mentions() }),
   );
-  const scope = createMemo(() => scopeFromTrace(world().trace));
 
   const selectedNode = createMemo(() => {
     const key = selectedKey();
@@ -54,14 +105,41 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   const selectionDetail = createMemo(async () => {
     const node = selectedNode();
-    if (!node) return EMPTY_SELECTION_DETAIL;
-    return selectionDetailForNode(node);
+    const f = focus();
+    if (!node) return emptyScopeDetail(f);
+    return selectionDetailForScope({
+      node,
+      focus: f,
+      mentions: mentions(),
+      print: mentionPrint(scope(), node),
+    });
   });
 
   function applyStep(next: ToolStep | undefined) {
     if (!next) return;
     if ("insert" in next) void insert(next.insert);
     else setTool(next.session);
+  }
+
+  function pickScope(pick: ScopePick) {
+    setFocus({
+      file: pick.file,
+      name: pick.name,
+      serial: pick.serial,
+      callerFile: pick.callerFile,
+      callerLine: pick.callerLine,
+    });
+  }
+
+  function focusFromNode(n: TraceNode): ScopeFocus | null {
+    if (!n.inv) return null;
+    return {
+      file: n.inv.file,
+      name: n.inv.name,
+      serial: n.inv.serial,
+      callerFile: n.inv.callerFile,
+      callerLine: n.inv.callerLine,
+    };
   }
 
   createEffect(
@@ -77,7 +155,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             setTool(null);
             setPlace(null);
             setWriteError(null);
+            if (toolLock()) {
+              setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
+              setToolLock(false);
+            }
           } else if (selectedKey()) setSelectedKey(null);
+          else setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
           return;
         }
         if (typing) return;
@@ -88,13 +171,18 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         }
         const session = tool();
         if (!session || picker()) return;
-        const next = keyTool(session, {
-          key: e.key,
-          shift: e.shiftKey,
-          ctrl: e.ctrlKey,
-          meta: e.metaKey,
-          alt: e.altKey,
-        }, place(), scope());
+        const next = keyTool(
+          session,
+          {
+            key: e.key,
+            shift: e.shiftKey,
+            ctrl: e.ctrlKey,
+            meta: e.metaKey,
+            alt: e.altKey,
+          },
+          place(),
+          scope(),
+        );
         if (next) {
           e.preventDefault();
           applyStep(next);
@@ -131,11 +219,17 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(null);
   }
 
-  async function insert(job: { from: string; args: unknown; bind?: string; patchVertex?: { id: string; index: number } }) {
+  async function insert(job: {
+    from: string;
+    args: unknown;
+    bind?: string;
+    patchVertex?: { id: string; index: number };
+  }) {
+    const dest = focus();
     const res = await fetch("/__oblik-insert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file: props.file, ...job }),
+      body: JSON.stringify({ file: dest.file, dest: dest.name, ...job }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -145,6 +239,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(null);
     setTool(null);
     setPlace(null);
+    setToolLock(false);
   }
 
   function onPlace(hit: PlaceHit) {
@@ -157,7 +252,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   }
 
   function onPick(hits: TraceNode[]) {
-    setSelectedKey(hits[0] ? traceKey(hits[0]) : null);
+    const n = hits[0];
+    setSelectedKey(n ? traceKey(n) : null);
+    if (!tool() && n) {
+      const next = focusFromNode(n);
+      if (next) setFocus(next);
+    }
   }
 
   const draftIds = createMemo(() => [...draft().keys()]);
@@ -177,7 +277,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     if (tool()) return "Type into the prompt, Tab between fields, Enter to commit. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
-    return "Space inserts. Click to inspect. Drag handles write literals.";
+    return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";
   });
 
   return (
@@ -193,6 +293,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           toolSession={tool()}
           hoverId={hoverId()}
           selectedKey={selectedKey()}
+          scope={scope()}
           onHoverId={setHoverId}
           onPick={onPick}
           onDraft={mergeDraft}
@@ -207,6 +308,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             setPicker(false);
             setPlace(null);
             setWriteError(null);
+            setToolLock(true);
             setTool(startTool(id));
           }}
           onClosePicker={() => setPicker(false)}
@@ -226,7 +328,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         />
       </div>
       <Loading fallback={<SelectionSidebar detail={EMPTY_SELECTION_DETAIL} />}>
-        <SelectionSidebar detail={selectionDetail()} />
+        <SelectionSidebar detail={selectionDetail()} onPickScope={pickScope} />
       </Loading>
     </div>
   );

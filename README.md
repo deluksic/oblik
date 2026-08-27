@@ -2,7 +2,7 @@
 
 TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `parallelLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
-Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 6](./docs/prototypes/6.md).
+Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 8](./docs/prototypes/8.md) (mentionable scopes). P7 geometry is still the running tape.
 
 ## Run
 
@@ -20,7 +20,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Shelf | `parallelLine`, `-shelf.distance` cellar, lamp glider, `dist` beam, `circleLineIntersection` |
 | Shared loop | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle |
 | Truss | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline) |
-| Mounting plate | AABB from two corners in `src/layout/mounting-plate.ts`, inset via `.distance`, holes via `.radius` |
+| Mounting plate | Parent binds `const plate = mountingPlateLayout()`. Snap `plate.drill` from `build`; dive to insert in the layout file |
 | Pie | Three sectors on one circle; `roundOffset(wedge, -gap)` opens the cuts |
 | Fillet | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise |
 | Triangle | three free points |

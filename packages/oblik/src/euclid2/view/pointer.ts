@@ -4,7 +4,7 @@ import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "
 import { lineBasis, signedDist } from "@/geom/ops";
 import { mul, perp, sub } from "@/geom/vec";
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
-import { hitsNear, movedPastClick } from "../pick";
+import { hitsNear, movedPastClick, traceKey, type SnapFilter } from "../pick";
 import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeAllowsGliders, placeSnapWorld, resolvePlacePoint } from "../place";
 import { enrichHit, type PlaceHit, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
@@ -245,41 +245,54 @@ export function placeFromEvent(
   size: PaneSize,
   trace: TraceNode[],
   tool?: ToolSession | null,
+  filter?: SnapFilter,
 ): PlaceHit {
   const w = worldOf(e, el, camera, size);
   const snap = placeSnapWorld(camera.scale);
   const allowGliders = placeAllowsGliders(tool);
-  let point = resolvePlacePoint(trace, w, snap, gliderSnapWorld(camera.scale), { allowGliders });
+  let point = resolvePlacePoint(trace, w, snap, gliderSnapWorld(camera.scale), {
+    allowGliders,
+    keys: filter?.keys,
+    print: filter?.print,
+  });
   const t = e.target;
   if (t instanceof Element && t.hasAttribute("data-handle")) {
     const id = t.getAttribute("data-handle")!;
     const found = trace.find((n) => n.id === id && n.occ === 0) ?? trace.find((n) => n.id === id);
-    if (found?.bind && (found.value.kind === "point" || isGlider(found.value))) {
-      const at = found.value.kind === "point" ? found.value : gliderAt(found.value);
-      point = {
-        kind: "ref",
-        bind: found.bind,
-        id: found.id,
-        at: { x: at.x, y: at.y },
-      };
+    if (found && (found.value.kind === "point" || isGlider(found.value))) {
+      const allowed = !filter?.keys || filter.keys.has(traceKey(found));
+      const bind = filter?.print?.(found) ?? found.bind;
+      if (allowed && bind) {
+        const at = found.value.kind === "point" ? found.value : gliderAt(found.value);
+        point = {
+          kind: "ref",
+          bind,
+          id: found.id,
+          at: { x: at.x, y: at.y },
+        };
+      }
     }
   } else if (allowGliders && t instanceof Element && point.kind !== "ref" && !isCrossing(point)) {
     const ink = t.closest("[data-ink]");
     const id = ink?.getAttribute("data-ink");
     if (id) {
       const found = trace.find((n) => n.id === id && n.occ === 0) ?? trace.find((n) => n.id === id);
-      const g = found ? gliderOnTraceNode(found, w) : null;
+      const allowed = found && (!filter?.keys || filter.keys.has(traceKey(found)));
+      const g = found && allowed ? gliderOnTraceNode(found, w, filter?.print?.(found)) : null;
       if (g) point = g;
     }
   }
   let length: PlaceHit["length"];
   if (t instanceof Element) {
     const sliderEl = t.closest("[data-slider]");
-    const id = sliderEl?.getAttribute("data-slider");
-    if (id) {
-      const found = trace.find((n) => n.id === id && n.kind === "slider");
-      if (found?.bind && found.value.kind === "slider") {
-        length = { expr: { kind: "ref", name: found.bind }, value: found.value.n };
+    const sid = sliderEl?.getAttribute("data-slider");
+    if (sid) {
+      const found = trace.find((n) => n.id === sid && n.kind === "slider");
+      if (found?.value.kind === "slider") {
+        const name = filter?.print?.(found) ?? found.bind;
+        if (name && (!filter?.keys || filter.keys.has(traceKey(found)))) {
+          length = { expr: { kind: "ref", name }, value: found.value.n };
+        }
       }
     }
   }
@@ -288,12 +301,24 @@ export function placeFromEvent(
     : undefined;
   if (!length && screen) {
     const slider = hitSlider(screen, sliderNodes(trace));
-    if (slider?.bind && slider.value.kind === "slider") {
-      length = { expr: { kind: "ref", name: slider.bind }, value: slider.value.n };
+    if (slider?.value.kind === "slider") {
+      const name = filter?.print?.(slider) ?? slider.bind;
+      if (name && (!filter?.keys || filter.keys.has(traceKey(slider)))) {
+        length = { expr: { kind: "ref", name }, value: slider.value.n };
+      }
     }
   }
   const hit: PlaceHit = { world: w, point, ...(length ? { length } : {}) };
-  return tool ? enrichHit(tool, hit, { trace, camera, size, screen, target: t }) : hit;
+  const ctx = {
+    trace,
+    camera,
+    size,
+    screen,
+    target: t,
+    keys: filter?.keys,
+    print: filter?.print,
+  };
+  return tool ? enrichHit(tool, hit, ctx) : hit;
 }
 
 export function applyDrag(

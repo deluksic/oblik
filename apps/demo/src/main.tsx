@@ -3,6 +3,7 @@ import type { DuplicateId, OblikSceneEntry } from "oblik";
 import {
   annotationCollisions as initialCollisions,
   annotationsByPath as initialAnnotations,
+  mentionsByPath as initialMentions,
 } from "virtual:oblik-annotations";
 import { scenes as initialScenes } from "virtual:oblik-catalog";
 
@@ -13,6 +14,7 @@ const host = mountOblik({
   scenes: initialScenes,
   loaders: initialLoaders,
   annotations: initialAnnotations,
+  mentions: initialMentions,
   collisions: initialCollisions,
 });
 
@@ -25,7 +27,11 @@ if (import.meta.hot) {
     async (mods) => {
       const catalogMod = mods?.[0] as { scenes: OblikSceneEntry[] } | undefined;
       const annMod = mods?.[1] as
-        | { annotationsByPath: typeof initialAnnotations; annotationCollisions: DuplicateId[] }
+        | {
+            annotationsByPath: typeof initialAnnotations;
+            annotationCollisions: DuplicateId[];
+            mentionsByPath: typeof initialMentions;
+          }
         | undefined;
       const loadersMod = mods?.[2] as { sceneLoaders: typeof initialLoaders } | undefined;
       if (catalogMod) host.setScenes(catalogMod.scenes);
@@ -33,10 +39,12 @@ if (import.meta.hot) {
       if (annMod) {
         host.setAnnotations(annMod.annotationsByPath);
         host.setCollisions(annMod.annotationCollisions);
+        host.setMentions(annMod.mentionsByPath);
       } else {
         const fresh = await reloadAnnotations();
         host.setAnnotations(fresh.annotationsByPath);
         host.setCollisions(fresh.annotationCollisions);
+        host.setMentions(fresh.mentionsByPath);
       }
       if (loadersMod) host.setLoaders(loadersMod.sceneLoaders);
       else host.setLoaders(await reloadLoaders());

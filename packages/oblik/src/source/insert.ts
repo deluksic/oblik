@@ -8,6 +8,8 @@ import { freshSiteId } from "./stamp";
 
 export type Insert = {
   file?: string;
+  /** Function to insert into. Default: `build`, then any block-bodied function of that name. */
+  dest?: string;
   from: string;
   bind?: string;
   args: Expr[];
@@ -47,6 +49,57 @@ function findBuildBody(sf: ts.SourceFile): ts.Block | null {
   };
   visit(sf);
   return body;
+}
+
+function isFnLike(
+  n: ts.Node,
+): n is ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration {
+  return ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n);
+}
+
+function fnLabel(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): string | undefined {
+  if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name) return ident(node.name);
+  const parent = node.parent;
+  if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text;
+  if (ts.isPropertyAssignment(parent)) return ident(parent.name);
+  return undefined;
+}
+
+function fnBlock(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): ts.Block | null {
+  if (node.body && ts.isBlock(node.body)) return node.body;
+  return null;
+}
+
+function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | null {
+  let body: ts.Block | null = null;
+  const visit = (node: ts.Node) => {
+    if (isFnLike(node) && fnLabel(node) === name) {
+      const block = fnBlock(node);
+      if (block) {
+        body = block;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return body;
+}
+
+function findFnBody(sf: ts.SourceFile, dest?: string): ts.Block | null {
+  const name = dest?.trim() || "build";
+  if (name === "build") return findBuildBody(sf) ?? findNamedFnBody(sf, "build");
+  return findNamedFnBody(sf, name) ?? findBuildBody(sf);
+}
+
+function usedInBody(body: ts.Block): Set<string> {
+  const names = new Set<string>();
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node)) names.add(node.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return names;
 }
 
 function ident(name: ts.PropertyName | ts.BindingName | undefined): string | undefined {
@@ -120,8 +173,8 @@ function addBindingName(name: ts.BindingName, into: Set<string>) {
   }
 }
 
-/** Imports plus bindings declared directly in `build()` — not locals inside helpers. */
-export function namesInBuildScope(source: string): Set<string> {
+/** Imports plus bindings declared directly in `dest` (default `build`). */
+export function namesInBuildScope(source: string, dest?: string): Set<string> {
   const sf = parse(source);
   const names = new Set<string>();
   for (const stmt of sf.statements) {
@@ -140,7 +193,7 @@ export function namesInBuildScope(source: string): Set<string> {
     }
     if (ts.isFunctionDeclaration(stmt) && stmt.name) names.add(stmt.name.text);
   }
-  const body = findBuildBody(sf);
+  const body = findFnBody(sf, dest);
   if (!body) return names;
   for (const stmt of body.statements) {
     if (ts.isVariableStatement(stmt)) {
@@ -217,7 +270,10 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   if (job.patchVertex) return patchProfileVertex(source, job);
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
-  const used = usedIdentifiers(parse(source));
+  const dest = job.dest?.trim() || "build";
+  const parsed = parse(source);
+  const destBody = findFnBody(parsed, dest);
+  const used = destBody ? usedInBody(destBody) : usedIdentifiers(parsed);
   const { exprs: args, hoists } = hoistIntersections(job.args, used);
   for (const h of hoists) {
     if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
@@ -228,24 +284,25 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
     { bind, from: job.from, args, id: job.id ?? nextId() },
   ];
   const introduced = new Set(statements.map((s) => s.bind));
-  const scope = namesInBuildScope(source);
+  const scope = namesInBuildScope(source, dest);
   const missing = [
     ...new Set(statements.flatMap((s) => s.args.flatMap(exprRefs)).filter((n) => !scope.has(n) && !introduced.has(n))),
   ];
   if (missing.length > 0) {
     const who = missing.join(", ");
     const verb = missing.length === 1 ? "is" : "are";
-    throw new Error(
-      `${who} ${verb} not in build() — geometry constructed in a helper cannot be inserted yet.`,
-    );
+    throw new Error(`${who} ${verb} not in ${dest}() — not mentionable in this scope.`);
   }
   const names = [
     ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),
   ];
   let next = ensureNamedImport(source, "oblik", names);
   const sf = parse(next);
-  const body = findBuildBody(sf);
-  if (!body) throw new Error("no defineScene({ build() { … } })");
+  const body = findFnBody(sf, dest);
+  if (!body) {
+    if (dest === "build") throw new Error("no defineScene({ build() { … } })");
+    throw new Error(`no function ${dest}() with a block body`);
+  }
   const stmts = body.statements;
   const last = stmts[stmts.length - 1];
   const indent = last ? indentAt(next, last.getStart(sf)) : "    ";

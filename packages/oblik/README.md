@@ -1,14 +1,14 @@
 # oblik
 
-P6 runtime: `evaluate` + tape, source stamp/patch, euclid2 SVG view.
+Geometry construction with **mentionable scopes**: insert and snap print names that are legal in the focused function + invocation.
 
 ```sh
 pnpm --filter oblik test
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Charter: [docs/prototypes/6.md](../../docs/prototypes/6.md).
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Charter: [docs/prototypes/8.md](../../docs/prototypes/8.md).
 
-App imports: `oblik` (eval/geom/source), `oblik/host` (`mountOblik`, scene picker), `virtual:oblik-catalog` + `scene-loaders.ts` in the demo. The Vite plugin **replaces** `scene-loaders.ts` on every transform with a disk-scanned `import()` map (plain JS — no `satisfies`) and stamps/analyzes all `apps/demo/src/**/*.ts` helpers, not only catalog scenes. `vite.config.ts` must import the plugin `.ts` file with a relative path because Node loads the config.
+App imports: `oblik` (eval/geom/source), `oblik/host` (`mountOblik`, scene picker), `virtual:oblik-catalog` + `virtual:oblik-annotations` (annotations + mention analysis) + `scene-loaders.ts` in the demo. The Vite plugin stamps/analyzes all `apps/demo/src/**/*.ts` helpers.
 
-Host: async `createMemo` for the scene module; a **`sceneKind` memo** chooses `<Euclid2Pane>` so HMR does not remount it. `scene={scene()}` stays in JSX. Insights: [docs/prototypes/6.md](../../docs/prototypes/6.md#learned-from-using-it).
+**Pass scene:** Mounting plate. `build` binds `const plate = mountingPlateLayout()`. From that parent, snap `plate.drill` (not private `hLeft`). Select a private or a helper frame in the origin sidebar to dive — insert lands in `src/layout/mounting-plate.ts` before that function’s `return`.

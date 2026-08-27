@@ -1,11 +1,12 @@
 import { For } from "solid-js";
 
-import type { OriginDisplayLine, OriginView, SelectionDetail } from "./selection-detail";
+import type { OriginDisplayLine, OriginFrame, OriginView, ScopePick, SelectionDetail } from "./selection-detail";
 
 import styles from "./SelectionSidebar.module.css";
 
 export type SelectionSidebarProps = {
   detail: SelectionDetail;
+  onPickScope?: (pick: ScopePick) => void;
 };
 
 export function SelectionSidebar(props: SelectionSidebarProps) {
@@ -17,12 +18,18 @@ export function SelectionSidebar(props: SelectionSidebarProps) {
         <p class={styles.meta}>{props.detail.meta}</p>
       </div>
       <p class={styles.kicker}>Origin</p>
-      <OriginPane origin={props.detail.origin} />
+      <OriginPane origin={props.detail.origin} onPickScope={props.onPickScope} />
+      {props.detail.expose ? (
+        <div class={[styles.expose, { [styles.exposeBlocked]: props.detail.expose.kind === "blocked" }]}>
+          <p class={styles.kicker}>{props.detail.expose.kind === "blocked" ? "Expose" : "Expose"}</p>
+          <p class={styles.exposeText}>{props.detail.expose.text}</p>
+        </div>
+      ) : null}
     </aside>
   );
 }
 
-function OriginPane(props: { origin: OriginView }) {
+function OriginPane(props: { origin: OriginView; onPickScope?: (pick: ScopePick) => void }) {
   const empty = () => props.origin.kind === "empty";
   const frames = () => (props.origin.kind === "origin" ? props.origin.frames : []);
   const message = () => (props.origin.kind === "empty" ? props.origin.message : "");
@@ -30,20 +37,39 @@ function OriginPane(props: { origin: OriginView }) {
     <div class={styles.originList}>
       <p class={[styles.emptyOrigin, { [styles.hidden]: !empty() }]}>{message()}</p>
       <For each={frames()}>
-        {(frame) => (
-          <div class={styles.originBox}>
-            <p class={styles.originFile}>{frame.file}</p>
-            <div class={styles.quote}>
-              <For each={frame.lines}>{(row) => <OriginLine row={row} />}</For>
-            </div>
-          </div>
-        )}
+        {(frame) => <OriginFrameBox frame={frame} onPickScope={props.onPickScope} />}
       </For>
     </div>
   );
 }
 
-function OriginLine(props: { row: OriginDisplayLine }) {
+function OriginFrameBox(props: {
+  frame: OriginFrame;
+  onPickScope?: (pick: ScopePick) => void;
+}) {
+  return (
+    <button
+      type="button"
+      class={[
+        styles.originBox,
+        {
+          [styles.scopeCurrent]: !!props.frame.current,
+          [styles.scopePick]: !!props.frame.pick && !props.frame.current,
+        },
+      ]}
+      disabled={!props.frame.pick || props.frame.current || !props.onPickScope}
+      onClick={() => {
+        const pick = props.frame.pick;
+        if (pick && !props.frame.current) props.onPickScope?.(pick);
+      }}
+    >
+      <p class={styles.originFile}>{props.frame.file}</p>
+      <div class={styles.quote}>
+        <For each={props.frame.lines}>{(row) => <OriginLine row={row} />}</For>
+      </div>
+    </button>
+  );
+}
   if (props.row.kind === "ellipsis") {
     return (
       <div class={styles.gapRow}>

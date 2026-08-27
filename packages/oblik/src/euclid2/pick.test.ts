@@ -36,6 +36,17 @@ describe("snapBoundPoint", () => {
     const anon: TraceNode = { ...A, bind: undefined, id: "o_z" };
     expect(snapBoundPoint([far, anon], { x: 0, y: 0 }, 0.3)).toBeNull();
   });
+
+  test("keys restrict snap and print the mention", () => {
+    const hidden: TraceNode = { ...A, id: "o_hid", bind: "hidden", value: { kind: "point", x: 0.05, y: 0 } };
+    const keys = new Set(["o_a:0"]);
+    const s = snapBoundPoint([A, hidden], { x: 0, y: 0 }, 0.3, {
+      keys,
+      print: (n) => (n.id === "o_a" ? "plate.origin" : n.bind),
+    });
+    expect(s).toMatchObject({ bind: "plate.origin", id: "o_a" });
+    expect(snapBoundPoint([hidden], { x: 0.05, y: 0 }, 0.3, { keys })).toBeNull();
+  });
 });
 
 describe("hitTest", () => {

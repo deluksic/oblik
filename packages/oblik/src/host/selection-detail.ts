@@ -1,7 +1,8 @@
 import type { CallSite } from "../eval/stack";
-import { isUserSourcePath } from "../eval/stack";
+import { isUserSourcePath, sourceFileKey } from "../eval/stack";
 import type { TraceNode } from "../eval/context";
 import { normalizeSceneRelPath } from "../source/scene-path";
+import type { MentionFile, MentionFn } from "../source/mention";
 
 export type OriginCodeLine = {
   kind: "code";
@@ -15,25 +16,42 @@ export type OriginDisplayLine =
   | { kind: "header"; line: number; text: string }
   | { kind: "ellipsis" };
 
+export type SelectionDetail = {
+  crumb: string;
+  meta: string;
+  origin: OriginView;
+  focus?: ScopePick;
+  expose?: ExposeNote;
+};
+
+export type ScopePick = {
+  file: string;
+  name?: string;
+  serial?: number;
+  callerFile?: string;
+  callerLine?: number;
+};
+
+export type ExposeNote = {
+  kind: "hint" | "blocked";
+  text: string;
+};
+
 export type OriginFrame = {
   file: string;
   lines: OriginDisplayLine[];
+  pick?: ScopePick;
+  current?: boolean;
 };
 
 export type OriginView =
   | { kind: "empty"; message: string }
   | { kind: "origin"; frames: OriginFrame[] };
 
-export type SelectionDetail = {
-  crumb: string;
-  meta: string;
-  origin: OriginView;
-};
-
 export const EMPTY_SELECTION_DETAIL: SelectionDetail = {
   crumb: "Nothing selected",
-  meta: "Hover or click geometry to inspect it.",
-  origin: { kind: "empty", message: "Select something to see where it comes from." },
+  meta: "Current scope, no geometry.",
+  origin: { kind: "empty", message: "Current scope, no geometry selected. Click a helper on the tape to dive." },
 };
 
 function fileName(file: string): string {
@@ -249,5 +267,137 @@ export async function selectionDetailForNode(node: TraceNode): Promise<Selection
     crumb: selectionCrumb(node),
     meta: selectionMeta(stack, node),
     origin,
+  };
+}
+
+function fnAtLine(mentions: readonly MentionFile[], file: string, line: number): MentionFn | undefined {
+  const key = sourceFileKey(file);
+  let best: MentionFn | undefined;
+  for (const bundle of mentions) {
+    for (const fn of bundle.functions) {
+      if (sourceFileKey(fn.file) !== key && sourceFileKey(bundle.file) !== key) continue;
+      if (line < fn.startLine || line > fn.endLine) continue;
+      if (!best || fn.end - fn.start < best.end - fn.start) best = fn;
+    }
+  }
+  return best;
+}
+
+function sameFocus(a: ScopePick, b: ScopePick): boolean {
+  if (sourceFileKey(a.file) !== sourceFileKey(b.file)) return false;
+  if ((a.name ?? "") !== (b.name ?? "")) return false;
+  if (a.serial != null && b.serial != null && a.serial !== b.serial) return false;
+  return true;
+}
+
+function exposeNote(fn: MentionFn | undefined, node: TraceNode): ExposeNote | undefined {
+  if (!fn || !fn.ids.includes(node.id)) return undefined;
+  if (fn.return.kind === "bag" && fn.return.fields.some((f) => f.id === node.id)) return undefined;
+  if (fn.return.kind === "value" && fn.return.id === node.id) return undefined;
+  if (fn.return.kind === "value" || fn.return.kind === "other") {
+    return {
+      kind: "blocked",
+      text: "This function returns a single value, so it has no bag to add a field to. Change the return to an object literal first — oblik will not wrap it.",
+    };
+  }
+  const bind = node.bind ?? node.id;
+  return {
+    kind: "hint",
+    text: `${bind} is constructed here and not on the return. Expose would add it to the bag so the caller can mention it.`,
+  };
+}
+
+export function emptyScopeDetail(focus: ScopePick): SelectionDetail {
+  const who = focus.name ?? "scope";
+  return {
+    crumb: who,
+    meta: originFileLabel(focus.file),
+    origin: {
+      kind: "empty",
+      message: "Current scope, no geometry selected. Click a helper on the tape or a parent frame to change scope.",
+    },
+    focus,
+  };
+}
+
+export async function selectionDetailForScope(opts: {
+  node: TraceNode | null;
+  focus: ScopePick;
+  mentions: readonly MentionFile[];
+  print?: string;
+}): Promise<SelectionDetail> {
+  const { node, focus, mentions, print } = opts;
+  if (!node) {
+    const detail = emptyScopeDetail(focus);
+    try {
+      const text = await peekFile(new Map(), focus.file);
+      const fn = focus.name
+        ? mentions
+            .flatMap((m) => m.functions)
+            .find((f) => f.name === focus.name && sourceFileKey(f.file) === sourceFileKey(focus.file))
+        : undefined;
+      const line = fn?.startLine ?? 1;
+      return {
+        ...detail,
+        origin: {
+          kind: "origin",
+          frames: [
+            {
+              file: originFileLabel(focus.file),
+              lines: buildOriginFrameLines(text, line, focus.name),
+              pick: focus,
+              current: true,
+            },
+          ],
+        },
+      };
+    } catch {
+      return detail;
+    }
+  }
+
+  const base = await selectionDetailForNode(node);
+  const runtime = node.stack
+    .filter((f) => isUserSourcePath(f.file))
+    .map((f) => ({
+      ...f,
+      file: normalizeSceneRelPath(f.file, node.module),
+    }));
+  const mapped = await mapStack(runtime);
+  const stack = pinConstructorSite(mapped, constructorSite(node));
+  let origin = base.origin;
+  if (origin.kind === "origin") {
+    origin = {
+      kind: "origin",
+      frames: origin.frames.map((frame, i) => {
+        const site = stack[i];
+        const fn = site ? fnAtLine(mentions, site.file, site.line) : undefined;
+        const pick: ScopePick =
+          i === 0 && node.inv
+            ? {
+                file: node.inv.file,
+                name: node.inv.name,
+                serial: node.inv.serial,
+                callerFile: node.inv.callerFile,
+                callerLine: node.inv.callerLine,
+              }
+            : fn
+              ? { file: fn.file, name: fn.name, serial: 0 }
+              : { file: site?.file ?? focus.file, name: site?.name ?? focus.name, serial: 0 };
+        return { ...frame, pick, current: sameFocus(pick, focus) };
+      }),
+    };
+  }
+  const focusedFn = focus.name
+    ? mentions
+        .flatMap((m) => m.functions)
+        .find((f) => f.name === focus.name && sourceFileKey(f.file) === sourceFileKey(focus.file))
+    : undefined;
+  return {
+    ...base,
+    crumb: print ?? selectionCrumb(node),
+    origin,
+    focus,
+    expose: exposeNote(focusedFn, node),
   };
 }

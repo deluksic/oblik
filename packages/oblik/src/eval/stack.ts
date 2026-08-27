@@ -1,3 +1,11 @@
+export function sourceFileKey(file: string): string {
+  const n = file.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\?.*$/, "");
+  const fromSrc = n.indexOf("/src/");
+  if (fromSrc >= 0) return n.slice(fromSrc + 1);
+  if (n.startsWith("src/")) return n;
+  return n;
+}
+
 export type CallSite = {
   file: string;
   line: number;

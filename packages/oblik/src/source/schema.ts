@@ -46,6 +46,7 @@ const exprSchema: v.GenericSchema<Expr> = v.lazy(() =>
 
 export const insertSchema = v.object({
   file: v.string(),
+  dest: v.optional(v.string()),
   from: v.string(),
   bind: v.optional(v.string()),
   args: v.array(exprSchema),

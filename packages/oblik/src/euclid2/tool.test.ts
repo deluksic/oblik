@@ -373,6 +373,7 @@ describe("clickTool", () => {
       carriers: {},
       circles: { reach: { expr: { kind: "ref", name: "reach" }, geom: { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2.5 } } },
       lengths: {},
+      byId: {},
     };
     expect(
       clickTool(
@@ -462,6 +463,7 @@ describe("clickTool", () => {
       },
       circles: {}, profiles: {},
       lengths: {},
+      byId: {},
     };
     expect(
       clickTool(
@@ -536,6 +538,7 @@ describe("clickTool", () => {
       },
       circles: {}, profiles: {},
       lengths: {},
+      byId: {},
     };
     const mid = clickTool(startTool("parallelLine"), {
       world: { x: 1, y: 0 },
@@ -716,6 +719,7 @@ describe("clickTool", () => {
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       circles: {}, profiles: {},
       lengths: {},
+      byId: {},
     };
     const mid = clickTool(startTool("perpendicularLine"), {
       world: { x: 1, y: 0 },
@@ -1238,6 +1242,7 @@ describe("roundOffset tool", () => {
       circles: {},
       profiles: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
       lengths: {},
+      byId: {},
     };
     expect(
       clickTool(

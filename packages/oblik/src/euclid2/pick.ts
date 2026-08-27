@@ -10,8 +10,24 @@ export type Vec2 = { x: number; y: number };
 
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
 
+/** When `keys` is set, only those tape nodes (`id:occ`) are snap-eligible. */
+export type SnapFilter = {
+  keys?: ReadonlySet<string>;
+  print?: (n: TraceNode) => string | undefined;
+};
+
 const GEOM_PX = 8;
 const POINT_PX = 12;
+
+export function snapEligible(n: TraceNode, filter?: SnapFilter): boolean {
+  if (!isFiniteTrace(n)) return false;
+  if (filter?.keys) return filter.keys.has(traceKey(n));
+  return n.occ === 0 && !!n.bind;
+}
+
+export function snapPrint(n: TraceNode, filter?: SnapFilter): string {
+  return filter?.print?.(n) ?? n.bind ?? n.id;
+}
 
 export function traceKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
@@ -56,16 +72,22 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
 }
 
 /** Nearest finite bound point on the live tape. Distance is in world units. */
-export function snapBoundPoint(trace: readonly TraceNode[], world: Vec2, maxDist: number): SnapPoint | null {
+export function snapBoundPoint(
+  trace: readonly TraceNode[],
+  world: Vec2,
+  maxDist: number,
+  filter?: SnapFilter,
+): SnapPoint | null {
   let best: { snap: SnapPoint; d: number } | null = null;
   for (const n of trace) {
-    if (n.occ !== 0 || !n.bind) continue;
+    if (!snapEligible(n, filter)) continue;
     if (n.value.kind !== "point" && !isGlider(n.value)) continue;
+    const bind = snapPrint(n, filter);
     const p = n.value.kind === "point" ? n.value : gliderAt(n.value);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     const d = Math.hypot(p.x - world.x, p.y - world.y);
     if (d > maxDist) continue;
-    if (!best || d < best.d) best = { snap: { id: n.id, bind: n.bind, at: { x: p.x, y: p.y } }, d };
+    if (!best || d < best.d) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d };
   }
   return best?.snap ?? null;
 }
@@ -138,14 +160,15 @@ export function snapLineCarrier(
   camera: Camera2,
   size: PaneSize,
   maxPx = GEOM_PX,
+  filter?: SnapFilter,
 ): { bind: string; geom: LineLike } | null {
   let best: { bind: string; geom: LineLike; d: number } | null = null;
   for (const n of trace) {
-    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (!snapEligible(n, filter)) continue;
     if (!LINE_LIKE.has(n.value.kind)) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike, d };
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }
@@ -157,12 +180,13 @@ export function snapProfile(
   camera: Camera2,
   _size: PaneSize,
   maxPx = GEOM_PX,
+  filter?: SnapFilter,
 ): { bind: string; geom: Profile; id: string } | null {
   let best: { bind: string; geom: Profile; id: string; inside: boolean; d: number; i: number } | null = null;
   let i = 0;
   for (const n of trace) {
     const idx = i++;
-    if (n.occ !== 0 || !n.bind || !isFiniteTrace(n)) continue;
+    if (!snapEligible(n, filter)) continue;
     if (!isProfile(n.value)) continue;
     const d = geomDistWorld(world, n);
     const inside = d === 0;
@@ -173,7 +197,7 @@ export function snapProfile(
       (inside === best.inside && d < best.d) ||
       (inside === best.inside && d === best.d && idx > best.i)
     ) {
-      best = { bind: n.bind, geom: n.value, id: n.id, inside, d, i: idx };
+      best = { bind: snapPrint(n, filter), geom: n.value, id: n.id, inside, d, i: idx };
     }
   }
   return best ? { bind: best.bind, geom: best.geom, id: best.id } : null;
@@ -183,8 +207,8 @@ const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);
 
 export type StrokeCarrier = { bind: string; geom: LineLike | Circle };
 
-function isNamedStroke(n: TraceNode): n is TraceNode & { bind: string } {
-  return n.occ === 0 && !!n.bind && isFiniteTrace(n) && STROKE.has(n.value.kind);
+function isNamedStroke(n: TraceNode, filter?: SnapFilter): boolean {
+  return snapEligible(n, filter) && STROKE.has(n.value.kind);
 }
 
 function strokeWithin(n: TraceNode, at: Vec2, camera: Camera2, maxPx: number): boolean {
@@ -197,11 +221,12 @@ export function namedStrokesThrough(
   at: Vec2,
   camera: Camera2,
   maxPx = GEOM_PX,
+  filter?: SnapFilter,
 ): Set<string> {
   const out = new Set<string>();
   for (const n of trace) {
-    if (!isNamedStroke(n)) continue;
-    if (strokeWithin(n, at, camera, maxPx)) out.add(n.bind);
+    if (!isNamedStroke(n, filter)) continue;
+    if (strokeWithin(n, at, camera, maxPx)) out.add(snapPrint(n, filter));
   }
   return out;
 }
@@ -212,16 +237,17 @@ export function snapStrokeCarrier(
   world: Vec2,
   camera: Camera2,
   _size: PaneSize,
-  opts?: { maxPx?: number; through?: Vec2 },
+  opts?: { maxPx?: number; through?: Vec2; filter?: SnapFilter },
 ): StrokeCarrier | null {
   const maxPx = opts?.maxPx ?? GEOM_PX;
+  const filter = opts?.filter;
   let best: { bind: string; geom: LineLike | Circle; d: number } | null = null;
   for (const n of trace) {
-    if (!isNamedStroke(n)) continue;
+    if (!isNamedStroke(n, filter)) continue;
     if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: n.bind, geom: n.value as LineLike | Circle, d };
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike | Circle, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

@@ -39,7 +39,7 @@ export {
 export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, type Insert } from "./source/insert";
-export { printExpr, member, type Expr, type ProductField } from "./source/expr";
+export { printExpr, member, parsePath, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";
 export type { Camera2 } from "./euclid2/camera";

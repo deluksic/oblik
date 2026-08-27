@@ -1,6 +1,6 @@
 import type { TraceNode } from "@/eval/context";
 import type { Circle, ParallelLine } from "@/geom";
-import { printExpr, member, rootRef, type Expr, type ProductField } from "@/source/expr";
+import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "@/source/expr";
 import { hitsNear } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
@@ -32,7 +32,7 @@ function withPendingNeg(
 }
 
 export function memberExpr(object: string, field: ProductField): Expr {
-  return member(object, field);
+  return member(parsePath(object), field);
 }
 
 export function lengthRefName(expr: Expr): string | null {
@@ -150,15 +150,20 @@ export function hasNumberBinding(raw: string, scope: Scope): boolean {
 
 export type LengthPickField = ProductField;
 
-function lengthFromNode(node: TraceNode, field: LengthPickField): { expr: Expr; value: number } | null {
-  if (!node.bind) return null;
+function lengthFromNode(
+  node: TraceNode,
+  field: LengthPickField,
+  print?: string,
+): { expr: Expr; value: number } | null {
+  const name = print ?? node.bind;
+  if (!name) return null;
   if (field === "radius" && node.value.kind === "circle") {
     const c = node.value as Circle;
-    return { expr: memberExpr(node.bind, "radius"), value: Math.abs(c.radius) };
+    return { expr: memberExpr(name, "radius"), value: Math.abs(c.radius) };
   }
   if (field === "distance" && node.value.kind === "parallelLine") {
     const pl = node.value as ParallelLine;
-    return { expr: memberExpr(node.bind, "distance"), value: pl.distance };
+    return { expr: memberExpr(name, "distance"), value: pl.distance };
   }
   return null;
 }
@@ -169,10 +174,13 @@ function nearestLengthPick(
   camera: import("../camera").Camera2,
   size: import("../camera").PaneSize,
   accept: readonly LengthPickField[],
+  print?: (n: TraceNode) => string | undefined,
+  keys?: ReadonlySet<string>,
 ): { expr: Expr; value: number } | null {
   for (const n of hitsNear(trace, world, camera, size)) {
+    if (keys && !keys.has(`${n.id}:${n.occ}`)) continue;
     for (const field of accept) {
-      const pick = lengthFromNode(n, field);
+      const pick = lengthFromNode(n, field, print?.(n));
       if (pick) return pick;
     }
   }
@@ -184,9 +192,10 @@ function lengthPickFromNode(
   accept: readonly LengthPickField[],
   pending: boolean,
   scope: Scope,
+  print?: string,
 ): PlaceHit["length"] | null {
   for (const field of accept) {
-    const pick = lengthFromNode(node, field);
+    const pick = lengthFromNode(node, field, print);
     if (!pick) continue;
     const expr = wrapLengthNeg(pick.expr, pending);
     const value = evalLengthExpr(expr, scope) ?? (pending ? -pick.value : pick.value);
@@ -201,7 +210,7 @@ function isDomElement(t: EventTarget | null | undefined): t is Element {
 
 export function attachLengthHit(
   hit: PlaceHit,
-  ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target">,
+  ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target" | "keys" | "print">,
   draft: LengthDraft,
   accept: readonly LengthPickField[] = [],
 ): PlaceHit {
@@ -210,10 +219,13 @@ export function attachLengthHit(
   if (hit.length) return { ...hit, length: withPendingNeg(hit.length, pending, scope) };
   if (ctx.screen) {
     const slider = hitSlider(ctx.screen, sliderNodes(ctx.trace));
-    if (slider?.bind && slider.value.kind === "slider") {
-      const expr = wrapLengthNeg({ kind: "ref", name: slider.bind }, pending);
-      const value = evalLengthExpr(expr, scope) ?? (pending ? -slider.value.n : slider.value.n);
-      return { ...hit, length: { expr, value } };
+    if (slider && slider.value.kind === "slider") {
+      const name = ctx.print?.(slider) ?? slider.bind;
+      if (name && (!ctx.keys || ctx.keys.has(`${slider.id}:${slider.occ}`))) {
+        const expr = wrapLengthNeg({ kind: "ref", name }, pending);
+        const value = evalLengthExpr(expr, scope) ?? (pending ? -slider.value.n : slider.value.n);
+        return { ...hit, length: { expr, value } };
+      }
     }
   }
   if (isPinnedPoint(hit.point)) return hit;
@@ -224,12 +236,12 @@ export function attachLengthHit(
     const id = inkEl?.getAttribute("data-ink");
     if (id) node = ctx.trace.find((n) => n.id === id && n.occ === 0) ?? ctx.trace.find((n) => n.id === id);
   }
-  if (node) {
-    const picked = lengthPickFromNode(node, accept, pending, scope);
+  if (node && (!ctx.keys || ctx.keys.has(`${node.id}:${node.occ}`))) {
+    const picked = lengthPickFromNode(node, accept, pending, scope, ctx.print?.(node));
     if (picked) return { ...hit, length: picked };
   }
   if (accept.length > 0) {
-    const picked = nearestLengthPick(ctx.trace, hit.world, ctx.camera, ctx.size, accept);
+    const picked = nearestLengthPick(ctx.trace, hit.world, ctx.camera, ctx.size, accept, ctx.print, ctx.keys);
     if (picked) {
       const expr = wrapLengthNeg(picked.expr, pending);
       const value = evalLengthExpr(expr, scope) ?? (pending ? -picked.value : picked.value);

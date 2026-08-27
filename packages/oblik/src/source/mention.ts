@@ -34,6 +34,8 @@ export type MentionFn = {
   file: string;
   start: number;
   end: number;
+  startLine: number;
+  endLine: number;
   /** Direct identifier params. */
   params: string[];
   /** `const` names declared as direct body statements (insert-point locals). */
@@ -355,6 +357,8 @@ export function analyzeMentions(source: string, file = "scene.ts"): MentionFile 
       file,
       start: node.getStart(sf),
       end: node.getEnd(),
+      startLine: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+      endLine: sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1,
       params: paramsOf(node),
       consts: body ? directConsts(body) : [],
       closures,

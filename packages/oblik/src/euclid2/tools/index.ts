@@ -30,7 +30,14 @@ export type {
   ToolStep,
 } from "./types";
 export { exprOfPlace } from "./common";
-export { scopeFromTrace } from "./scope";
+export {
+  scopeFromTrace,
+  snapFilterOf,
+  mutedForScope,
+  mentionPrint,
+  mentionExpr,
+  type ScopeFocus,
+} from "./scope";
 
 const byId = {
   point,

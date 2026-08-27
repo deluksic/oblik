@@ -5,9 +5,9 @@ import { mountingPlateLayout } from "../layout/mounting-plate";
 export default defineScene({
   kind: "euclid2",
   title: "Mounting plate",
-  hint: "Constructors live in src/layout/mounting-plate.ts. Inset is one parallel distance; holes reuse that and the first drill radius.",
+  hint: "Parent binds the helper as plate. Snap plate.drill from build; select a private to dive and insert in the layout file.",
   camera: { x: 2, y: 1.6, scale: 72 },
   build() {
-    return mountingPlateLayout();
+    const plate = mountingPlateLayout();
   },
 });

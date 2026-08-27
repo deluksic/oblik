@@ -13,6 +13,15 @@ export type SliderValue = {
 
 export type TraceValue = Geom | SliderValue;
 
+export type TraceInv = {
+  file: string;
+  name?: string;
+  callerFile: string;
+  callerLine: number;
+  callerColumn: number;
+  serial: number;
+};
+
 export type TraceNode = {
   id: string;
   occ: number;
@@ -23,6 +32,7 @@ export type TraceNode = {
   at?: { line: number; column: number };
   module?: string;
   stack: CallSite[];
+  inv?: TraceInv;
 };
 
 export type EvalCtx = {

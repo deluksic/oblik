@@ -1,7 +1,7 @@
 import type { TraceNode } from "@/eval/context";
 import type { Branch, Circle, LineLike, ProfileEdge } from "@/geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
-import { printExpr, type Expr } from "@/source/expr";
+import { printExpr, parsePath, type Expr } from "@/source/expr";
 import type { Camera2 } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 import { namedStrokesThrough, snapStrokeCarrier } from "../pick";
@@ -41,7 +41,7 @@ function sameVertex(a: Expr, b: Expr): boolean {
 
 function vertexOf(hit: PlaceHit, scope: Scope): Placed | null {
   if (hit.point.kind === "ref") {
-    return scope.points[hit.point.bind] ?? { expr: { kind: "ref", name: hit.point.bind }, at: hit.point.at };
+    return scope.points[hit.point.bind] ?? { expr: parsePath(hit.point.bind), at: hit.point.at };
   }
   if (isCrossing(hit.point)) return { expr: exprOfPlace(hit.point), at: hit.point.at };
   return null;
@@ -267,7 +267,7 @@ export const profile: Tool<ProfileSession> = {
       const k = place.carrier.geom.kind === "circle" && from ? hoverK(place.carrier.geom, from.at, place.world) : undefined;
       extra.push(
         carrierExpr({
-          expr: { kind: "ref", name: place.carrier.bind },
+          expr: parsePath(place.carrier.bind),
           geom: place.carrier.geom,
           k,
         }),

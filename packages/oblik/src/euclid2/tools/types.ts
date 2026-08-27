@@ -48,6 +48,13 @@ export type Scope = {
   profiles: Readonly<Record<string, { expr: Expr; geom: Profile }>>;
   /** Slider binds → live value (for length reuse). */
   lengths: Readonly<Record<string, number>>;
+  /** Mentionable constructor id → expr in this focus. */
+  byId: Readonly<Record<string, Expr>>;
+  /**
+   * Mentionable tape nodes (`id:occ`) → print. `undefined` is the legacy
+   * `occ === 0 && bind` path. An empty object means this scope has no snap.
+   */
+  prints?: Readonly<Record<string, Expr>>;
 };
 
 export type Draft = {
@@ -76,6 +83,9 @@ export type PlaceCtx = {
   size: PaneSize;
   screen?: { x: number; y: number };
   target?: EventTarget | null;
+  /** Mentionable tape keys (`id:occ`). When set, snap only those nodes. */
+  keys?: ReadonlySet<string>;
+  print?: (n: TraceNode) => string | undefined;
 };
 
 export type ToolSession =

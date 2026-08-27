@@ -37,7 +37,7 @@ function pointScope(...pts: { bind: string; x: number; y: number }[]): Scope {
     used.push(p.bind);
     points[p.bind] = { expr: { kind: "ref", name: p.bind }, at: { x: p.x, y: p.y } };
   }
-  return { used, points, carriers: {}, circles: {}, profiles: {}, lengths: {} };
+  return { used, points, carriers: {}, circles: {}, profiles: {}, lengths: {}, byId: {} };
 }
 
 describe("keyTool", () => {

@@ -414,6 +414,50 @@ export default defineScene({
     ).toThrow(/left.*not in build/);
   });
 
+  test("inserts into a named helper before its return", () => {
+    const src = `import { point, segment } from "oblik";
+
+export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const opp = point(1, 1, "o_opp");
+  return { origin, opp };
+}
+`;
+    const next = insertCall(src, {
+      dest: "plate",
+      from: "segment",
+      args: [
+        { kind: "ref", name: "origin" },
+        { kind: "ref", name: "opp" },
+      ],
+      id: "o_s",
+    });
+    expect(next).toContain('const s = segment(origin, opp, "o_s");');
+    expect(next).toMatch(/const s = segment\(origin, opp, "o_s"\);\n  return \{ origin, opp \}/);
+  });
+
+  test("inserts plate.hBottom when that name is in build()", () => {
+    const src = `import { point, defineScene } from "oblik";
+import { mountingPlateLayout } from "../layout/mounting-plate";
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    const next = insertCall(src, {
+      from: "segment",
+      args: [
+        { kind: "member", object: { kind: "ref", name: "plate" }, field: "c0" },
+        { kind: "member", object: { kind: "ref", name: "plate" }, field: "c1" },
+      ],
+      id: "o_s",
+    });
+    expect(next).toContain('const s = segment(plate.c0, plate.c1, "o_s");');
+  });
+
   test("patches fillet(A, r) into a profile array vertex", () => {
     const faceSrc = `import { point, segment, profile } from "oblik";
 import { defineScene } from "oblik";

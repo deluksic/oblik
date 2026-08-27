@@ -3,7 +3,16 @@ import { For, createEffect, createMemo, createSignal } from "solid-js";
 import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace } from "../pick";
-import { hoverTool, toolChrome, type Ghost, type PlaceHit, type ToolSession } from "../tool";
+import {
+  hoverTool,
+  mutedForScope,
+  snapFilterOf,
+  toolChrome,
+  type Ghost,
+  type PlaceHit,
+  type Scope,
+  type ToolSession,
+} from "../tool";
 import { profileEligibleCarriers } from "../tools/profile";
 import { isGlider } from "@/geom/gliders";
 import { isProfile } from "@/geom/profile";
@@ -48,6 +57,7 @@ export type Euclid2ViewProps = {
   onCommit: (id: string, values: number[]) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | null) => void;
+  scope?: Scope;
 };
 
 function readPaneSize(el: Element): PaneSize | null {
@@ -104,7 +114,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const el = paneEl();
     if (!el) return;
     if (props.placing) {
-      props.onPlace?.(placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession));
+      const filter = props.scope ? snapFilterOf(props.scope) : undefined;
+      const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter);
+      const nearest = topHit(e, el, camera(), size(), props.trace)[0];
+      if (nearest && props.scope && mutedForScope(nearest, props.scope) && hit.point.kind === "free") {
+        return;
+      }
+      props.onPlace?.(hit);
       return;
     }
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
@@ -159,7 +175,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
-      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession);
+      const filter = props.scope ? snapFilterOf(props.scope) : undefined;
+      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession, filter);
       props.onCursor?.(hit);
       const session = props.toolSession;
       props.onHoverId?.(session ? hoverTool(session, hit, props.trace) : null);
@@ -253,7 +270,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 selected={isSelected(n, props.selectedKey)}
                 muted={
                   chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind)))
+                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
+                  (!!props.scope && mutedForScope(n, props.scope))
                 }
                 camera={camera()}
                 size={size()}
@@ -283,7 +301,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               camera={camera()}
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints}
+              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
             />
           )}
         </For>
