@@ -30,7 +30,8 @@
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.28rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .swatch {
@@ -89,4 +90,48 @@
 .iconOn {
   border-color: var(--oblik-hover);
   background: color-mix(in srgb, var(--oblik-hover) 16%, var(--oblik-raised));
+}
+
+.colorWrap {
+  flex: none;
+  display: flex;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--oblik-text) 18%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--oblik-raised);
+}
+
+.colorWrap:hover,
+.colorOn {
+  border-color: var(--oblik-hover);
+}
+
+.colorOn {
+  box-shadow: 0 0 0 2px var(--oblik-paper), 0 0 0 3.5px var(--oblik-hover);
+}
+
+.color {
+  display: block;
+  padding: 0;
+  border: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.22rem;
+  cursor: pointer;
+  background: transparent;
+  appearance: auto;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

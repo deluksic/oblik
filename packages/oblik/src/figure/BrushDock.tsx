@@ -35,6 +35,13 @@ export function BrushDock(props: BrushDockProps) {
             />
           )}
         </For>
+        <ColorInput
+          value={props.settings.stroke}
+          fallback="#1c1917"
+          current={!STROKE_COLORS.includes(props.settings.stroke as (typeof STROKE_COLORS)[number])}
+          label="Custom stroke"
+          onPick={(stroke) => props.onChange({ ...props.settings, stroke })}
+        />
       </Group>
       <Group label="Fill">
         <For each={[...FILL_COLORS]}>
@@ -48,6 +55,13 @@ export function BrushDock(props: BrushDockProps) {
             />
           )}
         </For>
+        <ColorInput
+          value={props.settings.fill}
+          fallback="#cfe8d4"
+          current={props.settings.fill !== "none" && !FILL_COLORS.includes(props.settings.fill as (typeof FILL_COLORS)[number])}
+          label="Custom fill"
+          onPick={(fill) => props.onChange({ ...props.settings, fill })}
+        />
       </Group>
       <Group label="Width">
         <For each={[...STROKE_WIDTHS]}>
@@ -62,11 +76,11 @@ export function BrushDock(props: BrushDockProps) {
       </Group>
       <Group label="Style">
         <For each={[...LINE_STYLES]}>
-          {(row) => (
+          {(id) => (
             <StyleBtn
-              id={row.id}
-              current={props.settings.line === row.id}
-              onPick={() => props.onChange({ ...props.settings, line: row.id })}
+              id={id}
+              current={props.settings.line === id}
+              onPick={() => props.onChange({ ...props.settings, line: id })}
             />
           )}
         </For>
@@ -103,12 +117,40 @@ function Swatch(props: {
   );
 }
 
+function ColorInput(props: {
+  value: string;
+  fallback: string;
+  current: boolean;
+  label: string;
+  onPick: (hex: string) => void;
+}) {
+  const hex = () => (props.value.startsWith("#") ? props.value : props.fallback);
+  return (
+    <label class={[styles.colorWrap, { [styles.colorOn]: props.current }]}>
+      <span class={styles.srOnly}>{props.label}</span>
+      <input
+        type="color"
+        class={styles.color}
+        value={hex()}
+        aria-label={props.label}
+        onInput={(e) => props.onPick(e.currentTarget.value)}
+      />
+    </label>
+  );
+}
+
+function widthName(width: number): string {
+  if (width <= 1) return "Thin";
+  if (width <= 3) return "Medium";
+  return "Thick";
+}
+
 function WidthBtn(props: { width: number; current: boolean; onPick: () => void }) {
   return (
     <button
       type="button"
       class={[styles.iconBtn, { [styles.iconOn]: props.current }]}
-      aria-label={`Width ${props.width}`}
+      aria-label={widthName(props.width)}
       aria-pressed={props.current}
       onClick={props.onPick}
     >
@@ -119,7 +161,7 @@ function WidthBtn(props: { width: number; current: boolean; onPick: () => void }
           x2="25"
           y2="8"
           stroke="currentColor"
-          stroke-width={props.width}
+          stroke-width={Math.min(props.width, 6)}
           stroke-linecap="round"
         />
       </svg>

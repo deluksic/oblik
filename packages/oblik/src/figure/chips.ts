@@ -5,15 +5,16 @@ export const STROKE_COLORS = ["#1c1917", "#c23b22", "#2b7a3e", "#1f5fa8", "#d977
 
 export const FILL_COLORS = ["none", "#f3c5bc", "#cfe8d4", "#c5ddf5", "#f6e2b8"] as const;
 
-export const STROKE_WIDTHS = [1, 1.6, 2.8] as const;
+export const STROKE_WIDTHS = [1, 2.8, 5.6] as const;
 
 export type LineStyleId = "solid" | "dash" | "dot";
 
-export const LINE_STYLES: readonly { id: LineStyleId; dash?: readonly number[] }[] = [
-  { id: "solid" },
-  { id: "dash", dash: [7, 5] },
-  { id: "dot", dash: [1.4, 3.6] },
-];
+export const LINE_STYLES: readonly LineStyleId[] = ["solid", "dash", "dot"];
+
+const DASH_AT_THIN: Record<Exclude<LineStyleId, "solid">, readonly [number, number]> = {
+  dash: [7, 5],
+  dot: [1.4, 3.6],
+};
 
 export type BrushSettings = {
   stroke: string;
@@ -29,8 +30,15 @@ export const DEFAULT_BRUSH: BrushSettings = {
   line: "solid",
 };
 
-export function dashForLine(line: LineStyleId): readonly number[] | undefined {
-  return LINE_STYLES.find((row) => row.id === line)?.dash;
+function roundDash(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function dashForLine(line: LineStyleId, width = DEFAULT_BRUSH.width): readonly number[] | undefined {
+  if (line === "solid") return undefined;
+  const base = DASH_AT_THIN[line];
+  const w = width > 0 ? width : 1;
+  return [roundDash(base[0] * w), roundDash(base[1] * w)];
 }
 
 export function takesFill(kind: string): boolean {
@@ -38,7 +46,7 @@ export function takesFill(kind: string): boolean {
 }
 
 export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureStyle {
-  const dash = dashForLine(b.line);
+  const dash = dashForLine(b.line, b.width);
   return cloneStyle({
     stroke: b.stroke,
     width: b.width,
