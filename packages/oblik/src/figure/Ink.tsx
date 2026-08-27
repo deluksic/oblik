@@ -1,4 +1,4 @@
-import { createMemo } from "solid-js";
+import { Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "../eval/context";
 import type { FigureStyle } from "../eval/paint";
@@ -16,8 +16,7 @@ function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
 }
 
-export function FigureStroke(props: {
-  node: TraceNode;
+type StrokeProps = {
   look: FigureStyle;
   onion: boolean;
   hot: boolean;
@@ -26,7 +25,30 @@ export function FigureStroke(props: {
   camera: Camera2;
   size: PaneSize;
   preview?: boolean;
-}) {
+};
+
+/** `node` is `TraceNode | null` because Solid compiles JSX props as getters — a live preview can go null mid-update. */
+export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
+  return (
+    <Show when={props.node} keyed>
+      {(node) => (
+        <StrokeInk
+          node={node}
+          look={props.look}
+          onion={props.onion}
+          hot={props.hot}
+          selected={props.selected}
+          muted={props.muted}
+          camera={props.camera}
+          size={props.size}
+          preview={props.preview}
+        />
+      )}
+    </Show>
+  );
+}
+
+function StrokeInk(props: { node: TraceNode } & StrokeProps) {
   const kind = createMemo(() => props.node.value.kind);
   return (
     <g class={{ [styles.preview]: props.preview === true }}>
@@ -209,8 +231,7 @@ function Face(props: {
   );
 }
 
-export function FigurePoint(props: {
-  node: TraceNode;
+type PointProps = {
   look: FigureStyle | undefined;
   onion: boolean;
   hot: boolean;
@@ -218,7 +239,29 @@ export function FigurePoint(props: {
   muted: boolean;
   camera: Camera2;
   preview?: boolean;
-}) {
+};
+
+/** Same live-getter contract as `FigureStroke`: `node` may go null while Brush preview unmounts. */
+export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
+  return (
+    <Show when={props.node} keyed>
+      {(node) => (
+        <PointInk
+          node={node}
+          look={props.look}
+          onion={props.onion}
+          hot={props.hot}
+          selected={props.selected}
+          muted={props.muted}
+          camera={props.camera}
+          preview={props.preview}
+        />
+      )}
+    </Show>
+  );
+}
+
+function PointInk(props: { node: TraceNode } & PointProps) {
   const at = createMemo(() => {
     const v = props.node.value;
     if (v.kind === "point") return v;

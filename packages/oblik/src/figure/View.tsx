@@ -188,15 +188,9 @@ export function FigureView(props: FigureViewProps) {
       >
         <svg class={styles.world} viewBox={vb()}>
           <g transform={worldXf()}>
-            {page() ? (
-              <rect
-                class={styles.page}
-                x={page()!.x}
-                y={page()!.y}
-                width={page()!.w}
-                height={page()!.h}
-              />
-            ) : null}
+            <Show when={page()} keyed>
+              {(r) => <rect class={styles.page} x={r.x} y={r.y} width={r.w} height={r.h} />}
+            </Show>
             <Show when={props.shift}>
               <For each={onionInk()}>
                 {(n) => (
@@ -253,32 +247,34 @@ export function FigureView(props: FigureViewProps) {
                 />
               )}
             </For>
-            {props.tool === "brush" && previewGeom() ? (
-              isPointish(previewGeom()!) ? (
-                <FigurePoint
-                  node={previewGeom()!}
-                  look={props.brushLook}
-                  onion={false}
-                  hot={false}
-                  selected={false}
-                  muted={false}
-                  camera={camera()}
-                  preview={true}
-                />
-              ) : (
-                <FigureStroke
-                  node={previewGeom()!}
-                  look={props.brushLook}
-                  onion={false}
-                  hot={false}
-                  selected={false}
-                  muted={false}
-                  camera={camera()}
-                  size={size()}
-                  preview={true}
-                />
-              )
-            ) : null}
+            <Show when={props.tool === "brush" ? previewGeom() : undefined} keyed>
+              {(node) =>
+                isPointish(node) ? (
+                  <FigurePoint
+                    node={node}
+                    look={props.brushLook}
+                    onion={false}
+                    hot={false}
+                    selected={false}
+                    muted={false}
+                    camera={camera()}
+                    preview={true}
+                  />
+                ) : (
+                  <FigureStroke
+                    node={node}
+                    look={props.brushLook}
+                    onion={false}
+                    hot={false}
+                    selected={false}
+                    muted={false}
+                    camera={camera()}
+                    size={size()}
+                    preview={true}
+                  />
+                )
+              }
+            </Show>
           </g>
         </svg>
       </div>

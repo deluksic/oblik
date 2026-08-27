@@ -28,4 +28,14 @@ describe("solid conventions", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  test("does not pass live nodes with non-null assertions", () => {
+    const offenders: string[] = [];
+    for (const file of walk(root)) {
+      if (!file.endsWith(".tsx")) continue;
+      const src = fs.readFileSync(file, "utf8");
+      if (/node=\{[^}]*\(\)!/.test(src)) offenders.push(path.relative(root, file));
+    }
+    expect(offenders).toEqual([]);
+  });
 });
