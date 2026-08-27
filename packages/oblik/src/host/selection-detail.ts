@@ -135,6 +135,36 @@ export function isClosingBraceLine(text: string): boolean {
   return /^\s*\}[),;]*\s*$/.test(text);
 }
 
+function leadingIndent(text: string): string {
+  const match = /^[\t ]*/.exec(text);
+  return match?.[0] ?? "";
+}
+
+function commonLeadingIndent(texts: readonly string[]): string {
+  const indents = texts.filter((row) => row.trim() !== "").map(leadingIndent);
+  if (indents.length === 0) return "";
+  let prefix = indents[0]!;
+  for (const indent of indents.slice(1)) {
+    let n = 0;
+    while (n < prefix.length && n < indent.length && prefix[n] === indent[n]) n += 1;
+    prefix = prefix.slice(0, n);
+    if (prefix.length === 0) return "";
+  }
+  return prefix;
+}
+
+/** Strip indent shared by every non-blank origin line. Relative indent stays. */
+export function dedentOriginLines(lines: OriginDisplayLine[]): OriginDisplayLine[] {
+  const prefix = commonLeadingIndent(lines.flatMap((row) => ("text" in row ? [row.text] : [])));
+  if (!prefix) return lines;
+  return lines.map((row) => {
+    if (!("text" in row)) return row;
+    if (row.text.startsWith(prefix)) return { ...row, text: row.text.slice(prefix.length) };
+    if (row.text.trim() === "") return { ...row, text: "" };
+    return row;
+  });
+}
+
 function scanFunctionEnd(rows: readonly string[], headerIdx: number): number {
   let depth = 0;
   let started = false;
@@ -180,9 +210,11 @@ export function buildOriginFrameLines(text: string, line: number, name?: string)
     out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === target });
   }
 
-  return out.length > 0
-    ? out
-    : [{ kind: "code", line: target + 1, text: rows[target] ?? "", current: true }];
+  return dedentOriginLines(
+    out.length > 0
+      ? out
+      : [{ kind: "code", line: target + 1, text: rows[target] ?? "", current: true }],
+  );
 }
 
 /** Inclusive 1-based span of a function body, for empty-selection origin. */
@@ -229,7 +261,9 @@ export function buildFunctionSourceLines(
     if (n === from) out.push({ kind: "header", line, text: raw, current: true });
     else out.push({ kind: "code", line, text: raw });
   }
-  return out.length > 0 ? out : [{ kind: "header", line: span.startLine, text: "", current: true }];
+  return dedentOriginLines(
+    out.length > 0 ? out : [{ kind: "header", line: span.startLine, text: "", current: true }],
+  );
 }
 
 export async function peekFile(

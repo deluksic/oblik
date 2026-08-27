@@ -5,6 +5,7 @@ import type { TraceNode } from "../eval/context";
 import {
   buildFunctionSourceLines,
   buildOriginFrameLines,
+  dedentOriginLines,
   findFunctionHeaderRow,
   functionSourceSpan,
   originFileLabel,
@@ -141,15 +142,49 @@ describe("buildFunctionSourceLines", () => {
     expect(lines[0]).toEqual({
       kind: "header",
       line: 1,
-      text: "  build() {",
+      text: "build() {",
       current: true,
     });
     expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
-      "  build() {",
-      "    const plate = mountingPlateLayout();",
-      "  },",
+      "build() {",
+      "  const plate = mountingPlateLayout();",
+      "},",
     ]);
-    expect(lines[2]).toEqual({ kind: "code", line: 3, text: "  }," });
+    expect(lines[2]).toEqual({ kind: "code", line: 3, text: "}," });
+  });
+});
+
+describe("dedentOriginLines", () => {
+  test("strips indent shared by a nested build() snippet", () => {
+    const lines = dedentOriginLines([
+      { kind: "header", line: 7, text: "  build() {", current: true },
+      { kind: "code", line: 8, text: "    const plate = mountingPlateLayout();" },
+      { kind: "code", line: 9, text: "  }," },
+    ]);
+    expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
+      "build() {",
+      "  const plate = mountingPlateLayout();",
+      "},",
+    ]);
+  });
+
+  test("leaves a column-0 helper alone", () => {
+    const lines = dedentOriginLines([
+      { kind: "header", line: 1, text: "export function mountingPlateLayout() {", current: true },
+      { kind: "code", line: 2, text: "  const origin = point(0.13, 0.25, \"o_origin\");" },
+      { kind: "code", line: 3, text: "}" },
+    ]);
+    expect(lines[0]).toMatchObject({ text: "export function mountingPlateLayout() {" });
+    expect(lines[1]).toMatchObject({ text: "  const origin = point(0.13, 0.25, \"o_origin\");" });
+  });
+
+  test("does not over-strip mixed tabs and spaces", () => {
+    const lines = dedentOriginLines([
+      { kind: "header", line: 1, text: "  build() {", current: true },
+      { kind: "code", line: 2, text: "\tconst plate = mountingPlateLayout();" },
+    ]);
+    expect(lines[0]).toMatchObject({ text: "  build() {" });
+    expect(lines[1]).toMatchObject({ text: "\tconst plate = mountingPlateLayout();" });
   });
 });
 
@@ -219,7 +254,7 @@ describe("buildOriginFrameLines", () => {
     for (const lines of [atHeader, atBrace]) {
       const texts = lines.map((row) => ("text" in row ? row.text : "..."));
       expect(texts.some((t) => t.includes("camera"))).toBe(false);
-      expect(texts[0]).toBe("  build() {");
+      expect(texts[0]).toBe("build() {");
     }
   });
 });
@@ -272,20 +307,20 @@ export default defineScene({
       const texts = detail.origin.frames[0]!.lines.map((row) => ("text" in row ? row.text : "..."));
       expect(texts.some((t) => t.includes("ellipsis") || t === "...")).toBe(false);
       expect(texts).toEqual([
-        "  build() {",
-        "    const plate = mountingPlateLayout();",
-        "  },",
+        "build() {",
+        "  const plate = mountingPlateLayout();",
+        "},",
       ]);
       expect(detail.origin.frames[0]!.lines[0]).toEqual({
         kind: "header",
         line: 7,
-        text: "  build() {",
+        text: "build() {",
         current: true,
       });
       expect(detail.origin.frames[0]!.lines.at(-1)).toEqual({
         kind: "code",
         line: 9,
-        text: "  },",
+        text: "},",
       });
     } finally {
       globalThis.fetch = orig;
