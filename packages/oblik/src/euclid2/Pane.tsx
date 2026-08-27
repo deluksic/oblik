@@ -342,13 +342,15 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           }}
         />
       </div>
-      <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-        <SelectionSidebar
-          detail={selectionDetail()}
-          onPickScope={pickScope}
-          onExpose={(bind) => void expose(bind)}
-        />
-      </Loading>
+      <div class={styles.sidebarSlot}>
+        <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
+          <SelectionSidebar
+            detail={selectionDetail()}
+            onPickScope={pickScope}
+            onExpose={(bind) => void expose(bind)}
+          />
+        </Loading>
+      </div>
     </div>
   );
 }

@@ -105,7 +105,7 @@ function OriginLine(props: { row: OriginDisplayLine }) {
       class={{
         [styles.codeRow]: props.row.kind === "code",
         [styles.headerRow]: props.row.kind === "header",
-        [styles.current]: props.row.kind === "code" && props.row.current,
+        [styles.current]: !!props.row.current,
       }}
     >
       <span class={styles.ln}>{props.row.line}</span>

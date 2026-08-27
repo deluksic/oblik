@@ -14,7 +14,7 @@ export type OriginCodeLine = {
 
 export type OriginDisplayLine =
   | OriginCodeLine
-  | { kind: "header"; line: number; text: string }
+  | { kind: "header"; line: number; text: string; current?: boolean }
   | { kind: "ellipsis" };
 
 export type SelectionDetail = {
@@ -130,41 +130,12 @@ function rowLooksLikeFunctionHeader(text: string, name?: string): boolean {
   return false;
 }
 
-export function buildOriginFrameLines(text: string, line: number, name?: string): OriginDisplayLine[] {
-  const rows = text.split("\n");
-  const target = line - 1;
-  const headerIdx = findFunctionHeaderRow(rows, line, name);
-  const from = Math.max(0, target - 1);
-  const to = Math.min(rows.length, target + 2);
-  const out: OriginDisplayLine[] = [];
-
-  if (headerIdx != null) {
-    out.push({ kind: "header", line: headerIdx + 1, text: rows[headerIdx] ?? "" });
-    if (from > headerIdx + 1) out.push({ kind: "ellipsis" });
-  }
-
-  for (let n = from; n < to; n++) {
-    if (headerIdx != null && n === headerIdx) continue;
-    out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === target });
-  }
-
-  return out.length > 0
-    ? out
-    : [{ kind: "code", line, text: rows[target] ?? "", current: true }];
+/** A line that is only a function/object closer — stacks often land here. */
+export function isClosingBraceLine(text: string): boolean {
+  return /^\s*\}[),;]*\s*$/.test(text);
 }
 
-/** Inclusive 1-based span of a function body, for empty-selection origin. */
-export function functionSourceSpan(
-  text: string,
-  opts: { startLine?: number; endLine?: number; name?: string },
-): { startLine: number; endLine: number } {
-  if (opts.startLine != null && opts.endLine != null && opts.endLine >= opts.startLine) {
-    return { startLine: opts.startLine, endLine: opts.endLine };
-  }
-  const rows = text.split("\n");
-  const hint = opts.startLine ?? 1;
-  const headerIdx = findFunctionHeaderRow(rows, hint, opts.name);
-  if (headerIdx == null) return { startLine: hint, endLine: hint };
+function scanFunctionEnd(rows: readonly string[], headerIdx: number): number {
   let depth = 0;
   let started = false;
   for (let n = headerIdx; n < rows.length; n++) {
@@ -178,14 +149,71 @@ export function functionSourceSpan(
         depth -= 1;
       }
     }
-    if (started && depth <= 0) {
-      return { startLine: headerIdx + 1, endLine: n + 1 };
-    }
+    if (started && depth <= 0) return n + 1;
   }
-  return { startLine: headerIdx + 1, endLine: rows.length };
+  return rows.length;
 }
 
-/** Full function source — header + every remaining line, no ellipsis. */
+export function buildOriginFrameLines(text: string, line: number, name?: string): OriginDisplayLine[] {
+  const rows = text.split("\n");
+  const headerIdx = findFunctionHeaderRow(rows, line, name);
+  let target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
+  const pinOnHeader = headerIdx != null && isClosingBraceLine(rows[target] ?? "");
+  if (pinOnHeader) target = headerIdx;
+  const from = Math.max(0, target - 1);
+  const to = Math.min(rows.length, target + 2);
+  const out: OriginDisplayLine[] = [];
+
+  if (headerIdx != null) {
+    out.push({
+      kind: "header",
+      line: headerIdx + 1,
+      text: rows[headerIdx] ?? "",
+      current: target === headerIdx,
+    });
+    if (from > headerIdx + 1) out.push({ kind: "ellipsis" });
+  }
+
+  for (let n = from; n < to; n++) {
+    if (headerIdx != null && n === headerIdx) continue;
+    out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === target });
+  }
+
+  return out.length > 0
+    ? out
+    : [{ kind: "code", line: target + 1, text: rows[target] ?? "", current: true }];
+}
+
+/** Inclusive 1-based span of a function body, for empty-selection origin. */
+export function functionSourceSpan(
+  text: string,
+  opts: { startLine?: number; endLine?: number; name?: string },
+): { startLine: number; endLine: number } {
+  const rows = text.split("\n");
+  const hint = opts.startLine ?? opts.endLine ?? 1;
+  let headerIdx = findFunctionHeaderRow(rows, hint, opts.name);
+  if (headerIdx == null && opts.endLine != null && opts.endLine !== hint) {
+    headerIdx = findFunctionHeaderRow(rows, opts.endLine, opts.name);
+  }
+  if (headerIdx == null) {
+    if (
+      opts.startLine != null &&
+      opts.endLine != null &&
+      opts.endLine >= opts.startLine &&
+      !isClosingBraceLine(rows[opts.startLine - 1] ?? "")
+    ) {
+      return { startLine: opts.startLine, endLine: opts.endLine };
+    }
+    return { startLine: hint, endLine: hint };
+  }
+  const startLine = headerIdx + 1;
+  if (opts.endLine != null && opts.endLine >= startLine) {
+    return { startLine, endLine: opts.endLine };
+  }
+  return { startLine, endLine: scanFunctionEnd(rows, headerIdx) };
+}
+
+/** Full function source — header + every remaining line, no ellipsis. Pin is the opening. */
 export function buildFunctionSourceLines(
   text: string,
   span: { startLine: number; endLine: number },
@@ -197,10 +225,10 @@ export function buildFunctionSourceLines(
   for (let n = from; n < to; n++) {
     const line = n + 1;
     const raw = rows[n] ?? "";
-    if (n === from) out.push({ kind: "header", line, text: raw });
+    if (n === from) out.push({ kind: "header", line, text: raw, current: true });
     else out.push({ kind: "code", line, text: raw });
   }
-  return out.length > 0 ? out : [{ kind: "header", line: span.startLine, text: "" }];
+  return out.length > 0 ? out : [{ kind: "header", line: span.startLine, text: "", current: true }];
 }
 
 export async function peekFile(

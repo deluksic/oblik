@@ -4,6 +4,7 @@ import { analyzeMentions } from "../source/mention";
 import type { TraceNode } from "../eval/context";
 import {
   buildFunctionSourceLines,
+  buildOriginFrameLines,
   findFunctionHeaderRow,
   functionSourceSpan,
   originFileLabel,
@@ -121,6 +122,7 @@ describe("buildFunctionSourceLines", () => {
       kind: "header",
       line: 1,
       text: "export function mountingPlateLayout() {",
+      current: true,
     });
     expect(lines[3]).toEqual({
       kind: "code",
@@ -136,16 +138,23 @@ describe("buildFunctionSourceLines", () => {
   },
 `;
     const lines = buildFunctionSourceLines(src, { startLine: 1, endLine: 3 });
+    expect(lines[0]).toEqual({
+      kind: "header",
+      line: 1,
+      text: "  build() {",
+      current: true,
+    });
     expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
       "  build() {",
       "    const plate = mountingPlateLayout();",
       "  },",
     ]);
+    expect(lines[2]).toEqual({ kind: "code", line: 3, text: "  }," });
   });
 });
 
 describe("functionSourceSpan", () => {
-  test("trusts mention start/end when both are present", () => {
+  test("resolves the header even when mention start/end are present", () => {
     expect(functionSourceSpan(plateFn, { startLine: 1, endLine: 7, name: "mountingPlateLayout" })).toEqual({
       startLine: 1,
       endLine: 7,
@@ -157,6 +166,40 @@ describe("functionSourceSpan", () => {
       startLine: 1,
       endLine: 7,
     });
+  });
+
+  test("does not treat a closing-brace-only mention span as the function", () => {
+    expect(functionSourceSpan(plateFn, { startLine: 7, endLine: 7, name: "mountingPlateLayout" })).toEqual({
+      startLine: 1,
+      endLine: 7,
+    });
+  });
+});
+
+describe("buildOriginFrameLines", () => {
+  test("pins the header when the site is only a closing curly", () => {
+    const src = `export function mountingPlateLayout() {
+  const origin = point(0.13, 0.25, "o_origin");
+  return { origin };
+}
+`;
+    const lines = buildOriginFrameLines(src, 4, "mountingPlateLayout");
+    expect(lines[0]).toEqual({
+      kind: "header",
+      line: 1,
+      text: "export function mountingPlateLayout() {",
+      current: true,
+    });
+    expect(lines.some((row) => row.kind === "code" && row.current)).toBe(false);
+  });
+
+  test("keeps the pin on a real constructor site", () => {
+    const lines = buildOriginFrameLines(plateFn, 2, "mountingPlateLayout");
+    expect(lines[0]).toMatchObject({ kind: "header", text: "export function mountingPlateLayout() {" });
+    expect(lines[0]).not.toMatchObject({ current: true });
+    expect(lines.some((row) => row.kind === "code" && row.current && row.text.includes("origin"))).toBe(
+      true,
+    );
   });
 });
 
@@ -212,6 +255,17 @@ export default defineScene({
         "    const plate = mountingPlateLayout();",
         "  },",
       ]);
+      expect(detail.origin.frames[0]!.lines[0]).toEqual({
+        kind: "header",
+        line: 7,
+        text: "  build() {",
+        current: true,
+      });
+      expect(detail.origin.frames[0]!.lines.at(-1)).toEqual({
+        kind: "code",
+        line: 9,
+        text: "  },",
+      });
     } finally {
       globalThis.fetch = orig;
     }
