@@ -1,10 +1,7 @@
 .sidebar {
-  box-sizing: border-box;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1;
   min-width: 0;
-  max-width: 100%;
-  width: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -15,15 +12,18 @@
 }
 
 .head {
-  flex: 0 0 auto;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
-.kicker {
-  flex: 0 0 auto;
+.sidebar :is(p, h2) {
   margin: 0;
+}
+
+.kicker {
+  flex: none;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.62rem;
@@ -31,34 +31,28 @@
 }
 
 .crumb {
-  margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--oblik-text);
-  word-break: break-word;
 }
 
 .meta {
-  margin: 0;
   font-size: 0.78rem;
   color: var(--oblik-muted);
   line-height: 1.35;
 }
 
 .originList {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1;
   min-width: 0;
-  max-width: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 .emptyOrigin {
-  margin: 0;
   font-size: 0.78rem;
   color: var(--oblik-dim);
   line-height: 1.4;
@@ -69,20 +63,18 @@
 }
 
 .originBox {
-  box-sizing: border-box;
-  flex: 0 0 auto;
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   border: 1px solid var(--oblik-line);
   border-radius: 0.35rem;
-  overflow: hidden;
   background: var(--oblik-paper);
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  text-align: left;
-  padding: 0;
   color: inherit;
   font: inherit;
+  text-align: left;
+  overflow: auto;
 }
 
 .scopePick {
@@ -98,8 +90,10 @@
 }
 
 .expose {
-  flex: 0 0 auto;
-  margin-top: 0.35rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--oblik-line);
   border-radius: 0.35rem;
@@ -111,14 +105,13 @@
 }
 
 .exposeText {
-  margin: 0.25rem 0 0;
   font-size: 0.78rem;
   color: var(--oblik-muted);
   line-height: 1.4;
 }
 
 .exposeBtn {
-  margin-top: 0.5rem;
+  align-self: start;
   padding: 0.28rem 0.5rem;
   border: 1px solid var(--oblik-line);
   border-radius: 0.28rem;
@@ -135,35 +128,26 @@
 }
 
 .originFile {
-  margin: 0;
   padding: 0.35rem 0.55rem;
   font-size: 0.68rem;
   color: var(--oblik-accent);
   border-bottom: 1px solid var(--oblik-line);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  word-break: break-all;
 }
 
 .quote {
-  box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   line-height: 1.45;
   tab-size: 2;
-  overflow: hidden;
-  max-width: 100%;
-  min-width: 0;
 }
 
 .codeRow,
 .headerRow,
 .gapRow {
-  display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  display: flex;
   gap: 0.35rem;
   padding: 0 0.45rem;
-  min-width: 0;
-  max-width: 100%;
 }
 
 .headerRow {
@@ -184,16 +168,14 @@
 }
 
 .ln {
+  flex: none;
   text-align: right;
   color: var(--oblik-ln);
   user-select: none;
 }
 
 .tx {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  min-width: 0;
+  white-space: pre;
 }
 
 .gapRow .tx {
