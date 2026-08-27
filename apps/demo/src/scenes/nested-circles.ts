@@ -1,13 +1,15 @@
-import { defineScene } from "oblik";
+import { circle, defineScene, point } from "oblik";
 
 import { nestedCircles } from "../layout/nested-circles";
 
 export default defineScene({
   kind: "euclid2",
   title: "Nested circles",
-  hint: "build → nestedCircles → petal. Snap nest.hub from build; select the bead to dive two frames. Halo is private to the cluster.",
-  camera: { x: 2.1, y: 1.45, scale: 88 },
+  hint: "build reuses nest.origin and nest.hub.radius. Dive the bead for petal; halo is private to nestedCircles.",
+  camera: { x: 3.6, y: 1.45, scale: 64 },
   build() {
     const nest = nestedCircles();
+    const twin = point(nest.origin.x + 3.15, nest.origin.y, "o_nest_twin");
+    circle(twin, nest.hub.radius, "o_nest_twin_c");
   },
 });
