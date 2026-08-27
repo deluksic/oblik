@@ -108,7 +108,7 @@
   border: 1px solid var(--oblik-line);
   border-radius: 0.28rem;
   background: var(--oblik-raised);
-  color: var(--oblik-accent);
+  color: var(--oblik-text);
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;

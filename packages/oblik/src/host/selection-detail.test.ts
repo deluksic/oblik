@@ -306,7 +306,7 @@ export default defineScene({
       expect(detail.expose).toEqual({
         kind: "hint",
         bind: "hLeft",
-        text: "hLeft is constructed here and not on the return. Add it to the return bag so the caller can refer to it.",
+        text: "hLeft is constructed here and not returned. Add it to the return so the caller can refer to it.",
       });
     } finally {
       globalThis.fetch = orig;

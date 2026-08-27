@@ -458,7 +458,7 @@ function exposeNote(fn: MentionFn | undefined, node: TraceNode): ExposeNote | un
   return {
     kind: "hint",
     bind,
-    text: `${bind} is constructed here and not on the return. Add it to the return bag so the caller can refer to it.`,
+    text: `${bind} is constructed here and not returned. Add it to the return so the caller can refer to it.`,
   };
 }
 

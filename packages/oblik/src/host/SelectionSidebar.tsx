@@ -42,7 +42,7 @@ function ExposePane(props: { note: ExposeNote; onExpose?: (bind: string) => void
             if (bind) props.onExpose?.(bind);
           }}
         >
-          Add to return bag
+          Add to return
         </button>
       ) : null}
     </div>
