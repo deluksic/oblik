@@ -74,6 +74,26 @@ function childNodes(
   return callIndex === 0 ? all : [];
 }
 
+function addNestedLive(
+  live: Set<string>,
+  trace: readonly TraceNode[],
+  fn: MentionFn,
+  mentions: readonly MentionFile[],
+  seen: Set<string>,
+): void {
+  const key = `${sourceFileKey(fn.file)}\0${fn.name ?? ""}\0${fn.start}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  for (const call of fn.calls) {
+    const callee = findFn(mentions, { file: fn.file, name: call.callee });
+    const found =
+      callee ?? mentions.flatMap((m) => m.functions).find((f) => f.name === call.callee);
+    if (!found) continue;
+    for (const n of childNodes(trace, found, call, fn)) live.add(traceKey(n));
+    addNestedLive(live, trace, found, mentions, seen);
+  }
+}
+
 function exprForCall(
   call: MentionFn["calls"][number],
   callee: MentionFn,
@@ -172,11 +192,11 @@ export function scopeFromTrace(
         callee ?? mentions.flatMap((m) => m.functions).find((f) => f.name === call.callee);
       if (!found) continue;
       for (const n of childNodes(trace, found, call, fn)) {
-        live.add(traceKey(n));
         const expr = exprForCall(call, found, n.id);
         if (expr) put(n, expr, scope);
       }
     }
+    addNestedLive(live, trace, fn, mentions, new Set());
   }
   if (fn) {
     for (const name of insertPointNames(fn)) {

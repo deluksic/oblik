@@ -231,4 +231,98 @@ export default defineScene({
     expect(mutedForScope(holes[0]!, inner)).toBe(false);
     expect(mutedForScope(holes[1]!, inner)).toBe(true);
   });
+
+  test("two-level helpers stay drawn from build; the inner bead is not mentionable there", () => {
+    const layoutSrc = `import { circle, point } from "oblik";
+export function petal(center: { x: number; y: number }, radius: number) {
+  const rim = circle(center, radius, "o_nest_rim");
+  circle(center, 0.2, "o_nest_bead");
+  return { rim };
+}
+export function nestedCircles() {
+  const origin = point(0, 0, "o_nest");
+  const hub = circle(origin, 0.4, "o_nest_hub");
+  circle(origin, 1.5, "o_nest_halo");
+  const inner = petal(origin, 0.9);
+  return { origin, hub };
+}
+`;
+    const parentSrc = `import { nestedCircles } from "./nested-circles";
+import { defineScene } from "oblik";
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const nest = nestedCircles();
+  },
+});
+`;
+    const layoutFile = "apps/demo/src/layout/nested-circles.ts";
+    const parentFile = "apps/demo/src/scenes/nested-circles.ts";
+    const mentions = [analyzeMentions(layoutSrc, layoutFile), analyzeMentions(parentSrc, parentFile)];
+    const petalCall = mentions[0]!.functions.find((f) => f.name === "nestedCircles")!.calls[0]!;
+    const nestCall = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const origin = point(0, 0, "o_nest");
+        const hub = circle(origin, 0.4, "o_nest_hub");
+        circle(origin, 1.5, "o_nest_halo");
+        circle(origin, 0.9, "o_nest_rim");
+        circle(origin, 0.2, "o_nest_bead");
+      },
+    });
+    const annotations = {
+      ...Object.fromEntries(analyze(layoutSrc, layoutFile)),
+      ...Object.fromEntries(analyze(parentSrc, parentFile)),
+    };
+    const { trace } = evaluate(scene, { annotations, module: layoutFile });
+    const petalIds = new Set(["o_nest_rim", "o_nest_bead"]);
+    for (const n of trace) {
+      n.module = layoutFile;
+      n.at = n.at ?? { line: 3, column: 4 };
+      n.stack = petalIds.has(n.id)
+        ? [
+            { file: layoutFile, line: n.at.line, column: 4, name: "petal" },
+            { file: layoutFile, line: petalCall.line, column: petalCall.column, name: "nestedCircles" },
+            { file: parentFile, line: nestCall.line, column: nestCall.column, name: "build" },
+          ]
+        : [
+            { file: layoutFile, line: n.at.line, column: 4, name: "nestedCircles" },
+            { file: parentFile, line: nestCall.line, column: nestCall.column, name: "build" },
+          ];
+    }
+    assignInv(trace, mentions);
+
+    const bead = trace.find((n) => n.id === "o_nest_bead")!;
+    const halo = trace.find((n) => n.id === "o_nest_halo")!;
+    const hub = trace.find((n) => n.id === "o_nest_hub")!;
+    const rim = trace.find((n) => n.id === "o_nest_rim")!;
+
+    const build = scopeFromTrace(trace, { focus: { file: parentFile, name: "build", serial: 0 }, mentions });
+    expect(mutedForScope(bead, build)).toBe(false);
+    expect(mutedForScope(halo, build)).toBe(false);
+    expect(mutedForScope(hub, build)).toBe(false);
+    expect(printExpr(build.prints![`${hub.id}:${hub.occ}`]!)).toBe("nest.hub");
+    expect(build.prints?.[`${bead.id}:${bead.occ}`]).toBeUndefined();
+    expect(build.prints?.[`${halo.id}:${halo.occ}`]).toBeUndefined();
+
+    const cluster = scopeFromTrace(trace, {
+      focus: { file: layoutFile, name: "nestedCircles", serial: 0 },
+      mentions,
+    });
+    expect(mutedForScope(bead, cluster)).toBe(false);
+    expect(printExpr(cluster.prints![`${rim.id}:${rim.occ}`]!)).toBe("inner.rim");
+    expect(cluster.prints?.[`${bead.id}:${bead.occ}`]).toBeUndefined();
+    expect(printExpr(cluster.byId["o_nest_hub"]!)).toBe("hub");
+
+    const petal = scopeFromTrace(trace, {
+      focus: { file: layoutFile, name: "petal", serial: 0 },
+      mentions,
+    });
+    expect(mutedForScope(bead, petal)).toBe(false);
+    expect(mutedForScope(halo, petal)).toBe(true);
+    expect(printExpr(petal.byId["o_nest_rim"]!)).toBe("rim");
+  });
 });
