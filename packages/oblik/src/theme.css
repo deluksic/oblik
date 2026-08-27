@@ -1,3 +1,70 @@
+/* A Modern CSS Reset — Josh W. Comeau (June 2026)
+   https://www.joshwcomeau.com/css/custom-css-reset/ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+*:not(dialog) {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    interpolate-size: allow-keywords;
+  }
+}
+
+body {
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+
+#app {
+  isolation: isolate;
+}
+
 :root {
   --oblik-paper: #0e1016;
   --oblik-raised: #12151d;
@@ -23,10 +90,19 @@
   --oblik-scrollbar-track: transparent;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  background: var(--oblik-paper);
+  color: var(--oblik-text);
+  font-family: system-ui, sans-serif;
+}
+
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: var(--oblik-scrollbar-thumb) var(--oblik-scrollbar-track);
 }
