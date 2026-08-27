@@ -141,6 +141,56 @@ export function buildOriginFrameLines(text: string, line: number, name?: string)
     : [{ kind: "code", line, text: rows[target] ?? "", current: true }];
 }
 
+/** Inclusive 1-based span of a function body, for empty-selection origin. */
+export function functionSourceSpan(
+  text: string,
+  opts: { startLine?: number; endLine?: number; name?: string },
+): { startLine: number; endLine: number } {
+  if (opts.startLine != null && opts.endLine != null && opts.endLine >= opts.startLine) {
+    return { startLine: opts.startLine, endLine: opts.endLine };
+  }
+  const rows = text.split("\n");
+  const hint = opts.startLine ?? 1;
+  const headerIdx = findFunctionHeaderRow(rows, hint, opts.name);
+  if (headerIdx == null) return { startLine: hint, endLine: hint };
+  let depth = 0;
+  let started = false;
+  for (let n = headerIdx; n < rows.length; n++) {
+    const row = rows[n] ?? "";
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === "{") {
+        depth += 1;
+        started = true;
+      } else if (ch === "}") {
+        depth -= 1;
+      }
+    }
+    if (started && depth <= 0) {
+      return { startLine: headerIdx + 1, endLine: n + 1 };
+    }
+  }
+  return { startLine: headerIdx + 1, endLine: rows.length };
+}
+
+/** Full function source — header + every remaining line, no ellipsis. */
+export function buildFunctionSourceLines(
+  text: string,
+  span: { startLine: number; endLine: number },
+): OriginDisplayLine[] {
+  const rows = text.split("\n");
+  const from = Math.max(0, span.startLine - 1);
+  const to = Math.min(rows.length, Math.max(from + 1, span.endLine));
+  const out: OriginDisplayLine[] = [];
+  for (let n = from; n < to; n++) {
+    const line = n + 1;
+    const raw = rows[n] ?? "";
+    if (n === from) out.push({ kind: "header", line, text: raw });
+    else out.push({ kind: "code", line, text: raw });
+  }
+  return out.length > 0 ? out : [{ kind: "header", line: span.startLine, text: "" }];
+}
+
 export async function peekFile(
   cache: Map<string, string>,
   file: string,
@@ -336,7 +386,11 @@ export async function selectionDetailForScope(opts: {
             .flatMap((m) => m.functions)
             .find((f) => f.name === focus.name && sourceFileKey(f.file) === sourceFileKey(focus.file))
         : undefined;
-      const line = fn?.startLine ?? 1;
+      const span = functionSourceSpan(text, {
+        startLine: fn?.startLine,
+        endLine: fn?.endLine,
+        name: focus.name,
+      });
       return {
         ...detail,
         origin: {
@@ -344,7 +398,7 @@ export async function selectionDetailForScope(opts: {
           frames: [
             {
               file: originFileLabel(focus.file),
-              lines: buildOriginFrameLines(text, line, focus.name),
+              lines: buildFunctionSourceLines(text, span),
               pick: focus,
               current: true,
             },

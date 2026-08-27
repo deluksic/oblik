@@ -1,7 +1,13 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { pinConstructorSite, originFileLabel, stackForNode } from "./selection-detail";
+import {
+  buildFunctionSourceLines,
+  functionSourceSpan,
+  originFileLabel,
+  pinConstructorSite,
+  stackForNode,
+} from "./selection-detail";
 
 const node = {
   id: "o_a",
@@ -90,5 +96,62 @@ describe("originFileLabel", () => {
   test("keeps src/… so a helper is distinct from a same-named scene", () => {
     expect(originFileLabel("apps/demo/src/layout/mounting-plate.ts")).toBe("src/layout/mounting-plate.ts");
     expect(originFileLabel("src/scenes/mounting-plate.ts")).toBe("src/scenes/mounting-plate.ts");
+  });
+});
+
+const plateFn = `export function mountingPlateLayout() {
+  const origin = point(0.13, 0.25, "o_origin");
+  const opp = point(3.86, 3.02, "o_opp");
+  const hBottom = parallelLine(bottom, 0.49, "o_in");
+  const drill = circle(c0, 0.18, "o_drill");
+  return { origin, opp, hBottom, drill };
+}
+`;
+
+describe("buildFunctionSourceLines", () => {
+  test("emits every line of the function with no ellipsis", () => {
+    const lines = buildFunctionSourceLines(plateFn, { startLine: 1, endLine: 7 });
+    expect(lines.some((row) => row.kind === "ellipsis")).toBe(false);
+    expect(lines).toHaveLength(7);
+    expect(lines[0]).toEqual({
+      kind: "header",
+      line: 1,
+      text: "export function mountingPlateLayout() {",
+    });
+    expect(lines[3]).toEqual({
+      kind: "code",
+      line: 4,
+      text: '  const hBottom = parallelLine(bottom, 0.49, "o_in");',
+    });
+    expect(lines[6]).toEqual({ kind: "code", line: 7, text: "}" });
+  });
+
+  test("keeps a short build() whole, not a snippet around the header", () => {
+    const src = `  build() {
+    const plate = mountingPlateLayout();
+  },
+`;
+    const lines = buildFunctionSourceLines(src, { startLine: 1, endLine: 3 });
+    expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
+      "  build() {",
+      "    const plate = mountingPlateLayout();",
+      "  },",
+    ]);
+  });
+});
+
+describe("functionSourceSpan", () => {
+  test("trusts mention start/end when both are present", () => {
+    expect(functionSourceSpan(plateFn, { startLine: 1, endLine: 7, name: "mountingPlateLayout" })).toEqual({
+      startLine: 1,
+      endLine: 7,
+    });
+  });
+
+  test("scans braces from the header when mentions omit the span", () => {
+    expect(functionSourceSpan(plateFn, { name: "mountingPlateLayout" })).toEqual({
+      startLine: 1,
+      endLine: 7,
+    });
   });
 });
