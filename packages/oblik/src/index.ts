@@ -26,10 +26,20 @@ export {
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
 export { analyze, listAnnotationSites, siteSpecs, type Annotation } from "./source/analyze";
+export {
+  analyzeMentions,
+  fnAt,
+  fnNamed,
+  insertPointNames,
+  type FnReturn,
+  type HelperCall,
+  type MentionFile,
+  type MentionFn,
+} from "./source/mention";
 export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, type Insert } from "./source/insert";
-export { printExpr, type Expr } from "./source/expr";
+export { printExpr, member, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";
 export type { Camera2 } from "./euclid2/camera";

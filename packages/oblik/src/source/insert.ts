@@ -2,7 +2,7 @@ import MagicString from "magic-string";
 import * as ts from "typescript";
 
 import { siteSpecs, trailingId } from "./analyze";
-import { printExpr, type Expr } from "./expr";
+import { printExpr, exprRefs, type Expr } from "./expr";
 import { hoistIntersections, takeBind } from "./hoist";
 import { freshSiteId } from "./stamp";
 
@@ -106,16 +106,7 @@ function callees(expr: Expr): string[] {
   if (expr.kind === "array") return expr.items.flatMap(callees);
   if (expr.kind === "neg") return callees(expr.expr);
   if (expr.kind === "props") return Object.values(expr.props).flatMap(callees);
-  return [];
-}
-
-function exprRefs(expr: Expr): string[] {
-  if (expr.kind === "ref") return [expr.name];
-  if (expr.kind === "member") return [expr.object];
-  if (expr.kind === "call") return expr.args.flatMap(exprRefs);
-  if (expr.kind === "array") return expr.items.flatMap(exprRefs);
-  if (expr.kind === "neg") return exprRefs(expr.expr);
-  if (expr.kind === "props") return Object.values(expr.props).flatMap(exprRefs);
+  if (expr.kind === "member") return callees(expr.object);
   return [];
 }
 

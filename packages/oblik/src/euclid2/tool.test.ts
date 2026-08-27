@@ -380,7 +380,7 @@ describe("clickTool", () => {
         {
           world: { x: 2.5, y: 0 },
           point: free(2.5, 0),
-          length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+          length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
         },
         scope,
       ),
@@ -389,7 +389,7 @@ describe("clickTool", () => {
         from: "circle",
         args: [
           { kind: "ref", name: "A" },
-          { kind: "member", object: "reach", field: "radius" },
+          { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
         ],
       },
     });
@@ -402,7 +402,7 @@ describe("clickTool", () => {
       clickTool(mid.session, {
         world: namedP.at,
         point: namedP,
-        length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+        length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
       }),
     ).toEqual({
       insert: {
@@ -422,7 +422,7 @@ describe("clickTool", () => {
       clickTool(mid.session, {
         world: ll.at,
         point: ll,
-        length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2.5 },
+        length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
       }),
     ).toMatchObject({
       insert: {
@@ -469,7 +469,7 @@ describe("clickTool", () => {
         {
           world: { x: 0, y: 1.76 },
           point: free(0, 1.76),
-          length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+          length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
         },
         scope,
       ),
@@ -478,7 +478,7 @@ describe("clickTool", () => {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "member", object: "shelf", field: "distance" },
+          { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
         ],
       },
     });
@@ -502,7 +502,7 @@ describe("clickTool", () => {
       clickTool(session, {
         world: namedP.at,
         point: namedP,
-        length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+        length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
       }),
     ).toEqual({
       insert: {
@@ -549,7 +549,7 @@ describe("clickTool", () => {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "neg", expr: { kind: "member", object: "shelf", field: "distance" } },
+          { kind: "neg", expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" } },
         ],
       },
     });
@@ -691,14 +691,14 @@ describe("clickTool", () => {
     const done = clickTool(session, {
       world: onShelf.at,
       point: onShelf,
-      length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 1.76 },
+      length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
     });
     expect(done).toEqual({
       insert: {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "member", object: "shelf", field: "distance" },
+          { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
         ],
       },
     });
@@ -1245,14 +1245,14 @@ describe("roundOffset tool", () => {
         {
           world: { x: 0, y: 0 },
           point: free(0, 0),
-          length: { expr: { kind: "member", object: "reach", field: "radius" }, value: 2 },
+          length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2 },
         },
         scope,
       ),
     ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: "reach", field: "radius" }],
+        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }],
       },
     });
     expect(
@@ -1261,14 +1261,14 @@ describe("roundOffset tool", () => {
         {
           world: { x: 0, y: 0 },
           point: free(0, 0),
-          length: { expr: { kind: "member", object: "shelf", field: "distance" }, value: 0.2 },
+          length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 0.2 },
         },
         scope,
       ),
     ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: "shelf", field: "distance" }],
+        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }],
       },
     });
   });

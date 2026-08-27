@@ -55,10 +55,17 @@ describe("printExpr", () => {
   });
 
   test("prints member and neg expressions", () => {
-    expect(printExpr({ kind: "member", object: "reach", field: "radius" })).toBe("reach.radius");
+    expect(printExpr({ kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" })).toBe("reach.radius");
     expect(
-      printExpr({ kind: "neg", expr: { kind: "member", object: "shelf", field: "distance" } }),
+      printExpr({ kind: "neg", expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" } }),
     ).toBe("-shelf.distance");
+    expect(
+      printExpr({
+        kind: "member",
+        object: { kind: "member", object: { kind: "ref", name: "plate" }, field: "drill" },
+        field: "radius",
+      }),
+    ).toBe("plate.drill.radius");
     expect(printExpr({ kind: "neg", expr: { kind: "ref", name: "reach" } })).toBe("-reach");
     expect(
       printExpr({

@@ -24,8 +24,8 @@ const exprSchema: v.GenericSchema<Expr> = v.lazy(() =>
     v.object({ kind: v.literal("ref"), name: v.pipe(v.string(), v.minLength(1)) }),
     v.object({
       kind: v.literal("member"),
-      object: v.pipe(v.string(), v.minLength(1)),
-      field: v.union([v.literal("radius"), v.literal("distance")]),
+      object: exprSchema,
+      field: v.pipe(v.string(), v.minLength(1)),
     }),
     v.object({ kind: v.literal("neg"), expr: exprSchema }),
     v.object({

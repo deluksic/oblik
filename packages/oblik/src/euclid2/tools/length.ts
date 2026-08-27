@@ -1,6 +1,6 @@
 import type { TraceNode } from "@/eval/context";
 import type { Circle, ParallelLine } from "@/geom";
-import { printExpr, type Expr, type ProductField } from "@/source/expr";
+import { printExpr, member, rootRef, type Expr, type ProductField } from "@/source/expr";
 import { hitsNear } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
@@ -32,27 +32,38 @@ function withPendingNeg(
 }
 
 export function memberExpr(object: string, field: ProductField): Expr {
-  return { kind: "member", object, field };
+  return member(object, field);
 }
 
 export function lengthRefName(expr: Expr): string | null {
   return expr.kind === "ref" ? expr.name : null;
 }
 
-export function fieldValue(scope: Scope, object: string, field: ProductField): number | null {
+function objectKey(expr: Expr): string | null {
+  if (expr.kind === "ref") return expr.name;
+  if (expr.kind === "member") return printExpr(expr);
+  return null;
+}
+
+export function fieldValue(scope: Scope, object: string, field: string): number | null {
   if (field === "radius") {
     const c = scope.circles[object];
     return c ? Math.abs(c.geom.radius) : null;
   }
   const carrier = scope.carriers[object];
-  if (carrier?.geom.kind === "parallelLine") return (carrier.geom as ParallelLine).distance;
+  if (field === "distance" && carrier?.geom.kind === "parallelLine") {
+    return (carrier.geom as ParallelLine).distance;
+  }
   return null;
 }
 
 export function evalLengthExpr(expr: Expr, scope: Scope): number | null {
   if (expr.kind === "num") return expr.value;
   if (expr.kind === "ref") return scope.lengths[expr.name] ?? null;
-  if (expr.kind === "member") return fieldValue(scope, expr.object, expr.field);
+  if (expr.kind === "member") {
+    const key = objectKey(expr.object);
+    return key ? fieldValue(scope, key, expr.field) : null;
+  }
   if (expr.kind === "neg") {
     const v = evalLengthExpr(expr.expr, scope);
     return v == null ? null : -v;
@@ -232,10 +243,12 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   if (!hit.length) return null;
   const e = hit.length.expr;
   if (e.kind === "member") {
-    return trace.find((n) => n.bind === e.object && n.occ === 0)?.id ?? null;
+    const name = rootRef(e);
+    return name ? trace.find((n) => n.bind === name && n.occ === 0)?.id ?? null : null;
   }
   if (e.kind === "neg" && e.expr.kind === "member") {
-    return trace.find((n) => n.bind === e.expr.object && n.occ === 0)?.id ?? null;
+    const name = rootRef(e.expr);
+    return name ? trace.find((n) => n.bind === name && n.occ === 0)?.id ?? null : null;
   }
   if (e.kind === "ref") {
     return trace.find((n) => n.bind === e.name && n.occ === 0)?.id ?? null;
