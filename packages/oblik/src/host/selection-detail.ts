@@ -160,8 +160,9 @@ export function buildOriginFrameLines(text: string, line: number, name?: string)
   let target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
   const pinOnHeader = headerIdx != null && isClosingBraceLine(rows[target] ?? "");
   if (pinOnHeader) target = headerIdx;
-  const from = Math.max(0, target - 1);
-  const to = Math.min(rows.length, target + 2);
+  const bodyStart = headerIdx != null ? headerIdx + 1 : 0;
+  const from = Math.max(bodyStart, target - 1);
+  const to = Math.min(rows.length, Math.max(from, target) + 2);
   const out: OriginDisplayLine[] = [];
 
   if (headerIdx != null) {
@@ -404,6 +405,10 @@ function callerFromMentions(
     );
     if (hit) return hit;
   }
+  if (focus.callerFile) {
+    const inFile = hits.find((h) => sourceFileKey(h.file) === sourceFileKey(focus.callerFile));
+    if (inFile) return inFile;
+  }
   return hits[0];
 }
 
@@ -412,6 +417,10 @@ function callerSiteOf(
   mentions: readonly MentionFile[],
   trace: readonly TraceNode[],
 ): { file: string; line: number; name?: string } | undefined {
+  // Mentions know the call expression. Runtime stacks often land on `build() {`
+  // or the closing `}` of the caller instead of the helper invocation.
+  const fromMentions = callerFromMentions(focus, mentions);
+  if (fromMentions) return fromMentions;
   if (focus.callerFile && focus.callerLine && focus.callerLine > 0) {
     return { file: focus.callerFile, line: focus.callerLine };
   }
@@ -429,7 +438,7 @@ function callerSiteOf(
   if (n?.inv?.callerFile && n.inv.callerLine > 0) {
     return { file: n.inv.callerFile, line: n.inv.callerLine };
   }
-  return callerFromMentions(focus, mentions);
+  return undefined;
 }
 
 /** Caller scopes above `focus`, leaf-parent first — same order as a selected node's origin stack. */

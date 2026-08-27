@@ -201,6 +201,27 @@ describe("buildOriginFrameLines", () => {
       true,
     );
   });
+
+  test("does not quote scene fields that sit above build()", () => {
+    const src = `export default defineScene({
+  kind: "euclid2",
+  title: "Plate grid",
+  camera: { x: 6.2, y: 3.3, scale: 40 },
+  build() {
+    for (let col = 0; col < 3; col++) {
+      mountingPlateLayout(col * 4.15, 0);
+    }
+  },
+});
+`;
+    const atHeader = buildOriginFrameLines(src, 5, "build");
+    const atBrace = buildOriginFrameLines(src, 9, "build");
+    for (const lines of [atHeader, atBrace]) {
+      const texts = lines.map((row) => ("text" in row ? row.text : "..."));
+      expect(texts.some((t) => t.includes("camera"))).toBe(false);
+      expect(texts[0]).toBe("  build() {");
+    }
+  });
 });
 
 describe("findFunctionHeaderRow", () => {
@@ -319,6 +340,64 @@ export default defineScene({
       });
       const parentTexts = detail.origin.frames[1]!.lines.map((row) => ("text" in row ? row.text : "..."));
       expect(parentTexts.some((t) => t.includes("mountingPlateLayout()"))).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  test("a looped invocation quotes the call in build, not camera above it", async () => {
+    const helperFile = "apps/demo/src/layout/mounting-plate.ts";
+    const parentFile = "apps/demo/src/scenes/mounting-plate-grid.ts";
+    const helperSrc = plateFn;
+    const parentSrc = `import { defineScene } from "oblik";
+import { mountingPlateLayout } from "../layout/mounting-plate";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "Plate grid",
+  camera: { x: 6.2, y: 3.3, scale: 40 },
+  build() {
+    for (let col = 0; col < 3; col++) {
+      for (let row = 0; row < 2; row++) {
+        mountingPlateLayout(col * 4.15, row * 3.2);
+      }
+    }
+  },
+});
+`;
+    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const q = decodeURIComponent(url.split("file=")[1] ?? "");
+      if (q.includes("layout/mounting-plate")) return new Response(helperSrc, { status: 200 });
+      if (q.includes("scenes/mounting-plate-grid")) return new Response(parentSrc, { status: 200 });
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const detail = await selectionDetailForScope({
+        node: null,
+        focus: {
+          file: helperFile,
+          name: "mountingPlateLayout",
+          serial: 1,
+          callerFile: parentFile,
+          // Generated stacks land on the caller's `},`, not the helper call.
+          callerLine: 14,
+        },
+        mentions,
+      });
+      expect(detail.origin.kind).toBe("origin");
+      if (detail.origin.kind !== "origin") throw new Error("expected origin");
+      expect(detail.origin.frames).toHaveLength(2);
+      const parentTexts = detail.origin.frames[1]!.lines.map((row) => ("text" in row ? row.text : "..."));
+      expect(parentTexts.some((t) => t.includes("camera"))).toBe(false);
+      expect(parentTexts.some((t) => t.includes("mountingPlateLayout("))).toBe(true);
+      expect(
+        detail.origin.frames[1]!.lines.some(
+          (row) => row.kind === "code" && row.current && row.text.includes("mountingPlateLayout("),
+        ),
+      ).toBe(true);
     } finally {
       globalThis.fetch = orig;
     }
@@ -443,5 +522,32 @@ export default defineScene({
       pick: { name: "build", file: parentFile },
     });
     expect(chain[0]!.line).toBeGreaterThan(0);
+  });
+
+  test("looped helper call is the parent site even when callerLine is the closing brace", () => {
+    const helperFile = "apps/demo/src/layout/mounting-plate.ts";
+    const parentFile = "apps/demo/src/scenes/mounting-plate-grid.ts";
+    const parentSrc = `export default defineScene({
+  camera: { x: 6.2, y: 3.3, scale: 40 },
+  build() {
+    for (let col = 0; col < 3; col++) {
+      mountingPlateLayout(col * 4.15, 0);
+    }
+  },
+});
+`;
+    const mentions = [analyzeMentions(plateFn, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const chain = scopeCallerChain(
+      {
+        file: helperFile,
+        name: "mountingPlateLayout",
+        serial: 0,
+        callerFile: parentFile,
+        callerLine: 7,
+      },
+      mentions,
+    );
+    expect(chain).toHaveLength(1);
+    expect(parentSrc.split("\n")[chain[0]!.line - 1]).toContain("mountingPlateLayout(");
   });
 });
