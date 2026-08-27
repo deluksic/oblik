@@ -53,21 +53,25 @@ function reverseBind(fn: MentionFn, id: string): string | undefined {
 function childNodes(
   trace: readonly TraceNode[],
   callee: MentionFn,
-  call: { line: number; callee: string },
+  call: { line: number; column: number; callee: string },
   caller: MentionFn,
 ): TraceNode[] {
-  const hits = trace.filter((n) => {
-    const inv = n.inv;
-    if (!inv || !isFiniteTrace(n)) return false;
-    if (inv.name !== callee.name) return false;
-    return inv.callerLine === call.line;
-  });
-  if (hits.length > 0) return hits;
-  const nCalls = caller.calls.filter((c) => c.callee === call.callee).length;
-  if (nCalls === 1) {
-    return trace.filter((n) => n.inv?.name === callee.name && isFiniteTrace(n));
-  }
-  return hits;
+  const ofCallee = (n: TraceNode) =>
+    !!n.inv && isFiniteTrace(n) && n.inv.name === callee.name;
+  const all = trace.filter(ofCallee);
+  const siblingCalls = caller.calls.filter((c) => c.callee === call.callee);
+  const callIndex = siblingCalls.findIndex((c) => c.line === call.line && c.column === call.column);
+  const distinguished =
+    siblingCalls.length > 1 &&
+    siblingCalls.every((c) => all.some((n) => n.inv!.callerLine === c.line));
+  if (distinguished) return all.filter((n) => n.inv!.callerLine === call.line);
+  // Generated stacks often pin every call to one caller line. One call can
+  // still take every node; several calls split by invocation serial (source order).
+  if (siblingCalls.length <= 1) return all;
+  if (callIndex < 0) return [];
+  const bySerial = all.filter((n) => (n.inv?.serial ?? 0) === callIndex);
+  if (bySerial.length > 0) return bySerial;
+  return callIndex === 0 ? all : [];
 }
 
 function exprForCall(
