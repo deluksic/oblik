@@ -242,4 +242,27 @@ describe("profile pick", () => {
     expect(snapProfile([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
     expect(snapProfile([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });
+
+  test("snapProfile with keys uses that invocation, not occ 0", () => {
+    const face1 = {
+      ...FACE,
+      occ: 1,
+      value: {
+        kind: "profile" as const,
+        outer: [
+          { a: { x: 10, y: 0 }, b: { x: 14, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 14, y: 0 } } },
+          { a: { x: 14, y: 0 }, b: { x: 10, y: 3 }, carrier: { kind: "segment" as const, a: { x: 14, y: 0 }, b: { x: 10, y: 3 } } },
+          { a: { x: 10, y: 3 }, b: { x: 10, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 3 }, b: { x: 10, y: 0 } } },
+        ],
+      },
+    };
+    const at = { x: 11, y: 1 };
+    expect(snapProfile([FACE, face1], at, camera, size)).toBeNull();
+    expect(
+      snapProfile([FACE, face1], at, camera, size, undefined, {
+        keys: new Set(["o_pr:1"]),
+        print: (n) => n.bind,
+      })?.id,
+    ).toBe("o_pr");
+  });
 });

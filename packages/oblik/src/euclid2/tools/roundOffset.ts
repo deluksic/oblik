@@ -74,7 +74,8 @@ export const roundOffset: Tool<OffsetSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as OffsetSession["focus"] }),
   hit(session, hit, ctx) {
     if (!faceOf(session, scopeFromTrace(ctx.trace))) {
-      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size);
+      const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
+      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       return profile ? { ...hit, profile } : hit;
     }
     return attachLengthHit(hit, ctx, session, ["radius", "distance"]);

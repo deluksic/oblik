@@ -134,7 +134,8 @@ export const fillet: Tool<FilletSession> = {
   },
   hit(session, hit, ctx) {
     if (!vertexOf(session)) {
-      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size);
+      const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
+      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       if (!profile) return hit;
       const corner = closestCorner(profile.geom, hit.world);
       if (!corner) return { ...hit, profile };

@@ -73,7 +73,8 @@ export const perpendicularLine: Tool<PerpSession> = {
   setFocus: (s, id) => ({ ...s, focus: id as PerpSession["focus"] }),
   hit(session, hit, ctx) {
     if (!carrierOf(session, scopeFromTrace(ctx.trace))) {
-      const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size);
+      const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
+      const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
       return carrier ? { ...hit, carrier } : hit;
     }
     return hit;

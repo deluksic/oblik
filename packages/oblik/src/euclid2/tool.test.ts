@@ -1428,6 +1428,44 @@ describe("fillet tool", () => {
     expect(hit.corner?.at.y).toBeCloseTo(0);
   });
 
+  test("fillet profile pick follows the focused invocation, not occ 0", () => {
+    const square1 = {
+      kind: "profile" as const,
+      outer: [
+        { a: { x: 10, y: 0 }, b: { x: 11, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 11, y: 0 } } },
+        { a: { x: 11, y: 0 }, b: { x: 11, y: 1 }, carrier: { kind: "segment" as const, a: { x: 11, y: 0 }, b: { x: 11, y: 1 } } },
+        { a: { x: 11, y: 1 }, b: { x: 10, y: 1 }, carrier: { kind: "segment" as const, a: { x: 11, y: 1 }, b: { x: 10, y: 1 } } },
+        { a: { x: 10, y: 1 }, b: { x: 10, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 1 }, b: { x: 10, y: 0 } } },
+      ],
+    };
+    const mix0 = {
+      id: "o_pr",
+      occ: 0,
+      kind: "profile",
+      bind: "mix",
+      value: square,
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const mix1 = { ...mix0, occ: 1, value: square1 } as TraceNode;
+    const ctx = {
+      trace: [mix0, mix1],
+      camera: { x: 0, y: 0, scale: 48 },
+      size: { w: 800, h: 600 },
+      keys: new Set(["o_pr:1"]),
+      print: (n: TraceNode) => n.bind,
+    };
+    const miss = enrichHit(startTool("fillet"), { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) }, ctx);
+    expect(miss.profile).toBeUndefined();
+    expect(miss.corner).toBeUndefined();
+    const hit = enrichHit(startTool("fillet"), { world: { x: 10.02, y: 0.01 }, point: free(10.02, 0.01) }, ctx);
+    expect(hit.profile?.id).toBe("o_pr");
+    expect(hit.profile?.bind).toBe("mix");
+    expect(hit.corner?.index).toBe(0);
+    expect(hit.corner?.at.x).toBeCloseTo(10);
+    expect(hit.corner?.at.y).toBeCloseTo(0);
+  });
+
   test("subdues points and strokes while picking a corner, not fills", () => {
     expect(toolChrome(startTool("fillet"))).toEqual({
       hideFills: false,
