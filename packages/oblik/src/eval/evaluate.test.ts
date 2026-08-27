@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
 import { along, circle, fillet, paint, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider, style } from "./constructors";
-import { paintsFromTrace } from "./paint";
+import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
 import { defineScene } from "./scene";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -267,7 +267,7 @@ describe("style and paint", () => {
     expect(evaluate(defineScene({ kind: "figure", title: "t", build() {} })).trace).toEqual([]);
   });
 
-  test("paint walks a bag; later paint of the same target wins", () => {
+  test("paint walks a bag; a second paint on the same target is another stroke", () => {
     const scene = defineScene({
       kind: "figure",
       title: "t",
@@ -284,6 +284,8 @@ describe("style and paint", () => {
     const map = paintsFromTrace(trace);
     expect(map.get("a:0")?.width).toBe(1);
     expect(map.get("b:0")?.width).toBe(2.2);
+    const strokes = paintStrokesFromTrace(trace);
+    expect(strokes.filter((s) => s.geom.id === "b")).toHaveLength(2);
     const first = trace.find((n) => n.id === "p0");
     if (first?.value.kind === "paint") expect(first.value.targets).toHaveLength(2);
   });

@@ -1,15 +1,16 @@
-import { For, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import { paintsFromTrace, paintKey, type FigureStyle } from "@/eval/paint";
+import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
 import { isGlider } from "@/geom/gliders";
 import { kWorldToNdc, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
-import { isFiniteTrace, traceKey } from "../euclid2/pick";
+import { traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
-import { isHot, isSelected } from "../euclid2/view/marks";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
 import { FigurePoint, FigureStroke } from "./Ink";
 import { frameRect, type FigureFrame } from "./frame";
+import { inkFromGeomHits, isDrawnGeom } from "./pick";
+import type { FigureToolId } from "./tools";
 
 import styles from "./View.module.css";
 
@@ -21,25 +22,22 @@ export type FigureViewProps = {
   initialCamera?: Camera2;
   paper?: "cream" | "white";
   frame?: FigureFrame;
-  placing?: boolean;
-  hoverId?: string | null;
+  tool?: FigureToolId | null;
+  shift?: boolean;
+  brushLook: FigureStyle;
+  hoverKey?: string | null;
   selectedKey?: string | null;
   scope?: Scope;
-  onHoverId?: (id: string | null) => void;
+  onShift?: (on: boolean) => void;
+  onHoverKey?: (key: string | null) => void;
   onPick?: (hits: TraceNode[]) => void;
-  onPaint?: (node: TraceNode) => void;
+  onToolHit?: (node: TraceNode) => void;
 };
 
 function readPaneSize(el: Element): PaneSize | null {
   const r = el.getBoundingClientRect();
   if (r.width < 8 || r.height < 8) return null;
   return { w: r.width, h: r.height };
-}
-
-function isDrawnGeom(n: TraceNode): boolean {
-  if (!isFiniteTrace(n)) return false;
-  const k = n.value.kind;
-  return k !== "slider" && k !== "style" && k !== "paint";
 }
 
 function isPointish(n: TraceNode): boolean {
@@ -54,6 +52,7 @@ export function FigureView(props: FigureViewProps) {
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [grabbing, setGrabbing] = createSignal(false);
+  const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
   let drag: Drag | null = null;
   let pendingPick: TraceNode[] | null = null;
 
@@ -77,16 +76,17 @@ export function FigureView(props: FigureViewProps) {
     return `scale(${k} ${-k}) translate(${-cam.x} ${-cam.y})`;
   });
   const page = createMemo(() => frameRect(props.frame, initialCameraMemo()));
-  const looks = createMemo(() => paintsFromTrace(props.trace));
   const geom = createMemo(() => props.trace.filter(isDrawnGeom));
-  const onion = createMemo(() => geom().filter((n) => !looks().has(paintKey(n.id, n.occ))));
-  const painted = createMemo(() =>
-    geom().filter((n) => looks().has(paintKey(n.id, n.occ))),
-  );
-  const onionInk = createMemo(() => onion().filter((n) => !isPointish(n)));
-  const onionPts = createMemo(() => onion().filter(isPointish));
-  const paintedInk = createMemo(() => painted().filter((n) => !isPointish(n)));
-  const paintedPts = createMemo(() => painted().filter(isPointish));
+  const strokes = createMemo(() => paintStrokesFromTrace(props.trace));
+  const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)));
+  const onionPts = createMemo(() => geom().filter(isPointish));
+  const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
+  const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
+
+  function hitsOf(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
+    const geoms = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom);
+    return props.shift ? geoms : inkFromGeomHits(props.trace, geoms);
+  }
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
@@ -99,14 +99,19 @@ export function FigureView(props: FigureViewProps) {
     setCamera(zoomAt(camera(), screen, pane, wheelZoomFactor(e.deltaY, e.deltaMode)));
   }
 
+  function noteShift(e: PointerEvent | KeyboardEvent) {
+    props.onShift?.(e.shiftKey);
+  }
+
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
+    noteShift(e);
     const el = paneEl();
     if (!el) return;
-    const hits = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom);
-    if (props.placing) {
+    const hits = hitsOf(e, el);
+    if (props.tool) {
       const hit = hits[0];
-      if (hit) props.onPaint?.(hit);
+      if (hit) props.onToolHit?.(hit);
       return;
     }
     drag = panDrag(e, camera());
@@ -117,11 +122,18 @@ export function FigureView(props: FigureViewProps) {
     if (drag?.moved) return;
     const el = paneEl();
     if (!el) return;
-    const hit = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom)[0];
-    props.onHoverId?.(hit?.id ?? null);
+    const hits = hitsOf(e, el);
+    const hit = hits[0] ?? null;
+    props.onHoverKey?.(hit ? traceKey(hit) : null);
+    if (props.tool === "brush" && props.shift && hit && isDrawnGeom(hit)) setPreviewGeom(hit);
+    else if (props.tool === "brush" && !props.shift && hit?.value.kind === "paint") {
+      const g = paintStrokesFromTrace(props.trace).find((s) => s.paint === hit || traceKey(s.paint) === traceKey(hit))?.geom;
+      setPreviewGeom(g ?? null);
+    } else setPreviewGeom(null);
   }
 
   function onPointerMove(e: PointerEvent) {
+    noteShift(e);
     noteHover(e);
     if (!drag) return;
     if (!drag.moved) {
@@ -156,8 +168,9 @@ export function FigureView(props: FigureViewProps) {
           {
             [styles.framed]: !!props.frame,
             [styles.grabbing]: grabbing(),
-            [styles.grab]: !grabbing() && !props.placing,
-            [styles.placing]: !!props.placing,
+            [styles.grab]: !grabbing() && !props.tool,
+            [styles.placing]: props.tool === "brush",
+            [styles.erasing]: props.tool === "eraser",
           },
         ]}
         style={
@@ -170,7 +183,10 @@ export function FigureView(props: FigureViewProps) {
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onPointerLeave={() => props.onHoverId?.(null)}
+        onPointerLeave={() => {
+          props.onHoverKey?.(null);
+          setPreviewGeom(null);
+        }}
       >
         <svg class={styles.world} viewBox={vb()}>
           <g transform={worldXf()}>
@@ -183,63 +199,139 @@ export function FigureView(props: FigureViewProps) {
                 height={page()!.h}
               />
             ) : null}
-            <For each={onionInk()}>
-              {(n) => (
-                <FigureStroke
-                  node={n}
-                  look={ONION}
-                  onion={true}
-                  hot={isHot(n, props.hoverId, props.selectedKey)}
-                  selected={isSelected(n, props.selectedKey)}
-                  muted={!!props.scope && mutedForScope(n, props.scope)}
+            <Show when={props.shift}>
+              <For each={onionInk()}>
+                {(n) => (
+                  <FigureStroke
+                    node={n}
+                    look={ONION}
+                    onion={true}
+                    hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+                    selected={traceKey(n) === props.selectedKey}
+                    muted={!!props.scope && mutedForScope(n, props.scope)}
+                    camera={camera()}
+                    size={size()}
+                  />
+                )}
+              </For>
+            </Show>
+            <For each={inkStrokes()}>
+              {(s) => (
+                <InkStroke
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  scope={props.scope}
                   camera={camera()}
                   size={size()}
                 />
               )}
             </For>
-            <For each={paintedInk()}>
-              {(n) => (
-                <FigureStroke
-                  node={n}
-                  look={looks().get(paintKey(n.id, n.occ)) ?? ONION}
+            <Show when={props.shift}>
+              <For each={onionPts()}>
+                {(n) => (
+                  <FigurePoint
+                    node={n}
+                    look={undefined}
+                    onion={true}
+                    hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+                    selected={traceKey(n) === props.selectedKey}
+                    muted={!!props.scope && mutedForScope(n, props.scope)}
+                    camera={camera()}
+                  />
+                )}
+              </For>
+            </Show>
+            <For each={inkPts()}>
+              {(s) => (
+                <InkPoint
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  scope={props.scope}
+                  camera={camera()}
+                />
+              )}
+            </For>
+            {props.tool === "brush" && previewGeom() ? (
+              isPointish(previewGeom()!) ? (
+                <FigurePoint
+                  node={previewGeom()!}
+                  look={props.brushLook}
                   onion={false}
-                  hot={isHot(n, props.hoverId, props.selectedKey)}
-                  selected={isSelected(n, props.selectedKey)}
-                  muted={!!props.scope && mutedForScope(n, props.scope)}
+                  hot={false}
+                  selected={false}
+                  muted={false}
+                  camera={camera()}
+                  preview={true}
+                />
+              ) : (
+                <FigureStroke
+                  node={previewGeom()!}
+                  look={props.brushLook}
+                  onion={false}
+                  hot={false}
+                  selected={false}
+                  muted={false}
                   camera={camera()}
                   size={size()}
+                  preview={true}
                 />
-              )}
-            </For>
-            <For each={onionPts()}>
-              {(n) => (
-                <FigurePoint
-                  node={n}
-                  look={undefined}
-                  onion={true}
-                  hot={isHot(n, props.hoverId, props.selectedKey)}
-                  selected={isSelected(n, props.selectedKey)}
-                  muted={!!props.scope && mutedForScope(n, props.scope)}
-                  camera={camera()}
-                />
-              )}
-            </For>
-            <For each={paintedPts()}>
-              {(n) => (
-                <FigurePoint
-                  node={n}
-                  look={looks().get(paintKey(n.id, n.occ))}
-                  onion={false}
-                  hot={isHot(n, props.hoverId, props.selectedKey)}
-                  selected={isSelected(n, props.selectedKey)}
-                  muted={!!props.scope && mutedForScope(n, props.scope)}
-                  camera={camera()}
-                />
-              )}
-            </For>
+              )
+            ) : null}
           </g>
         </svg>
       </div>
     </div>
+  );
+}
+
+function InkStroke(props: {
+  s: PaintStroke;
+  hoverKey?: string | null;
+  selectedKey?: string | null;
+  eraser?: boolean;
+  scope?: Scope;
+  camera: Camera2;
+  size: PaneSize;
+}) {
+  const paintKeyNow = () => traceKey(props.s.paint);
+  const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
+  return (
+    <FigureStroke
+      node={props.s.geom}
+      look={props.s.style}
+      onion={false}
+      hot={paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey}
+      selected={paintKeyNow() === props.selectedKey}
+      muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
+      camera={props.camera}
+      size={props.size}
+    />
+  );
+}
+
+function InkPoint(props: {
+  s: PaintStroke;
+  hoverKey?: string | null;
+  selectedKey?: string | null;
+  eraser?: boolean;
+  scope?: Scope;
+  camera: Camera2;
+}) {
+  const paintKeyNow = () => traceKey(props.s.paint);
+  const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
+  return (
+    <FigurePoint
+      node={props.s.geom}
+      look={props.s.style}
+      onion={false}
+      hot={paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey}
+      selected={paintKeyNow() === props.selectedKey}
+      muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
+      camera={props.camera}
+    />
   );
 }

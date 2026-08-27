@@ -25,10 +25,11 @@ export function FigureStroke(props: {
   muted: boolean;
   camera: Camera2;
   size: PaneSize;
+  preview?: boolean;
 }) {
   const kind = createMemo(() => props.node.value.kind);
   return (
-    <>
+    <g class={{ [styles.preview]: props.preview === true }}>
       {kind() === "segment" ? <Seg node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} /> : null}
       {kind() === "line" || kind() === "parallelLine" ? (
         <Inf
@@ -48,7 +49,7 @@ export function FigureStroke(props: {
       {kind() === "profile" ? (
         <Face node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} />
       ) : null}
-    </>
+    </g>
   );
 }
 
@@ -214,6 +215,7 @@ export function FigurePoint(props: {
   selected: boolean;
   muted: boolean;
   camera: Camera2;
+  preview?: boolean;
 }) {
   const at = createMemo(() => {
     const v = props.node.value;
@@ -226,7 +228,7 @@ export function FigurePoint(props: {
   const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
   const fill = () => (props.onion || mark() === "open" ? "none" : (props.look?.fill ?? stroke()));
   return (
-    <>
+    <g class={{ [styles.preview]: props.preview === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
           <circle
@@ -251,6 +253,6 @@ export function FigurePoint(props: {
           />
         </>
       )}
-    </>
+    </g>
   );
 }

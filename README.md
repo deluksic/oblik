@@ -11,7 +11,7 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`. Drag a handle; release writes the scene file. Figure scenes paint with `style` / `paint` (tape objects) on cream paper. Export is later.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
 
 Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 

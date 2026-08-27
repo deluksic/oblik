@@ -1,12 +1,12 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 
-import { filterChips, type StyleChip } from "./chips";
+import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./tools";
 
 import styles from "./Palette.module.css";
 
 export type FigurePaletteProps = {
   picker: boolean;
-  onPick: (chip: StyleChip) => void;
+  onPick: (id: FigureToolId) => void;
   onClosePicker: () => void;
 };
 
@@ -20,11 +20,11 @@ export function FigurePalette(props: FigurePaletteProps) {
   );
 }
 
-function Picker(props: { onPick: (chip: StyleChip) => void; onClose: () => void }) {
+function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void }) {
   const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
-  const items = () => filterChips(query());
+  const items = () => filterFigureTools(query());
 
   createEffect(
     () => inputEl(),
@@ -55,7 +55,7 @@ function Picker(props: { onPick: (chip: StyleChip) => void; onClose: () => void 
         if (e.key === "Enter") {
           e.preventDefault();
           const c = items()[active()];
-          if (c) props.onPick(c);
+          if (c) props.onPick(c.id);
         }
       };
       window.addEventListener("keydown", onKey);
@@ -68,14 +68,14 @@ function Picker(props: { onPick: (chip: StyleChip) => void; onClose: () => void 
       <div
         class={styles.panel}
         role="dialog"
-        aria-label="Paint style"
+        aria-label="Figure tool"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <input
           ref={setInputEl}
           type="search"
           class={styles.input}
-          placeholder="Paint with…"
+          placeholder="Brush or eraser…"
           autocomplete="off"
           value={query()}
           onInput={(e) => {
@@ -84,8 +84,8 @@ function Picker(props: { onPick: (chip: StyleChip) => void; onClose: () => void 
           }}
         />
         <ul class={styles.list}>
-          <For each={filterChips(query())} fallback={<p class={styles.empty}>No match.</p>}>
-            {(chip, i) => <ChipRow chip={chip} active={active() === i()} onPick={props.onPick} />}
+          <For each={filterFigureTools(query())} fallback={<p class={styles.empty}>No match.</p>}>
+            {(spec, i) => <ToolRow spec={spec} active={active() === i()} onPick={props.onPick} />}
           </For>
         </ul>
       </div>
@@ -93,24 +93,14 @@ function Picker(props: { onPick: (chip: StyleChip) => void; onClose: () => void 
   );
 }
 
-function ChipRow(props: { chip: StyleChip; active: boolean; onPick: (chip: StyleChip) => void }) {
+function ToolRow(props: { spec: FigureToolSpec; active: boolean; onPick: (id: FigureToolId) => void }) {
   return (
     <li
       class={[styles.listItem, { [styles.listItemActive]: props.active }]}
-      onClick={() => props.onPick(props.chip)}
+      onClick={() => props.onPick(props.spec.id)}
     >
-      <span class={styles.cmd}>{props.chip.title}</span>
-      <span class={styles.cmdHint}>{hintOf(props.chip)}</span>
+      <span class={styles.cmd}>{props.spec.title}</span>
+      <span class={styles.cmdHint}>{props.spec.hint}</span>
     </li>
   );
-}
-
-function hintOf(chip: StyleChip): string {
-  const s = chip.style;
-  const bits: string[] = [];
-  if (s.width != null) bits.push(`${s.width}px`);
-  if (s.dash) bits.push("dashed");
-  if (s.fill && s.fill !== "none") bits.push("fill");
-  if (s.point) bits.push(s.point);
-  return bits.join(" · ") || "stroke";
 }

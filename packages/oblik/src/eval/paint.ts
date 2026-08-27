@@ -81,7 +81,7 @@ export function collectPaintTargets(object: unknown): PaintTarget[] {
   return [...byKey.values()];
 }
 
-/** Last paint in tape order wins per `id:occ`. */
+/** Topmost style per geom (last paint in tape order). */
 export function paintsFromTrace(trace: readonly TraceNode[]): Map<string, FigureStyle> {
   const out = new Map<string, FigureStyle>();
   for (const n of trace) {
@@ -90,6 +90,39 @@ export function paintsFromTrace(trace: readonly TraceNode[]): Map<string, Figure
     for (const t of p.targets) out.set(paintKey(t.id, t.occ), p.style);
   }
   return out;
+}
+
+export type PaintStroke = {
+  paint: TraceNode;
+  geom: TraceNode;
+  style: FigureStyle;
+};
+
+/** Every paint×target in tape order (later on top). */
+export function paintStrokesFromTrace(trace: readonly TraceNode[]): PaintStroke[] {
+  const geom = new Map<string, TraceNode>();
+  for (const n of trace) {
+    if (n.value.kind === "style" || n.value.kind === "paint" || n.value.kind === "slider") continue;
+    geom.set(paintKey(n.id, n.occ), n);
+  }
+  const out: PaintStroke[] = [];
+  for (const n of trace) {
+    if (n.value.kind !== "paint") continue;
+    const p = n.value as PaintValue;
+    for (const t of p.targets) {
+      const g = geom.get(paintKey(t.id, t.occ));
+      if (g) out.push({ paint: n, geom: g, style: p.style });
+    }
+  }
+  return out;
+}
+
+export function paintsCovering(trace: readonly TraceNode[], geom: TraceNode): TraceNode[] {
+  const key = paintKey(geom.id, geom.occ);
+  return trace.filter((n) => {
+    if (n.value.kind !== "paint") return false;
+    return (n.value as PaintValue).targets.some((t) => paintKey(t.id, t.occ) === key);
+  });
 }
 
 export function cloneStyle(spec: Omit<FigureStyle, "kind"> | FigureStyle): FigureStyle {

@@ -74,6 +74,15 @@
   cursor: crosshair;
 }
 
+.erasing {
+  cursor: cell;
+}
+
+.preview {
+  pointer-events: none;
+  opacity: 0.78;
+}
+
 .hit {
   fill: none;
   stroke: transparent;

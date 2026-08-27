@@ -15,9 +15,11 @@ import {
 } from "../host/selection-detail";
 import { traceKey } from "../euclid2/pick";
 import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../euclid2/tool";
-import { styleExpr, type StyleChip } from "./chips";
+import { BRUSH_LOOK, styleExpr } from "./chips";
 import { FigurePalette } from "./Palette";
 import { FigureView } from "./View";
+import { isDrawnGeom } from "./pick";
+import type { FigureToolId } from "./tools";
 
 import styles from "./Pane.module.css";
 
@@ -57,8 +59,9 @@ function parentFocus(
 
 export function FigurePane(props: FigurePaneProps) {
   const [picker, setPicker] = createSignal(() => (props.scene, false));
-  const [chip, setChip] = createSignal<StyleChip | null>(() => (props.scene, null));
-  const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
+  const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.scene, null));
+  const [shift, setShift] = createSignal(false);
+  const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [writeError, setWriteError] = createSignal<string | null>(null);
@@ -121,91 +124,127 @@ export function FigurePane(props: FigurePaneProps) {
     () => 1,
     () => {
       const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Shift") setShift(e.type === "keydown");
         const typing =
           e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
         if (e.key === "Escape") {
           e.preventDefault();
           if (picker()) setPicker(false);
-          else if (chip()) {
-            setChip(null);
+          else if (tool()) {
+            setTool(null);
             setWriteError(null);
           } else if (selectedKey()) setSelectedKey(null);
           else setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
           return;
         }
         if (typing) return;
-        if (e.code === "Space" && !chip()) {
+        if (e.code === "Space") {
+          if (e.repeat) return;
           e.preventDefault();
           setPicker((p) => !p);
         }
       };
+      const onUp = (e: KeyboardEvent) => {
+        if (e.key === "Shift") setShift(false);
+      };
+      const onBlur = () => setShift(false);
       window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
+      window.addEventListener("keyup", onUp);
+      window.addEventListener("blur", onBlur);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("keyup", onUp);
+        window.removeEventListener("blur", onBlur);
+      };
     },
   );
 
-  async function insert(job: { from: string; args: unknown }) {
-    const dest = focus();
-    const res = await fetch("/__oblik-insert", {
+  async function postJson(url: string, body: unknown): Promise<boolean> {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file: dest.file, dest: dest.name, ...job }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setWriteError(body?.error ?? `insert failed (${res.status})`);
-      return;
+      const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+      setWriteError(errBody?.error ?? `${url} failed (${res.status})`);
+      return false;
     }
     setWriteError(null);
-    setChip(null);
+    return true;
+  }
+
+  async function insertPaint(geom: TraceNode) {
+    const expr = mentionExpr(scope(), geom);
+    if (!expr) {
+      const who = mentionPrint(scope(), geom) ?? geom.bind ?? geom.id;
+      setWriteError(`${who} is not referable here — dive or Add to return.`);
+      return;
+    }
+    const dest = focus();
+    await postJson("/__oblik-insert", {
+      file: dest.file,
+      dest: dest.name,
+      from: "paint",
+      args: [expr, styleExpr(BRUSH_LOOK)],
+    });
+  }
+
+  async function replacePaint(paint: TraceNode) {
+    const file = paint.module ?? focus().file;
+    await postJson("/__oblik-paint-style", {
+      file,
+      id: paint.id,
+      style: styleExpr(BRUSH_LOOK),
+    });
+  }
+
+  async function erasePaint(paint: TraceNode) {
+    const file = paint.module ?? focus().file;
+    const ok = await postJson("/__oblik-erase", { file, id: paint.id });
+    if (ok && selectedKey() === traceKey(paint)) setSelectedKey(null);
   }
 
   async function expose(bind: string) {
     const dest = focus();
     if (!dest.name) return;
-    const res = await fetch("/__oblik-expose", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file: dest.file, dest: dest.name, bind }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setWriteError(body?.error ?? `expose failed (${res.status})`);
-      return;
-    }
-    setWriteError(null);
+    await postJson("/__oblik-expose", { file: dest.file, dest: dest.name, bind });
   }
 
   function onPick(hits: TraceNode[]) {
     const n = hits[0];
     setSelectedKey(n ? traceKey(n) : null);
-    if (!chip() && n) {
+    if (n) {
       const next = focusFromNode(n);
       if (next) setFocus(next);
     }
   }
 
-  function onPaint(n: TraceNode) {
-    const look = chip();
-    if (!look) return;
-    const expr = mentionExpr(scope(), n);
-    if (!expr) {
-      const who = mentionPrint(scope(), n) ?? n.bind ?? n.id;
-      setWriteError(`${who} is not referable here — dive or Add to return.`);
+  function onToolHit(n: TraceNode) {
+    const t = tool();
+    if (t === "eraser") {
+      if (n.value.kind === "paint") void erasePaint(n);
       return;
     }
-    void insert({
-      from: "paint",
-      args: [expr, styleExpr(look.style)],
-    });
+    if (t !== "brush") return;
+    if (n.value.kind === "paint") {
+      void replacePaint(n);
+      return;
+    }
+    if (isDrawnGeom(n)) void insertPaint(n);
   }
 
   const status = createMemo(() => {
     const fail = writeError() ?? world().error;
     if (fail) return fail;
-    const look = chip();
-    if (look) return `${look.title} — click nameable geom to paint. Escape cancels.`;
-    return "Space picks a style. Click to inspect (select is scope). Outline not returned stays onioned.";
+    const t = tool();
+    if (t === "brush") {
+      return shift()
+        ? "Brush — hover previews, click onion to add ink. Ink stays on top. Escape leaves the brush."
+        : "Brush — click ink to replace. Hold Shift to see construction and add. Escape leaves the brush.";
+    }
+    if (t === "eraser") return "Eraser — click ink to remove it. Construction stays. Escape leaves the eraser.";
+    return "Click ink to inspect. Hold Shift for construction. Space for Brush or Eraser.";
   });
 
   return (
@@ -217,20 +256,23 @@ export function FigurePane(props: FigurePaneProps) {
           initialCamera={props.scene.camera}
           paper={props.scene.paper}
           frame={props.scene.frame}
-          placing={chip() != null}
-          hoverId={hoverId()}
+          tool={tool()}
+          shift={shift()}
+          brushLook={BRUSH_LOOK}
+          hoverKey={hoverKey()}
           selectedKey={selectedKey()}
           scope={scope()}
-          onHoverId={setHoverId}
+          onShift={setShift}
+          onHoverKey={setHoverKey}
           onPick={onPick}
-          onPaint={onPaint}
+          onToolHit={onToolHit}
         />
         <FigurePalette
           picker={picker()}
-          onPick={(next) => {
+          onPick={(id) => {
             setPicker(false);
             setWriteError(null);
-            setChip(next);
+            setTool(id);
           }}
           onClosePicker={() => setPicker(false)}
         />

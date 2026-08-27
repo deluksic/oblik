@@ -27,7 +27,7 @@ export {
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
-export { isStyle, isPaint, paintsFromTrace, type FigureStyle, type FigurePointMark, type PaintValue } from "./eval/paint";
+export { isStyle, isPaint, paintsFromTrace, paintStrokesFromTrace, type FigureStyle, type FigurePointMark, type PaintValue, type PaintStroke } from "./eval/paint";
 export { analyze, listAnnotationSites, siteSpecs, type Annotation } from "./source/analyze";
 export {
   analyzeMentions,
@@ -42,6 +42,7 @@ export {
 export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, exposeReturnBag, namesInFunctionScope, type Insert } from "./source/insert";
+export { patchPaintStyle, removePaintCall } from "./source/paint-edit";
 export { printExpr, member, parsePath, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";

@@ -67,6 +67,33 @@ export function parseInsert(raw: unknown): InsertBody | string {
   return r.issues.map((i) => i.message).join("; ");
 }
 
+export const paintPatchSchema = v.object({
+  file: v.string(),
+  id: v.pipe(v.string(), v.minLength(1)),
+  style: exprSchema,
+});
+
+export type PaintPatchBody = v.InferOutput<typeof paintPatchSchema>;
+
+export function parsePaintPatch(raw: unknown): PaintPatchBody | string {
+  const r = v.safeParse(paintPatchSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}
+
+export const eraseSchema = v.object({
+  file: v.string(),
+  id: v.pipe(v.string(), v.minLength(1)),
+});
+
+export type EraseBody = v.InferOutput<typeof eraseSchema>;
+
+export function parseErase(raw: unknown): EraseBody | string {
+  const r = v.safeParse(eraseSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}
+
 export const exposeSchema = v.object({
   file: v.string(),
   dest: v.pipe(v.string(), v.minLength(1)),
