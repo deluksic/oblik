@@ -1,7 +1,9 @@
 .sidebar {
+  box-sizing: border-box;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+  max-width: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -46,6 +48,8 @@
 .originList {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -65,6 +69,7 @@
 }
 
 .originBox {
+  box-sizing: border-box;
   flex: 0 0 auto;
   border: 1px solid var(--oblik-line);
   border-radius: 0.35rem;
@@ -72,6 +77,8 @@
   background: var(--oblik-paper);
   display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   text-align: left;
   padding: 0;
   color: inherit;
@@ -138,21 +145,25 @@
 }
 
 .quote {
+  box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   line-height: 1.45;
-  overflow-x: auto;
-  overflow-y: visible;
+  tab-size: 2;
+  overflow: hidden;
   max-width: 100%;
+  min-width: 0;
 }
 
 .codeRow,
 .headerRow,
 .gapRow {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
   gap: 0.35rem;
   padding: 0 0.45rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .headerRow {
@@ -179,7 +190,9 @@
 }
 
 .tx {
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   min-width: 0;
 }
 

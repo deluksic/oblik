@@ -26,6 +26,7 @@
 *,
 *::before,
 *::after {
+  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: var(--oblik-scrollbar-thumb) var(--oblik-scrollbar-track);
 }

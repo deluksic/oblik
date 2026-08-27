@@ -140,6 +140,23 @@ function leadingIndent(text: string): string {
   return match?.[0] ?? "";
 }
 
+function indentColumns(indent: string): number {
+  let cols = 0;
+  for (const ch of indent) cols += ch === "\t" ? 2 : 1;
+  return cols;
+}
+
+function gcd(a: number, b: number): number {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y) {
+    const next = x % y;
+    x = y;
+    y = next;
+  }
+  return x;
+}
+
 function commonLeadingIndent(texts: readonly string[]): string {
   const indents = texts.filter((row) => row.trim() !== "").map(leadingIndent);
   if (indents.length === 0) return "";
@@ -153,15 +170,43 @@ function commonLeadingIndent(texts: readonly string[]): string {
   return prefix;
 }
 
-/** Strip indent shared by every non-blank origin line. Relative indent stays. */
+function stripCommonIndent(text: string, prefix: string): string {
+  if (prefix && text.startsWith(prefix)) return text.slice(prefix.length);
+  if (text.trim() === "") return "";
+  return text;
+}
+
+function twoSpaceIndent(text: string, unit: number): string {
+  if (text.trim() === "") return "";
+  const indent = leadingIndent(text);
+  const rest = text.slice(indent.length);
+  const cols = indentColumns(indent);
+  if (cols === 0) return rest;
+  const levels = unit >= 2 ? Math.round(cols / unit) : cols;
+  return `${"  ".repeat(levels)}${rest}`;
+}
+
+function originIndentUnit(texts: readonly string[]): number {
+  const widths = texts
+    .filter((row) => row.trim() !== "")
+    .map((row) => indentColumns(leadingIndent(row)))
+    .filter((cols) => cols > 0);
+  if (widths.length === 0) return 2;
+  const unit = widths.reduce((a, b) => gcd(a, b));
+  return unit >= 2 ? unit : 2;
+}
+
+/** Strip shared indent, then rewrite remaining indent as 2 spaces per level. */
 export function dedentOriginLines(lines: OriginDisplayLine[]): OriginDisplayLine[] {
-  const prefix = commonLeadingIndent(lines.flatMap((row) => ("text" in row ? [row.text] : [])));
-  if (!prefix) return lines;
+  const texts = lines.flatMap((row) => ("text" in row ? [row.text] : []));
+  const prefix = commonLeadingIndent(texts);
+  const stripped = texts.map((text) => stripCommonIndent(text, prefix));
+  const unit = originIndentUnit(stripped);
+  let i = 0;
   return lines.map((row) => {
     if (!("text" in row)) return row;
-    if (row.text.startsWith(prefix)) return { ...row, text: row.text.slice(prefix.length) };
-    if (row.text.trim() === "") return { ...row, text: "" };
-    return row;
+    const text = twoSpaceIndent(stripped[i++] ?? "", unit);
+    return text === row.text ? row : { ...row, text };
   });
 }
 

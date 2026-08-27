@@ -3,12 +3,19 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--oblik-text);
   background: var(--oblik-paper);
 }
 
 .head {
+  box-sizing: border-box;
   flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0.7rem 1.1rem;
   border-bottom: 1px solid var(--oblik-line);
 }
@@ -47,6 +54,8 @@
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

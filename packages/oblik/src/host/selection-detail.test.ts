@@ -178,13 +178,28 @@ describe("dedentOriginLines", () => {
     expect(lines[1]).toMatchObject({ text: "  const origin = point(0.13, 0.25, \"o_origin\");" });
   });
 
-  test("does not over-strip mixed tabs and spaces", () => {
+  test("rewrites mixed tabs and spaces to 2-space indent", () => {
     const lines = dedentOriginLines([
       { kind: "header", line: 1, text: "  build() {", current: true },
       { kind: "code", line: 2, text: "\tconst plate = mountingPlateLayout();" },
     ]);
-    expect(lines[0]).toMatchObject({ text: "  build() {" });
-    expect(lines[1]).toMatchObject({ text: "\tconst plate = mountingPlateLayout();" });
+    expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
+      "  build() {",
+      "  const plate = mountingPlateLayout();",
+    ]);
+  });
+
+  test("collapses 4-space indent to 2-space after stripping the shared prefix", () => {
+    const lines = dedentOriginLines([
+      { kind: "header", line: 7, text: "    build() {", current: true },
+      { kind: "code", line: 8, text: "        const plate = mountingPlateLayout();" },
+      { kind: "code", line: 9, text: "    }," },
+    ]);
+    expect(lines.map((row) => ("text" in row ? row.text : "..."))).toEqual([
+      "build() {",
+      "  const plate = mountingPlateLayout();",
+      "},",
+    ]);
   });
 });
 
