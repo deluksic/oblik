@@ -1,11 +1,58 @@
 import { cloneStyle, type FigureStyle } from "../eval/paint";
 import type { Expr } from "../source/expr";
 
-/** Brush settings for this slice — not a `style()` UI. */
-export const BRUSH_LOOK: FigureStyle = cloneStyle({
-  stroke: "#1c1917",
-  width: 1.35,
-});
+export const STROKE_COLORS = ["#1c1917", "#c23b22", "#2b7a3e", "#1f5fa8", "#d97706"] as const;
+
+export const FILL_COLORS = ["none", "#f3c5bc", "#cfe8d4", "#c5ddf5", "#f6e2b8"] as const;
+
+export const STROKE_WIDTHS = [1, 1.6, 2.8] as const;
+
+export type LineStyleId = "solid" | "dash" | "dot";
+
+export const LINE_STYLES: readonly { id: LineStyleId; dash?: readonly number[] }[] = [
+  { id: "solid" },
+  { id: "dash", dash: [7, 5] },
+  { id: "dot", dash: [1.4, 3.6] },
+];
+
+export type BrushSettings = {
+  stroke: string;
+  fill: string;
+  width: number;
+  line: LineStyleId;
+};
+
+export const DEFAULT_BRUSH: BrushSettings = {
+  stroke: STROKE_COLORS[0],
+  fill: "none",
+  width: STROKE_WIDTHS[1],
+  line: "solid",
+};
+
+export function dashForLine(line: LineStyleId): readonly number[] | undefined {
+  return LINE_STYLES.find((row) => row.id === line)?.dash;
+}
+
+export function takesFill(kind: string): boolean {
+  return kind === "profile" || kind === "circle";
+}
+
+export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureStyle {
+  const dash = dashForLine(b.line);
+  return cloneStyle({
+    stroke: b.stroke,
+    width: b.width,
+    ...(dash ? { dash } : {}),
+    ...(closed ? { fill: b.fill } : {}),
+  });
+}
+
+/** Closed-shape look used for hover preview (lines ignore fill; dots treat `none` as ink). */
+export function previewLook(b: BrushSettings): FigureStyle {
+  return figureStyleFromBrush(b, true);
+}
+
+export const BRUSH_LOOK: FigureStyle = figureStyleFromBrush(DEFAULT_BRUSH, false);
 
 export function styleExpr(s: FigureStyle): Expr {
   const props: Record<string, Expr> = {};

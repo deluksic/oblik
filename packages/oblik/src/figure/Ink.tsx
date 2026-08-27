@@ -188,7 +188,7 @@ function Face(props: {
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
   const look = () => (props.onion ? ONION : props.look);
-  const fill = () => (props.onion ? "none" : (look().fill ?? "#efe8d8"));
+  const fill = () => (props.onion ? "none" : (look().fill ?? "none"));
   return (
     <>
       <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={d()} />
@@ -199,6 +199,8 @@ function Face(props: {
         fill={fill()}
         stroke={look().stroke ?? "#1c1917"}
         stroke-width={look().width ?? 1.35}
+        stroke-dasharray={dash(look())}
+        stroke-linecap="round"
         stroke-linejoin="round"
         vector-effect="non-scaling-stroke"
         opacity={props.onion ? 0.35 : 1}
@@ -226,7 +228,12 @@ export function FigurePoint(props: {
   const mark = () => (props.onion ? "open" : (props.look?.point ?? "dot"));
   const r = () => 5 / Math.max(12, props.camera.scale);
   const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
-  const fill = () => (props.onion || mark() === "open" ? "none" : (props.look?.fill ?? stroke()));
+  const fill = () => {
+    if (props.onion || mark() === "open") return "none";
+    const f = props.look?.fill;
+    if (!f || f === "none") return stroke();
+    return f;
+  };
   return (
     <g class={{ [styles.preview]: props.preview === true }}>
       {mark() === "none" && !props.onion ? null : (

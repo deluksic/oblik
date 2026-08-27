@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Loading } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 
 import { tryEvaluate } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
@@ -7,6 +7,7 @@ import { sourceFileKey } from "../eval/stack";
 import type { FigureScene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
+import { isPaint, type PaintValue } from "../eval/paint";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import {
   emptyScopeDetail,
@@ -15,7 +16,15 @@ import {
 } from "../host/selection-detail";
 import { traceKey } from "../euclid2/pick";
 import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../euclid2/tool";
-import { BRUSH_LOOK, styleExpr } from "./chips";
+import {
+  DEFAULT_BRUSH,
+  figureStyleFromBrush,
+  previewLook,
+  styleExpr,
+  takesFill,
+  type BrushSettings,
+} from "./chips";
+import { BrushDock } from "./BrushDock";
 import { FigurePalette } from "./Palette";
 import { FigureView } from "./View";
 import { isDrawnGeom } from "./pick";
@@ -61,6 +70,7 @@ export function FigurePane(props: FigurePaneProps) {
   const [picker, setPicker] = createSignal(() => (props.file, false));
   // Paint HMR replaces `scene`; keep Brush/Eraser until Esc or a different file.
   const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.file, null));
+  const [brush, setBrush] = createSignal<BrushSettings>(() => (props.file, { ...DEFAULT_BRUSH }));
   const [shift, setShift] = createSignal(false);
   const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
@@ -126,8 +136,10 @@ export function FigurePane(props: FigurePaneProps) {
     () => {
       const onKey = (e: KeyboardEvent) => {
         if (e.key === "Shift") setShift(e.type === "keydown");
-        const typing =
-          e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+        const field =
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement ||
+          e.target instanceof HTMLButtonElement;
         if (e.key === "Escape") {
           e.preventDefault();
           if (picker()) setPicker(false);
@@ -138,7 +150,7 @@ export function FigurePane(props: FigurePaneProps) {
           else setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
           return;
         }
-        if (typing) return;
+        if (field) return;
         if (e.code === "Space") {
           if (e.repeat) return;
           e.preventDefault();
@@ -175,6 +187,17 @@ export function FigurePane(props: FigurePaneProps) {
     return true;
   }
 
+  function lookFor(geom: TraceNode) {
+    return figureStyleFromBrush(brush(), takesFill(geom.value.kind));
+  }
+
+  function geomForPaint(paint: TraceNode): TraceNode | undefined {
+    if (!isPaint(paint.value)) return undefined;
+    const t = (paint.value as PaintValue).targets[0];
+    if (!t) return undefined;
+    return world().trace.find((n) => n.id === t.id && n.occ === t.occ);
+  }
+
   async function insertPaint(geom: TraceNode) {
     const expr = mentionExpr(scope(), geom);
     if (!expr) {
@@ -187,16 +210,17 @@ export function FigurePane(props: FigurePaneProps) {
       file: dest.file,
       dest: dest.name,
       from: "paint",
-      args: [expr, styleExpr(BRUSH_LOOK)],
+      args: [expr, styleExpr(lookFor(geom))],
     });
   }
 
   async function replacePaint(paint: TraceNode) {
     const file = paint.module ?? focus().file;
+    const geom = geomForPaint(paint);
     await postJson("/__oblik-paint-style", {
       file,
       id: paint.id,
-      style: styleExpr(BRUSH_LOOK),
+      style: styleExpr(geom ? lookFor(geom) : figureStyleFromBrush(brush(), true)),
     });
   }
 
@@ -252,31 +276,36 @@ export function FigurePane(props: FigurePaneProps) {
     <div class={styles.workspace}>
       <div class={styles.wrap}>
         <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
-        <FigureView
-          trace={world().trace}
-          initialCamera={props.scene.camera}
-          paper={props.scene.paper}
-          frame={props.scene.frame}
-          tool={tool()}
-          shift={shift()}
-          brushLook={BRUSH_LOOK}
-          hoverKey={hoverKey()}
-          selectedKey={selectedKey()}
-          scope={scope()}
-          onShift={setShift}
-          onHoverKey={setHoverKey}
-          onPick={onPick}
-          onToolHit={onToolHit}
-        />
-        <FigurePalette
-          picker={picker()}
-          onPick={(id) => {
-            setPicker(false);
-            setWriteError(null);
-            setTool(id);
-          }}
-          onClosePicker={() => setPicker(false)}
-        />
+        <div class={styles.stage}>
+          <FigureView
+            trace={world().trace}
+            initialCamera={props.scene.camera}
+            paper={props.scene.paper}
+            frame={props.scene.frame}
+            tool={tool()}
+            shift={shift()}
+            brushLook={previewLook(brush())}
+            hoverKey={hoverKey()}
+            selectedKey={selectedKey()}
+            scope={scope()}
+            onShift={setShift}
+            onHoverKey={setHoverKey}
+            onPick={onPick}
+            onToolHit={onToolHit}
+          />
+          <Show when={tool() === "brush"}>
+            <BrushDock settings={brush()} onChange={setBrush} />
+          </Show>
+          <FigurePalette
+            picker={picker()}
+            onPick={(id) => {
+              setPicker(false);
+              setWriteError(null);
+              setTool(id);
+            }}
+            onClosePicker={() => setPicker(false)}
+          />
+        </div>
       </div>
       <div class={styles.sidebarSlot}>
         <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
