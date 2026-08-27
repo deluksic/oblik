@@ -33,8 +33,17 @@ function fnForNode(n: TraceNode, files: readonly MentionFile[]): MentionFn | und
 
 function callerOf(n: TraceNode, fn: MentionFn): CallSite {
   const frames = n.stack.filter((f) => isUserSourcePath(f.file));
+  const inSpan = (f: CallSite) =>
+    sameSourceFile(f.file, fn.file) && f.line >= fn.startLine && f.line <= fn.endLine;
+  const anyInSpan = frames.some(inSpan);
   for (const f of frames) {
-    if (sameSourceFile(f.file, fn.file) && f.line >= fn.startLine && f.line <= fn.endLine) continue;
+    if (anyInSpan) {
+      if (inSpan(f)) continue;
+    } else if (sameSourceFile(f.file, fn.file)) {
+      // Generated stacks may not land in the source span. Same-file frames are
+      // still this function; the caller is the first frame in another file.
+      continue;
+    }
     return f;
   }
   return { file: "", line: 0, column: 0 };

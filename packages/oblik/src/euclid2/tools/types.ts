@@ -55,6 +55,12 @@ export type Scope = {
    * `occ === 0 && bind` path. An empty object means this scope has no snap.
    */
   prints?: Readonly<Record<string, Expr>>;
+  /**
+   * Tape nodes drawn at full strength in this focus (`id:occ`). Nested helper
+   * geometry is included so a parent call shows the callee in full. `undefined`
+   * means do not mute.
+   */
+  liveKeys?: ReadonlySet<string>;
 };
 
 export type Draft = {

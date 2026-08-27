@@ -2,7 +2,7 @@ import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
 import { kWorldToNdc, viewBox, type Camera2, type PaneSize } from "../camera";
-import { isFiniteTrace } from "../pick";
+import { isFiniteTrace, traceKey } from "../pick";
 import {
   hoverTool,
   mutedForScope,
@@ -117,7 +117,12 @@ export function Euclid2View(props: Euclid2ViewProps) {
       const filter = props.scope ? snapFilterOf(props.scope) : undefined;
       const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter);
       const nearest = topHit(e, el, camera(), size(), props.trace)[0];
-      if (nearest && props.scope && mutedForScope(nearest, props.scope) && hit.point.kind === "free") {
+      if (
+        nearest &&
+        filter?.keys &&
+        !filter.keys.has(traceKey(nearest)) &&
+        hit.point.kind === "free"
+      ) {
         return;
       }
       props.onPlace?.(hit);

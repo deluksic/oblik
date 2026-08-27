@@ -141,6 +141,7 @@ export function scopeFromTrace(
   const lengths: Record<string, number> = {};
   const byId: Record<string, Expr> = {};
   const prints: Record<string, Expr> = {};
+  const live = new Set<string>();
   const scope = { used, points, carriers, circles, profiles: profilesRec, lengths, byId, prints };
 
   const focus = opts?.focus;
@@ -151,6 +152,7 @@ export function scopeFromTrace(
     if (!isFiniteTrace(n)) continue;
     if (fn && focus) {
       if (invMatches(n, focus)) {
+        live.add(traceKey(n));
         const bind = reverseBind(fn, n.id);
         if (bind) put(n, { kind: "ref", name: bind }, scope);
       }
@@ -166,6 +168,7 @@ export function scopeFromTrace(
         callee ?? mentions.flatMap((m) => m.functions).find((f) => f.name === call.callee);
       if (!found) continue;
       for (const n of childNodes(trace, found, call, fn)) {
+        live.add(traceKey(n));
         const expr = exprForCall(call, found, n.id);
         if (expr) put(n, expr, scope);
       }
@@ -176,7 +179,8 @@ export function scopeFromTrace(
       if (!used.includes(name)) used.push(name);
     }
   }
-  return fn && focus ? scope : { ...scope, prints: undefined };
+  if (fn && focus) return { ...scope, liveKeys: live };
+  return { ...scope, prints: undefined };
 }
 
 export function mentionExpr(scope: Scope, n: TraceNode): Expr | undefined {
@@ -197,8 +201,8 @@ export function snapFilterOf(scope: Scope): SnapFilter | undefined {
 }
 
 export function mutedForScope(n: TraceNode, scope: Scope): boolean {
-  if (!scope.prints) return false;
-  return scope.prints[traceKey(n)] == null;
+  if (!scope.liveKeys) return false;
+  return !scope.liveKeys.has(traceKey(n));
 }
 
 export function scopeOf(x?: Scope | readonly string[]): Scope {
