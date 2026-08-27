@@ -19,6 +19,26 @@ export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   return { origin: g.a, dir: norm(sub(g.b, g.a)) };
 }
 
+/** Axis of an infinite line, or `null` when `g` is missing or not line-like. */
+export function infiniteLineAxis(
+  g: { kind: string; origin?: Vec2; direction?: Vec2; line?: Line } | null | undefined,
+): { origin: Vec2; dir: Vec2 } | null {
+  if (g == null) return null;
+  if (g.kind === "parallelLine") {
+    const origin = g.line?.origin;
+    const dir = g.line?.direction;
+    if (!origin || !dir) return null;
+    return { origin, dir };
+  }
+  if (g.kind === "line") {
+    const origin = g.origin;
+    const dir = g.direction;
+    if (!origin || !dir) return null;
+    return { origin, dir };
+  }
+  return null;
+}
+
 export function signedDist(p: Vec2, geom: LineLike): number {
   const { origin, dir } = lineBasis(geom);
   return dot(sub(p, origin), perp(dir));

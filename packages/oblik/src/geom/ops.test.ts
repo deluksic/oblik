@@ -1,16 +1,38 @@
 import { describe, expect, test } from "vitest";
 
-import { circleCircleIntersectionValue, circleLineIntersectionValue } from "./ops";
-import type { Circle } from "./types";
+import {
+  circleCircleIntersectionValue,
+  circleLineIntersectionValue,
+  infiniteLineAxis,
+  lineBasis,
+  perpendicularLineValue,
+} from "./ops";
+import type { Circle, Line, ParallelLine } from "./types";
+import { dot, perp } from "./vec";
 
 const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const b: Circle = { kind: "circle", center: { x: 2, y: 0 }, radius: 2 };
-
-import { dot, perp } from "./vec";
-import { lineBasis, perpendicularLineValue } from "./ops";
-import type { Line } from "./types";
-
 const ground: Line = { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
+
+describe("infiniteLineAxis", () => {
+  test("reads line and parallelLine", () => {
+    expect(infiniteLineAxis(ground)).toEqual({ origin: ground.origin, dir: ground.direction });
+    const offset: ParallelLine = {
+      kind: "parallelLine",
+      line: { kind: "line", origin: { x: 0, y: 1 }, direction: { x: 1, y: 0 } },
+      distance: 1,
+    };
+    expect(infiniteLineAxis(offset)).toEqual({ origin: offset.line.origin, dir: offset.line.direction });
+  });
+
+  test("returns null for other kinds and missing fields", () => {
+    expect(infiniteLineAxis(undefined)).toBeNull();
+    expect(infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 })).toBeNull();
+    expect(infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } })).toBeNull();
+    expect(infiniteLineAxis({ kind: "parallelLine" })).toBeNull();
+    expect(infiniteLineAxis({ kind: "line" })).toBeNull();
+  });
+});
 
 describe("perpendicularLineValue", () => {
   test("passes through the point and is normal to the carrier", () => {

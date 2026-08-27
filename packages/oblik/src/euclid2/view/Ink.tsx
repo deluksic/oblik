@@ -1,7 +1,8 @@
-import { createMemo } from "solid-js";
+import { Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Line, ParallelLine, Profile, Segment } from "@/geom";
+import type { Circle, Profile, Segment } from "@/geom";
+import { infiniteLineAxis } from "@/geom/ops";
 import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
@@ -92,27 +93,30 @@ function InfiniteStroke(props: {
   size: PaneSize;
 }) {
   const ends = createMemo(() => {
-    const v = props.node.value;
-    const origin = v.kind === "parallelLine" ? (v as ParallelLine).line.origin : (v as Line).origin;
-    const dir = v.kind === "parallelLine" ? (v as ParallelLine).line.direction : (v as Line).direction;
-    return infiniteClip(origin, dir, props.camera, props.size);
+    const axis = infiniteLineAxis(props.node?.value);
+    if (!axis) return null;
+    return infiniteClip(axis.origin, axis.dir, props.camera, props.size);
   });
   return (
-    <>
-      <line class={styles.hit} data-ink={traceKey(props.node)} x1={ends().a.x} y1={ends().a.y} x2={ends().b.x} y2={ends().b.y} />
-      <line
-        class={inkClass(
-          props.hot,
-          props.selected,
-          props.node.value.kind === "parallelLine" && props.node.editable,
-          props.muted,
-        )}
-        x1={ends().a.x}
-        y1={ends().a.y}
-        x2={ends().b.x}
-        y2={ends().b.y}
-      />
-    </>
+    <Show when={ends()}>
+      {(e) => (
+        <>
+          <line class={styles.hit} data-ink={traceKey(props.node)} x1={e().a.x} y1={e().a.y} x2={e().b.x} y2={e().b.y} />
+          <line
+            class={inkClass(
+              props.hot,
+              props.selected,
+              props.node?.value.kind === "parallelLine" && !!props.node.editable,
+              props.muted,
+            )}
+            x1={e().a.x}
+            y1={e().a.y}
+            x2={e().b.x}
+            y2={e().b.y}
+          />
+        </>
+      )}
+    </Show>
   );
 }
 
