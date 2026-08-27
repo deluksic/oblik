@@ -23,7 +23,7 @@ export function ndcToWorld(ndc: { x: number; y: number }, cam: Camera2, size: Pa
 export const SCALE_MIN = 8;
 export const SCALE_MAX = 280;
 /** One mouse-wheel notch. Pixel deltas of 100 and line deltas of 1 both map here. */
-export const ZOOM_NOTCH = 1.08;
+export const ZOOM_NOTCH = 1.12;
 const PIXEL_PER_NOTCH = 100;
 const LINES_PER_PAGE = 16;
 const MAX_NOTCHES = 4;

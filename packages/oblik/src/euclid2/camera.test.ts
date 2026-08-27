@@ -63,12 +63,12 @@ describe("camera", () => {
     expect(next.scale).toBeCloseTo(cam.scale / 1.08, 10);
   });
 
-  test("a pixel mouse tick matches the old 8% step", () => {
+  test("a pixel mouse tick is one notch", () => {
     expect(wheelZoomFactor(-100, 0)).toBeCloseTo(ZOOM_NOTCH, 10);
     expect(wheelZoomFactor(100, 0)).toBeCloseTo(1 / ZOOM_NOTCH, 10);
   });
 
-  test("a line-mode mouse tick matches the old 8% step", () => {
+  test("a line-mode mouse tick is one notch", () => {
     expect(wheelZoomFactor(-1, 1)).toBeCloseTo(ZOOM_NOTCH, 10);
     expect(wheelZoomFactor(1, 1)).toBeCloseTo(1 / ZOOM_NOTCH, 10);
   });
