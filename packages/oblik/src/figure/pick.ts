@@ -1,10 +1,17 @@
 import type { TraceNode } from "../eval/context";
 import { isGeomKind, paintsCovering } from "../eval/paint";
 import { isFiniteTrace, traceKey } from "../euclid2/pick";
+import { mentionExpr, type Scope } from "../euclid2/tool";
 
 export function isDrawnGeom(n: TraceNode): boolean {
   if (!isFiniteTrace(n)) return false;
   return isGeomKind(n.value.kind);
+}
+
+/** Shift+brush may only target geom this scope can name. */
+export function brushAddHits(geoms: readonly TraceNode[], scope?: Scope): TraceNode[] {
+  if (!scope) return [];
+  return geoms.filter((n) => isDrawnGeom(n) && mentionExpr(scope, n) != null);
 }
 
 /** Map construction hits to covering paint nodes, topmost first. */

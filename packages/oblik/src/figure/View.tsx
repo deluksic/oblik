@@ -9,7 +9,7 @@ import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
 import { FigurePoint, FigureStroke } from "./Ink";
 import { frameRect, type FigureFrame } from "./frame";
-import { inkFromGeomHits, isDrawnGeom } from "./pick";
+import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
 import styles from "./View.module.css";
@@ -85,7 +85,11 @@ export function FigureView(props: FigureViewProps) {
 
   function hitsOf(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
     const geoms = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom);
-    return props.shift ? geoms : inkFromGeomHits(props.trace, geoms);
+    if (props.shift) {
+      if (props.tool === "brush") return brushAddHits(geoms, props.scope);
+      return geoms;
+    }
+    return inkFromGeomHits(props.trace, geoms);
   }
 
   function onWheel(e: WheelEvent) {
