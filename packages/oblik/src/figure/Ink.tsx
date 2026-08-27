@@ -25,6 +25,7 @@ type StrokeProps = {
   camera: Camera2;
   size: PaneSize;
   preview?: boolean;
+  replaced?: boolean;
 };
 
 /** `node` is `TraceNode | null` because Solid compiles JSX props as getters — a live preview can go null mid-update. */
@@ -42,6 +43,7 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
           camera={props.camera}
           size={props.size}
           preview={props.preview}
+          replaced={props.replaced}
         />
       )}
     </Show>
@@ -51,7 +53,7 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
 function StrokeInk(props: { node: TraceNode } & StrokeProps) {
   const kind = createMemo(() => props.node.value.kind);
   return (
-    <g class={{ [styles.preview]: props.preview === true }}>
+    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       <Show when={kind() === "segment"}>
         <Seg node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} />
       </Show>
@@ -265,6 +267,7 @@ type PointProps = {
   muted: boolean;
   camera: Camera2;
   preview?: boolean;
+  replaced?: boolean;
 };
 
 /** Same live-getter contract as `FigureStroke`: `node` may go null while Brush preview unmounts. */
@@ -281,6 +284,7 @@ export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
           muted={props.muted}
           camera={props.camera}
           preview={props.preview}
+          replaced={props.replaced}
         />
       )}
     </Show>
@@ -304,7 +308,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     return f;
   };
   return (
-    <g class={{ [styles.preview]: props.preview === true }}>
+    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
           <circle

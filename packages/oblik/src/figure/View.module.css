@@ -56,7 +56,10 @@
 
 .preview {
   pointer-events: none;
-  opacity: 0.78;
+}
+
+.replaced :where([data-role="paint"], [data-role="onion"]) {
+  opacity: 0;
 }
 
 .hit {

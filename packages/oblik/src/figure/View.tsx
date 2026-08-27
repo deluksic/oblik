@@ -86,6 +86,11 @@ export function FigureView(props: FigureViewProps) {
   const onionPts = createMemo(() => geom().filter(isPointish));
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
+  const previewKey = createMemo(() => {
+    if (props.tool !== "brush") return null;
+    const n = previewGeom();
+    return n ? traceKey(n) : null;
+  });
 
   function hitsOf(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
     const geoms = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom);
@@ -218,6 +223,7 @@ export function FigureView(props: FigureViewProps) {
                     muted={!!props.scope && mutedForScope(n, props.scope)}
                     camera={camera()}
                     size={size()}
+                    replaced={previewKey() === traceKey(n)}
                   />
                 )}
               </For>
@@ -229,6 +235,7 @@ export function FigureView(props: FigureViewProps) {
                   hoverKey={props.hoverKey}
                   selectedKey={props.selectedKey}
                   eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
                   scope={props.scope}
                   camera={camera()}
                   size={size()}
@@ -246,6 +253,7 @@ export function FigureView(props: FigureViewProps) {
                     selected={traceKey(n) === props.selectedKey}
                     muted={!!props.scope && mutedForScope(n, props.scope)}
                     camera={camera()}
+                    replaced={previewKey() === traceKey(n)}
                   />
                 )}
               </For>
@@ -257,6 +265,7 @@ export function FigureView(props: FigureViewProps) {
                   hoverKey={props.hoverKey}
                   selectedKey={props.selectedKey}
                   eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
                   scope={props.scope}
                   camera={camera()}
                 />
@@ -302,6 +311,7 @@ function InkStroke(props: {
   hoverKey?: string | null;
   selectedKey?: string | null;
   eraser?: boolean;
+  replacePreview?: boolean;
   scope?: Scope;
   camera: Camera2;
   size: PaneSize;
@@ -318,6 +328,7 @@ function InkStroke(props: {
       muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
       size={props.size}
+      replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
     />
   );
 }
@@ -327,6 +338,7 @@ function InkPoint(props: {
   hoverKey?: string | null;
   selectedKey?: string | null;
   eraser?: boolean;
+  replacePreview?: boolean;
   scope?: Scope;
   camera: Camera2;
 }) {
@@ -341,6 +353,7 @@ function InkPoint(props: {
       selected={paintKeyNow() === props.selectedKey}
       muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
+      replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
     />
   );
 }
