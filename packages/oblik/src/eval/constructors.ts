@@ -31,7 +31,14 @@ import {
   type Segment,
   type Vec2,
 } from "../geom";
-import { brand, currentEval, type SliderValue, type TraceNode } from "./context";
+import { brand, currentEval, type SliderValue, type TraceNode, type TraceValue } from "./context";
+import {
+  cloneStyle,
+  collectPaintTargets,
+  isStyle,
+  type FigureStyle,
+  type PaintValue,
+} from "./paint";
 import { $site, type SiteSpec } from "./site";
 import { captureUserStack } from "./stack";
 
@@ -42,10 +49,10 @@ function draftAt(id: string | undefined, i: number, fallback: number): number {
   return v != null && Number.isFinite(v) ? v : fallback;
 }
 
-function traced<T extends Geom>(value: T, id: string | undefined): T {
+function traced<T extends TraceValue>(value: T, id: string | undefined): T {
   const ctx = currentEval();
   if (!ctx || !id) return value;
-  if (!isFiniteValue(value)) return value;
+  if (!isRecordable(value)) return value;
   const occ = ctx.occ.get(id) ?? 0;
   ctx.occ.set(id, occ + 1);
   const anno = ctx.annotations.get(id);
@@ -62,6 +69,11 @@ function traced<T extends Geom>(value: T, id: string | undefined): T {
   };
   ctx.trace.push(node);
   return brand(value, node);
+}
+
+function isRecordable(v: TraceValue): boolean {
+  if (v.kind === "style" || v.kind === "paint" || v.kind === "slider") return true;
+  return isFiniteValue(v);
 }
 
 function isFiniteValue(v: { kind: string }): boolean {
@@ -237,6 +249,18 @@ export const slider = mark((n: number, opts?: SliderOpts, id?: string): number =
   return tracedSlider(v, { min, max, step }, id);
 }, { dof: [0] });
 
+/** Presentation spec. On the tape when evaluated inside `build()` with a stamped id. */
+export const style = mark((spec: Omit<FigureStyle, "kind"> = {}, id?: string): FigureStyle => {
+  return traced(cloneStyle(spec), id);
+}, { dof: [] });
+
+/** Walk branded geom in `object` and record a paint. Last paint of an id:occ wins at draw. */
+export const paint = mark((object: unknown, spec: FigureStyle, id?: string): PaintValue => {
+  if (!isStyle(spec)) throw new Error("paint needs a style()");
+  const value: PaintValue = { kind: "paint", targets: collectPaintTargets(object), style: cloneStyle(spec) };
+  return traced(value, id);
+}, { dof: [] });
+
 export const constructors = {
   point,
   circle,
@@ -253,4 +277,6 @@ export const constructors = {
   slider,
   profile,
   roundOffset,
+  style,
+  paint,
 } as const;

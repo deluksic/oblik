@@ -708,6 +708,64 @@ export function plate() {
     expect(() => exposeReturnBag(plate, "plate", "ground")).toThrow(/cannot refer to ground/);
   });
 
+  test("inserts paint as a stamped constructor and imports style", () => {
+    const fig = `import { defineScene } from "oblik";
+import { mountingPlateLayout } from "../layout/mounting-plate";
+
+export default defineScene({
+  kind: "figure",
+  title: "t",
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    const next = insertCall(fig, {
+      from: "paint",
+      args: [
+        { kind: "member", object: { kind: "ref", name: "plate" }, field: "drill" },
+        {
+          kind: "call",
+          name: "style",
+          args: [
+            {
+              kind: "props",
+              props: {
+                stroke: { kind: "str", value: "#1c1917" },
+                width: { kind: "num", value: 1.2 },
+              },
+            },
+          ],
+        },
+      ],
+      id: "o_p",
+    });
+    expect(next).toContain('const ink = paint(plate.drill, style({ stroke: "#1c1917", width: 1.2 }), "o_p");');
+    expect(next).toMatch(/import \{ defineScene, paint, style \} from "oblik"/);
+  });
+
+  test("paint insert refuses names the dest cannot refer to", () => {
+    const fig = `import { defineScene } from "oblik";
+export default defineScene({
+  kind: "figure",
+  title: "t",
+  build() {
+    const plate = 1;
+  },
+});
+`;
+    expect(() =>
+      insertCall(fig, {
+        from: "paint",
+        args: [
+          { kind: "ref", name: "hLeft" },
+          { kind: "call", name: "style", args: [{ kind: "props", props: {} }] },
+        ],
+        id: "o_p",
+      }),
+    ).toThrow(/cannot refer to hLeft/);
+  });
+
   test("adds a scene local to build()'s return bag", () => {
     const next = exposeReturnBag(src, "build", "A");
     expect(next).toBe(src);

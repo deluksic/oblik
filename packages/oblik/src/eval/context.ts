@@ -2,6 +2,7 @@ import type { Geom } from "../geom";
 import type { Annotation } from "../source/analyze";
 import type { CallSite } from "./stack";
 import { $node } from "./site";
+import type { FigureStyle, PaintValue } from "./paint";
 
 export type SliderValue = {
   kind: "slider";
@@ -11,7 +12,7 @@ export type SliderValue = {
   step: number;
 };
 
-export type TraceValue = Geom | SliderValue;
+export type TraceValue = Geom | SliderValue | FigureStyle | PaintValue;
 
 export type TraceInv = {
   file: string;

@@ -1,0 +1,118 @@
+.mat {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  container-type: size;
+  background: #c4b9a8;
+  overflow: hidden;
+}
+
+.flush {
+  background: transparent;
+  padding: 0;
+  display: block;
+}
+
+.paper {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: default;
+  user-select: none;
+}
+
+.flush .paper {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+}
+
+.framed {
+  aspect-ratio: var(--frame-w) / var(--frame-h);
+  width: min(100cqw, calc(100cqh * var(--frame-w) / var(--frame-h)));
+  height: min(100cqh, calc(100cqw * var(--frame-h) / var(--frame-w)));
+  box-shadow: 0 10px 28px #1c191733;
+}
+
+.cream {
+  background: #f4efe4;
+}
+
+.white {
+  background: #fbfaf6;
+}
+
+.world,
+.hud {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  pointer-events: none;
+}
+
+.grabbing {
+  cursor: grabbing;
+}
+
+.grab {
+  cursor: grab;
+}
+
+.placing {
+  cursor: crosshair;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+
+.hitFill {
+  fill: transparent;
+  stroke: none;
+  pointer-events: fill;
+}
+
+.stroke {
+  pointer-events: none;
+}
+
+.point {
+  pointer-events: none;
+}
+
+.hot {
+  stroke: #3b82c4;
+}
+
+.selected {
+  stroke: #c45c3e;
+}
+
+.muted {
+  opacity: 0.28;
+}
+
+.page {
+  fill: none;
+  stroke: #d6cbb8;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}

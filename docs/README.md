@@ -16,5 +16,6 @@ Prototypes (charter + what we learned):
 - [6 — oblik: tape, draft, SVG](./prototypes/6.md) — open; greenfield runtime next to paper. [Learned from using it](./prototypes/6.md#learned-from-using-it) (Tab, gliders, length reuse, Solid 2 pane identity). Style sheet was a failed experiment — see P7.
 - [7 — profiles on the euclid2 tape](./prototypes/7.md) — building. `profile([A, chord, B, along(c, k)], id)` in euclid2; muted fill; Space Profile tool. Horizon: paper inks a sketch.
 - [8 — mentionable scopes](./prototypes/8.md) — shipped (learned). Insert and snap print names legal in the focused function + invocation. Pass: `const plate = mountingPlateLayout()`. Remaining: caller-side binding; no remove-from-return.
+- [9 — figure](./prototypes/9.md) — building. A second scene kind (`figure`) with `style()` / `paint()` as tape objects. Same helpers as euclid2; optional frame. Export later.
 
 [Critique](./critique.md) records why unmarked-literal CAD and a single kernel were dropped.

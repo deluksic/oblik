@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import { siteOf } from "./site";
-import { along, circle, fillet, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider } from "./constructors";
+import { along, circle, fillet, paint, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider, style } from "./constructors";
+import { paintsFromTrace } from "./paint";
 import { defineScene } from "./scene";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
@@ -236,6 +237,55 @@ describe("evaluate", () => {
       draft: new Map([["off", [-0.5]]]),
     }).trace.find((n) => n.id === "off");
     expect(drafted).toBeUndefined();
+  });
+});
+
+describe("style and paint", () => {
+  test("are tape nodes inside evaluate", () => {
+    const scene = defineScene({
+      kind: "figure",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const ink = style({ stroke: "#1c1917", width: 1.2 }, "s");
+        paint(A, ink, "p");
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.map((n) => n.kind)).toEqual(["point", "style", "paint"]);
+    const p = trace.find((n) => n.kind === "paint");
+    expect(p?.value.kind).toBe("paint");
+    if (p?.value.kind === "paint") {
+      expect(p.value.targets).toEqual([{ id: "a", occ: 0 }]);
+      expect(p.value.style.stroke).toBe("#1c1917");
+    }
+  });
+
+  test("style() without eval ctx is an untraced value", () => {
+    const ink = style({ stroke: "#111", width: 1.35 });
+    expect(ink).toEqual({ kind: "style", stroke: "#111", width: 1.35 });
+    expect(evaluate(defineScene({ kind: "figure", title: "t", build() {} })).trace).toEqual([]);
+  });
+
+  test("paint walks a bag; later paint of the same target wins", () => {
+    const scene = defineScene({
+      kind: "figure",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(1, 0, "b");
+        const ink = style({ stroke: "#111", width: 1 }, "s0");
+        const heavy = style({ stroke: "#111", width: 2.2 }, "s1");
+        paint({ A, B }, ink, "p0");
+        paint(B, heavy, "p1");
+      },
+    });
+    const { trace } = evaluate(scene);
+    const map = paintsFromTrace(trace);
+    expect(map.get("a:0")?.width).toBe(1);
+    expect(map.get("b:0")?.width).toBe(2.2);
+    const first = trace.find((n) => n.id === "p0");
+    if (first?.value.kind === "paint") expect(first.value.targets).toHaveLength(2);
   });
 });
 

@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
+import { paintsFromTrace } from "./paint";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
@@ -13,11 +14,12 @@ import pie from "../../../../apps/demo/src/scenes/pie.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
-import type { Euclid2Scene } from "./scene";
+import plateFigure from "../../../../apps/demo/src/scenes/plate-figure.ts";
+import type { Scene } from "./scene";
 
 const demoSrc = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../apps/demo/src");
 
-function run(mod: Euclid2Scene, files: string[]) {
+function run(mod: Scene, files: string[]) {
   const bundle: Record<string, Record<string, Annotation>> = {};
   for (const rel of files) {
     const src = readFileSync(path.join(demoSrc, rel.replace(/^apps\/demo\/src\//, "")), "utf8");
@@ -92,6 +94,21 @@ describe("migrated demo scenes", () => {
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("profile");
     if (one?.value.kind === "profile") expect(one.value.outer).toHaveLength(3);
+  });
+
+  test("plate figure paints returned fields from the same helper", () => {
+    const { trace } = run(plateFigure, [
+      "apps/demo/src/scenes/plate-figure.ts",
+      "apps/demo/src/layout/mounting-plate.ts",
+    ]);
+    expect(trace.filter((n) => n.kind === "paint")).toHaveLength(4);
+    expect(trace.filter((n) => n.kind === "style")).toHaveLength(0);
+    expect(trace.some((n) => n.bind === "drill" && n.kind === "circle")).toBe(true);
+    const paints = paintsFromTrace(trace);
+    expect(paints.has("o_drill:0")).toBe(true);
+    expect(paints.has("o_origin:0")).toBe(true);
+    expect(paints.has("o_in:0")).toBe(true);
+    expect(paints.has("o_bot:0")).toBe(false);
   });
 
   test("fillet scene traces the challenge cases from one radius slider", () => {

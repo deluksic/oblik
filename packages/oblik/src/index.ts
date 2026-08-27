@@ -1,5 +1,5 @@
-export { defineScene, type Euclid2Scene, type Scene } from "./eval/scene";
-export { evaluate, tryEvaluate, emit, type Draft, type EvaluateOpts } from "./eval/evaluate";
+export { defineScene, type Euclid2Scene, type FigureScene, type Scene } from "./eval/scene";
+export { evaluate, tryEvaluate, emit, type Draft, type EvaluateOpts, type EvaluateResult } from "./eval/evaluate";
 export { nodeOf, type TraceNode } from "./eval/context";
 export { $site, $node } from "./eval/site";
 export {
@@ -22,9 +22,12 @@ export {
   fillet,
   profile,
   roundOffset,
+  style,
+  paint,
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
+export { isStyle, isPaint, paintsFromTrace, type FigureStyle, type FigurePointMark, type PaintValue } from "./eval/paint";
 export { analyze, listAnnotationSites, siteSpecs, type Annotation } from "./source/analyze";
 export {
   analyzeMentions,

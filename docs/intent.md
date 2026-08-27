@@ -57,7 +57,7 @@ GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs t
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current runtime: [Prototype 6](./prototypes/6.md) (P5 paper app still runs). Next design: [Prototype 7](./prototypes/7.md) (profiles — not a go-ahead to build).
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current runtime: [Prototype 6](./prototypes/6.md) (P5 paper app still runs). Current view experiment: [Prototype 9](./prototypes/9.md) (figure). P8 mention is shipped; P7 profiles are on the tape.
 
 Packages and rules: [layout.md](./layout.md). Catalog and palette: [scenes.md](./scenes.md).
 

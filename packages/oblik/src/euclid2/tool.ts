@@ -13,6 +13,7 @@ export {
   snapFilterOf,
   mutedForScope,
   mentionPrint,
+  mentionExpr,
   startTool,
   tabTool,
   toolById,

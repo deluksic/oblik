@@ -29,6 +29,28 @@ describe("parseOblikSceneSource", () => {
     });
   });
 
+  test("reads a figure scene kind", () => {
+    const figure = `import { defineScene, paint, style } from "oblik";
+export default defineScene({
+  kind: "figure",
+  title: "Plate figure",
+  build() {},
+});
+`;
+    const e = parseOblikSceneSource(
+      "/repo/apps/demo/src/scenes/plate-figure.ts",
+      figure,
+      "apps/demo/src/scenes/plate-figure.ts",
+    );
+    expect(e).toEqual({
+      id: "plate-figure",
+      file: "plate-figure.ts",
+      path: "apps/demo/src/scenes/plate-figure.ts",
+      title: "Plate figure",
+      kind: "figure",
+    });
+  });
+
   test("errors when defineScene is missing", () => {
     const e = parseOblikSceneSource("/repo/x.ts", "export const x = 1;", "x.ts");
     expect(e.error).toMatch(/defineScene/);

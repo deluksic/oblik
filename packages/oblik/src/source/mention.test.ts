@@ -136,6 +136,26 @@ function plate() {
     expect(fnNamed(file, "plate")?.calls).toEqual([]);
   });
 
+  test("does not record paint or style as helper calls", () => {
+    const src = `import { paint, style } from "oblik";
+import { mountingPlateLayout } from "./layout";
+function build() {
+  const plate = mountingPlateLayout();
+  const ink = style({ stroke: "#111" }, "o_s");
+  paint(plate.drill, ink, "o_p");
+}
+`;
+    const file = analyzeMentions(src, "fig.ts");
+    expect(fnNamed(file, "build")?.calls).toEqual([
+      {
+        callee: "mountingPlateLayout",
+        line: 4,
+        column: 17,
+        binding: { kind: "const", name: "plate" },
+      },
+    ]);
+  });
+
   test("inline ctor in a bag field keeps the trailing id", () => {
     const src = `import { parallelLine, point } from "oblik";
 function plate() {

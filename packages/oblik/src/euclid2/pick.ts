@@ -64,6 +64,7 @@ export function nodeByPrint(
 
 export function isFiniteTrace(n: TraceNode): boolean {
   const v = n.value;
+  if (v.kind === "style" || v.kind === "paint") return false;
   if (v.kind === "slider") return Number.isFinite(v.n);
   if (v.kind === "point") return Number.isFinite(v.x) && Number.isFinite(v.y);
   if (v.kind === "circle") return Number.isFinite(v.radius) && Number.isFinite(v.center.x);

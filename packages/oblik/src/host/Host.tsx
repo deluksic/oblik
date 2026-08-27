@@ -2,7 +2,8 @@ import { render } from "@solidjs/web";
 import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import type { Scene } from "../eval/scene";
+import { FigurePane } from "../figure/Pane";
+import type { FigureScene, Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import {
@@ -149,6 +150,16 @@ function Host(props: {
   const pane = createMemo(() => {
     const e = entry();
     if (!e) return <p class={styles.err}>Unknown scene</p>;
+    if (sceneKind() === "figure") {
+      return (
+        <FigurePane
+          scene={scene() as FigureScene}
+          file={e.path}
+          annotations={annotations()}
+          mentions={Object.values(props.mentions)}
+        />
+      );
+    }
     return sceneKind() === "euclid2" ? (
       <Euclid2Pane
         scene={scene()}

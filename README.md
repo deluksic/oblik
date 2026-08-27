@@ -2,7 +2,7 @@
 
 TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `parallelLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
 
-Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 8](./docs/prototypes/8.md) (mentionable scopes — shipped). P7 geometry is still the running tape.
+Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 9](./docs/prototypes/9.md) (figure — paint and style). P8 mention is shipped. P7 geometry is still the running tape.
 
 ## Run
 
@@ -11,7 +11,7 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`. Drag a handle; release writes the scene file.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`. Drag a handle; release writes the scene file. Figure scenes paint with `style` / `paint` (tape objects) on cream paper. Export is later.
 
 Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 
@@ -23,6 +23,7 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Mounting plate | Parent binds `const plate = mountingPlateLayout()`. Snap `plate.drill` from `build`; dive to insert in the layout file; Add to return for a private local |
 | Mounting plate grid | 3×2 `for` of the same helper. Dive one plate; siblings mute. Serial is once-id `occ`, not a second document |
 | Nested circles | Two-level helpers (`nestedCircles` → `petal`). Parent draws nested geometry; the inner bead is not referable there |
+| Plate figure | P9: same `mountingPlateLayout()` as Mounting plate. Cream paper, optional frame; `paint` / `style` on the tape. Outline not returned stays onioned |
 | Pie | Three sectors on one circle; `roundOffset(wedge, -gap)` opens the cuts |
 | Fillet | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise |
 | Triangle | three free points |

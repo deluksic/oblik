@@ -10,13 +10,18 @@ export type EvaluateOpts = {
   module?: string;
 };
 
+export type EvaluateResult = {
+  value: unknown;
+  trace: TraceNode[];
+};
+
 function asMap(a?: EvaluateOpts["annotations"]): Map<string, Annotation> {
   if (!a) return new Map();
   if (a instanceof Map) return a;
   return new Map(Object.entries(a));
 }
 
-export function evaluate(mod: Scene, opts: EvaluateOpts = {}): { value: unknown; trace: TraceNode[] } {
+export function evaluate(mod: Scene, opts: EvaluateOpts = {}): EvaluateResult {
   const ctx: EvalCtx = {
     draft: opts.draft ?? new Map(),
     trace: [],
@@ -32,7 +37,7 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): { value: unknown;
 export function tryEvaluate(
   mod: Scene,
   opts: EvaluateOpts = {},
-): { value: unknown; trace: TraceNode[]; error: string | null } {
+): EvaluateResult & { error: string | null } {
   try {
     return { ...evaluate(mod, opts), error: null };
   } catch (err) {

@@ -11,7 +11,7 @@ export type OblikSceneEntry = {
   file: string;
   path: string;
   title: string;
-  kind: "euclid2";
+  kind: "euclid2" | "figure";
   error?: string;
 };
 
@@ -60,7 +60,7 @@ export function parseOblikSceneSource(absPath: string, source: string, relPath: 
     };
   }
 
-  if (kind && kind !== "euclid2") {
+  if (kind && kind !== "euclid2" && kind !== "figure") {
     return {
       id,
       file,
@@ -76,7 +76,7 @@ export function parseOblikSceneSource(absPath: string, source: string, relPath: 
     file,
     path: relPath.replace(/\\/g, "/"),
     title: title ?? id,
-    kind: "euclid2",
+    kind: kind === "figure" ? "figure" : "euclid2",
   };
 }
 

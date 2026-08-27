@@ -47,6 +47,16 @@ describe("stamp", () => {
     expect(source).toContain("o_keep");
   });
 
+  test("stamps style and paint constructors", () => {
+    let n = 0;
+    const { source, added } = stamp(
+      `const ink = style({ stroke: "#111" });\npaint(A, ink);\n`,
+      () => `o_${n++}`,
+    );
+    expect(added).toEqual(["o_0", "o_1"]);
+    expect(source).toBe(`const ink = style({ stroke: "#111" }, "o_0");\npaint(A, ink, "o_1");\n`);
+  });
+
   test("emits a source map for the Vite module path", () => {
     const { map, added } = stamp("export const c = circle(80);\n", () => "o_1", "src/layout/plate.ts");
     expect(added).toEqual(["o_1"]);
