@@ -1,6 +1,7 @@
 import type { CallSite } from "../eval/stack";
 import { isUserSourcePath, sourceFileKey } from "../eval/stack";
 import type { TraceNode } from "../eval/context";
+import { invMatches } from "../eval/inv";
 import { normalizeSceneRelPath } from "../source/scene-path";
 import type { MentionFile, MentionFn } from "../source/mention";
 
@@ -350,6 +351,97 @@ function sameFocus(a: ScopePick, b: ScopePick): boolean {
   return true;
 }
 
+function callerFromMentions(
+  focus: ScopePick,
+  mentions: readonly MentionFile[],
+): { file: string; line: number; name?: string } | undefined {
+  if (!focus.name) return undefined;
+  const hits: { file: string; line: number; name?: string }[] = [];
+  for (const bundle of mentions) {
+    for (const fn of bundle.functions) {
+      if (fn.name === focus.name && sourceFileKey(fn.file) === sourceFileKey(focus.file)) continue;
+      for (const call of fn.calls) {
+        if (call.callee !== focus.name) continue;
+        hits.push({ file: fn.file, line: call.line, name: fn.name });
+      }
+    }
+  }
+  if (hits.length === 0) return undefined;
+  if (focus.callerLine != null) {
+    const hit = hits.find(
+      (h) =>
+        h.line === focus.callerLine &&
+        (focus.callerFile == null || sourceFileKey(h.file) === sourceFileKey(focus.callerFile)),
+    );
+    if (hit) return hit;
+  }
+  return hits[0];
+}
+
+function callerSiteOf(
+  focus: ScopePick,
+  mentions: readonly MentionFile[],
+  trace: readonly TraceNode[],
+): { file: string; line: number; name?: string } | undefined {
+  if (focus.callerFile && focus.callerLine && focus.callerLine > 0) {
+    return { file: focus.callerFile, line: focus.callerLine };
+  }
+  const n = trace.find((node) =>
+    node.inv
+      ? invMatches(node, {
+          file: focus.file,
+          name: focus.name,
+          serial: focus.serial,
+          callerFile: focus.callerFile,
+          callerLine: focus.callerLine,
+        })
+      : false,
+  );
+  if (n?.inv?.callerFile && n.inv.callerLine > 0) {
+    return { file: n.inv.callerFile, line: n.inv.callerLine };
+  }
+  return callerFromMentions(focus, mentions);
+}
+
+/** Caller scopes above `focus`, leaf-parent first — same order as a selected node's origin stack. */
+export function scopeCallerChain(
+  focus: ScopePick,
+  mentions: readonly MentionFile[],
+  trace: readonly TraceNode[] = [],
+): Array<{ pick: ScopePick; file: string; line: number; name?: string }> {
+  const out: Array<{ pick: ScopePick; file: string; line: number; name?: string }> = [];
+  const seen = new Set<string>();
+  let cur = focus;
+  for (let i = 0; i < 8; i++) {
+    const id = `${sourceFileKey(cur.file)}\0${cur.name ?? ""}\0${cur.serial ?? ""}`;
+    if (seen.has(id)) break;
+    seen.add(id);
+    const site = callerSiteOf(cur, mentions, trace);
+    if (!site?.file || site.line <= 0) break;
+    const fn = fnAtLine(mentions, site.file, site.line);
+    const parentNode = trace.find(
+      (n) =>
+        !!n.inv &&
+        !!fn &&
+        n.inv.name === fn.name &&
+        sourceFileKey(n.inv.file) === sourceFileKey(fn.file),
+    );
+    const pick: ScopePick = fn
+      ? {
+          file: fn.file,
+          name: fn.name,
+          serial: parentNode?.inv?.serial ?? 0,
+          callerFile: parentNode?.inv?.callerFile || undefined,
+          callerLine: parentNode?.inv?.callerLine || undefined,
+        }
+      : { file: site.file, name: site.name, serial: 0 };
+    if (sameFocus(pick, cur)) break;
+    out.push({ pick, file: site.file, line: site.line, name: fn?.name ?? site.name });
+    cur = pick;
+  }
+  return out;
+}
+
 function exposeNote(fn: MentionFn | undefined, node: TraceNode): ExposeNote | undefined {
   if (!fn || !fn.ids.includes(node.id)) return undefined;
   if (fn.return.kind === "bag" && fn.return.fields.some((f) => f.id === node.id)) return undefined;
@@ -385,12 +477,14 @@ export async function selectionDetailForScope(opts: {
   focus: ScopePick;
   mentions: readonly MentionFile[];
   print?: string;
+  trace?: readonly TraceNode[];
 }): Promise<SelectionDetail> {
-  const { node, focus, mentions, print } = opts;
+  const { node, focus, mentions, print, trace = [] } = opts;
   if (!node) {
     const detail = emptyScopeDetail(focus);
     try {
-      const text = await peekFile(new Map(), focus.file);
+      const cache = new Map<string, string>();
+      const text = await peekFile(cache, focus.file);
       const fn = focus.name
         ? mentions
             .flatMap((m) => m.functions)
@@ -401,19 +495,30 @@ export async function selectionDetailForScope(opts: {
         endLine: fn?.endLine,
         name: focus.name,
       });
+      const frames: OriginFrame[] = [
+        {
+          file: originFileLabel(focus.file),
+          lines: buildFunctionSourceLines(text, span),
+          pick: focus,
+          current: true,
+        },
+      ];
+      for (const ancestor of scopeCallerChain(focus, mentions, trace)) {
+        try {
+          const parentText = await peekFile(cache, ancestor.file);
+          frames.push({
+            file: originFileLabel(ancestor.file),
+            lines: buildOriginFrameLines(parentText, ancestor.line, ancestor.name),
+            pick: ancestor.pick,
+            current: false,
+          });
+        } catch {
+          /* parent peek is optional — still show the focused function */
+        }
+      }
       return {
         ...detail,
-        origin: {
-          kind: "origin",
-          frames: [
-            {
-              file: originFileLabel(focus.file),
-              lines: buildFunctionSourceLines(text, span),
-              pick: focus,
-              current: true,
-            },
-          ],
-        },
+        origin: { kind: "origin", frames },
       };
     } catch {
       return detail;

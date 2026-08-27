@@ -110,6 +110,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       focus: f,
       mentions: mentions(),
       print: node ? mentionPrint(scope(), node) : undefined,
+      trace: world().trace,
     });
   });
 

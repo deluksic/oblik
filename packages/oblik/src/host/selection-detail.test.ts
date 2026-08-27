@@ -8,6 +8,7 @@ import {
   functionSourceSpan,
   originFileLabel,
   pinConstructorSite,
+  scopeCallerChain,
   selectionDetailForScope,
   stackForNode,
 } from "./selection-detail";
@@ -203,6 +204,7 @@ export default defineScene({
       expect(detail.crumb).toBe("build");
       expect(detail.origin.kind).toBe("origin");
       if (detail.origin.kind !== "origin") throw new Error("expected origin");
+      expect(detail.origin.frames).toHaveLength(1);
       const texts = detail.origin.frames[0]!.lines.map((row) => ("text" in row ? row.text : "..."));
       expect(texts.some((t) => t.includes("ellipsis") || t === "...")).toBe(false);
       expect(texts).toEqual([
@@ -213,5 +215,94 @@ export default defineScene({
     } finally {
       globalThis.fetch = orig;
     }
+  });
+
+  test("empty helper selection also shows the parent call site as a jump target", async () => {
+    const helperFile = "apps/demo/src/layout/mounting-plate.ts";
+    const parentFile = "apps/demo/src/scenes/mounting-plate.ts";
+    const helperSrc = plateFn;
+    const parentSrc = `import { mountingPlateLayout } from "../layout/mounting-plate";
+import { defineScene } from "oblik";
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const q = decodeURIComponent(url.split("file=")[1] ?? "");
+      if (q.includes("layout/mounting-plate")) return new Response(helperSrc, { status: 200 });
+      if (q.includes("scenes/mounting-plate")) return new Response(parentSrc, { status: 200 });
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const detail = await selectionDetailForScope({
+        node: null,
+        focus: {
+          file: helperFile,
+          name: "mountingPlateLayout",
+          serial: 0,
+          callerFile: parentFile,
+          callerLine: 7,
+        },
+        mentions,
+      });
+      expect(detail.origin.kind).toBe("origin");
+      if (detail.origin.kind !== "origin") throw new Error("expected origin");
+      expect(detail.origin.frames).toHaveLength(2);
+      expect(detail.origin.frames[0]).toMatchObject({
+        current: true,
+        pick: expect.objectContaining({ name: "mountingPlateLayout" }),
+      });
+      expect(detail.origin.frames[1]).toMatchObject({
+        current: false,
+        pick: expect.objectContaining({ name: "build", file: parentFile }),
+      });
+      const parentTexts = detail.origin.frames[1]!.lines.map((row) => ("text" in row ? row.text : "..."));
+      expect(parentTexts.some((t) => t.includes("mountingPlateLayout()"))).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+});
+
+describe("scopeCallerChain", () => {
+  test("root build has no parent frame", () => {
+    const file = "apps/demo/src/scenes/mounting-plate.ts";
+    const src = `export default defineScene({
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    expect(scopeCallerChain({ file, name: "build", serial: 0 }, [analyzeMentions(src, file)])).toEqual([]);
+  });
+
+  test("helper walks to the build() call without a selected node", () => {
+    const helperFile = "apps/demo/src/layout/mounting-plate.ts";
+    const parentFile = "apps/demo/src/scenes/mounting-plate.ts";
+    const parentSrc = `import { mountingPlateLayout } from "../layout/mounting-plate";
+export default defineScene({
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    const mentions = [analyzeMentions(plateFn, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const chain = scopeCallerChain(
+      { file: helperFile, name: "mountingPlateLayout", serial: 0 },
+      mentions,
+    );
+    expect(chain).toHaveLength(1);
+    expect(chain[0]).toMatchObject({
+      name: "build",
+      pick: { name: "build", file: parentFile },
+    });
+    expect(chain[0]!.line).toBeGreaterThan(0);
   });
 });
