@@ -39,6 +39,10 @@ function findFn(mentions: readonly MentionFile[], focus: ScopeFocus): MentionFn 
       const fn = fnNamed(f, focus.name);
       if (fn) return fn;
     }
+    // Named miss: do not pick some other function in the file. Unknown
+    // callees (`fillet`, `along`) are not helpers; treating them as this
+    // function would add every sibling invocation to liveKeys.
+    return undefined;
   }
   return mentions.flatMap((m) => m.functions).find((f) => sourceFileKey(f.file) === want);
 }

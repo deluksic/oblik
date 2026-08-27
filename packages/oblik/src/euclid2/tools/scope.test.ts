@@ -232,6 +232,84 @@ export default defineScene({
     expect(mutedForScope(holes[1]!, inner)).toBe(true);
   });
 
+  test("a fillet in a helper does not unmute sibling invocations", () => {
+    const helperSrc = `import { point, circle, fillet, profile, segment } from "oblik";
+export function plate() {
+  const origin = point(0, 0, "o_origin");
+  const drill = circle(origin, 0.2, "o_drill");
+  const hidden = point(1, 1, "o_hid");
+  const B = point(1, 0, "o_b");
+  const C = point(0, 1, "o_c");
+  const ab = segment(origin, B, "o_ab");
+  const bc = segment(B, C, "o_bc");
+  const ca = segment(C, origin, "o_ca");
+  profile([fillet(origin, 0.1), ab, B, bc, C, ca], "o_mix");
+  return { origin, drill };
+}
+`;
+    const parentSrc = `import { plate } from "./plate";
+import { defineScene } from "oblik";
+export default defineScene({
+  kind: "euclid2",
+  title: "t",
+  build() {
+    const a = plate();
+    const b = plate();
+  },
+});
+`;
+    const helperFile = "apps/demo/src/layout/plate.ts";
+    const parentFile = "apps/demo/src/scenes/t.ts";
+    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    expect(mentions[0]!.functions.find((f) => f.name === "plate")!.calls.map((c) => c.callee)).toEqual(["fillet"]);
+    const callA = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const origin = point(0, 0, "o_origin");
+        const drill = circle(origin, 0.2, "o_drill");
+        point(1, 1, "o_hid");
+        const originB = point(0, 0, "o_origin");
+        const drillB = circle(originB, 0.2, "o_drill");
+        point(1, 1, "o_hid");
+      },
+    });
+    const annotations = {
+      ...Object.fromEntries(analyze(helperSrc, helperFile)),
+      ...Object.fromEntries(analyze(parentSrc, parentFile)),
+    };
+    const { trace } = evaluate(scene, { annotations, module: helperFile });
+    for (const n of trace) {
+      n.module = helperFile;
+      n.at = n.at ?? { line: 3, column: 4 };
+      n.stack = [
+        { file: helperFile, line: 3, column: 4, name: "plate" },
+        { file: parentFile, line: callA.line, column: callA.column, name: "build" },
+      ];
+    }
+    assignInv(trace, mentions);
+
+    const origins = trace.filter((n) => n.id === "o_origin");
+    const holes = trace.filter((n) => n.id === "o_hid");
+    expect(origins).toHaveLength(2);
+
+    const inner = scopeFromTrace(trace, {
+      focus: {
+        file: helperFile,
+        name: "plate",
+        serial: 0,
+        callerFile: parentFile,
+        callerLine: callA.line,
+      },
+      mentions,
+    });
+    expect(mutedForScope(origins[0]!, inner)).toBe(false);
+    expect(mutedForScope(origins[1]!, inner)).toBe(true);
+    expect(mutedForScope(holes[0]!, inner)).toBe(false);
+    expect(mutedForScope(holes[1]!, inner)).toBe(true);
+  });
+
   test("two-level helpers stay drawn from build; the inner bead is not mentionable there", () => {
     const layoutSrc = `import { circle, point } from "oblik";
 export function petal(center: { x: number; y: number }, radius: number) {
