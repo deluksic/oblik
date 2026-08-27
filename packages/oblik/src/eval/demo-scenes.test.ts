@@ -7,6 +7,7 @@ import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
+import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import pie from "../../../../apps/demo/src/scenes/pie.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
@@ -66,6 +67,20 @@ describe("migrated demo scenes", () => {
     expect(trace.filter((n) => n.kind === "circle")).toHaveLength(4);
     expect(trace.every((n) => n.module === "apps/demo/src/layout/mounting-plate.ts")).toBe(true);
     expect(trace.some((n) => n.bind === "drill" && n.editable)).toBe(true);
+  });
+
+  test("plate grid evaluates six helper invocations from one looped call site", () => {
+    const { trace } = run(mountingPlateGrid, [
+      "apps/demo/src/scenes/mounting-plate-grid.ts",
+      "apps/demo/src/layout/mounting-plate.ts",
+    ]);
+    expect(trace.filter((n) => n.id === "o_origin")).toHaveLength(6);
+    expect(trace.filter((n) => n.id === "o_drill")).toHaveLength(6);
+    expect(trace.filter((n) => n.kind === "circle")).toHaveLength(24);
+    const xs = trace
+      .filter((n) => n.id === "o_origin" && n.value.kind === "point")
+      .map((n) => (n.value.kind === "point" ? n.value.x : 0));
+    expect(new Set(xs.map((x) => x.toFixed(2))).size).toBe(3);
   });
 
   test("pie traces three roundOffset slices from one gap slider", () => {

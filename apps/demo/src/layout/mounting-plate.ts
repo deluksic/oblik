@@ -1,9 +1,9 @@
 import { circle, lineIntersection, parallelLine, point, segment } from "oblik";
 
 /** Shared plate constructors — stamp/analyze this file, not only the scene. */
-export function mountingPlateLayout() {
-  const origin = point(0.13, 0.25, "o_origin");
-  const opp = point(3.86, 3.02, "o_opp");
+export function mountingPlateLayout(ox = 0, oy = 0) {
+  const origin = point(0.13 + ox, 0.25 + oy, "o_origin");
+  const opp = point(3.86 + ox, 3.02 + oy, "o_opp");
   const minX = Math.min(origin.x, opp.x);
   const maxX = Math.max(origin.x, opp.x);
   const minY = Math.min(origin.y, opp.y);

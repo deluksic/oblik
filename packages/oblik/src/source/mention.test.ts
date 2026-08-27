@@ -17,7 +17,7 @@ describe("analyzeMentions", () => {
     const file = analyzeMentions(plateSrc, "apps/demo/src/layout/mounting-plate.ts");
     const plate = fnNamed(file, "mountingPlateLayout");
     expect(plate).toBeDefined();
-    expect(plate!.params).toEqual([]);
+    expect(plate!.params).toEqual(["ox", "oy"]);
     expect(plate!.consts).toEqual(
       expect.arrayContaining(["origin", "opp", "hBottom", "hLeft", "drill", "c0"]),
     );
