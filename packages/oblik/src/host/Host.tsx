@@ -116,6 +116,7 @@ function Host(props: {
   const sceneKind = createMemo(() => scene().kind);
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
+  const paneFile = createMemo(() => entry()?.path ?? null);
 
   createEffect(
     () => true,
@@ -148,28 +149,30 @@ function Host(props: {
   }
 
   const pane = createMemo(() => {
-    const e = entry();
-    if (!e) return <p class={styles.err}>Unknown scene</p>;
-    if (sceneKind() === "figure") {
+    const kind = sceneKind();
+    const file = paneFile();
+    if (file == null) return <p class={styles.err}>Unknown scene</p>;
+    if (kind === "figure") {
       return (
         <FigurePane
           scene={scene() as FigureScene}
-          file={e.path}
+          file={file}
           annotations={annotations()}
           mentions={Object.values(props.mentions)}
         />
       );
     }
-    return sceneKind() === "euclid2" ? (
-      <Euclid2Pane
-        scene={scene()}
-        file={e.path}
-        annotations={annotations()}
-        mentions={Object.values(props.mentions)}
-      />
-    ) : (
-      <p class={styles.err}>Unknown scene kind</p>
-    );
+    if (kind === "euclid2") {
+      return (
+        <Euclid2Pane
+          scene={scene()}
+          file={file}
+          annotations={annotations()}
+          mentions={Object.values(props.mentions)}
+        />
+      );
+    }
+    return <p class={styles.err}>Unknown scene kind</p>;
   });
 
   return (

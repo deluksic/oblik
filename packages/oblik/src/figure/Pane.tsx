@@ -58,8 +58,9 @@ function parentFocus(
 }
 
 export function FigurePane(props: FigurePaneProps) {
-  const [picker, setPicker] = createSignal(() => (props.scene, false));
-  const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.scene, null));
+  const [picker, setPicker] = createSignal(() => (props.file, false));
+  // Paint HMR replaces `scene`; keep Brush/Eraser until Esc or a different file.
+  const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.file, null));
   const [shift, setShift] = createSignal(false);
   const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, null));
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
