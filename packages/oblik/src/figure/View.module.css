@@ -116,9 +116,11 @@
 .page::after {
   content: "Frame";
   position: absolute;
-  left: 8px;
-  top: 7px;
-  font: 500 10px/1 system-ui, sans-serif;
-  letter-spacing: 0.08em;
-  color: #9a9084;
+  left: 0;
+  bottom: 100%;
+  padding-bottom: 5px;
+  font: 500 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  color: #8a8278;
+  white-space: nowrap;
 }
