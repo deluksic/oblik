@@ -1,7 +1,7 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import { kWorldToNdc, viewBox, zoomAt, type Camera2, type PaneSize } from "../camera";
+import { kWorldToNdc, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../camera";
 import { isFiniteTrace, traceKey } from "../pick";
 import {
   hoverTool,
@@ -105,7 +105,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const pane: PaneSize = { w: rect.width, h: rect.height };
     if (pane.w < 8 || pane.h < 8) return;
     const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    setCamera(zoomAt(camera(), screen, pane, e.deltaY < 0 ? 1.08 : 1 / 1.08));
+    setCamera(zoomAt(camera(), screen, pane, wheelZoomFactor(e.deltaY, e.deltaMode)));
   }
 
   function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {

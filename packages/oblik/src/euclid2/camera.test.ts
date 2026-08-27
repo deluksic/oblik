@@ -4,9 +4,11 @@ import {
   clientToNdc,
   ndcToWorld,
   screenToWorld,
+  wheelZoomFactor,
   worldToNdc,
   worldToScreen,
   zoomAt,
+  ZOOM_NOTCH,
   type Camera2,
   type PaneSize,
 } from "./camera";
@@ -59,5 +61,26 @@ describe("camera", () => {
     expect(next.x).toBeCloseTo(cam.x, 10);
     expect(next.y).toBeCloseTo(cam.y, 10);
     expect(next.scale).toBeCloseTo(cam.scale / 1.08, 10);
+  });
+
+  test("a pixel mouse tick matches the old 8% step", () => {
+    expect(wheelZoomFactor(-100, 0)).toBeCloseTo(ZOOM_NOTCH, 10);
+    expect(wheelZoomFactor(100, 0)).toBeCloseTo(1 / ZOOM_NOTCH, 10);
+  });
+
+  test("a line-mode mouse tick matches the old 8% step", () => {
+    expect(wheelZoomFactor(-1, 1)).toBeCloseTo(ZOOM_NOTCH, 10);
+    expect(wheelZoomFactor(1, 1)).toBeCloseTo(1 / ZOOM_NOTCH, 10);
+  });
+
+  test("many small pixel events compose like one mouse tick", () => {
+    let factor = 1;
+    for (let i = 0; i < 25; i++) factor *= wheelZoomFactor(4, 0);
+    expect(factor).toBeCloseTo(wheelZoomFactor(100, 0), 10);
+  });
+
+  test("a huge delta is clamped to a few notches", () => {
+    expect(wheelZoomFactor(10_000, 0)).toBeCloseTo(ZOOM_NOTCH ** -4, 10);
+    expect(wheelZoomFactor(-1, 2)).toBeCloseTo(ZOOM_NOTCH ** 4, 10);
   });
 });

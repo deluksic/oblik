@@ -22,6 +22,20 @@ export function ndcToWorld(ndc: { x: number; y: number }, cam: Camera2, size: Pa
 
 export const SCALE_MIN = 8;
 export const SCALE_MAX = 280;
+/** One mouse-wheel notch. Pixel deltas of 100 and line deltas of 1 both map here. */
+export const ZOOM_NOTCH = 1.08;
+const PIXEL_PER_NOTCH = 100;
+const LINES_PER_PAGE = 16;
+const MAX_NOTCHES = 4;
+
+/** Zoom factor from a wheel event. Magnitude matters; a mouse tick stays `ZOOM_NOTCH`. */
+export function wheelZoomFactor(deltaY: number, deltaMode = 0): number {
+  if (!Number.isFinite(deltaY) || deltaY === 0) return 1;
+  const raw =
+    deltaMode === 1 ? deltaY : deltaMode === 2 ? deltaY * LINES_PER_PAGE : deltaY / PIXEL_PER_NOTCH;
+  const notches = Math.max(-MAX_NOTCHES, Math.min(MAX_NOTCHES, raw));
+  return ZOOM_NOTCH ** -notches;
+}
 
 /** Screen-space gizmos. Y-down pixels; 1 unit = 1 CSS pixel when the HUD viewBox matches the pane. */
 export function worldToScreen(
