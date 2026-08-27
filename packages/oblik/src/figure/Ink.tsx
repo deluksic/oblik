@@ -303,9 +303,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
   const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
   const fill = () => {
     if (props.onion || mark() === "open") return "none";
-    const f = props.look?.fill;
-    if (!f || f === "none") return stroke();
-    return f;
+    return stroke();
   };
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>

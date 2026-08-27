@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   DEFAULT_BRUSH,
   figureStyleFromBrush,
-  previewLook,
   lookExpr,
+  lookFromBrush,
   takesFill,
 } from "./chips";
 
@@ -19,6 +19,7 @@ describe("figureStyleFromBrush", () => {
     expect(takesFill("profile")).toBe(true);
     expect(takesFill("circle")).toBe(true);
     expect(takesFill("segment")).toBe(false);
+    expect(takesFill("point")).toBe(false);
     const look = figureStyleFromBrush({ ...DEFAULT_BRUSH, fill: "#cfe8d4", line: "dot" }, true);
     expect(look.fill).toBe("#cfe8d4");
     expect(look.dash).toEqual([3.92, 10.08]);
@@ -32,8 +33,14 @@ describe("figureStyleFromBrush", () => {
     expect(thick.width).toBe(5.6);
   });
 
-  test("preview look always carries fill so a profile hover can show it", () => {
-    expect(previewLook(DEFAULT_BRUSH).fill).toBe("none");
+  test("preview look matches paint: fill only on profiles and circles", () => {
+    const washed = { ...DEFAULT_BRUSH, fill: "#f3c5bc" };
+    expect(lookFromBrush(washed, "point").fill).toBeUndefined();
+    expect(lookFromBrush(washed, "segment").fill).toBeUndefined();
+    expect(lookFromBrush(washed, "line").fill).toBeUndefined();
+    expect(lookFromBrush(washed, "profile").fill).toBe("#f3c5bc");
+    expect(lookFromBrush(washed, "circle").fill).toBe("#f3c5bc");
+    expect(lookFromBrush(washed, "point").stroke).toBe(DEFAULT_BRUSH.stroke);
   });
 });
 

@@ -55,9 +55,9 @@ export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureS
   });
 }
 
-/** Closed-shape look used for hover preview (lines ignore fill; dots treat `none` as ink). */
-export function previewLook(b: BrushSettings): FigureStyle {
-  return figureStyleFromBrush(b, true);
+/** Same look paint writes — fill only for profiles and circles. Points and lines are stroke. */
+export function lookFromBrush(b: BrushSettings, kind: string): FigureStyle {
+  return figureStyleFromBrush(b, takesFill(kind));
 }
 
 export const BRUSH_LOOK: FigureStyle = figureStyleFromBrush(DEFAULT_BRUSH, false);

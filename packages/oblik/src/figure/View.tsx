@@ -7,6 +7,7 @@ import { kWorldToNdc, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneS
 import { traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
+import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
 import { frameRect, pageScreenRect, type FigureFrame } from "./frame";
 import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
@@ -24,7 +25,7 @@ export type FigureViewProps = {
   frame?: FigureFrame;
   tool?: FigureToolId | null;
   shift?: boolean;
-  brushLook: FigureStyle;
+  brush: BrushSettings;
   hoverKey?: string | null;
   selectedKey?: string | null;
   scope?: Scope;
@@ -276,7 +277,7 @@ export function FigureView(props: FigureViewProps) {
                 isPointish(node) ? (
                   <FigurePoint
                     node={node}
-                    look={props.brushLook}
+                    look={lookFromBrush(props.brush, node.value.kind)}
                     onion={false}
                     hot={false}
                     selected={false}
@@ -287,7 +288,7 @@ export function FigureView(props: FigureViewProps) {
                 ) : (
                   <FigureStroke
                     node={node}
-                    look={props.brushLook}
+                    look={lookFromBrush(props.brush, node.value.kind)}
                     onion={false}
                     hot={false}
                     selected={false}

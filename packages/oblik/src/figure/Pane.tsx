@@ -19,9 +19,8 @@ import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../e
 import {
   DEFAULT_BRUSH,
   figureStyleFromBrush,
-  previewLook,
   lookExpr,
-  takesFill,
+  lookFromBrush,
   type BrushSettings,
 } from "./chips";
 import { BrushDock } from "./BrushDock";
@@ -188,7 +187,7 @@ export function FigurePane(props: FigurePaneProps) {
   }
 
   function lookFor(geom: TraceNode) {
-    return figureStyleFromBrush(brush(), takesFill(geom.value.kind));
+    return lookFromBrush(brush(), geom.value.kind);
   }
 
   function geomForPaint(paint: TraceNode): TraceNode | undefined {
@@ -284,7 +283,7 @@ export function FigurePane(props: FigurePaneProps) {
             frame={props.scene.frame}
             tool={tool()}
             shift={shift()}
-            brushLook={previewLook(brush())}
+            brush={brush()}
             hoverKey={hoverKey()}
             selectedKey={selectedKey()}
             scope={scope()}
