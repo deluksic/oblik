@@ -21,7 +21,7 @@ export function SelectionSidebar(props: SelectionSidebarProps) {
       <OriginPane origin={props.detail.origin} onPickScope={props.onPickScope} />
       {props.detail.expose ? (
         <div class={[styles.expose, { [styles.exposeBlocked]: props.detail.expose.kind === "blocked" }]}>
-          <p class={styles.kicker}>{props.detail.expose.kind === "blocked" ? "Expose" : "Expose"}</p>
+          <p class={styles.kicker}>Expose</p>
           <p class={styles.exposeText}>{props.detail.expose.text}</p>
         </div>
       ) : null}
@@ -70,6 +70,8 @@ function OriginFrameBox(props: {
     </button>
   );
 }
+
+function OriginLine(props: { row: OriginDisplayLine }) {
   if (props.row.kind === "ellipsis") {
     return (
       <div class={styles.gapRow}>
