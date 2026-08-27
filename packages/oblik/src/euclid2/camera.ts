@@ -20,6 +20,9 @@ export function ndcToWorld(ndc: { x: number; y: number }, cam: Camera2, size: Pa
   return { x: cam.x + ndc.x / k, y: cam.y - ndc.y / k };
 }
 
+export const SCALE_MIN = 8;
+export const SCALE_MAX = 280;
+
 /** Screen-space gizmos. Y-down pixels; 1 unit = 1 CSS pixel when the HUD viewBox matches the pane. */
 export function worldToScreen(
   world: { x: number; y: number },
@@ -29,6 +32,35 @@ export function worldToScreen(
   return {
     x: size.w / 2 + (world.x - cam.x) * cam.scale,
     y: size.h / 2 - (world.y - cam.y) * cam.scale,
+  };
+}
+
+export function screenToWorld(
+  screen: { x: number; y: number },
+  cam: Camera2,
+  size: PaneSize,
+): { x: number; y: number } {
+  return {
+    x: cam.x + (screen.x - size.w / 2) / cam.scale,
+    y: cam.y - (screen.y - size.h / 2) / cam.scale,
+  };
+}
+
+/** Zoom so the world point under `screen` stays under `screen`. */
+export function zoomAt(
+  cam: Camera2,
+  screen: { x: number; y: number },
+  size: PaneSize,
+  factor: number,
+): Camera2 {
+  const before = screenToWorld(screen, cam, size);
+  const scale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, cam.scale * factor));
+  const next = { ...cam, scale };
+  const after = screenToWorld(screen, next, size);
+  return {
+    scale,
+    x: cam.x + before.x - after.x,
+    y: cam.y + before.y - after.y,
   };
 }
 
