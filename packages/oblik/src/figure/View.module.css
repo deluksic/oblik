@@ -31,6 +31,7 @@
   display: block;
   width: 100%;
   height: 100%;
+  z-index: 1;
 }
 
 .hud {
@@ -94,9 +95,30 @@
 }
 
 .page {
-  fill: none;
-  stroke: #d6cbb8;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+  position: absolute;
+  z-index: 0;
   pointer-events: none;
+  border: 1px solid #d4c7b4;
+  box-shadow:
+    0 1px 2px rgba(42, 34, 24, 0.07),
+    0 6px 18px rgba(42, 34, 24, 0.1);
+}
+
+.cream > .page {
+  background: #faf6ee;
+}
+
+.white > .page {
+  background: #fff;
+  border-color: #e4ddd0;
+}
+
+.page::after {
+  content: "Frame";
+  position: absolute;
+  left: 8px;
+  top: 7px;
+  font: 500 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  color: #9a9084;
 }

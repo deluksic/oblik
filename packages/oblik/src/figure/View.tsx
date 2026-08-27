@@ -8,7 +8,7 @@ import { traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
 import { FigurePoint, FigureStroke } from "./Ink";
-import { frameRect, type FigureFrame } from "./frame";
+import { frameRect, pageScreenRect, type FigureFrame } from "./frame";
 import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -76,6 +76,10 @@ export function FigureView(props: FigureViewProps) {
     return `scale(${k} ${-k}) translate(${-cam.x} ${-cam.y})`;
   });
   const page = createMemo(() => frameRect(props.frame, initialCameraMemo()));
+  const pageBox = createMemo(() => {
+    const r = page();
+    return r ? pageScreenRect(r, camera(), size()) : null;
+  });
   const geom = createMemo(() => props.trace.filter(isDrawnGeom));
   const strokes = createMemo(() => paintStrokesFromTrace(props.trace));
   const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)));
@@ -186,11 +190,22 @@ export function FigureView(props: FigureViewProps) {
           setPreviewGeom(null);
         }}
       >
+        <Show when={pageBox()}>
+          {(box) => (
+            <div
+              class={styles.page}
+              aria-hidden="true"
+              style={{
+                left: `${box().left}px`,
+                top: `${box().top}px`,
+                width: `${box().width}px`,
+                height: `${box().height}px`,
+              }}
+            />
+          )}
+        </Show>
         <svg class={styles.world} viewBox={vb()}>
           <g transform={worldXf()}>
-            <Show when={page()} keyed>
-              {(r) => <rect class={styles.page} x={r.x} y={r.y} width={r.w} height={r.h} />}
-            </Show>
             <Show when={props.shift}>
               <For each={onionInk()}>
                 {(n) => (
