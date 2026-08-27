@@ -9,7 +9,6 @@ import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import {
-  EMPTY_SELECTION_DETAIL,
   emptyScopeDetail,
   selectionDetailForScope,
   type ScopePick,
@@ -106,12 +105,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const selectionDetail = createMemo(async () => {
     const node = selectedNode();
     const f = focus();
-    if (!node) return emptyScopeDetail(f);
     return selectionDetailForScope({
       node,
       focus: f,
       mentions: mentions(),
-      print: mentionPrint(scope(), node),
+      print: node ? mentionPrint(scope(), node) : undefined,
     });
   });
 
@@ -327,7 +325,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           }}
         />
       </div>
-      <Loading fallback={<SelectionSidebar detail={EMPTY_SELECTION_DETAIL} />}>
+      <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
         <SelectionSidebar detail={selectionDetail()} onPickScope={pickScope} />
       </Loading>
     </div>

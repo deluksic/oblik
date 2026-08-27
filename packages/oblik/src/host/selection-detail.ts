@@ -99,23 +99,33 @@ function escapeRegExp(value: string): string {
 }
 
 export function findFunctionHeaderRow(rows: readonly string[], line: number, name?: string): number | null {
-  const target = line - 1;
+  const target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
   for (let n = target; n >= 0; n--) {
-    const text = rows[n] ?? "";
-    if (name) {
-      const patterns = [
-        new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\b`),
-        new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${escapeRegExp(name)}\\b`),
-        new RegExp(`\\b${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\()`),
-      ];
-      if (patterns.some((re) => re.test(text))) return n;
-      continue;
+    if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
+  }
+  if (name) {
+    for (let n = 0; n < rows.length; n++) {
+      if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
     }
-    if (/^\s*export\s+(?:async\s+)?function\s+\w+/.test(text)) return n;
-    if (/^\s*(?:async\s+)?function\s+\w+/.test(text)) return n;
-    if (/^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/.test(text) && /=>|function/.test(text)) return n;
   }
   return null;
+}
+
+function rowLooksLikeFunctionHeader(text: string, name?: string): boolean {
+  if (name) {
+    const patterns = [
+      new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\b`),
+      new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${escapeRegExp(name)}\\b`),
+      new RegExp(`\\b${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\()`),
+      // Method shorthand: `build() {` inside defineScene({ … }).
+      new RegExp(`\\b${escapeRegExp(name)}\\s*\\([^\\n;]*\\)\\s*(?::[^{\\n]+)?\\{`),
+    ];
+    return patterns.some((re) => re.test(text));
+  }
+  if (/^\s*export\s+(?:async\s+)?function\s+\w+/.test(text)) return true;
+  if (/^\s*(?:async\s+)?function\s+\w+/.test(text)) return true;
+  if (/^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/.test(text) && /=>|function/.test(text)) return true;
+  return false;
 }
 
 export function buildOriginFrameLines(text: string, line: number, name?: string): OriginDisplayLine[] {

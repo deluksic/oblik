@@ -1,11 +1,14 @@
 import { describe, expect, test } from "vitest";
 
+import { analyzeMentions } from "../source/mention";
 import type { TraceNode } from "../eval/context";
 import {
   buildFunctionSourceLines,
+  findFunctionHeaderRow,
   functionSourceSpan,
   originFileLabel,
   pinConstructorSite,
+  selectionDetailForScope,
   stackForNode,
 } from "./selection-detail";
 
@@ -153,5 +156,62 @@ describe("functionSourceSpan", () => {
       startLine: 1,
       endLine: 7,
     });
+  });
+});
+
+describe("findFunctionHeaderRow", () => {
+  test("matches defineScene method shorthand build() {", () => {
+    const rows = [
+      "import { defineScene } from \"oblik\";",
+      "export default defineScene({",
+      "  build() {",
+      "    const plate = mountingPlateLayout();",
+      "  },",
+      "});",
+    ];
+    expect(findFunctionHeaderRow(rows, 1, "build")).toBe(2);
+  });
+});
+
+describe("selectionDetailForScope", () => {
+  test("empty selection quotes the full focused build() body", async () => {
+    const src = `import { defineScene } from "oblik";
+import { mountingPlateLayout } from "../layout/mounting-plate";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "Mounting plate",
+  build() {
+    const plate = mountingPlateLayout();
+  },
+});
+`;
+    const file = "apps/demo/src/scenes/mounting-plate.ts";
+    const mentions = [analyzeMentions(src, file)];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("__peek")) return new Response(src, { status: 200 });
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const detail = await selectionDetailForScope({
+        node: null,
+        focus: { file, name: "build", serial: 0 },
+        mentions,
+      });
+      expect(detail.crumb).toBe("build");
+      expect(detail.origin.kind).toBe("origin");
+      if (detail.origin.kind !== "origin") throw new Error("expected origin");
+      const texts = detail.origin.frames[0]!.lines.map((row) => ("text" in row ? row.text : "..."));
+      expect(texts.some((t) => t.includes("ellipsis") || t === "...")).toBe(false);
+      expect(texts).toEqual([
+        "  build() {",
+        "    const plate = mountingPlateLayout();",
+        "  },",
+      ]);
+    } finally {
+      globalThis.fetch = orig;
+    }
   });
 });
