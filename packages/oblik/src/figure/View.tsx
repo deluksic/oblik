@@ -8,9 +8,10 @@ import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
 import { isGlider } from "@/geom/gliders";
 import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
-import { traceKey } from "../euclid2/pick";
+import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
-import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
+import { applyDrag, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
+import { createDragHandler } from "../host/createDragHandler";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
 import { frameRect, frameMoved, frameResized, pageScreenRect, type FigureFrame, type FrameRect, type FrameXywh } from "./frame";
@@ -68,12 +69,6 @@ export function FigureView(props: FigureViewProps) {
   const [grabbing, setGrabbing] = createSignal(false);
   const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
   let drag: Drag | null = null;
-  let pendingPick: TraceNode[] | null = null;
-  let frameDrag:
-    | { kind: "move"; start: FrameXywh; world0: { x: number; y: number } }
-    | { kind: "resize"; anchor: { x: number; y: number } }
-    | null = null;
-  let frameDraft: FrameXywh | null = null;
 
   createEffect(
     () => paneEl(),
@@ -115,43 +110,57 @@ export function FigureView(props: FigureViewProps) {
     return screenToWorld(panePoint(e, el), camera(), size());
   }
 
-  function applyFrameDrag(e: PointerEvent) {
-    const el = paneEl();
-    const dragState = frameDrag;
-    if (!el || !dragState) return;
-    const world = worldAt(e, el);
-    const next =
-      dragState.kind === "move"
-        ? frameMoved(dragState.start, dragState.world0, world)
-        : frameResized(dragState.anchor, world);
-    frameDraft = next;
-    props.onFrameDraft?.(next);
-  }
+  const onFrameMove = createDragHandler((e) => frameHandleSession(e, "move"));
+  const onFrameResize = createDragHandler((e) => frameHandleSession(e, "resize"));
+  const onPanePointerDown = createDragHandler(
+    (e) => {
+      noteShift(e);
+      const el = paneEl();
+      if (!el) return;
+      const hits = hitsOf(e, el);
+      if (props.tool) {
+        const hit = hits[0];
+        if (hit) props.onToolHit?.(hit);
+        return;
+      }
+      const start = panDrag(e, camera());
+      drag = start;
+      const pick = hits.length > 0 ? hits : null;
+      let moved = false;
+      return {
+        onPointerMove(ev) {
+          moved = true;
+          start.moved = true;
+          if (!grabbing()) setGrabbing(true);
+          const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
+          if (next.camera) setCamera(next.camera);
+        },
+        onDone() {
+          drag = null;
+          setGrabbing(false);
+          if (!moved) props.onPick?.(pick ?? []);
+        },
+      };
+    },
+    { deadZoneRadius: PICK_CLICK_PX, preventDefault: false },
+  );
 
-  function startFrameDrag(e: PointerEvent, kind: "move" | "resize") {
+  function frameHandleSession(e: PointerEvent, kind: "move" | "resize") {
     const el = paneEl();
     const start = frameXywh();
     if (!el || !start || props.tool) return;
-    e.preventDefault();
-    e.stopPropagation();
-    el.setPointerCapture(e.pointerId);
-    if (kind === "move") {
-      frameDrag = { kind: "move", start, world0: worldAt(e, el) };
-    } else {
-      frameDrag = { kind: "resize", anchor: { x: start.x, y: start.y } };
-    }
-    applyFrameDrag(e);
-  }
-
-  function endFrameDrag(e: PointerEvent) {
-    const el = paneEl();
-    if (!frameDrag) return false;
-    if (el?.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    const next = frameDraft ?? frameXywh();
-    if (next) props.onFrameCommit?.(next);
-    frameDrag = null;
-    frameDraft = null;
-    return true;
+    const world0 = worldAt(e, el);
+    const anchor = { x: start.x, y: start.y };
+    let last = start;
+    return {
+      onPointerMove(ev: PointerEvent) {
+        last = kind === "move" ? frameMoved(start, world0, worldAt(ev, el)) : frameResized(anchor, worldAt(ev, el));
+        props.onFrameDraft?.(last);
+      },
+      onDone() {
+        props.onFrameCommit?.(last);
+      },
+    };
   }
 
   const previewKey = createMemo(() => {
@@ -184,21 +193,6 @@ export function FigureView(props: FigureViewProps) {
     props.onShift?.(e.shiftKey);
   }
 
-  function onPointerDown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    noteShift(e);
-    const el = paneEl();
-    if (!el) return;
-    const hits = hitsOf(e, el);
-    if (props.tool) {
-      const hit = hits[0];
-      if (hit) props.onToolHit?.(hit);
-      return;
-    }
-    drag = panDrag(e, camera());
-    pendingPick = hits.length > 0 ? hits : null;
-  }
-
   function noteHover(e: PointerEvent) {
     if (drag?.moved) return;
     const el = paneEl();
@@ -215,33 +209,7 @@ export function FigureView(props: FigureViewProps) {
 
   function onPointerMove(e: PointerEvent) {
     noteShift(e);
-    if (frameDrag) {
-      applyFrameDrag(e);
-      return;
-    }
     noteHover(e);
-    if (!drag) return;
-    if (!drag.moved) {
-      if (!dragMoved(drag, e)) return;
-      drag.moved = true;
-      const el = paneEl();
-      if (el && !el.hasPointerCapture(e.pointerId)) el.setPointerCapture(e.pointerId);
-      if (!grabbing()) setGrabbing(true);
-    }
-    const next = applyDrag(drag, e, paneEl(), camera(), size(), props.trace);
-    if (next.camera) setCamera(next.camera);
-  }
-
-  function endDrag(e: PointerEvent) {
-    if (endFrameDrag(e)) return;
-    const d = drag;
-    const pick = pendingPick;
-    drag = null;
-    pendingPick = null;
-    setGrabbing(false);
-    if (d?.kind === "pan") {
-      if (!d.moved) props.onPick?.(pick ?? []);
-    }
   }
 
   return (
@@ -259,10 +227,8 @@ export function FigureView(props: FigureViewProps) {
           },
         ]}
         onWheel={onWheel}
-        onPointerDown={onPointerDown}
+        onPointerDown={onPanePointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
         onPointerLeave={() => {
           props.onHoverKey?.(null);
           setPreviewGeom(null);
@@ -312,7 +278,7 @@ export function FigureView(props: FigureViewProps) {
                   top: `${box().top + box().height}px`,
                 }}
                 aria-label="Move frame"
-                onPointerDown={(e) => startFrameDrag(e, "move")}
+                onPointerDown={onFrameMove}
               >
                 <IconMove class={styles.frameHandleIcon} aria-hidden="true" />
               </button>
@@ -324,7 +290,7 @@ export function FigureView(props: FigureViewProps) {
                   top: `${box().top}px`,
                 }}
                 aria-label="Resize frame"
-                onPointerDown={(e) => startFrameDrag(e, "resize")}
+                onPointerDown={onFrameResize}
               >
                 <IconScaling class={styles.frameHandleIcon} aria-hidden="true" />
               </button>
