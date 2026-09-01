@@ -9,18 +9,20 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("selected overlay is knockout, outline, paint", () => {
+  test("selected overlay is outline, paper gap, paint", () => {
+    const gap = 2.8 + 2 * FIGURE_PAPER_PX;
     expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true })).toEqual([
-      { kind: "knockout", width: 2.8 + 2 * FIGURE_PAPER_PX + 2 * FIGURE_SELECT_PX },
-      { kind: "outline", width: 2.8 + 2 * FIGURE_SELECT_PX },
+      { kind: "outline", width: gap + 2 * FIGURE_SELECT_PX },
+      { kind: "knockout", width: gap },
       { kind: "paint", width: 2.8 },
     ]);
   });
 
   test("hover overlay also knockouts, with a thinner ring", () => {
+    const gap = 1 + 2 * FIGURE_PAPER_PX;
     expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true })).toEqual([
-      { kind: "knockout", width: 1 + 2 * FIGURE_PAPER_PX + 2 * FIGURE_HOVER_PX },
-      { kind: "outline", width: 1 + 2 * FIGURE_HOVER_PX },
+      { kind: "outline", width: gap + 2 * FIGURE_HOVER_PX },
+      { kind: "knockout", width: gap },
       { kind: "paint", width: 1 },
     ]);
   });
