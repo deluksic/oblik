@@ -60,3 +60,26 @@ export function chromeDprScale(): number {
   if (typeof window === "undefined") return 1;
   return window.devicePixelRatio || 1;
 }
+
+const CLIP_EXTENT = 1e6;
+
+/** Closed circle as a path, for even-odd outside clips. */
+export function circleClipD(cx: number, cy: number, r: number): string {
+  const rr = Math.abs(r);
+  if (!(rr > 0) || !Number.isFinite(cx) || !Number.isFinite(cy)) return "";
+  return `M${cx - rr},${cy}a${rr},${rr} 0 1,0 ${2 * rr},0a${rr},${rr} 0 1,0 ${-2 * rr},0z`;
+}
+
+/** Universe minus `inner` (closed path). Pair with `clip-rule="evenodd"`. */
+export function outsideClipD(inner: string, extent = CLIP_EXTENT): string {
+  if (!inner) return "";
+  return `M${-extent},${-extent}H${extent}V${extent}H${-extent}Z${inner}`;
+}
+
+export function chromeOutsideClipId(key: string): string {
+  return `chrome-out-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+export function chromeOutsideUrl(id: string, layer: ChromeLayer): string | undefined {
+  return layer.kind === "paint" ? undefined : `url(#${id})`;
+}

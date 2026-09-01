@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeLayers, layerStrokeWidth } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeLayers, chromeOutsideUrl, circleClipD, layerStrokeWidth, outsideClipD } from "./chrome";
 
 const M = DEFAULT_CHROME_METRICS;
 
@@ -61,6 +61,34 @@ describe("chromeLayers", () => {
 
   test("idle overlay draws nothing", () => {
     expect(chromeLayers(1.35, { selected: false, hover: false, overlay: true, knockout: true }, M)).toEqual([]);
+  });
+});
+
+describe("outsideClipD", () => {
+  test("even-odd universe minus inner path", () => {
+    expect(outsideClipD("M0,0h1v1h-1z", 10)).toBe("M-10,-10H10V10H-10ZM0,0h1v1h-1z");
+  });
+
+  test("empty inner yields empty clip", () => {
+    expect(outsideClipD("")).toBe("");
+  });
+});
+
+describe("circleClipD", () => {
+  test("two-arc closed circle", () => {
+    expect(circleClipD(0, 0, 2)).toBe("M-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z");
+  });
+
+  test("skips degenerate radii", () => {
+    expect(circleClipD(1, 1, 0)).toBe("");
+  });
+});
+
+describe("chromeOutsideUrl", () => {
+  test("clips knockout and outline only", () => {
+    expect(chromeOutsideUrl("chrome-out-a", { kind: "outline", width: 4 })).toBe("url(#chrome-out-a)");
+    expect(chromeOutsideUrl("chrome-out-a", { kind: "knockout", width: 3 })).toBe("url(#chrome-out-a)");
+    expect(chromeOutsideUrl("chrome-out-a", { kind: "paint", width: 1 })).toBeUndefined();
   });
 });
 

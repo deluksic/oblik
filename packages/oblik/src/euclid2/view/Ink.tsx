@@ -7,7 +7,8 @@ import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
-import { CONSTRUCTION_STROKE_PX, chromeLayers, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, chromeLayers, chromeOutsideClipId, chromeOutsideUrl, circleClipD, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
+import { ChromeOutsideClip } from "./ChromeClip";
 import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
@@ -106,8 +107,11 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
 
 function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolean; layers: ChromeLayer[] }) {
   const c = () => props.node.value as Circle;
+  const clipId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
+  const clipD = () => circleClipD(c().center.x, c().center.y, c().radius);
   return (
     <>
+      {props.overlay ? <ChromeOutsideClip id={clipId()} d={clipD()} /> : null}
       {props.overlay ? null : (
         <circle class={styles.hit} data-ink={traceKey(props.node)} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
       )}
@@ -115,6 +119,7 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
         {(layer) => (
           <circle
             class={layerClass(layer.kind, props.node.editable, !!props.muted)}
+            clip-path={props.overlay ? chromeOutsideUrl(clipId(), layer) : undefined}
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
             cy={c().center.y}
@@ -179,18 +184,23 @@ export function ProfileOutline(props: {
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false));
+  const clipId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
   return (
-    <For each={layers()}>
-      {(layer) => (
-        <path
-          class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
-          d={d()}
-          fill={layer.kind === "paint" ? undefined : "none"}
-          stroke={layer.kind === "paint" ? "none" : undefined}
-          stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
-        />
-      )}
-    </For>
+    <>
+      {props.overlay === true ? <ChromeOutsideClip id={clipId()} d={d()} /> : null}
+      <For each={layers()}>
+        {(layer) => (
+          <path
+            class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
+            clip-path={props.overlay === true ? chromeOutsideUrl(clipId(), layer) : undefined}
+            d={d()}
+            fill={layer.kind === "paint" ? undefined : "none"}
+            stroke={layer.kind === "paint" ? "none" : undefined}
+            stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+          />
+        )}
+      </For>
+    </>
   );
 }
 
