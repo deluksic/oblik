@@ -26,6 +26,7 @@ export function readChromeMetrics(): ChromeMetrics {
   const style = getComputedStyle(document.documentElement);
   return {
     knockoutPx: cssLengthPx(style, "--oblik-chrome-knockout") ?? DEFAULT_CHROME_METRICS.knockoutPx,
+    selectKnockoutPx: cssLengthPx(style, "--oblik-chrome-knockout-selected") ?? DEFAULT_CHROME_METRICS.selectKnockoutPx,
     hoverOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-hover") ?? DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
     selectOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-selected") ?? DEFAULT_CHROME_METRICS.selectOutlineOpacity,
   };

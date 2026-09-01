@@ -89,8 +89,9 @@ h6 {
   --oblik-stroke: 1.5px;
   --oblik-stroke-selected: 2.25px;
   --oblik-chrome-knockout: 7px;
-  --oblik-chrome-outline-hover: 0.25;
-  --oblik-chrome-outline-selected: 0.5;
+  --oblik-chrome-knockout-selected: 4px;
+  --oblik-chrome-outline-hover: 0.5;
+  --oblik-chrome-outline-selected: 1;
   --oblik-hit: 14px;
   --oblik-scrollbar-thumb: color-mix(in srgb, var(--oblik-muted) 42%, transparent);
   --oblik-scrollbar-thumb-hover: color-mix(in srgb, var(--oblik-text) 28%, transparent);

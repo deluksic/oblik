@@ -20,14 +20,16 @@ export type ChromeOpts = {
 
 export type ChromeMetrics = {
   knockoutPx: number;
+  selectKnockoutPx: number;
   hoverOutlineOpacity: number;
   selectOutlineOpacity: number;
 };
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
   knockoutPx: 7,
-  hoverOutlineOpacity: 0.25,
-  selectOutlineOpacity: 0.5,
+  selectKnockoutPx: 4,
+  hoverOutlineOpacity: 0.5,
+  selectOutlineOpacity: 1,
 };
 
 /** CSS `stroke-width` for a chrome layer (logical px). */
@@ -36,8 +38,9 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
 }
 
 /**
- * Base pass is paint only. Overlay is knockout then outline, drawn before
- * that node's paint so hover and selection highlights sit under the geometry.
+ * Base pass is paint only. Overlay sits under that paint:
+ * hover is a translucent outline (no gap); selection is an opaque outline
+ * with a thinner knockout on top to cut a paper gap inside the ring.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -50,11 +53,13 @@ export function chromeLayers(
   const band = metrics.knockoutPx * px;
   if (opts.overlay) {
     if (!hot || !opts.knockout) return [];
-    const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
-    return [
-      { kind: "knockout", width: band },
-      { kind: "outline", width: band, opacity: outlineOpacity },
-    ];
+    const outline: ChromeLayer = {
+      kind: "outline",
+      width: band,
+      opacity: opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity,
+    };
+    if (!opts.selected) return [outline];
+    return [outline, { kind: "knockout", width: metrics.selectKnockoutPx * px }];
   }
   return [{ kind: "paint", width: w }];
 }

@@ -11,44 +11,44 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("base pass is paint only when hovered; knockout lives in the overlay", () => {
+  test("base pass is paint only when hovered; outline lives in the overlay", () => {
     expect(chromeLayers(1, { selected: false, hover: true, overlay: false, knockout: true }, M)).toEqual([
       { kind: "paint", width: 1 },
     ]);
   });
 
-  test("selected base pass is paint only; knockout lives in the overlay", () => {
+  test("selected base pass is paint only; outline and gap live in the overlay", () => {
     expect(chromeLayers(2.8, { selected: true, hover: false, overlay: false, knockout: true }, M)).toEqual([
       { kind: "paint", width: 2.8 },
     ]);
   });
 
-  test("selected overlay is knockout then outline, under the lifted paint", () => {
-    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "knockout", width: M.knockoutPx },
-      { kind: "outline", width: M.knockoutPx, opacity: M.selectOutlineOpacity },
+  test("hover overlay is a translucent outline with no knockout gap", () => {
+    expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
+      { kind: "outline", width: M.knockoutPx, opacity: M.hoverOutlineOpacity },
     ]);
   });
 
-  test("hover overlay is knockout then outline, under the hovered paint", () => {
-    expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "knockout", width: M.knockoutPx },
-      { kind: "outline", width: M.knockoutPx, opacity: M.hoverOutlineOpacity },
+  test("selected overlay is an opaque outline with a thinner knockout on top", () => {
+    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
+      { kind: "outline", width: M.knockoutPx, opacity: M.selectOutlineOpacity },
+      { kind: "knockout", width: M.selectKnockoutPx },
     ]);
+    expect(M.selectKnockoutPx).toBeLessThan(M.knockoutPx);
+    expect(M.selectOutlineOpacity).toBe(1);
   });
 
   test("world overlay outline scales by device pixel ratio", () => {
     vi.stubGlobal("window", { devicePixelRatio: 2 });
     expect(chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "knockout", width: M.knockoutPx * 2 },
       { kind: "outline", width: M.knockoutPx * 2, opacity: M.selectOutlineOpacity },
+      { kind: "knockout", width: M.selectKnockoutPx * 2 },
     ]);
   });
 
-  test("world hover overlay knockout scales by device pixel ratio", () => {
+  test("world hover overlay outline scales by device pixel ratio", () => {
     vi.stubGlobal("window", { devicePixelRatio: 2 });
     expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "knockout", width: M.knockoutPx * 2 },
       { kind: "outline", width: M.knockoutPx * 2, opacity: M.hoverOutlineOpacity },
     ]);
   });
@@ -58,8 +58,8 @@ describe("chromeLayers", () => {
     expect(
       chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true, screenSpace: true }, M),
     ).toEqual([
-      { kind: "knockout", width: M.knockoutPx },
       { kind: "outline", width: M.knockoutPx, opacity: M.selectOutlineOpacity },
+      { kind: "knockout", width: M.selectKnockoutPx },
     ]);
   });
 
