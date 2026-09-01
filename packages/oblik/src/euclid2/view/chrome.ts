@@ -1,11 +1,13 @@
 export const CONSTRUCTION_STROKE_PX = 1.5;
-export const POINT_STROKE_PX = 2.25;
+export const POINT_STROKE_PX = 2;
 
 export type ChromeKind = "knockout" | "outline" | "paint";
+export type ChromeClip = "outside" | "inside";
 
 export type ChromeLayer = {
   kind: ChromeKind;
   width: number;
+  clip?: ChromeClip;
 };
 
 export type ChromeOpts = {
@@ -21,7 +23,7 @@ export type ChromeMetrics = {
   gapPx: number;
   selectRingPx: number;
   hoverRingPx: number;
-  /** Paper underlap on each side of the paint edge, in CSS px. */
+  /** Paper underlap on the inside of a closed path, in CSS px. */
   bleedPx: number;
 };
 
@@ -37,7 +39,11 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
   return `${layer.width}px`;
 }
 
-/** Drawn back to front: outline, knockout (paper gap), paint. Reads inward as paint → gap → ring. */
+/**
+ * Drawn back to front: outline, outer knockout, inner knockout, paint.
+ * Outer knockout is paper in the gap; inner knockout is paper under the paint
+ * and 1px into the interior so neighbor edges cannot leak through.
+ */
 export function chromeLayers(
   paintWidth: number,
   opts: ChromeOpts,
@@ -54,8 +60,9 @@ export function chromeLayers(
   const bleedBand = metrics.bleedPx * px;
   const gap = w + 2 * gapBand;
   return [
-    { kind: "outline", width: gap + 2 * ringBand },
-    { kind: "knockout", width: gap + 2 * bleedBand },
+    { kind: "outline", width: gap + 2 * ringBand, clip: "outside" },
+    { kind: "knockout", width: gap, clip: "outside" },
+    { kind: "knockout", width: w + 2 * bleedBand, clip: "inside" },
     { kind: "paint", width: w },
   ];
 }
@@ -85,48 +92,11 @@ export function chromeOutsideClipId(key: string): string {
   return `chrome-out-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
-export function chromeKnockoutClipId(key: string): string {
-  return `chrome-ko-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+export function chromeInsideClipId(key: string): string {
+  return `chrome-in-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
-/** Inset from a closed stroke path so knockout can underlap paint without filling the interior. */
-export function chromeKnockoutClipInset(
-  paintWidth: number,
-  screenSpace: boolean,
-  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
-  cameraScale = 48,
-): number {
-  const px = screenSpace ? 1 : chromeDprScale();
-  const insetPx = paintWidth / 2 + metrics.bleedPx * px;
-  return screenSpace ? insetPx : insetPx / Math.max(8, cameraScale);
-}
-
-export function circleKnockoutClipD(
-  cx: number,
-  cy: number,
-  r: number,
-  paintWidth: number,
-  screenSpace: boolean,
-  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
-  cameraScale = 48,
-): string {
-  const inset = chromeKnockoutClipInset(paintWidth, screenSpace, metrics, cameraScale);
-  return circleClipD(cx, cy, Math.abs(r) - inset);
-}
-
-export function chromeOutlineUrl(id: string, layer: ChromeLayer): string | undefined {
-  return layer.kind === "outline" ? `url(#${id})` : undefined;
-}
-
-export function chromeKnockoutUrl(id: string, layer: ChromeLayer): string | undefined {
-  return layer.kind === "knockout" ? `url(#${id})` : undefined;
-}
-
-export function chromeClipUrl(outlineId: string, knockoutId: string, layer: ChromeLayer): string | undefined {
-  return chromeOutlineUrl(outlineId, layer) ?? chromeKnockoutUrl(knockoutId, layer);
-}
-
-/** @deprecated Use chromeOutlineUrl or chromeKnockoutUrl. */
-export function chromeOutsideUrl(id: string, layer: ChromeLayer): string | undefined {
-  return layer.kind === "paint" ? undefined : `url(#${id})`;
+export function chromeClipUrl(outsideId: string, insideId: string, layer: ChromeLayer): string | undefined {
+  if (!layer.clip) return undefined;
+  return `url(#${layer.clip === "inside" ? insideId : outsideId})`;
 }

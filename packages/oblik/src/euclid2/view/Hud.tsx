@@ -6,8 +6,8 @@ import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
-import { POINT_STROKE_PX, chromeClipUrl, chromeKnockoutClipId, chromeLayers, chromeOutsideClipId, circleClipD, circleKnockoutClipD, layerStrokeWidth } from "./chrome";
-import { ChromeOutsideClip } from "./ChromeClip";
+import { POINT_STROKE_PX, chromeClipUrl, chromeInsideClipId, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth } from "./chrome";
+import { ChromeClosedClips } from "./ChromeClip";
 import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
@@ -40,18 +40,12 @@ export function PointMark(props: {
       screenSpace: true,
     }, readChromeMetrics()),
   );
-  const outlineId = () => chromeOutsideClipId(`hud-${traceKey(props.node)}`);
-  const knockoutId = () => chromeKnockoutClipId(`hud-${traceKey(props.node)}`);
+  const outsideId = () => chromeOutsideClipId(`hud-${traceKey(props.node)}`);
+  const insideId = () => chromeInsideClipId(`hud-${traceKey(props.node)}`);
   const clipD = () => circleClipD(pos().x, pos().y, POINT_R);
-  const knockoutClipD = () => circleKnockoutClipD(pos().x, pos().y, POINT_R, POINT_STROKE_PX, true);
   return (
     <>
-      {props.overlay === true ? (
-        <>
-          <ChromeOutsideClip id={outlineId()} d={clipD()} />
-          <ChromeOutsideClip id={knockoutId()} d={knockoutClipD()} />
-        </>
-      ) : null}
+      {props.overlay === true ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={clipD()} /> : null}
       <For each={layers()}>
         {(layer) => (
           <circle
@@ -62,7 +56,7 @@ export function PointMark(props: {
                   ? styles.outline
                   : [styles.point, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]
             }
-            clip-path={props.overlay === true ? chromeClipUrl(outlineId(), knockoutId(), layer) : undefined}
+            clip-path={props.overlay === true ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
             cx={pos().x}
             cy={pos().y}
             r={POINT_R}

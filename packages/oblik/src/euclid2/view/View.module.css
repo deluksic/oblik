@@ -112,7 +112,7 @@
 .point {
   fill: var(--oblik-ink);
   stroke: var(--oblik-paper);
-  stroke-width: var(--oblik-stroke-selected);
+  stroke-width: 2px;
   vector-effect: non-scaling-stroke;
 }
 
