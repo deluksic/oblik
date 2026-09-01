@@ -14,10 +14,11 @@ import {
 } from "./catalog";
 import { insertCall, exposeReturnBag } from "./insert";
 import { patchPaintStyle, removePaintCall } from "./paint-edit";
+import { patchFrame } from "./frame-edit";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
-import { parseErase, parseExpose, parseInsert, parseLiteralPatch, parsePaintPatch } from "./schema";
+import { parseErase, parseExpose, parseFrameEdit, parseInsert, parseLiteralPatch, parsePaintPatch } from "./schema";
 import { freshSiteId, stamp } from "./stamp";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
@@ -230,6 +231,34 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             const src = fs.readFileSync(abs, "utf8");
             const next = patchPaintStyle(src, job.id, job.style);
             await enqueue(abs, () => fs.writeFileSync(abs, next));
+            json(res, 200, { ok: true });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-frame") {
+          let body: unknown;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { ok: false, error: "invalid json" });
+            return;
+          }
+          const job = parseFrameEdit(body);
+          if (typeof job === "string") {
+            json(res, 400, { ok: false, error: job });
+            return;
+          }
+          try {
+            const abs = resolveUnder(workspaceRoot, job.file);
+            const src = fs.readFileSync(abs, "utf8");
+            const patched = patchFrame(src, job.frame);
+            if (patched == null) {
+              json(res, 400, { ok: false, error: "could not patch frame" });
+              return;
+            }
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });

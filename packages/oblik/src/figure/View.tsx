@@ -9,7 +9,7 @@ import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
-import { frameRect, pageScreenRect, type FigureFrame } from "./frame";
+import { frameRect, pageScreenRect, type FigureFrame, type FrameRect } from "./frame";
 import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -28,11 +28,13 @@ export type FigureViewProps = {
   brush: BrushSettings;
   hoverKey?: string | null;
   selectedKey?: string | null;
+  frameSelected?: boolean;
   scope?: Scope;
   onShift?: (on: boolean) => void;
   onHoverKey?: (key: string | null) => void;
   onPick?: (hits: TraceNode[]) => void;
   onToolHit?: (node: TraceNode) => void;
+  onPickFrame?: () => void;
 };
 
 function readPaneSize(el: Element): PaneSize | null {
@@ -212,6 +214,9 @@ export function FigureView(props: FigureViewProps) {
         </Show>
         <svg class={styles.world} viewBox={vb()}>
           <g transform={worldXf()}>
+            <Show when={page()}>
+              {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} onPick={props.onPickFrame} />}
+            </Show>
             <Show when={props.shift}>
               <For each={onionInk()}>
                 {(n) => (
@@ -304,6 +309,42 @@ export function FigureView(props: FigureViewProps) {
         </svg>
       </div>
     </div>
+  );
+}
+
+function FrameHandle(props: { rect: FrameRect; selected: boolean; onPick?: () => void }) {
+  return (
+    <g>
+      <rect
+        x={props.rect.x}
+        y={props.rect.y}
+        width={props.rect.w}
+        height={props.rect.h}
+        fill="none"
+        stroke="transparent"
+        stroke-width={14}
+        vector-effect="non-scaling-stroke"
+        pointer-events="stroke"
+        style={{ cursor: "pointer" }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          props.onPick?.();
+        }}
+      />
+      <Show when={props.selected}>
+        <rect
+          x={props.rect.x}
+          y={props.rect.y}
+          width={props.rect.w}
+          height={props.rect.h}
+          fill="none"
+          stroke="#c45c3e"
+          stroke-width={1.5}
+          vector-effect="non-scaling-stroke"
+          pointer-events="none"
+        />
+      </Show>
+    </g>
   );
 }
 

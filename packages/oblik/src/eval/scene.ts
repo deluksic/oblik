@@ -12,8 +12,12 @@ export type FigureScene = {
   hint?: string;
   camera?: { x: number; y: number; scale: number };
   paper?: "cream" | "white";
-  /** World-unit artboard, drawn as a page. Omit for no crop marks. */
-  frame?: { width: number; height: number };
+  /**
+   * World-unit artboard, drawn as a page. Omit for no crop marks.
+   * `x`/`y` are the min corner (bottom-left, y-up); when omitted the frame is
+   * centered on the camera look-at.
+   */
+  frame?: { width: number; height: number; x?: number; y?: number };
   build: () => unknown;
 };
 

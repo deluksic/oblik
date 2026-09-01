@@ -43,6 +43,7 @@ export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, exposeReturnBag, namesInFunctionScope, type Insert } from "./source/insert";
 export { patchPaintStyle, removePaintCall } from "./source/paint-edit";
+export { patchFrame, type FrameValues } from "./source/frame-edit";
 export { printExpr, member, parsePath, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";

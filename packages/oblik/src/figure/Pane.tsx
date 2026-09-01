@@ -8,7 +8,7 @@ import type { FigureScene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import { isPaint, type PaintValue } from "../eval/paint";
-import { SelectionSidebar } from "../host/SelectionSidebar";
+import { SelectionInspector, SelectionSidebar, SidebarIdentity, SidebarSection } from "../host/SelectionSidebar";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -28,7 +28,9 @@ import { BrushDock } from "./BrushDock";
 import { ExportModal } from "./ExportModal";
 import { FigurePalette } from "./Palette";
 import { FigureView } from "./View";
+import { FrameEditor, type FrameXywh } from "./FrameEditor";
 import { figureToSvg } from "./export";
+import { frameRect } from "./frame";
 import { isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -78,9 +80,15 @@ export function FigurePane(props: FigurePaneProps) {
   const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [writeError, setWriteError] = createSignal<string | null>(null);
+  const [frameSelected, setFrameSelected] = createSignal(() => (props.file, false));
 
   const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
+
+  const frameXywh = createMemo<FrameXywh | null>(() => {
+    const r = frameRect(props.scene.frame, props.scene.camera);
+    return r ? { x: r.x, y: r.y, width: r.w, height: r.h } : null;
+  });
 
   const world = createMemo(() => {
     const w = tryEvaluate(props.scene, {
@@ -146,6 +154,7 @@ export function FigurePane(props: FigurePaneProps) {
         if (e.key === "Escape") {
           e.preventDefault();
           if (picker()) setPicker(false);
+          else if (frameSelected()) setFrameSelected(false);
           else if (tool()) {
             setTool(null);
             setWriteError(null);
@@ -241,11 +250,21 @@ export function FigurePane(props: FigurePaneProps) {
 
   function onPick(hits: TraceNode[]) {
     const n = hits[0];
+    setFrameSelected(false);
     setSelectedKey(n ? traceKey(n) : null);
     if (n) {
       const next = focusFromNode(n);
       if (next) setFocus(next);
     }
+  }
+
+  function onPickFrame() {
+    setSelectedKey(null);
+    setFrameSelected(true);
+  }
+
+  async function commitFrame(next: FrameXywh) {
+    await postJson("/__oblik-frame", { file: props.file, frame: next });
   }
 
   function onToolHit(n: TraceNode) {
@@ -313,11 +332,13 @@ export function FigurePane(props: FigurePaneProps) {
             brush={brush()}
             hoverKey={hoverKey()}
             selectedKey={selectedKey()}
+            frameSelected={frameSelected()}
             scope={scope()}
             onShift={setShift}
             onHoverKey={setHoverKey}
             onPick={onPick}
             onToolHit={onToolHit}
+            onPickFrame={onPickFrame}
           />
           <Show when={tool() === "brush"}>
             <BrushDock settings={brush()} onChange={setBrush} />
@@ -338,13 +359,29 @@ export function FigurePane(props: FigurePaneProps) {
         </div>
       </div>
       <div class={styles.sidebarSlot}>
-        <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-          <SelectionSidebar
-            detail={selectionDetail()}
-            onPickScope={pickScope}
-            onExpose={(bind) => void expose(bind)}
-          />
-        </Loading>
+        <SelectionSidebar>
+          <Show
+            when={frameSelected() ? frameXywh() : null}
+            fallback={
+              <Loading fallback={<SelectionInspector detail={emptyScopeDetail(focus())} />}>
+                <SelectionInspector
+                  detail={selectionDetail()}
+                  onPickScope={pickScope}
+                  onExpose={(bind) => void expose(bind)}
+                />
+              </Loading>
+            }
+          >
+            {(xy) => (
+              <>
+                <SidebarIdentity crumb="Frame" meta="Page artboard — world units" />
+                <SidebarSection title="Dimensions">
+                  <FrameEditor value={xy()} onChange={(next) => void commitFrame(next)} />
+                </SidebarSection>
+              </>
+            )}
+          </Show>
+        </SelectionSidebar>
       </div>
     </div>
   );

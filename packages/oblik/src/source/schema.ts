@@ -94,6 +94,24 @@ export function parseErase(raw: unknown): EraseBody | string {
   return r.issues.map((i) => i.message).join("; ");
 }
 
+export const frameEditSchema = v.object({
+  file: v.string(),
+  frame: v.object({
+    x: v.number(),
+    y: v.number(),
+    width: v.pipe(v.number(), v.minValue(0)),
+    height: v.pipe(v.number(), v.minValue(0)),
+  }),
+});
+
+export type FrameEditBody = v.InferOutput<typeof frameEditSchema>;
+
+export function parseFrameEdit(raw: unknown): FrameEditBody | string {
+  const r = v.safeParse(frameEditSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}
+
 export const exposeSchema = v.object({
   file: v.string(),
   dest: v.pipe(v.string(), v.minLength(1)),
