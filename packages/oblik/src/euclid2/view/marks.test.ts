@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "@/eval/context";
-import { hoverNode, isGrabbable, isHot, liftSelected } from "./marks";
+import { hoverNode, isGrabbable, isHot, liftSelected, splitChrome } from "./marks";
 
 const A = {
   id: "o_a",
@@ -51,6 +51,21 @@ describe("isGrabbable", () => {
     expect(isGrabbable(SEG)).toBe(false);
     expect(isGrabbable({ ...A, editable: false })).toBe(false);
     expect(isGrabbable(null)).toBe(false);
+  });
+});
+
+describe("splitChrome", () => {
+  test("peels hover and selected without mixing groups", () => {
+    expect(splitChrome(["a", "b", "c", "d"], (x) => x === "d", (x) => x === "b")).toEqual({
+      rest: ["a", "c"],
+      hover: ["b"],
+      lifted: ["d"],
+    });
+    expect(splitChrome(["a", "b"], (x) => x === "b", (x) => x === "b")).toEqual({
+      rest: ["a"],
+      hover: [],
+      lifted: ["b"],
+    });
   });
 });
 

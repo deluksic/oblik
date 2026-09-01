@@ -47,6 +47,7 @@ type StrokeProps = {
   replaced?: boolean;
   overlay?: boolean;
   knockout?: boolean;
+  erase?: boolean;
 };
 
 /** `node` is `TraceNode | null` because Solid compiles JSX props as getters — a live preview can go null mid-update. */
@@ -67,6 +68,7 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
           replaced={props.replaced}
           overlay={props.overlay}
           knockout={props.knockout}
+          erase={props.erase}
         />
       )}
     </Show>
@@ -86,7 +88,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
     }),
   );
   return (
-    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
+    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true, [styles.erase]: props.erase === true }}>
       <Show when={kind() === "segment"}>
         <Seg node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
       </Show>
@@ -343,6 +345,7 @@ type PointProps = {
   replaced?: boolean;
   overlay?: boolean;
   knockout?: boolean;
+  erase?: boolean;
 };
 
 /** Same live-getter contract as `FigureStroke`: `node` may go null while Brush preview unmounts. */
@@ -362,6 +365,7 @@ export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
           replaced={props.replaced}
           overlay={props.overlay}
           knockout={props.knockout}
+          erase={props.erase}
         />
       )}
     </Show>
@@ -392,7 +396,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     }, readChromeMetrics()),
   );
   return (
-    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
+    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true, [styles.erase]: props.erase === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
           {props.overlay ? null : (

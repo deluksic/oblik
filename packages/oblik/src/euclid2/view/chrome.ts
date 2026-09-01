@@ -36,9 +36,8 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
 }
 
 /**
- * Base pass keeps paint order. Hover knockouts in place, then paint.
- * Overlay is outline (and, when selected, knockout) so chrome sits under
- * the lifted selected paint but above same-priority siblings.
+ * Base pass is paint only. Overlay is knockout then outline, drawn before
+ * that node's paint so hover and selection highlights sit under the geometry.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -52,15 +51,9 @@ export function chromeLayers(
   if (opts.overlay) {
     if (!hot || !opts.knockout) return [];
     const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
-    const outline: ChromeLayer = { kind: "outline", width: band, opacity: outlineOpacity };
-    if (opts.selected) return [{ kind: "knockout", width: band }, outline];
-    return [outline];
-  }
-  if (opts.selected) return [{ kind: "paint", width: w }];
-  if (hot && opts.knockout) {
     return [
       { kind: "knockout", width: band },
-      { kind: "paint", width: w },
+      { kind: "outline", width: band, opacity: outlineOpacity },
     ];
   }
   return [{ kind: "paint", width: w }];

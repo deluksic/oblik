@@ -11,3 +11,10 @@ describe("figure selection paint", () => {
     expect(ink).not.toContain("oblik-selected-paint");
   });
 });
+
+describe("figure eraser chrome", () => {
+  test("eraser outline is error red, under the geometry", () => {
+    const css = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "View.module.css"), "utf8");
+    expect(css).toMatch(/\.erase\s+\.outline[\s\S]*oblik-error/);
+  });
+});

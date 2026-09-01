@@ -11,9 +11,8 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("base pass knockouts then paints hovered nodes in place", () => {
+  test("base pass is paint only when hovered; knockout lives in the overlay", () => {
     expect(chromeLayers(1, { selected: false, hover: true, overlay: false, knockout: true }, M)).toEqual([
-      { kind: "knockout", width: M.knockoutPx },
       { kind: "paint", width: 1 },
     ]);
   });
@@ -31,8 +30,9 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("hover overlay uses hover outline opacity", () => {
+  test("hover overlay is knockout then outline, under the hovered paint", () => {
     expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
+      { kind: "knockout", width: M.knockoutPx },
       { kind: "outline", width: M.knockoutPx, opacity: M.hoverOutlineOpacity },
     ]);
   });
@@ -45,11 +45,11 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("world base knockout scales by device pixel ratio", () => {
+  test("world hover overlay knockout scales by device pixel ratio", () => {
     vi.stubGlobal("window", { devicePixelRatio: 2 });
-    expect(chromeLayers(1, { selected: false, hover: true, overlay: false, knockout: true }, M)).toEqual([
+    expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
       { kind: "knockout", width: M.knockoutPx * 2 },
-      { kind: "paint", width: 1 },
+      { kind: "outline", width: M.knockoutPx * 2, opacity: M.hoverOutlineOpacity },
     ]);
   });
 

@@ -10,11 +10,28 @@ export function isSelected(node: TraceNode, selectedKey: string | null | undefin
   return traceKey(node) === selectedKey;
 }
 
+export type ChromeSplit<T> = { rest: T[]; hover: T[]; lifted: T[] };
+
+/** Idle, then hovered, then selected — hover/select paint draws after their overlay. */
+export function splitChrome<T>(
+  items: readonly T[],
+  selected: (item: T) => boolean,
+  hover: (item: T) => boolean,
+): ChromeSplit<T> {
+  const rest: T[] = [];
+  const hovered: T[] = [];
+  const lifted: T[] = [];
+  for (const item of items) {
+    if (selected(item)) lifted.push(item);
+    else if (hover(item)) hovered.push(item);
+    else rest.push(item);
+  }
+  return { rest, hover: hovered, lifted };
+}
+
 /** Keep original order, then selected items — for drawing a node above same-priority siblings. */
 export function liftSelected<T>(items: readonly T[], selected: (item: T) => boolean): { rest: T[]; lifted: T[] } {
-  const rest: T[] = [];
-  const lifted: T[] = [];
-  for (const item of items) (selected(item) ? lifted : rest).push(item);
+  const { rest, lifted } = splitChrome(items, selected, () => false);
   return { rest, lifted };
 }
 

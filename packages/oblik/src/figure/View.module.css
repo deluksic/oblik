@@ -101,6 +101,10 @@
   vector-effect: non-scaling-stroke;
 }
 
+.erase .outline {
+  stroke: var(--oblik-error);
+}
+
 .muted {
   opacity: 0.28;
 }
