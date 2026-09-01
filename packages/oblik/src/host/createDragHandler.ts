@@ -5,7 +5,10 @@ export type DragSession = {
   onDone?: (event?: PointerEvent) => void;
 };
 
-export type CreateDragHandlers = (event: PointerEvent) => DragSession | undefined;
+export type CreateDragHandlers<T extends unknown[] = []> = (
+  event: PointerEvent,
+  ...args: T
+) => DragSession | undefined;
 
 export type DragHandlerOptions = {
   /** Manhattan distance in CSS pixels before `onPointerMove` runs. */
@@ -45,20 +48,21 @@ function captureTarget(event: PointerEvent): Element | null {
 /**
  * Click-and-drag helper for pointer sessions.
  *
- * Call from a component, then put the returned function on `onPointerDown`.
+ * Call from a component, then put the returned function on `onPointerDown`
+ * (or call it from a classifier that passes extra start arguments).
  * Move/up/cancel listen on `document` so the drag keeps going if the pointer
  * leaves the original node. Unmount or a second touch ends the session.
  */
-export function createDragHandler(
-  createHandlers: CreateDragHandlers,
+export function createDragHandler<T extends unknown[] = []>(
+  createHandlers: CreateDragHandlers<T>,
   { deadZoneRadius = 0, preventDefault = true }: DragHandlerOptions = {},
-): (event: PointerEvent) => void {
+): (event: PointerEvent, ...args: T) => void {
   const unmount = new AbortController();
   onCleanup(() => unmount.abort());
 
-  return (initEvent: PointerEvent) => {
+  return (initEvent: PointerEvent, ...args: T) => {
     if (initEvent.button !== 0) return;
-    const handlers = createHandlers(initEvent);
+    const handlers = createHandlers(initEvent, ...args);
     if (!handlers) return;
 
     const cleanup = new AbortController();

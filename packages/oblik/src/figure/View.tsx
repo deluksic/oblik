@@ -112,10 +112,7 @@ export function FigureView(props: FigureViewProps) {
 
   const dragOpts = { deadZoneRadius: PICK_CLICK_PX, preventDefault: false } as const;
 
-  const startPan = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hits = hitsOf(e, el);
+  const startPan = createDragHandler((e, hits: TraceNode[]) => {
     const start = panDrag(e, camera());
     drag = start;
     const pick = hits.length > 0 ? hits : null;
@@ -175,12 +172,13 @@ export function FigureView(props: FigureViewProps) {
     if (e.button !== 0) return;
     const el = paneEl();
     if (!el) return;
+    const hits = hitsOf(e, el);
     if (props.tool) {
-      const hit = hitsOf(e, el)[0];
+      const hit = hits[0];
       if (hit) props.onToolHit?.(hit);
       return;
     }
-    startPan(e);
+    startPan(e, hits);
   }
 
   const previewKey = createMemo(() => {

@@ -78,11 +78,13 @@ function pointerEvent(partial: {
   } as unknown as PointerEvent;
 }
 
-function withHandler(setup: () => (event: PointerEvent) => void): {
-  start: (event: PointerEvent) => void;
+function withHandler<T extends unknown[] = []>(
+  setup: () => (event: PointerEvent, ...args: T) => void,
+): {
+  start: (event: PointerEvent, ...args: T) => void;
   dispose: () => void;
 } {
-  let start!: (event: PointerEvent) => void;
+  let start!: (event: PointerEvent, ...args: T) => void;
   const dispose = createRoot((d) => {
     start = setup();
     return d;
@@ -181,5 +183,23 @@ describe("createDragHandler", () => {
     dispose();
     expect(finished).toBe(1);
     expect(doc.listenerCount("pointermove")).toBe(0);
+  });
+
+  test("forwards start arguments into the session factory", () => {
+    install();
+    let received: { id: string } | undefined;
+    const { start, dispose } = withHandler<[ { id: string } ]>(() =>
+      createDragHandler(
+        (_e, node: { id: string }) => {
+          received = node;
+          return {};
+        },
+        { preventDefault: false },
+      ),
+    );
+    const hit = { id: "p0" };
+    start(pointerEvent({ clientX: 0, clientY: 0 }), hit);
+    expect(received).toBe(hit);
+    dispose();
   });
 });

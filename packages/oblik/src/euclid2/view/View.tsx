@@ -137,52 +137,29 @@ export function Euclid2View(props: Euclid2ViewProps) {
     };
   }
 
-  const startPoint = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
-    if (!hit) return;
+  const startPoint = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(pointDrag(hit, worldOf(e, el, camera(), size()), e));
   }, dragOpts);
 
-  const startGlider = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
-    if (!hit) return;
+  const startGlider = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
     const g = gliderDrag(hit, worldOf(e, el, camera(), size()), e);
     if (!g) return;
     return editSession(g);
   }, dragOpts);
 
-  const startRadius = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
-    if (!hit) return;
+  const startRadius = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(radiusDrag(hit, worldOf(e, el, camera(), size()), e));
   }, dragOpts);
 
-  const startParallel = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
-    if (!hit) return;
+  const startParallel = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(parallelDrag(hit, worldOf(e, el, camera(), size()), e));
   }, dragOpts);
 
-  const startSlider = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (!slider) return;
+  const startSlider = createDragHandler((e, slider: TraceNode) => {
     return editSession(sliderDrag(slider, e));
   }, dragOpts);
 
-  const startPan = createDragHandler((e) => {
-    const el = paneEl();
-    if (!el) return;
-    const hits = topHit(e, el, camera(), size(), props.trace);
+  const startPan = createDragHandler((e, hits: TraceNode[]) => {
     const start = panDrag(e, camera());
     drag = start;
     const pick = hits.length > 0 ? hits : null;
@@ -213,27 +190,28 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
     if (slider) {
-      startSlider(e);
+      startSlider(e, slider);
       return;
     }
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    const hits = topHit(e, el, camera(), size(), props.trace);
+    const hit = hits[0];
     if (hit && isGrabbable(hit) && hit.value.kind === "point") {
-      startPoint(e);
+      startPoint(e, el, hit);
       return;
     }
     if (hit && isGrabbable(hit) && isGlider(hit.value)) {
-      startGlider(e);
+      startGlider(e, el, hit);
       return;
     }
     if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
-      startRadius(e);
+      startRadius(e, el, hit);
       return;
     }
     if (hit && isGrabbable(hit) && hit.value.kind === "parallelLine") {
-      startParallel(e);
+      startParallel(e, el, hit);
       return;
     }
-    startPan(e);
+    startPan(e, hits);
   }
 
   function onWheel(e: WheelEvent) {
