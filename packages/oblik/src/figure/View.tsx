@@ -11,7 +11,7 @@ import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Came
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
-import { createDragHandler } from "../host/createDragHandler";
+import { createDragHandler } from "../euclid2/view/createDragHandler";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
 import { frameRect, frameMoved, frameResized, pageScreenRect, type FigureFrame, type FrameRect, type FrameXywh } from "./frame";

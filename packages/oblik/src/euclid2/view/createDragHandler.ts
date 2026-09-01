@@ -14,7 +14,7 @@ export type CreateDragHandlers<T extends unknown[] = []> = (
 ) => DragSession | undefined;
 
 export type DragHandlerOptions = {
-  /** Manhattan distance in CSS pixels before `onPointerMove` runs. */
+  /** Euclidean distance in CSS pixels before `onPointerMove` runs. */
   deadZoneRadius?: number;
   preventDefault?: boolean;
 };
@@ -27,10 +27,12 @@ export type DragHandler = {
   ) => (event: PointerEvent, ...args: T) => void;
 };
 
-type ClientPoint = { clientX: number; clientY: number };
-
-function manhattanDistance(a: ClientPoint, b: ClientPoint): number {
-  return Math.abs(a.clientX - b.clientX) + Math.abs(a.clientY - b.clientY);
+function pastDeadZone(
+  from: { clientX: number; clientY: number },
+  to: { clientX: number; clientY: number },
+  radius: number,
+): boolean {
+  return Math.hypot(to.clientX - from.clientX, to.clientY - from.clientY) >= radius;
 }
 
 function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {
@@ -116,7 +118,7 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
           event.preventDefault();
           event.stopImmediatePropagation();
         }
-        if (moved || manhattanDistance(initEvent, event) >= deadZoneRadius) {
+        if (moved || pastDeadZone(initEvent, event, deadZoneRadius)) {
           if (!moved) setPhase("dragging");
           moved = true;
           onPointerMove?.(event);

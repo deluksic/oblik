@@ -25,18 +25,14 @@ import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
 import { hitSlider, sliderNodes } from "./sliderHud";
 import {
   applyDrag,
+  editDragOf,
   panDrag,
   placeFromEvent,
-  parallelDrag,
-  pointDrag,
-  radiusDrag,
-  gliderDrag,
   sliderDrag,
   topHit,
-  worldOf,
   type EditDrag,
 } from "./pointer";
-import { createDragHandler, type DragSession } from "../../host/createDragHandler";
+import { createDragHandler, type DragSession } from "./createDragHandler";
 
 import styles from "./View.module.css";
 
@@ -129,27 +125,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     };
   }
 
-  const startPoint = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
-    return editSession(pointDrag(hit, worldOf(e, el, camera(), size()), e));
-  });
-
-  const startGlider = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
-    const g = gliderDrag(hit, worldOf(e, el, camera(), size()), e);
-    if (!g) return;
-    return editSession(g);
-  });
-
-  const startRadius = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
-    return editSession(radiusDrag(hit, worldOf(e, el, camera(), size()), e));
-  });
-
-  const startParallel = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
-    return editSession(parallelDrag(hit, worldOf(e, el, camera(), size()), e));
-  });
-
-  const startSlider = drag.start((e, slider: TraceNode) => {
-    return editSession(sliderDrag(slider, e));
-  });
+  const startEdit = drag.start((_e, session: EditDrag) => editSession(session));
 
   const startPan = drag.start((e, hits: TraceNode[]) => {
     const start = panDrag(e, camera());
@@ -177,26 +153,17 @@ export function Euclid2View(props: Euclid2ViewProps) {
     }
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
     if (slider) {
-      startSlider(e, slider);
+      startEdit(e, sliderDrag(slider, e));
       return;
     }
     const hits = topHit(e, el, camera(), size(), props.trace);
     const hit = hits[0];
-    if (hit && isGrabbable(hit) && hit.value.kind === "point") {
-      startPoint(e, el, hit);
-      return;
-    }
-    if (hit && isGrabbable(hit) && isGlider(hit.value)) {
-      startGlider(e, el, hit);
-      return;
-    }
-    if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
-      startRadius(e, el, hit);
-      return;
-    }
-    if (hit && isGrabbable(hit) && hit.value.kind === "parallelLine") {
-      startParallel(e, el, hit);
-      return;
+    if (hit && isGrabbable(hit)) {
+      const session = editDragOf(e, el, hit, camera(), size());
+      if (session) {
+        startEdit(e, session);
+        return;
+      }
     }
     startPan(e, hits);
   }

@@ -219,6 +219,21 @@ export function gliderDrag(
   return null;
 }
 
+export function editDragOf(
+  e: PointerEvent,
+  el: HTMLDivElement | null,
+  hit: TraceNode,
+  camera: Camera2,
+  size: PaneSize,
+): EditDrag | null {
+  const w = worldOf(e, el, camera, size);
+  if (hit.value.kind === "point") return pointDrag(hit, w, e);
+  if (isGlider(hit.value)) return gliderDrag(hit, w, e);
+  if (hit.value.kind === "circle") return radiusDrag(hit, w, e);
+  if (hit.value.kind === "parallelLine") return parallelDrag(hit, w, e);
+  return null;
+}
+
 export function sliderDrag(node: TraceNode, e: PointerEvent): Extract<Drag, { kind: "slider" }> {
   const g = node.value;
   const startN = g.kind === "slider" ? g.n : 0;
