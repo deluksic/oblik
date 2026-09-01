@@ -47,6 +47,7 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
  * Base pass is paint only. Overlay sits under that paint:
  * hover is a translucent outline (no gap); selection is an opaque outline
  * with a thinner knockout on top to cut a paper gap inside the ring.
+ * Stroke knockout grows with paint width so thick figure ink still shows a gap.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -56,20 +57,36 @@ export function chromeLayers(
   const w = paintWidth > 0 ? paintWidth : 1;
   const hot = opts.selected || opts.hover;
   const px = opts.screenSpace ? 1 : chromeDprScale();
-  const outlinePx = opts.point ? metrics.pointKnockoutPx : metrics.knockoutPx;
-  const gapPx = opts.point ? metrics.pointSelectKnockoutPx : metrics.selectKnockoutPx;
-  const band = outlinePx * px;
+  const bands = overlayBands(w, opts, metrics);
   if (opts.overlay) {
     if (!hot || !opts.knockout) return [];
     const outline: ChromeLayer = {
       kind: "outline",
-      width: band,
+      width: bands.outline * px,
       opacity: opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity,
     };
     if (!opts.selected) return [outline];
-    return [outline, { kind: "knockout", width: gapPx * px }];
+    return [outline, { kind: "knockout", width: bands.knockout * px }];
   }
   return [{ kind: "paint", width: w }];
+}
+
+/** Outline and gap widths in CSS px, before device-pixel scaling. */
+export function overlayBands(
+  paintWidth: number,
+  opts: Pick<ChromeOpts, "selected" | "point">,
+  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
+): { outline: number; knockout: number } {
+  if (opts.point) {
+    return { outline: metrics.pointKnockoutPx, knockout: metrics.pointSelectKnockoutPx };
+  }
+  const outline = metrics.knockoutPx;
+  const knockout = metrics.selectKnockoutPx;
+  if (!opts.selected) return { outline, knockout };
+  const gapPad = metrics.selectKnockoutPx - CONSTRUCTION_STROKE_PX;
+  const ringPad = metrics.knockoutPx - metrics.selectKnockoutPx;
+  const nextKnockout = Math.max(knockout, paintWidth + gapPad);
+  return { outline: Math.max(outline, nextKnockout + ringPad), knockout: nextKnockout };
 }
 
 /** Scale CSS px to device px for world-space non-scaling strokes. */

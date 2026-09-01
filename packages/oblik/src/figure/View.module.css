@@ -92,6 +92,8 @@
   stroke: var(--oblik-knockout);
   pointer-events: none;
   vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .outline {

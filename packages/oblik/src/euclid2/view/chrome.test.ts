@@ -30,12 +30,21 @@ describe("chromeLayers", () => {
   });
 
   test("selected overlay is an opaque outline with a thinner knockout on top", () => {
-    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
+    expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
       { kind: "outline", width: M.knockoutPx, opacity: M.selectOutlineOpacity },
       { kind: "knockout", width: M.selectKnockoutPx },
     ]);
     expect(M.selectKnockoutPx).toBeLessThan(M.knockoutPx);
     expect(M.selectOutlineOpacity).toBe(1);
+  });
+
+  test("selected knockout stays wider than thick figure paint so the gap is visible", () => {
+    const layers = chromeLayers(5.6, { selected: true, hover: false, overlay: true, knockout: true }, M);
+    const outline = layers.find((l) => l.kind === "outline");
+    const knock = layers.find((l) => l.kind === "knockout");
+    expect(knock?.width).toBeGreaterThan(5.6);
+    expect(outline?.width).toBeGreaterThan(knock!.width);
+    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)[1]?.width).toBeGreaterThan(2.8);
   });
 
   test("world overlay outline scales by device pixel ratio", () => {
