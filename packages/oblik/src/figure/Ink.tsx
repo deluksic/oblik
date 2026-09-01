@@ -8,7 +8,7 @@ import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
 import { chromeClipUrl, chromeInsideClipId, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
-import { ChromeClosedClips } from "../euclid2/view/ChromeClip";
+import { ChromeClosedClips, ChromeOutsideClip } from "../euclid2/view/ChromeClip";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 
 import styles from "./View.module.css";
@@ -19,13 +19,14 @@ function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
 }
 
-function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean }): ChromeLayer[] {
+function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean; filled?: boolean }): ChromeLayer[] {
   const w = (opts.onion ? ONION.width : opts.look.width) ?? 1.35;
   return chromeLayers(w, {
     selected: opts.selected,
     hover: opts.hot && !opts.selected,
     overlay: opts.overlay === true,
     knockout: opts.knockout !== false,
+    filled: opts.filled === true,
   }, readChromeMetrics());
 }
 
@@ -83,6 +84,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
       selected: props.selected,
       overlay: props.overlay,
       knockout: props.knockout,
+      filled: kind() === "profile" && props.overlay === true,
     }),
   );
   return (
@@ -308,7 +310,7 @@ function Face(props: {
     <Show when={d()}>
       {(path) => (
         <>
-          {props.overlay ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={path()} /> : null}
+          {props.overlay ? <ChromeOutsideClip id={outsideId()} d={path()} /> : null}
           {props.overlay ? null : <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />}
           <For each={props.layers}>
             {(layer) => (
@@ -317,8 +319,8 @@ function Face(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 clip-path={props.overlay ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
                 d={path()}
-                fill={paintFill(look(), props.onion, layer, true)}
-                stroke={paintStroke(look(), layer)}
+                fill={props.overlay ? "none" : paintFill(look(), props.onion, layer, true)}
+                stroke={props.overlay ? undefined : paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"

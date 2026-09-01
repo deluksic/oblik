@@ -8,7 +8,7 @@ import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
 import { CONSTRUCTION_STROKE_PX, chromeClipUrl, chromeInsideClipId, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
-import { ChromeClosedClips } from "./ChromeClip";
+import { ChromeClosedClips, ChromeOutsideClip } from "./ChromeClip";
 import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
@@ -29,12 +29,13 @@ function layerClass(kind: ChromeKind, editable: boolean, muted: boolean) {
   return inkClass(editable, muted);
 }
 
-function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean): ChromeLayer[] {
+function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean, filled = false): ChromeLayer[] {
   return chromeLayers(CONSTRUCTION_STROKE_PX, {
     selected,
     hover: hot && !selected,
     overlay,
     knockout,
+    filled,
   }, readChromeMetrics());
 }
 
@@ -184,21 +185,19 @@ export function ProfileOutline(props: {
   knockout?: boolean;
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false, true));
   const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
-  const insideId = () => chromeInsideClipId(`e2-${traceKey(props.node)}`);
   return (
     <>
-      {props.overlay === true ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={d()} /> : null}
+      {props.overlay === true ? <ChromeOutsideClip id={outsideId()} d={d()} /> : null}
       <For each={layers()}>
         {(layer) => (
           <path
-            class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
-            clip-path={props.overlay === true ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
+            class={layerClass(layer.kind, false, false)}
+            clip-path={props.overlay === true ? chromeClipUrl(outsideId(), "", layer) : undefined}
             d={d()}
-            fill={layer.kind === "paint" ? undefined : "none"}
-            stroke={layer.kind === "paint" ? "none" : undefined}
-            stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+            fill="none"
+            stroke-width={layerStrokeWidth(layer)}
           />
         )}
       </For>

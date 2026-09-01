@@ -15,6 +15,8 @@ export type ChromeOpts = {
   hover: boolean;
   overlay: boolean;
   knockout: boolean;
+  /** Filled regions (profiles): boundary chrome only, no paint or inner knockout. */
+  filled?: boolean;
   /** HUD / screen-space SVG where viewBox units are already CSS px. */
   screenSpace?: boolean;
 };
@@ -59,6 +61,12 @@ export function chromeLayers(
   const ringBand = ringCss * px;
   const bleedBand = metrics.bleedPx * px;
   const gap = w + 2 * gapBand;
+  if (opts.filled) {
+    return [
+      { kind: "outline", width: gap + 2 * ringBand, clip: "outside" },
+      { kind: "knockout", width: gap, clip: "outside" },
+    ];
+  }
   return [
     { kind: "outline", width: gap + 2 * ringBand, clip: "outside" },
     { kind: "knockout", width: gap, clip: "outside" },

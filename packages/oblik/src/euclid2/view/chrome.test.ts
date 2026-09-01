@@ -59,6 +59,14 @@ describe("chromeLayers", () => {
     vi.unstubAllGlobals();
   });
 
+  test("filled overlay is boundary chrome only", () => {
+    const gap = 1.5 + 2 * M.gapPx;
+    expect(chromeLayers(1.5, { selected: true, hover: false, overlay: true, knockout: true, filled: true }, M)).toEqual([
+      { kind: "outline", width: gap + 2 * M.selectRingPx, clip: "outside" },
+      { kind: "knockout", width: gap, clip: "outside" },
+    ]);
+  });
+
   test("dragging skips overlay chrome", () => {
     expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true, knockout: false }, M)).toEqual([]);
   });
