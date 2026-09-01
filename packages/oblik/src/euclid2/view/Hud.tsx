@@ -8,12 +8,9 @@ import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
 import { POINT_STROKE_PX, chromeLayers, layerStrokeWidth } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
+import { HANDLE_R, SNAP_R, pointMarkRadius } from "./pointMark";
 
 import styles from "./View.module.css";
-
-const HANDLE_R = 7;
-const POINT_R = 3.5;
-const SNAP_R = 9;
 
 export function PointMark(props: {
   node: TraceNode;
@@ -49,12 +46,19 @@ export function PointMark(props: {
                 ? styles.knockout
                 : layer.kind === "outline"
                   ? styles.outline
-                  : [styles.point, { [styles.selected]: props.selected, [styles.muted]: !!props.muted && !props.hot && !props.selected }]
+                  : [
+                      styles.point,
+                      {
+                        [styles.editable]: props.node.editable && !props.selected,
+                        [styles.selected]: props.selected,
+                        [styles.muted]: !!props.muted && !props.hot && !props.selected,
+                      },
+                    ]
             }
             opacity={layer.opacity}
             cx={pos().x}
             cy={pos().y}
-            r={POINT_R}
+            r={pointMarkRadius(props.node.editable)}
             fill={layer.kind === "paint" ? undefined : "none"}
             stroke-width={layerStrokeWidth(layer)}
           />

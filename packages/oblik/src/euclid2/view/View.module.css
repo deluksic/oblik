@@ -115,6 +115,11 @@
   vector-effect: non-scaling-stroke;
 }
 
+.point.editable {
+  fill: var(--oblik-accent);
+  stroke: var(--oblik-paper);
+}
+
 .point.selected {
   fill: var(--oblik-selected-paint);
   stroke: var(--oblik-paper);
