@@ -10,6 +10,14 @@ export function isSelected(node: TraceNode, selectedKey: string | null | undefin
   return traceKey(node) === selectedKey;
 }
 
+/** Keep original order, then selected items — for drawing a node above same-priority siblings. */
+export function liftSelected<T>(items: readonly T[], selected: (item: T) => boolean): { rest: T[]; lifted: T[] } {
+  const rest: T[] = [];
+  const lifted: T[] = [];
+  for (const item of items) (selected(item) ? lifted : rest).push(item);
+  return { rest, lifted };
+}
+
 export function isGrabbable(node: TraceNode | null | undefined): boolean {
   return (
     !!node?.editable &&

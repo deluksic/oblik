@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "@/eval/context";
-import { hoverNode, isGrabbable, isHot } from "./marks";
+import { hoverNode, isGrabbable, isHot, liftSelected } from "./marks";
 
 const A = {
   id: "o_a",
@@ -51,6 +51,16 @@ describe("isGrabbable", () => {
     expect(isGrabbable(SEG)).toBe(false);
     expect(isGrabbable({ ...A, editable: false })).toBe(false);
     expect(isGrabbable(null)).toBe(false);
+  });
+});
+
+describe("liftSelected", () => {
+  test("moves selected items after the rest, preserving order in each group", () => {
+    expect(liftSelected(["a", "b", "c", "d"], (x) => x === "b" || x === "d")).toEqual({
+      rest: ["a", "c"],
+      lifted: ["b", "d"],
+    });
+    expect(liftSelected(["a", "b"], () => false)).toEqual({ rest: ["a", "b"], lifted: [] });
   });
 });
 
