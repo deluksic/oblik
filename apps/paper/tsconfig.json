@@ -8,7 +8,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["../../packages/shell/src/*"]
-    }
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["src", "vite.config.ts"]
 }

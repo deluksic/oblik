@@ -5,7 +5,13 @@
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
     "types": ["vite/client"],
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../../packages/oblik/src/*"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

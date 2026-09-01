@@ -10,6 +10,7 @@
     "preview": "pnpm --filter @design-scenes/paper preview",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
+    "typecheck": "pnpm -r typecheck",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check ."
   },

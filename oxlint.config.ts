@@ -21,6 +21,12 @@ export default defineConfig({
       },
     ],
     "eslint/no-underscore-dangle": "off",
+    "import/no-unassigned-import": [
+      "error",
+      {
+        allow: ["**/*.css", "**/*.module.css"],
+      },
+    ],
     "eslint/no-restricted-imports": [
       "error",
       {
@@ -40,6 +46,24 @@ export default defineConfig({
       plugins: ["vitest"],
       env: {
         vitest: true,
+      },
+    },
+    {
+      // Scene files keep named `const` bindings for interactive editing even when
+      // not yet referenced in the rest of the scene.
+      files: [
+        "apps/**/scenes/**/*",
+        "apps/**/*.scene.ts",
+        "apps/**/demo/**/*",
+      ],
+      rules: {
+        "eslint/no-unused-vars": "off",
+      },
+    },
+    {
+      files: ["**/*.{css,module.css}"],
+      rules: {
+        "import/no-unassigned-import": "off",
       },
     },
   ],

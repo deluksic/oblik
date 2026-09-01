@@ -10,7 +10,8 @@
     "./plugin": "./src/source/vite-plugin.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
