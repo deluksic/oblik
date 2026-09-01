@@ -8,7 +8,6 @@ import type { FigureScene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import { isPaint, type PaintValue } from "../eval/paint";
-import { currentChromePins } from "../host/routing";
 import { SelectionInspector, SelectionSidebar, SidebarIdentity, SidebarSection } from "../host/SelectionSidebar";
 import {
   emptyScopeDetail,
@@ -89,11 +88,11 @@ export function FigurePane(props: FigurePaneProps) {
   const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.file, null));
   const [brush, setBrush] = createSignal<BrushSettings>(() => (props.file, { ...DEFAULT_BRUSH }));
   const [shift, setShift] = createSignal(false);
-  const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, currentChromePins().hover));
-  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, currentChromePins().select));
+  const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, null));
+  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [writeError, setWriteError] = createSignal<string | null>(null);
-  const [frameSelected, setFrameSelected] = createSignal(() => (props.file, currentChromePins().frame));
+  const [frameSelected, setFrameSelected] = createSignal(() => (props.file, false));
   const [editedFrame, setEditedFrame] = createSignal<FrameXywh | null>(() => (props.scene, null));
 
   const requestModal = useRequestModal();
@@ -351,10 +350,7 @@ export function FigurePane(props: FigurePaneProps) {
             frameSelected={frameSelected()}
             scope={scope()}
             onShift={setShift}
-            onHoverKey={(key) => {
-              if (currentChromePins().pin) return;
-              setHoverKey(key);
-            }}
+            onHoverKey={setHoverKey}
             onPick={onPick}
             onToolHit={onToolHit}
             onPickFrame={onPickFrame}

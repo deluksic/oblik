@@ -9,7 +9,6 @@ import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eva
 import { isGlider } from "@/geom/gliders";
 import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
-import { isLabChromeId, resolveChrome } from "../euclid2/view/chrome-lab";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
 import { createDragHandler } from "../euclid2/view/createDragHandler";
@@ -184,10 +183,10 @@ export function FigureView(props: FigureViewProps) {
   function hitsOf(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
     const geoms = topHit(e, el, camera(), size(), props.trace).filter(isDrawnGeom);
     if (props.shift) {
-      if (props.tool === "brush") return brushAddHits(geoms, props.scope).filter((n) => !isLabChromeId(n.id));
-      return geoms.filter((n) => !isLabChromeId(n.id));
+      if (props.tool === "brush") return brushAddHits(geoms, props.scope);
+      return geoms;
     }
-    return inkFromGeomHits(props.trace, geoms).filter((n) => !isLabChromeId(n.id));
+    return inkFromGeomHits(props.trace, geoms);
   }
 
   function onWheel(e: WheelEvent) {
@@ -321,8 +320,8 @@ export function FigureView(props: FigureViewProps) {
                     node={n}
                     look={ONION}
                     onion={true}
-                    hot={resolveChrome(n.id, traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey, traceKey(n) === props.selectedKey).hot}
-                    selected={resolveChrome(n.id, traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey, traceKey(n) === props.selectedKey).selected}
+                    hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+                    selected={traceKey(n) === props.selectedKey}
                     muted={!!props.scope && mutedForScope(n, props.scope)}
                     camera={camera()}
                     size={size()}
@@ -352,8 +351,8 @@ export function FigureView(props: FigureViewProps) {
                     node={n}
                     look={undefined}
                     onion={true}
-                    hot={resolveChrome(n.id, traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey, traceKey(n) === props.selectedKey).hot}
-                    selected={resolveChrome(n.id, traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey, traceKey(n) === props.selectedKey).selected}
+                    hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+                    selected={traceKey(n) === props.selectedKey}
                     muted={!!props.scope && mutedForScope(n, props.scope)}
                     camera={camera()}
                     replaced={previewKey() === traceKey(n)}
@@ -439,19 +438,13 @@ function InkStroke(props: {
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
   const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
-  const chrome = () =>
-    resolveChrome(
-      props.s.paint.id,
-      paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey,
-      paintKeyNow() === props.selectedKey,
-    );
   return (
     <FigureStroke
       node={props.s.geom}
       look={props.s.style}
       onion={false}
-      hot={chrome().hot}
-      selected={chrome().selected}
+      hot={paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey}
+      selected={paintKeyNow() === props.selectedKey}
       muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
       size={props.size}
@@ -471,19 +464,13 @@ function InkPoint(props: {
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
   const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
-  const chrome = () =>
-    resolveChrome(
-      props.s.paint.id,
-      paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey,
-      paintKeyNow() === props.selectedKey,
-    );
   return (
     <FigurePoint
       node={props.s.geom}
       look={props.s.style}
       onion={false}
-      hot={chrome().hot}
-      selected={chrome().selected}
+      hot={paintKeyNow() === props.hoverKey || paintKeyNow() === props.selectedKey}
+      selected={paintKeyNow() === props.selectedKey}
       muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
       replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}

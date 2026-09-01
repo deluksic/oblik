@@ -15,8 +15,6 @@ import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import plateFigure from "../../../../apps/demo/src/scenes/plate-figure.ts";
-import chromeConstruction from "../../../../apps/demo/src/scenes/chrome-construction.ts";
-import chromeFigure from "../../../../apps/demo/src/scenes/chrome-figure.ts";
 import type { Scene } from "./scene";
 
 const demoSrc = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../apps/demo/src");
@@ -160,27 +158,5 @@ describe("migrated demo scenes", () => {
     expect(
       inset?.value.kind === "profile" ? inset.value.outer.filter((e) => e.carrier.kind === "circle") : [],
     ).toHaveLength(inset?.value.kind === "profile" ? 4 : 0);
-  });
-
-  test("chrome construction keeps free vs derived and a frozen selected specimen", () => {
-    const { trace } = run(chromeConstruction, ["apps/demo/src/scenes/chrome-construction.ts"]);
-    expect(trace.find((n) => n.bind === "FreeA")?.editable).toBe(true);
-    expect(trace.find((n) => n.bind === "Derived")?.editable).toBe(false);
-    expect(trace.find((n) => n.bind === "copy")?.editable).toBe(false);
-    expect(trace.some((n) => n.id === "o_ink_selected")).toBe(true);
-    expect(trace.some((n) => n.id === "o_pick_a")).toBe(true);
-  });
-
-  test("chrome figure paints colliding colors in idle/hover/selected and a live pick pair", () => {
-    const { trace } = run(chromeFigure, [
-      "apps/demo/src/scenes/chrome-figure.ts",
-      "apps/demo/src/layout/mounting-plate.ts",
-    ]);
-    const paints = paintsFromTrace(trace);
-    expect(paints.has("o_coral_selected_s:0")).toBe(true);
-    expect(paints.get("o_coral_selected_s:0")?.stroke).toBe("#c45c3e");
-    expect(paints.get("o_blue_hover_s:0")?.stroke).toBe("#3b82c4");
-    expect(trace.some((n) => n.id === "o_pick_red")).toBe(true);
-    expect(trace.some((n) => n.id === "o_ghost_drill")).toBe(true);
   });
 });
