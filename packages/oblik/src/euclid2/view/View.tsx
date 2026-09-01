@@ -21,6 +21,7 @@ import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { NumberSliders } from "./NumberSliders";
 import { ProfileFill, ProfileGhost, ProfileOutline, Stroke } from "./Ink";
+import { isLabChromeId, resolveChrome } from "./chrome-lab";
 import { isGrabbable, isHot, isSelected, hoverNode } from "./marks";
 import { hitSlider, sliderNodes } from "./sliderHud";
 import {
@@ -55,6 +56,10 @@ export type Euclid2ViewProps = {
   onCursor?: (hit: PlaceHit | null) => void;
   scope?: Scope;
 };
+
+function nodeChrome(n: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined) {
+  return resolveChrome(n.id, isHot(n, hoverId, selectedKey), isSelected(n, selectedKey));
+}
 
 function readPaneSize(el: Element): PaneSize | null {
   const r = el.getBoundingClientRect();
@@ -152,11 +157,11 @@ export function Euclid2View(props: Euclid2ViewProps) {
       return;
     }
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (slider) {
+    if (slider && !isLabChromeId(slider.id)) {
       startEdit(e, sliderDrag(slider, e));
       return;
     }
-    const hits = topHit(e, el, camera(), size(), props.trace);
+    const hits = topHit(e, el, camera(), size(), props.trace).filter((n) => !isLabChromeId(n.id));
     const hit = hits[0];
     if (hit && isGrabbable(hit)) {
       const session = editDragOf(e, el, hit, camera(), size());
@@ -184,11 +189,11 @@ export function Euclid2View(props: Euclid2ViewProps) {
     const el = paneEl();
     if (!el) return;
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (slider) {
+    if (slider && !isLabChromeId(slider.id)) {
       props.onHoverId?.(slider.id);
       return;
     }
-    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    const hit = topHit(e, el, camera(), size(), props.trace).find((n) => !isLabChromeId(n.id));
     props.onHoverId?.(hit?.id ?? null);
   }
 
@@ -253,8 +258,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             {(n) => (
               <ProfileFill
                 node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
+                hot={nodeChrome(n, props.hoverId, props.selectedKey).hot}
+                selected={nodeChrome(n, props.hoverId, props.selectedKey).selected}
               />
             )}
           </For>
@@ -262,8 +267,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             {(n) => (
               <Stroke
                 node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
+                hot={nodeChrome(n, props.hoverId, props.selectedKey).hot}
+                selected={nodeChrome(n, props.hoverId, props.selectedKey).selected}
                 muted={
                   chrome().muteStrokes ||
                   (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
@@ -278,8 +283,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             {(n) => (
               <ProfileOutline
                 node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
+                hot={nodeChrome(n, props.hoverId, props.selectedKey).hot}
+                selected={nodeChrome(n, props.hoverId, props.selectedKey).selected}
               />
             )}
           </For>
@@ -295,8 +300,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
               node={n}
               size={size()}
               camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
+              hot={nodeChrome(n, props.hoverId, props.selectedKey).hot}
+              selected={nodeChrome(n, props.hoverId, props.selectedKey).selected}
               muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
             />
           )}
@@ -307,8 +312,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
               node={n}
               size={size()}
               camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
+              hot={nodeChrome(n, props.hoverId, props.selectedKey).hot}
+              selected={nodeChrome(n, props.hoverId, props.selectedKey).selected}
               muted={chrome().mutePoints}
             />
           )}

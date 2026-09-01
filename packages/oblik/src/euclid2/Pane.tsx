@@ -7,6 +7,7 @@ import { sourceFileKey } from "../eval/stack";
 import type { Euclid2Scene } from "../eval/scene";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
+import { currentChromePins } from "../host/routing";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import {
   emptyScopeDetail,
@@ -86,8 +87,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [picker, setPicker] = createSignal(() => (props.scene, false));
   const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
   const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
-  const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
-  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
+  const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, currentChromePins().hover));
+  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, currentChromePins().select));
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [toolLock, setToolLock] = createSignal(false);
   const [writeError, setWriteError] = createSignal<string | null>(null);
@@ -310,7 +311,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           hoverId={hoverId()}
           selectedKey={selectedKey()}
           scope={scope()}
-          onHoverId={setHoverId}
+          onHoverId={(id) => {
+            if (currentChromePins().pin) return;
+            setHoverId(id);
+          }}
           onPick={onPick}
           onDraft={mergeDraft}
           onCommit={(id, values) => void commit(id, values)}
