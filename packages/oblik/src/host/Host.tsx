@@ -18,8 +18,8 @@ import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 import { originFileLabel } from "./selection-detail";
 
+import "../theme.css";
 import styles from "./Host.module.css";
-import "./theme.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;
 export type MentionBundle = Record<string, MentionFile>;
