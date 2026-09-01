@@ -79,6 +79,7 @@ h6 {
   --oblik-ghost: #9a9488;
   --oblik-knockout: var(--oblik-paper);
   --oblik-cream: #fff3e6;
+  --oblik-selected-paint: var(--oblik-cream);
   --oblik-line: #2a3040;
   --oblik-grid: #1d2230;
   --oblik-axis: #3a4156;

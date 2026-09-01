@@ -60,6 +60,15 @@
   stroke: var(--oblik-accent);
 }
 
+.selected {
+  stroke: var(--oblik-selected-paint);
+}
+
+.fill.selected {
+  fill: color-mix(in srgb, var(--oblik-selected-paint) 28%, transparent);
+  stroke: none;
+}
+
 .knockout {
   fill: none;
   stroke: var(--oblik-knockout);
@@ -94,19 +103,9 @@
 }
 
 .handle {
-  fill: var(--oblik-accent);
-  stroke: var(--oblik-paper);
-  stroke-width: 2;
+  fill: transparent;
+  stroke: none;
   pointer-events: auto;
-}
-
-.handleHot {
-  fill: var(--oblik-cream);
-}
-
-.handleSelected {
-  fill: var(--oblik-accent);
-  stroke: var(--oblik-cream);
 }
 
 .point {
@@ -114,6 +113,11 @@
   stroke: var(--oblik-paper);
   stroke-width: 2px;
   vector-effect: non-scaling-stroke;
+}
+
+.point.selected {
+  fill: var(--oblik-selected-paint);
+  stroke: var(--oblik-paper);
 }
 
 .muted {

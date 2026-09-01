@@ -49,7 +49,7 @@ export function PointMark(props: {
                 ? styles.knockout
                 : layer.kind === "outline"
                   ? styles.outline
-                  : [styles.point, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]
+                  : [styles.point, { [styles.selected]: props.selected, [styles.muted]: !!props.muted && !props.hot && !props.selected }]
             }
             opacity={layer.opacity}
             cx={pos().x}
@@ -89,14 +89,7 @@ export function Handle(props: {
   });
   return (
     <circle
-      class={[
-        styles.handle,
-        {
-          [styles.handleHot]: props.hot && !props.selected,
-          [styles.handleSelected]: props.selected,
-          [styles.muted]: !!props.muted && !props.hot && !props.selected,
-        },
-      ]}
+      class={styles.handle}
       data-handle={traceKey(props.node)}
       data-kind="point"
       cx={pos().x}

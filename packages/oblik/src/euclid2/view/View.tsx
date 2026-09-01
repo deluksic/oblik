@@ -279,21 +279,21 @@ export function Euclid2View(props: Euclid2ViewProps) {
           </For>
           <For each={fillBand().lifted}>
             {(n) => (
-              <ProfileFill
+              <ProfileOutline
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
+                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
             )}
           </For>
           <For each={fillBand().lifted}>
             {(n) => (
-              <ProfileOutline
+              <ProfileFill
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
-                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
             )}
@@ -346,6 +346,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 }
                 camera={camera()}
                 size={size()}
+                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
             )}
@@ -363,7 +364,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 }
                 camera={camera()}
                 size={size()}
-                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
             )}
@@ -410,6 +410,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
               muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
+              overlay={true}
               knockout={drag.phase() !== "dragging"}
             />
           )}
@@ -423,7 +424,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
               muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              overlay={true}
               knockout={drag.phase() !== "dragging"}
             />
           )}

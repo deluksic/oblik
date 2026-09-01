@@ -13,20 +13,21 @@ import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
 
-function inkClass(editable: boolean, muted = false) {
+function inkClass(editable: boolean, muted = false, selected = false) {
   return [
     styles.ink,
     {
-      [styles.editable]: editable,
-      [styles.muted]: muted,
+      [styles.editable]: editable && !selected,
+      [styles.muted]: muted && !selected,
+      [styles.selected]: selected,
     },
   ];
 }
 
-function layerClass(kind: ChromeKind, editable: boolean, muted: boolean) {
+function layerClass(kind: ChromeKind, editable: boolean, muted: boolean, selected = false) {
   if (kind === "knockout") return styles.knockout;
   if (kind === "outline") return styles.outline;
-  return inkClass(editable, muted);
+  return inkClass(editable, muted, selected);
 }
 
 function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean): ChromeLayer[] {
@@ -56,6 +57,7 @@ export function Stroke(props: {
         <SegmentStroke
           node={props.node}
           muted={props.muted}
+          selected={props.selected}
           overlay={props.overlay === true}
           layers={layers()}
         />
@@ -64,6 +66,7 @@ export function Stroke(props: {
         <InfiniteStroke
           node={props.node}
           muted={props.muted}
+          selected={props.selected}
           overlay={props.overlay === true}
           layers={layers()}
           camera={props.camera}
@@ -74,6 +77,7 @@ export function Stroke(props: {
         <CircleStroke
           node={props.node}
           muted={props.muted}
+          selected={props.selected}
           overlay={props.overlay === true}
           layers={layers()}
         />
@@ -82,7 +86,7 @@ export function Stroke(props: {
   );
 }
 
-function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boolean; layers: ChromeLayer[] }) {
+function SegmentStroke(props: { node: TraceNode; muted?: boolean; selected: boolean; overlay: boolean; layers: ChromeLayer[] }) {
   const s = () => props.node.value as Segment;
   return (
     <>
@@ -92,7 +96,7 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
       <For each={props.layers}>
         {(layer) => (
           <line
-            class={layerClass(layer.kind, false, !!props.muted)}
+            class={layerClass(layer.kind, false, !!props.muted, props.selected)}
             opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             x1={s().a.x}
@@ -106,7 +110,7 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
   );
 }
 
-function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolean; layers: ChromeLayer[] }) {
+function CircleStroke(props: { node: TraceNode; muted?: boolean; selected: boolean; overlay: boolean; layers: ChromeLayer[] }) {
   const c = () => props.node.value as Circle;
   return (
     <>
@@ -116,7 +120,7 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
       <For each={props.layers}>
         {(layer) => (
           <circle
-            class={layerClass(layer.kind, props.node.editable, !!props.muted)}
+            class={layerClass(layer.kind, props.node.editable, !!props.muted, props.selected)}
             opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
@@ -132,6 +136,7 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
 function InfiniteStroke(props: {
   node: TraceNode;
   muted?: boolean;
+  selected: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
   camera: Camera2;
@@ -153,7 +158,7 @@ function InfiniteStroke(props: {
           <For each={props.layers}>
             {(layer) => (
               <line
-                class={layerClass(layer.kind, editable(), !!props.muted)}
+                class={layerClass(layer.kind, editable(), !!props.muted, props.selected)}
                 opacity={layer.opacity}
                 stroke-width={layerStrokeWidth(layer)}
                 x1={e().a.x}
@@ -181,7 +186,7 @@ export function ProfileFill(props: {
     <For each={layers()}>
       {(layer) => (
         <path
-          class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
+          class={layer.kind === "paint" ? [styles.fill, { [styles.selected]: props.selected }] : layerClass(layer.kind, false, false)}
           data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
           d={d()}
           fill={layer.kind === "paint" ? undefined : "none"}

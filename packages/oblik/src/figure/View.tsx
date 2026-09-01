@@ -369,6 +369,7 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
+              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -381,7 +382,6 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
-              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -419,6 +419,7 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
+              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -431,7 +432,6 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
-              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -466,6 +466,7 @@ export function FigureView(props: FigureViewProps) {
               replacePreview={props.tool === "brush" && !props.shift}
               scope={props.scope}
               camera={camera()}
+              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -477,7 +478,6 @@ export function FigureView(props: FigureViewProps) {
               replacePreview={props.tool === "brush" && !props.shift}
               scope={props.scope}
               camera={camera()}
-              overlay={true}
               knockout={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
@@ -511,6 +511,7 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
+                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
               <OnionStrokeList
@@ -521,7 +522,6 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
-                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
               <OnionStrokeList
@@ -553,6 +553,7 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
+                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
               <OnionStrokeList
@@ -563,7 +564,6 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
-                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
               <OnionPointList
@@ -592,6 +592,7 @@ export function FigureView(props: FigureViewProps) {
                 scope={props.scope}
                 camera={camera()}
                 previewKey={previewKey()}
+                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
               <OnionPointList
@@ -601,7 +602,6 @@ export function FigureView(props: FigureViewProps) {
                 scope={props.scope}
                 camera={camera()}
                 previewKey={previewKey()}
-                overlay={true}
                 knockout={drag.phase() !== "dragging"}
               />
             </Show>

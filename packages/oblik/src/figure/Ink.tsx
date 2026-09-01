@@ -88,7 +88,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       <Show when={kind() === "segment"}>
-        <Seg node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Seg node={props.node} look={props.look} onion={props.onion} muted={props.muted} selected={props.selected} overlay={props.overlay === true} layers={layers()} />
       </Show>
       <Show when={kind() === "line" || kind() === "parallelLine"}>
         <Inf
@@ -96,6 +96,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
           look={props.look}
           onion={props.onion}
           muted={props.muted}
+          selected={props.selected}
           overlay={props.overlay === true}
           layers={layers()}
           camera={props.camera}
@@ -103,10 +104,10 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
         />
       </Show>
       <Show when={kind() === "circle"}>
-        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} selected={props.selected} overlay={props.overlay === true} layers={layers()} />
       </Show>
       <Show when={kind() === "profile"}>
-        <Face node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Face node={props.node} look={props.look} onion={props.onion} muted={props.muted} selected={props.selected} overlay={props.overlay === true} layers={layers()} />
       </Show>
     </g>
   );
@@ -118,13 +119,16 @@ function layerOpacity(layer: ChromeLayer, onion: boolean, onionPaint = 0.4): num
   return undefined;
 }
 
-function paintStroke(look: FigureStyle, layer: ChromeLayer): string | undefined {
-  return layer.kind === "paint" ? (look.stroke ?? "#1c1917") : undefined;
+function paintStroke(look: FigureStyle, layer: ChromeLayer, selected: boolean): string | undefined {
+  if (layer.kind !== "paint") return undefined;
+  if (selected) return "var(--oblik-selected-paint)";
+  return look.stroke ?? "#1c1917";
 }
 
-function paintFill(look: FigureStyle, onion: boolean, layer: ChromeLayer, closed: boolean): string {
+function paintFill(look: FigureStyle, onion: boolean, layer: ChromeLayer, closed: boolean, selected: boolean): string {
   if (layer.kind !== "paint") return "none";
   if (onion || !closed) return "none";
+  if (selected) return "color-mix(in srgb, var(--oblik-selected-paint) 28%, transparent)";
   return look.fill ?? "none";
 }
 
@@ -133,6 +137,7 @@ function Seg(props: {
   look: FigureStyle;
   onion: boolean;
   muted: boolean;
+  selected: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
 }) {
@@ -163,7 +168,7 @@ function Seg(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 opacity={layerOpacity(layer, props.onion)}
                 fill="none"
-                stroke={paintStroke(look(), layer)}
+                stroke={paintStroke(look(), layer, props.selected)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
@@ -186,6 +191,7 @@ function Circ(props: {
   look: FigureStyle;
   onion: boolean;
   muted: boolean;
+  selected: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
 }) {
@@ -214,8 +220,8 @@ function Circ(props: {
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 opacity={layerOpacity(layer, props.onion)}
-                fill={paintFill(look(), props.onion, layer, true)}
-                stroke={paintStroke(look(), layer)}
+                fill={paintFill(look(), props.onion, layer, true, props.selected)}
+                stroke={paintStroke(look(), layer, props.selected)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 vector-effect="non-scaling-stroke"
@@ -236,6 +242,7 @@ function Inf(props: {
   look: FigureStyle;
   onion: boolean;
   muted: boolean;
+  selected: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
   camera: Camera2;
@@ -269,7 +276,7 @@ function Inf(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 opacity={layerOpacity(layer, props.onion)}
                 fill="none"
-                stroke={paintStroke(look(), layer)}
+                stroke={paintStroke(look(), layer, props.selected)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
@@ -292,6 +299,7 @@ function Face(props: {
   look: FigureStyle;
   onion: boolean;
   muted: boolean;
+  selected: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
 }) {
@@ -314,8 +322,8 @@ function Face(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
                 d={path()}
-                fill={paintFill(look(), props.onion, layer, true)}
-                stroke={paintStroke(look(), layer)}
+                fill={paintFill(look(), props.onion, layer, true, props.selected)}
+                stroke={paintStroke(look(), layer, props.selected)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
@@ -376,7 +384,8 @@ function PointInk(props: { node: TraceNode } & PointProps) {
   });
   const mark = () => (props.onion ? "open" : (props.look?.point ?? "dot"));
   const r = () => 5 / Math.max(12, props.camera.scale);
-  const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
+  const stroke = () =>
+    props.selected ? "var(--oblik-selected-paint)" : props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917");
   const fill = () => {
     if (props.onion || mark() === "open") return "none";
     return stroke();
