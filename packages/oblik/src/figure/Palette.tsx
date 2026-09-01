@@ -75,7 +75,7 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
           ref={setInputEl}
           type="search"
           class={styles.input}
-          placeholder="Brush or eraser…"
+          placeholder="Brush, eraser, or export…"
           autocomplete="off"
           value={query()}
           onInput={(e) => {

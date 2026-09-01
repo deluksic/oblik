@@ -1,0 +1,43 @@
+.root {
+  position: relative;
+}
+
+@keyframes oblikModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 18px 16px;
+  color: var(--oblik-text);
+  background: var(--oblik-panel);
+  border: 1px solid var(--oblik-line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  max-width: min(92vw, 760px);
+  max-height: min(88vh, 100%);
+  overflow: auto;
+  opacity: 0;
+  animation: oblikModalIn 150ms ease forwards;
+}
+
+.modal::backdrop {
+  background: rgba(6, 8, 12, 0.62);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+    opacity: 1;
+  }
+}

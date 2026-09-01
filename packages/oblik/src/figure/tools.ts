@@ -1,4 +1,4 @@
-export type FigureToolId = "brush" | "eraser";
+export type FigureToolId = "brush" | "eraser" | "export";
 
 export type FigureToolSpec = {
   id: FigureToolId;
@@ -9,6 +9,7 @@ export type FigureToolSpec = {
 export const FIGURE_TOOLS: readonly FigureToolSpec[] = [
   { id: "brush", title: "Brush", hint: "Add on onion (Shift). Replace existing ink." },
   { id: "eraser", title: "Eraser", hint: "Remove ink. Construction stays." },
+  { id: "export", title: "Export", hint: "Save this figure as an SVG — copy or download." },
 ];
 
 export function filterFigureTools(query: string): FigureToolSpec[] {

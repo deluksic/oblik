@@ -23,9 +23,12 @@ import {
   lookFromBrush,
   type BrushSettings,
 } from "./chips";
+import { useRequestModal } from "../modal/ModalContext";
 import { BrushDock } from "./BrushDock";
+import { ExportModal } from "./ExportModal";
 import { FigurePalette } from "./Palette";
 import { FigureView } from "./View";
+import { figureToSvg } from "./export";
 import { isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -76,6 +79,7 @@ export function FigurePane(props: FigurePaneProps) {
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [writeError, setWriteError] = createSignal<string | null>(null);
 
+  const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
 
   const world = createMemo(() => {
@@ -258,6 +262,29 @@ export function FigurePane(props: FigurePaneProps) {
     if (isDrawnGeom(n)) void insertPaint(n);
   }
 
+  function openExport() {
+    const result = figureToSvg({
+      trace: world().trace,
+      frame: props.scene.frame,
+      paper: props.scene.paper,
+      camera: props.scene.camera,
+      title: props.scene.title,
+      file: props.file,
+    });
+    void requestModal({
+      content: ({ respond }) => (
+        <ExportModal
+          svg={result.svg}
+          width={result.width}
+          height={result.height}
+          filename={result.filename}
+          empty={result.empty}
+          respond={respond}
+        />
+      ),
+    });
+  }
+
   const status = createMemo(() => {
     const fail = writeError() ?? world().error;
     if (fail) return fail;
@@ -268,7 +295,7 @@ export function FigurePane(props: FigurePaneProps) {
         : "Brush — click ink to replace. Hold Shift to see construction and add. Escape leaves the brush.";
     }
     if (t === "eraser") return "Eraser — click ink to remove it. Construction stays. Escape leaves the eraser.";
-    return "Click ink to inspect. Hold Shift for construction. Space for Brush or Eraser.";
+    return "Click ink to inspect. Hold Shift for construction. Space for Brush, Eraser, or Export.";
   });
 
   return (
@@ -300,6 +327,10 @@ export function FigurePane(props: FigurePaneProps) {
             onPick={(id) => {
               setPicker(false);
               setWriteError(null);
+              if (id === "export") {
+                openExport();
+                return;
+              }
               setTool(id);
             }}
             onClosePicker={() => setPicker(false)}

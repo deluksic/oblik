@@ -12,6 +12,7 @@ import {
   type DuplicateId,
   type OblikSceneEntry,
 } from "../source/catalog";
+import { Modal } from "../modal/Modal";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
@@ -62,14 +63,16 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
 
   render(
     () => (
-      <Host
-        scenes={scenes()}
-        loaders={loaders()}
-        annotations={annotations()}
-        mentions={mentions()}
-        collisions={collisions()}
-        initialSceneId={initialSceneId}
-      />
+      <Modal>
+        <Host
+          scenes={scenes()}
+          loaders={loaders()}
+          annotations={annotations()}
+          mentions={mentions()}
+          collisions={collisions()}
+          initialSceneId={initialSceneId}
+        />
+      </Modal>
     ),
     opts.el,
   );
