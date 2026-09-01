@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeLayers, chromeOutsideUrl, circleClipD, layerStrokeWidth, outsideClipD } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeClipUrl, chromeKnockoutUrl, chromeLayers, chromeOutlineUrl, chromeOutsideUrl, circleClipD, circleKnockoutClipD, layerStrokeWidth, outsideClipD } from "./chrome";
 
 const M = DEFAULT_CHROME_METRICS;
 
@@ -15,7 +15,7 @@ describe("chromeLayers", () => {
     const gap = 2.8 + 2 * M.gapPx;
     expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
       { kind: "outline", width: gap + 2 * M.selectRingPx },
-      { kind: "knockout", width: gap },
+      { kind: "knockout", width: gap + 2 * M.bleedPx },
       { kind: "paint", width: 2.8 },
     ]);
   });
@@ -24,7 +24,7 @@ describe("chromeLayers", () => {
     const gap = 1 + 2 * M.gapPx;
     expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
       { kind: "outline", width: gap + 2 * M.hoverRingPx },
-      { kind: "knockout", width: gap },
+      { kind: "knockout", width: gap + 2 * M.bleedPx },
       { kind: "paint", width: 1 },
     ]);
   });
@@ -34,7 +34,7 @@ describe("chromeLayers", () => {
     const gap = 1 + 2 * M.gapPx * 2;
     expect(chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
       { kind: "outline", width: gap + 2 * M.selectRingPx * 2 },
-      { kind: "knockout", width: gap },
+      { kind: "knockout", width: gap + 2 * M.bleedPx * 2 },
       { kind: "paint", width: 1 },
     ]);
   });
@@ -46,7 +46,7 @@ describe("chromeLayers", () => {
       chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true, screenSpace: true }, M),
     ).toEqual([
       { kind: "outline", width: gap + 2 * M.selectRingPx },
-      { kind: "knockout", width: gap },
+      { kind: "knockout", width: gap + 2 * M.bleedPx },
       { kind: "paint", width: 1 },
     ]);
   });
@@ -89,6 +89,22 @@ describe("chromeOutsideUrl", () => {
     expect(chromeOutsideUrl("chrome-out-a", { kind: "outline", width: 4 })).toBe("url(#chrome-out-a)");
     expect(chromeOutsideUrl("chrome-out-a", { kind: "knockout", width: 3 })).toBe("url(#chrome-out-a)");
     expect(chromeOutsideUrl("chrome-out-a", { kind: "paint", width: 1 })).toBeUndefined();
+  });
+});
+
+describe("chromeClipUrl", () => {
+  test("routes outline and knockout to separate clips", () => {
+    expect(chromeOutlineUrl("out", { kind: "outline", width: 2 })).toBe("url(#out)");
+    expect(chromeKnockoutUrl("ko", { kind: "knockout", width: 2 })).toBe("url(#ko)");
+    expect(chromeClipUrl("out", "ko", { kind: "outline", width: 2 })).toBe("url(#out)");
+    expect(chromeClipUrl("out", "ko", { kind: "knockout", width: 2 })).toBe("url(#ko)");
+    expect(chromeClipUrl("out", "ko", { kind: "paint", width: 2 })).toBeUndefined();
+  });
+});
+
+describe("circleKnockoutClipD", () => {
+  test("shrinks the clip hole for paint underlap", () => {
+    expect(circleKnockoutClipD(0, 0, 10, 2, true, M)).toBe(circleClipD(0, 0, 10 - (1 + M.bleedPx)));
   });
 });
 

@@ -1,4 +1,5 @@
 export const CONSTRUCTION_STROKE_PX = 1.5;
+export const POINT_STROKE_PX = 2.25;
 
 export type ChromeKind = "knockout" | "outline" | "paint";
 
@@ -20,12 +21,15 @@ export type ChromeMetrics = {
   gapPx: number;
   selectRingPx: number;
   hoverRingPx: number;
+  /** Paper underlap on each side of the paint edge, in CSS px. */
+  bleedPx: number;
 };
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
   gapPx: 4,
   selectRingPx: 2,
   hoverRingPx: 2,
+  bleedPx: 1,
 };
 
 /** CSS `stroke-width` for a chrome layer (logical px). */
@@ -47,10 +51,11 @@ export function chromeLayers(
   const px = opts.screenSpace ? 1 : chromeDprScale();
   const gapBand = metrics.gapPx * px;
   const ringBand = ringCss * px;
+  const bleedBand = metrics.bleedPx * px;
   const gap = w + 2 * gapBand;
   return [
     { kind: "outline", width: gap + 2 * ringBand },
-    { kind: "knockout", width: gap },
+    { kind: "knockout", width: gap + 2 * bleedBand },
     { kind: "paint", width: w },
   ];
 }
@@ -80,6 +85,48 @@ export function chromeOutsideClipId(key: string): string {
   return `chrome-out-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
+export function chromeKnockoutClipId(key: string): string {
+  return `chrome-ko-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+/** Inset from a closed stroke path so knockout can underlap paint without filling the interior. */
+export function chromeKnockoutClipInset(
+  paintWidth: number,
+  screenSpace: boolean,
+  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
+  cameraScale = 48,
+): number {
+  const px = screenSpace ? 1 : chromeDprScale();
+  const insetPx = paintWidth / 2 + metrics.bleedPx * px;
+  return screenSpace ? insetPx : insetPx / Math.max(8, cameraScale);
+}
+
+export function circleKnockoutClipD(
+  cx: number,
+  cy: number,
+  r: number,
+  paintWidth: number,
+  screenSpace: boolean,
+  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
+  cameraScale = 48,
+): string {
+  const inset = chromeKnockoutClipInset(paintWidth, screenSpace, metrics, cameraScale);
+  return circleClipD(cx, cy, Math.abs(r) - inset);
+}
+
+export function chromeOutlineUrl(id: string, layer: ChromeLayer): string | undefined {
+  return layer.kind === "outline" ? `url(#${id})` : undefined;
+}
+
+export function chromeKnockoutUrl(id: string, layer: ChromeLayer): string | undefined {
+  return layer.kind === "knockout" ? `url(#${id})` : undefined;
+}
+
+export function chromeClipUrl(outlineId: string, knockoutId: string, layer: ChromeLayer): string | undefined {
+  return chromeOutlineUrl(outlineId, layer) ?? chromeKnockoutUrl(knockoutId, layer);
+}
+
+/** @deprecated Use chromeOutlineUrl or chromeKnockoutUrl. */
 export function chromeOutsideUrl(id: string, layer: ChromeLayer): string | undefined {
   return layer.kind === "paint" ? undefined : `url(#${id})`;
 }

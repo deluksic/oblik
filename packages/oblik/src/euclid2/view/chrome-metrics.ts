@@ -21,5 +21,6 @@ export function readChromeMetrics(): ChromeMetrics {
     gapPx: cssLengthPx(style, "--oblik-chrome-gap") ?? DEFAULT_CHROME_METRICS.gapPx,
     selectRingPx: cssLengthPx(style, "--oblik-chrome-ring") ?? DEFAULT_CHROME_METRICS.selectRingPx,
     hoverRingPx: cssLengthPx(style, "--oblik-chrome-ring-hover") ?? DEFAULT_CHROME_METRICS.hoverRingPx,
+    bleedPx: cssLengthPx(style, "--oblik-chrome-bleed") ?? DEFAULT_CHROME_METRICS.bleedPx,
   };
 }

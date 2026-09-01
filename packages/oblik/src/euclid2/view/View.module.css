@@ -112,7 +112,8 @@
 .point {
   fill: var(--oblik-ink);
   stroke: var(--oblik-paper);
-  stroke-width: 1.5;
+  stroke-width: var(--oblik-stroke-selected);
+  vector-effect: non-scaling-stroke;
 }
 
 .muted {
@@ -121,7 +122,7 @@
 
 .ghost {
   fill: none;
-  stroke: var(--oblik-ghost);
+  stroke: color-mix(in srgb, var(--oblik-ink) 70%, transparent);
   stroke-width: var(--oblik-stroke);
   stroke-dasharray: 5 4;
   stroke-linecap: round;

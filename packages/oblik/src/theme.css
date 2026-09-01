@@ -90,6 +90,7 @@ h6 {
   --oblik-chrome-gap: 4px;
   --oblik-chrome-ring: 2px;
   --oblik-chrome-ring-hover: 2px;
+  --oblik-chrome-bleed: 1px;
   --oblik-hit: 14px;
   --oblik-scrollbar-thumb: color-mix(in srgb, var(--oblik-muted) 42%, transparent);
   --oblik-scrollbar-thumb-hover: color-mix(in srgb, var(--oblik-text) 28%, transparent);

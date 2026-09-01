@@ -7,7 +7,7 @@ import { isGlider } from "../geom/gliders";
 import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
-import { chromeLayers, chromeOutsideClipId, chromeOutsideUrl, circleClipD, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
+import { chromeClipUrl, chromeKnockoutClipId, chromeLayers, chromeOutsideClipId, circleClipD, circleKnockoutClipD, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
 import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 
@@ -103,7 +103,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
         />
       </Show>
       <Show when={kind() === "circle"}>
-        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} camera={props.camera} />
       </Show>
       <Show when={kind() === "profile"}>
         <Face node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
@@ -182,6 +182,7 @@ function Circ(props: {
   muted: boolean;
   overlay: boolean;
   layers: ChromeLayer[];
+  camera: Camera2;
 }) {
   const c = createMemo(() => {
     const v = props.node?.value;
@@ -189,15 +190,28 @@ function Circ(props: {
   });
   const look = () => (props.onion ? ONION : props.look);
   const clipId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const knockoutId = () => chromeKnockoutClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const paintW = () => (props.onion ? ONION.width : props.look.width) ?? 1.35;
   const clipD = () => {
     const circ = c();
     return circ ? circleClipD(circ.center.x, circ.center.y, circ.radius) : "";
+  };
+  const knockoutClipD = () => {
+    const circ = c();
+    return circ
+      ? circleKnockoutClipD(circ.center.x, circ.center.y, circ.radius, paintW(), false, undefined, props.camera.scale)
+      : "";
   };
   return (
     <Show when={c()}>
       {(circ) => (
         <>
-          {props.overlay ? <ChromeOutsideClip id={clipId()} d={clipD()} /> : null}
+          {props.overlay ? (
+            <>
+              <ChromeOutsideClip id={clipId()} d={clipD()} />
+              <ChromeOutsideClip id={knockoutId()} d={knockoutClipD()} />
+            </>
+          ) : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -213,7 +227,7 @@ function Circ(props: {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeOutsideUrl(clipId(), layer) : undefined}
+                clip-path={props.overlay ? chromeClipUrl(clipId(), knockoutId(), layer) : undefined}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
@@ -302,18 +316,24 @@ function Face(props: {
   });
   const look = () => (props.onion ? ONION : props.look);
   const clipId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const knockoutId = () => chromeKnockoutClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
   return (
     <Show when={d()}>
       {(path) => (
         <>
-          {props.overlay ? <ChromeOutsideClip id={clipId()} d={path()} /> : null}
+          {props.overlay ? (
+            <>
+              <ChromeOutsideClip id={clipId()} d={path()} />
+              <ChromeOutsideClip id={knockoutId()} d={path()} />
+            </>
+          ) : null}
           {props.overlay ? null : <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />}
           <For each={props.layers}>
             {(layer) => (
               <path
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeOutsideUrl(clipId(), layer) : undefined}
+                clip-path={props.overlay ? chromeClipUrl(clipId(), knockoutId(), layer) : undefined}
                 d={path()}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
@@ -383,7 +403,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     return stroke();
   };
   const layers = createMemo(() =>
-    chromeLayers(props.look?.width ?? 1.2, {
+    chromeLayers(props.look?.width ?? POINT_STROKE_PX, {
       selected: props.selected,
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
@@ -391,12 +411,20 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     }, readChromeMetrics()),
   );
   const clipId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const knockoutId = () => chromeKnockoutClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const paintW = () => props.look?.width ?? POINT_STROKE_PX;
   const clipD = () => circleClipD(at().x, at().y, r());
+  const knockoutClipD = () => circleKnockoutClipD(at().x, at().y, r(), paintW(), false, undefined, props.camera.scale);
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
-          {props.overlay === true ? <ChromeOutsideClip id={clipId()} d={clipD()} /> : null}
+          {props.overlay === true ? (
+            <>
+              <ChromeOutsideClip id={clipId()} d={clipD()} />
+              <ChromeOutsideClip id={knockoutId()} d={knockoutClipD()} />
+            </>
+          ) : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -412,7 +440,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layer.kind === "paint" ? [styles.point, { [styles.muted]: props.muted }] : layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay === true ? chromeOutsideUrl(clipId(), layer) : undefined}
+                clip-path={props.overlay === true ? chromeClipUrl(clipId(), knockoutId(), layer) : undefined}
                 cx={at().x}
                 cy={at().y}
                 r={r()}
