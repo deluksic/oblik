@@ -26,8 +26,8 @@ export type ChromeMetrics = {
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
   knockoutPx: 7,
-  hoverOutlineOpacity: 0.1,
-  selectOutlineOpacity: 0.3,
+  hoverOutlineOpacity: 0.25,
+  selectOutlineOpacity: 0.5,
 };
 
 /** CSS `stroke-width` for a chrome layer (logical px). */
@@ -46,15 +46,16 @@ export function chromeLayers(
 ): ChromeLayer[] {
   const w = paintWidth > 0 ? paintWidth : 1;
   const hot = opts.selected || opts.hover;
+  const px = opts.screenSpace ? 1 : chromeDprScale();
+  const band = metrics.knockoutPx * px;
   if (opts.overlay) {
     if (!hot || !opts.knockout) return [];
     const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
-    return [{ kind: "outline", width: w, opacity: outlineOpacity }];
+    return [{ kind: "outline", width: band, opacity: outlineOpacity }];
   }
   if (hot && opts.knockout) {
-    const px = opts.screenSpace ? 1 : chromeDprScale();
     return [
-      { kind: "knockout", width: metrics.knockoutPx * px },
+      { kind: "knockout", width: band },
       { kind: "paint", width: w },
     ];
   }

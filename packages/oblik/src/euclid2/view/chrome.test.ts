@@ -22,15 +22,22 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("selected overlay is outline only", () => {
+  test("selected overlay is a knockout-width outline", () => {
     expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "outline", width: 2.8, opacity: M.selectOutlineOpacity },
+      { kind: "outline", width: M.knockoutPx, opacity: M.selectOutlineOpacity },
     ]);
   });
 
   test("hover overlay uses hover outline opacity", () => {
     expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true }, M)).toEqual([
-      { kind: "outline", width: 1, opacity: M.hoverOutlineOpacity },
+      { kind: "outline", width: M.knockoutPx, opacity: M.hoverOutlineOpacity },
+    ]);
+  });
+
+  test("world overlay outline scales by device pixel ratio", () => {
+    vi.stubGlobal("window", { devicePixelRatio: 2 });
+    expect(chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
+      { kind: "outline", width: M.knockoutPx * 2, opacity: M.selectOutlineOpacity },
     ]);
   });
 
