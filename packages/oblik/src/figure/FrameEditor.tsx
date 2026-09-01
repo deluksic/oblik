@@ -1,4 +1,6 @@
-import { For } from "solid-js";
+import { For, createEffect, createSignal } from "solid-js";
+
+import { formatNum } from "@/source/patch";
 
 import styles from "./FrameEditor.module.css";
 
@@ -17,25 +19,64 @@ const FIELDS: readonly { key: keyof FrameXywh; label: string }[] = [
   { key: "height", label: "H" },
 ];
 
+function FrameField(props: {
+  label: string;
+  value: number;
+  onCommit: (next: number) => void;
+}) {
+  const [draft, setDraft] = createSignal(formatNum(props.value));
+  const [editing, setEditing] = createSignal(false);
+
+  createEffect(() => {
+    if (!editing()) setDraft(formatNum(props.value));
+  });
+
+  function commit() {
+    const n = Number(draft());
+    if (Number.isFinite(n)) props.onCommit(n);
+    setEditing(false);
+  }
+
+  return (
+    <label class={styles.field}>
+      <span class={styles.label}>{props.label}</span>
+      <input
+        class={styles.input}
+        type="text"
+        inputmode="decimal"
+        value={editing() ? draft() : formatNum(props.value)}
+        onFocus={() => {
+          setEditing(true);
+          setDraft(formatNum(props.value));
+        }}
+        onInput={(e) => setDraft(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+          if (e.key === "Escape") {
+            setDraft(formatNum(props.value));
+            setEditing(false);
+            e.currentTarget.blur();
+          }
+        }}
+        onBlur={commit}
+      />
+    </label>
+  );
+}
+
 export function FrameEditor(props: FrameEditorProps) {
   return (
     <div class={styles.grid}>
       <For each={FIELDS}>
         {(field) => (
-          <label class={styles.field}>
-            <span class={styles.label}>{field.label}</span>
-            <input
-              class={styles.input}
-              type="number"
-              step="0.1"
-              value={props.value[field.key]}
-              onChange={(e) => {
-                const n = Number(e.currentTarget.value);
-                if (!Number.isFinite(n)) return;
-                props.onChange({ ...props.value, [field.key]: n });
-              }}
-            />
-          </label>
+          <FrameField
+            label={field.label}
+            value={props.value[field.key]}
+            onCommit={(next) => props.onChange({ ...props.value, [field.key]: next })}
+          />
         )}
       </For>
     </div>

@@ -97,9 +97,15 @@
   opacity: 0.28;
 }
 
+.pageWrap {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .page {
   position: absolute;
-  z-index: 0;
+  inset: 0;
   pointer-events: none;
   border: 1px solid #d4c7b4;
   box-shadow:
@@ -107,23 +113,35 @@
     0 6px 18px rgba(42, 34, 24, 0.1);
 }
 
-.cream > .page {
+.cream > .pageWrap > .page {
   background: #faf6ee;
 }
 
-.white > .page {
+.white > .pageWrap > .page {
   background: #fff;
   border-color: #e4ddd0;
 }
 
-.page::after {
-  content: "Frame";
+.frameTitle {
   position: absolute;
   left: 0;
   bottom: 100%;
-  padding-bottom: 5px;
+  margin: 0;
+  padding: 2px 6px 5px 0;
+  border: none;
+  background: transparent;
   font: 500 11px/1 system-ui, sans-serif;
   letter-spacing: 0.02em;
   color: #8a8278;
   white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.frameTitle:hover {
+  color: #5c564e;
+}
+
+.frameTitleSelected {
+  color: #c45c3e;
 }

@@ -201,21 +201,32 @@ export function FigureView(props: FigureViewProps) {
         <Show when={pageBox()}>
           {(box) => (
             <div
-              class={styles.page}
-              aria-hidden="true"
+              class={styles.pageWrap}
               style={{
                 left: `${box().left}px`,
                 top: `${box().top}px`,
                 width: `${box().width}px`,
                 height: `${box().height}px`,
               }}
-            />
+            >
+              <button
+                type="button"
+                class={[styles.frameTitle, { [styles.frameTitleSelected]: props.frameSelected === true }]}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  props.onPickFrame?.();
+                }}
+              >
+                Frame
+              </button>
+              <div class={styles.page} aria-hidden="true" />
+            </div>
           )}
         </Show>
         <svg class={styles.world} viewBox={vb()}>
           <g transform={worldXf()}>
             <Show when={page()}>
-              {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} onPick={props.onPickFrame} />}
+              {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} />}
             </Show>
             <Show when={props.shift}>
               <For each={onionInk()}>
@@ -312,39 +323,21 @@ export function FigureView(props: FigureViewProps) {
   );
 }
 
-function FrameHandle(props: { rect: FrameRect; selected: boolean; onPick?: () => void }) {
+function FrameHandle(props: { rect: FrameRect; selected: boolean }) {
   return (
-    <g>
+    <Show when={props.selected}>
       <rect
         x={props.rect.x}
         y={props.rect.y}
         width={props.rect.w}
         height={props.rect.h}
         fill="none"
-        stroke="transparent"
-        stroke-width={14}
+        stroke="#c45c3e"
+        stroke-width={1.5}
         vector-effect="non-scaling-stroke"
-        pointer-events="stroke"
-        style={{ cursor: "pointer" }}
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          props.onPick?.();
-        }}
+        pointer-events="none"
       />
-      <Show when={props.selected}>
-        <rect
-          x={props.rect.x}
-          y={props.rect.y}
-          width={props.rect.w}
-          height={props.rect.h}
-          fill="none"
-          stroke="#c45c3e"
-          stroke-width={1.5}
-          vector-effect="non-scaling-stroke"
-          pointer-events="none"
-        />
-      </Show>
-    </g>
+    </Show>
   );
 }
 

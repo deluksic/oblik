@@ -1,13 +1,14 @@
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 0.55rem;
+  grid-template-columns: max-content max-content;
+  gap: 0.4rem 0.75rem;
+  width: fit-content;
 }
 
 .field {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
 .label {
@@ -18,9 +19,9 @@
 }
 
 .input {
-  min-width: 0;
-  flex: 1;
-  padding: 0.28rem 0.4rem;
+  box-sizing: border-box;
+  width: 4.25rem;
+  padding: 0.28rem 0.35rem;
   font-size: 0.8rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--oblik-text);
