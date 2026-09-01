@@ -1,5 +1,8 @@
 import { Show, createSignal } from "solid-js";
 
+import IconClipboard from "~icons/lucide/clipboard-copy";
+import IconDownload from "~icons/lucide/download";
+
 import { ModalTitleBar } from "../modal/ModalTitleBar";
 
 import styles from "./ExportModal.module.css";
@@ -66,9 +69,11 @@ export function ExportModal(props: ExportModalProps) {
           disabled={props.empty}
           onClick={() => void copy()}
         >
+          <IconClipboard class={styles.btnIcon} aria-hidden="true" />
           {copied() ? "Copied!" : "Copy SVG"}
         </button>
         <button type="button" class={styles.primary} disabled={props.empty} onClick={download}>
+          <IconDownload class={styles.btnIcon} aria-hidden="true" />
           Download .svg
         </button>
       </footer>

@@ -1,6 +1,8 @@
 import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
 
+import IconX from "~icons/lucide/x";
+
 import styles from "./ModalTitleBar.module.css";
 
 export type ModalTitleBarProps = {
@@ -19,7 +21,7 @@ export function ModalTitleBar(props: ParentProps<ModalTitleBarProps>) {
           aria-label="Close"
           onClick={() => props.onClose?.()}
         >
-          ×
+          <IconX class={styles.closeIcon} aria-hidden="true" />
         </button>
       </Show>
     </header>

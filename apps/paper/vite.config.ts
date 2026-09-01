@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import solid from "@solidjs/vite-plugin";
+import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
 
 import { sceneDevPlugin } from "../../packages/shell/src/plugin/vite-plugin.ts";
@@ -12,6 +13,7 @@ const workspaceRoot = path.resolve(appRoot, "../..");
 export default defineConfig({
   plugins: [
     solid(),
+    Icons({ compiler: "solid" }),
     sceneDevPlugin({
       workspaceRoot,
       sceneDir: path.join(appRoot, "src/scenes"),

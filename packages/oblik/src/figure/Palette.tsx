@@ -1,8 +1,23 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 
+import IconDownload from "~icons/lucide/download";
+import IconEraser from "~icons/lucide/eraser";
+import IconPaintbrush from "~icons/lucide/paintbrush";
+
 import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./tools";
 
 import styles from "./Palette.module.css";
+
+function toolIcon(id: FigureToolId) {
+  switch (id) {
+    case "brush":
+      return <IconPaintbrush class={styles.icon} aria-hidden="true" />;
+    case "eraser":
+      return <IconEraser class={styles.icon} aria-hidden="true" />;
+    case "export":
+      return <IconDownload class={styles.icon} aria-hidden="true" />;
+  }
+}
 
 export type FigurePaletteProps = {
   picker: boolean;
@@ -99,8 +114,13 @@ function ToolRow(props: { spec: FigureToolSpec; active: boolean; onPick: (id: Fi
       class={[styles.listItem, { [styles.listItemActive]: props.active }]}
       onClick={() => props.onPick(props.spec.id)}
     >
-      <span class={styles.cmd}>{props.spec.title}</span>
-      <span class={styles.cmdHint}>{props.spec.hint}</span>
+      <div class={styles.row}>
+        {toolIcon(props.spec.id)}
+        <div class={styles.copy}>
+          <span class={styles.cmd}>{props.spec.title}</span>
+          <span class={styles.cmdHint}>{props.spec.hint}</span>
+        </div>
+      </div>
     </li>
   );
 }

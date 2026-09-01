@@ -1,5 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 
+import IconFrame from "~icons/lucide/frame";
+
 import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
 import { isGlider } from "@/geom/gliders";
@@ -226,6 +228,7 @@ export function FigureView(props: FigureViewProps) {
                 props.onPickFrame?.();
               }}
             >
+              <IconFrame class={styles.frameIcon} aria-hidden="true" />
               Frame
             </button>
           )}

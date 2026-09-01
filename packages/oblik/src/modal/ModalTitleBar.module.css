@@ -38,3 +38,8 @@
   background: var(--oblik-raised);
   border-color: var(--oblik-dim);
 }
+
+.closeIcon {
+  width: 1rem;
+  height: 1rem;
+}

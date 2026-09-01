@@ -13,5 +13,5 @@
       "@/*": ["../../packages/oblik/src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "../../packages/oblik/src/icons.d.ts"]
 }

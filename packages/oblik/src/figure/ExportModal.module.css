@@ -54,6 +54,9 @@
 .secondary,
 .primary {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 8px 14px;
   font-size: 0.9rem;
   font-weight: 500;
@@ -91,4 +94,10 @@
 .primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btnIcon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
