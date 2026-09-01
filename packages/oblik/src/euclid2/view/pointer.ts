@@ -95,6 +95,8 @@ export type Drag =
       moved: boolean;
     };
 
+export type EditDrag = Exclude<Drag, { kind: "pan" }>;
+
 export function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -111,7 +113,7 @@ export function worldOf(
   return ndcToWorld(ndc, camera, size);
 }
 
-export function pointDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
+export function pointDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "point" }> {
   const p = node.value as Point;
   return {
     kind: "point",
@@ -127,7 +129,7 @@ export function pointDrag(node: TraceNode, w: { x: number; y: number }, e: Point
   };
 }
 
-export function radiusDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
+export function radiusDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "radius" }> {
   const c = node.value as Circle;
   return {
     kind: "radius",
@@ -151,7 +153,7 @@ function carrierLine(ol: ParallelLine): Line {
   };
 }
 
-export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag {
+export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "parallel" }> {
   const ol = node.value as ParallelLine;
   const base = carrierLine(ol);
   return {
@@ -167,7 +169,11 @@ export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: Po
   };
 }
 
-export function gliderDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Drag | null {
+export function gliderDrag(
+  node: TraceNode,
+  w: { x: number; y: number },
+  e: PointerEvent,
+): Extract<Drag, { kind: "gliderSegment" | "gliderLine" | "gliderCircle" }> | null {
   const g = node.value as Glider;
   if (g.kind === "gliderSegment") {
     return {
@@ -213,7 +219,7 @@ export function gliderDrag(node: TraceNode, w: { x: number; y: number }, e: Poin
   return null;
 }
 
-export function sliderDrag(node: TraceNode, e: PointerEvent): Drag {
+export function sliderDrag(node: TraceNode, e: PointerEvent): Extract<Drag, { kind: "slider" }> {
   const g = node.value;
   const startN = g.kind === "slider" ? g.n : 0;
   return {
@@ -227,7 +233,7 @@ export function sliderDrag(node: TraceNode, e: PointerEvent): Drag {
   };
 }
 
-export function panDrag(e: PointerEvent, camera: Camera2): Drag {
+export function panDrag(e: PointerEvent, camera: Camera2): Extract<Drag, { kind: "pan" }> {
   return {
     kind: "pan",
     x: e.clientX,

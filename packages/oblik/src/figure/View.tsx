@@ -110,57 +110,77 @@ export function FigureView(props: FigureViewProps) {
     return screenToWorld(panePoint(e, el), camera(), size());
   }
 
-  const onFrameMove = createDragHandler((e) => frameHandleSession(e, "move"));
-  const onFrameResize = createDragHandler((e) => frameHandleSession(e, "resize"));
-  const onPanePointerDown = createDragHandler(
-    (e) => {
-      noteShift(e);
-      const el = paneEl();
-      if (!el) return;
-      const hits = hitsOf(e, el);
-      if (props.tool) {
-        const hit = hits[0];
-        if (hit) props.onToolHit?.(hit);
-        return;
-      }
-      const start = panDrag(e, camera());
-      drag = start;
-      const pick = hits.length > 0 ? hits : null;
-      let moved = false;
-      return {
-        onPointerMove(ev) {
-          moved = true;
-          start.moved = true;
-          if (!grabbing()) setGrabbing(true);
-          const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
-          if (next.camera) setCamera(next.camera);
-        },
-        onDone() {
-          drag = null;
-          setGrabbing(false);
-          if (!moved) props.onPick?.(pick ?? []);
-        },
-      };
-    },
-    { deadZoneRadius: PICK_CLICK_PX, preventDefault: false },
-  );
+  const dragOpts = { deadZoneRadius: PICK_CLICK_PX, preventDefault: false } as const;
 
-  function frameHandleSession(e: PointerEvent, kind: "move" | "resize") {
+  const startPan = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hits = hitsOf(e, el);
+    const start = panDrag(e, camera());
+    drag = start;
+    const pick = hits.length > 0 ? hits : null;
+    let moved = false;
+    return {
+      onPointerMove(ev) {
+        moved = true;
+        start.moved = true;
+        if (!grabbing()) setGrabbing(true);
+        const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
+        if (next.camera) setCamera(next.camera);
+      },
+      onDone() {
+        drag = null;
+        setGrabbing(false);
+        if (!moved) props.onPick?.(pick ?? []);
+      },
+    };
+  }, dragOpts);
+
+  const onFrameMove = createDragHandler((e) => {
     const el = paneEl();
     const start = frameXywh();
-    if (!el || !start || props.tool) return;
+    if (!el || !start) return;
     const world0 = worldAt(e, el);
-    const anchor = { x: start.x, y: start.y };
     let last = start;
     return {
-      onPointerMove(ev: PointerEvent) {
-        last = kind === "move" ? frameMoved(start, world0, worldAt(ev, el)) : frameResized(anchor, worldAt(ev, el));
+      onPointerMove(ev) {
+        last = frameMoved(start, world0, worldAt(ev, el));
         props.onFrameDraft?.(last);
       },
       onDone() {
         props.onFrameCommit?.(last);
       },
     };
+  });
+
+  const onFrameResize = createDragHandler((_e) => {
+    const el = paneEl();
+    const start = frameXywh();
+    if (!el || !start) return;
+    const anchor = { x: start.x, y: start.y };
+    let last = start;
+    return {
+      onPointerMove(ev) {
+        last = frameResized(anchor, worldAt(ev, el));
+        props.onFrameDraft?.(last);
+      },
+      onDone() {
+        props.onFrameCommit?.(last);
+      },
+    };
+  });
+
+  function onPointerDown(e: PointerEvent) {
+    noteShift(e);
+    if (e.button !== 0) return;
+    const el = paneEl();
+    if (!el) return;
+    if (props.tool) {
+      const hit = hitsOf(e, el)[0];
+      if (hit) props.onToolHit?.(hit);
+      return;
+    }
+    startPan(e);
   }
 
   const previewKey = createMemo(() => {
@@ -227,7 +247,7 @@ export function FigureView(props: FigureViewProps) {
           },
         ]}
         onWheel={onWheel}
-        onPointerDown={onPanePointerDown}
+        onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerLeave={() => {
           props.onHoverKey?.(null);

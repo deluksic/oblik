@@ -35,8 +35,9 @@ import {
   topHit,
   worldOf,
   type Drag,
+  type EditDrag,
 } from "./pointer";
-import { createDragHandler } from "../../host/createDragHandler";
+import { createDragHandler, type DragSession } from "../../host/createDragHandler";
 
 import styles from "./View.module.css";
 
@@ -101,24 +102,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
     return `scale(${k} ${-k}) translate(${-cam.x} ${-cam.y})`;
   });
 
-  function inspectDrag(e: PointerEvent, el: HTMLDivElement): { session: Drag; pick: TraceNode[] | null } {
-    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (slider) return { session: sliderDrag(slider, e), pick: null };
-    const w = worldOf(e, el, camera(), size());
-    const hits = topHit(e, el, camera(), size(), props.trace);
-    const hit = hits[0];
-    if (hit && isGrabbable(hit) && hit.value.kind === "point") return { session: pointDrag(hit, w, e), pick: null };
-    if (hit && isGrabbable(hit) && isGlider(hit.value)) {
-      const g = gliderDrag(hit, w, e);
-      if (g) return { session: g, pick: null };
-    }
-    if (hit && isGrabbable(hit) && hit.value.kind === "circle") return { session: radiusDrag(hit, w, e), pick: null };
-    if (hit && isGrabbable(hit) && hit.value.kind === "parallelLine") {
-      return { session: parallelDrag(hit, w, e), pick: null };
-    }
-    return { session: panDrag(e, camera()), pick: hits.length > 0 ? hits : null };
-  }
-
   function placeAt(e: PointerEvent, el: HTMLDivElement) {
     const filter = props.scope ? snapFilterOf(props.scope) : undefined;
     const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter, props.scope);
@@ -127,44 +110,131 @@ export function Euclid2View(props: Euclid2ViewProps) {
     props.onPlace?.(hit);
   }
 
-  const onPointerDown = createDragHandler(
-    (e) => {
-      const el = paneEl();
-      if (!el) return;
-      if (props.placing) {
-        placeAt(e, el);
-        return;
-      }
-      const { session, pick } = inspectDrag(e, el);
-      drag = session;
-      let moved = false;
-      return {
-        onPointerMove(ev) {
-          moved = true;
-          session.moved = true;
-          if (!grabbing()) setGrabbing(true);
-          const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
-          if (next.camera) setCamera(next.camera);
-          if (next.draft) props.onDraft(next.draft.id, next.draft.values);
-        },
-        onDone(ev) {
-          const d = drag;
-          drag = null;
-          setGrabbing(false);
-          if (!d) return;
-          if (!moved) {
-            if (d.kind === "pan") props.onPick?.(pick ?? []);
-            else props.onPick?.([d.node]);
-            return;
-          }
-          if (d.kind === "pan" || !ev) return;
-          const next = applyDrag(d, ev, paneEl(), camera(), size(), props.trace);
-          if (next.draft) props.onCommit(next.draft.id, next.draft.values);
-        },
-      };
-    },
-    { deadZoneRadius: PICK_CLICK_PX, preventDefault: false },
-  );
+  const dragOpts = { deadZoneRadius: PICK_CLICK_PX, preventDefault: false } as const;
+
+  function editSession(session: EditDrag): DragSession {
+    drag = session;
+    let moved = false;
+    return {
+      onPointerMove(ev) {
+        moved = true;
+        session.moved = true;
+        if (!grabbing()) setGrabbing(true);
+        const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
+        if (next.draft) props.onDraft(next.draft.id, next.draft.values);
+      },
+      onDone(ev) {
+        drag = null;
+        setGrabbing(false);
+        if (!moved) {
+          props.onPick?.([session.node]);
+          return;
+        }
+        if (!ev) return;
+        const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
+        if (next.draft) props.onCommit(next.draft.id, next.draft.values);
+      },
+    };
+  }
+
+  const startPoint = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    if (!hit) return;
+    return editSession(pointDrag(hit, worldOf(e, el, camera(), size()), e));
+  }, dragOpts);
+
+  const startGlider = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    if (!hit) return;
+    const g = gliderDrag(hit, worldOf(e, el, camera(), size()), e);
+    if (!g) return;
+    return editSession(g);
+  }, dragOpts);
+
+  const startRadius = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    if (!hit) return;
+    return editSession(radiusDrag(hit, worldOf(e, el, camera(), size()), e));
+  }, dragOpts);
+
+  const startParallel = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    if (!hit) return;
+    return editSession(parallelDrag(hit, worldOf(e, el, camera(), size()), e));
+  }, dragOpts);
+
+  const startSlider = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
+    if (!slider) return;
+    return editSession(sliderDrag(slider, e));
+  }, dragOpts);
+
+  const startPan = createDragHandler((e) => {
+    const el = paneEl();
+    if (!el) return;
+    const hits = topHit(e, el, camera(), size(), props.trace);
+    const start = panDrag(e, camera());
+    drag = start;
+    const pick = hits.length > 0 ? hits : null;
+    let moved = false;
+    return {
+      onPointerMove(ev) {
+        moved = true;
+        start.moved = true;
+        if (!grabbing()) setGrabbing(true);
+        const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
+        if (next.camera) setCamera(next.camera);
+      },
+      onDone() {
+        drag = null;
+        setGrabbing(false);
+        if (!moved) props.onPick?.(pick ?? []);
+      },
+    };
+  }, dragOpts);
+
+  function onPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    const el = paneEl();
+    if (!el) return;
+    if (props.placing) {
+      placeAt(e, el);
+      return;
+    }
+    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
+    if (slider) {
+      startSlider(e);
+      return;
+    }
+    const hit = topHit(e, el, camera(), size(), props.trace)[0];
+    if (hit && isGrabbable(hit) && hit.value.kind === "point") {
+      startPoint(e);
+      return;
+    }
+    if (hit && isGrabbable(hit) && isGlider(hit.value)) {
+      startGlider(e);
+      return;
+    }
+    if (hit && isGrabbable(hit) && hit.value.kind === "circle") {
+      startRadius(e);
+      return;
+    }
+    if (hit && isGrabbable(hit) && hit.value.kind === "parallelLine") {
+      startParallel(e);
+      return;
+    }
+    startPan(e);
+  }
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
