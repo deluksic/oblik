@@ -143,27 +143,32 @@
 }
 
 .quote {
+  display: grid;
+  grid-template-columns: minmax(2.2rem, max-content) minmax(0, 1fr);
+  min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   line-height: 1.45;
   tab-size: 2;
 }
 
+.quote > * {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  padding: 0 0.45rem;
+}
+
 .codeRow,
 .headerRow,
 .gapRow {
-  display: flex;
-  gap: 0.35rem;
-  padding: 0 0.45rem;
+  color: var(--oblik-code);
 }
 
 .headerRow {
   color: var(--oblik-hover);
   background: color-mix(in srgb, var(--oblik-hover) 8%, var(--oblik-paper));
-}
-
-.codeRow {
-  color: var(--oblik-code);
 }
 
 .current {
@@ -175,13 +180,16 @@
 }
 
 .ln {
-  flex: none;
+  grid-column: 1;
   text-align: right;
+  padding-right: 0.5rem;
   color: var(--oblik-ln);
   user-select: none;
 }
 
 .tx {
+  grid-column: 2;
+  min-width: 0;
   white-space: pre;
 }
 

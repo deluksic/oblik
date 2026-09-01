@@ -221,14 +221,20 @@
 }
 
 .quote {
+  display: grid;
+  grid-template-columns: minmax(2.2rem, max-content) minmax(0, 1fr);
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  max-width: 100%;
 }
 
-.quote div {
+.quote > * {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
   padding: 0.15rem 0.45rem;
-  white-space: pre;
 }
 
 .headerRow {
@@ -240,8 +246,9 @@
 }
 
 .ln {
-  display: inline-block;
-  width: 2.6rem;
+  grid-column: 1;
+  text-align: right;
+  padding-right: 0.5rem;
   color: #5c6370;
   user-select: none;
 }
@@ -252,6 +259,8 @@
 }
 
 .tx {
+  grid-column: 2;
+  min-width: 0;
   white-space: pre;
 }
 
