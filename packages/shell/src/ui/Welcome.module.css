@@ -36,7 +36,7 @@
 }
 
 .button {
-  background: var(--accent, #e8876a);
+  background: var(--accent, #3b82c4);
   color: #1a120e;
   border: 0;
   border-radius: 6px;

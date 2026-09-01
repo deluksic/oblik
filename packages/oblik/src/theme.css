@@ -73,8 +73,11 @@ h6 {
   --oblik-text: #ece8de;
   --oblik-muted: #9a9488;
   --oblik-dim: #6f6a60;
-  --oblik-accent: #e8876a;
-  --oblik-hover: #7ec8e3;
+  --oblik-accent: #3b82c4;
+  --oblik-hover: #3b82c4;
+  --oblik-error: #c45c3e;
+  --oblik-ghost: #9a9488;
+  --oblik-knockout: var(--oblik-paper);
   --oblik-cream: #fff3e6;
   --oblik-line: #2a3040;
   --oblik-grid: #1d2230;

@@ -250,13 +250,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
           <For each={fills()}>
-            {(n) => (
-              <ProfileFill
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-              />
-            )}
+            {(n) => <ProfileFill node={n} />}
           </For>
           <For each={ink()}>
             {(n) => (
@@ -280,6 +274,26 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
+                overlay={true}
+                knockout={drag.phase() !== "dragging"}
+              />
+            )}
+          </For>
+          <For each={ink()}>
+            {(n) => (
+              <Stroke
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+                muted={
+                  chrome().muteStrokes ||
+                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
+                  (!!props.scope && mutedForScope(n, props.scope))
+                }
+                camera={camera()}
+                size={size()}
+                overlay={true}
+                knockout={drag.phase() !== "dragging"}
               />
             )}
           </For>
@@ -298,6 +312,20 @@ export function Euclid2View(props: Euclid2ViewProps) {
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
               muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
+            />
+          )}
+        </For>
+        <For each={points()}>
+          {(n) => (
+            <PointMark
+              node={n}
+              size={size()}
+              camera={camera()}
+              hot={isHot(n, props.hoverId, props.selectedKey)}
+              selected={isSelected(n, props.selectedKey)}
+              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
+              overlay={true}
+              knockout={drag.phase() !== "dragging"}
             />
           )}
         </For>

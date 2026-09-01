@@ -18,10 +18,12 @@
 
 .cream {
   background: #f4efe4;
+  --oblik-knockout: #faf6ee;
 }
 
 .white {
   background: #fbfaf6;
+  --oblik-knockout: #fff;
 }
 
 .world,
@@ -58,7 +60,7 @@
   pointer-events: none;
 }
 
-.replaced :where([data-role="paint"], [data-role="onion"]) {
+.replaced :where([data-role="paint"], [data-role="onion"], [data-role="knockout"], [data-role="outline"]) {
   opacity: 0;
 }
 
@@ -85,12 +87,18 @@
   pointer-events: none;
 }
 
-.hot {
-  stroke: #3b82c4;
+.knockout {
+  fill: none;
+  stroke: var(--oblik-knockout);
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
-.selected {
-  stroke: #c45c3e;
+.outline {
+  fill: none;
+  stroke: var(--oblik-accent);
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
 .muted {
@@ -146,7 +154,7 @@
 }
 
 .frameTitleSelected {
-  color: #c45c3e;
+  color: var(--oblik-accent);
 }
 
 .frameHandle {
@@ -158,10 +166,10 @@
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1px solid #c45c3e;
+  border: 1px solid var(--oblik-accent);
   border-radius: 6px;
   background: #faf6ee;
-  color: #c45c3e;
+  color: var(--oblik-accent);
   box-shadow: 0 2px 8px rgba(42, 34, 24, 0.14);
   transform: translate(-50%, -50%);
   touch-action: none;
@@ -181,8 +189,8 @@
 
 .frameHandle:hover {
   background: #fff;
-  border-color: #a84d32;
-  color: #a84d32;
+  border-color: color-mix(in srgb, var(--oblik-accent) 78%, #1c1917);
+  color: color-mix(in srgb, var(--oblik-accent) 78%, #1c1917);
 }
 
 .frameHandleIcon {

@@ -60,13 +60,22 @@
   stroke: var(--oblik-accent);
 }
 
-.hot {
-  stroke: var(--oblik-hover);
+.knockout {
+  fill: none;
+  stroke: var(--oblik-knockout);
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.selected {
+.outline {
+  fill: none;
   stroke: var(--oblik-accent);
-  stroke-width: var(--oblik-stroke-selected);
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .hit {
@@ -82,32 +91,6 @@
   fill: color-mix(in srgb, var(--oblik-ink) 16%, transparent);
   stroke: none;
   pointer-events: none;
-}
-
-.fillHot {
-  fill: color-mix(in srgb, var(--oblik-hover) 22%, transparent);
-}
-
-.fillSelected {
-  fill: color-mix(in srgb, var(--oblik-accent) 28%, transparent);
-}
-
-.fillOutline {
-  fill: none;
-  stroke: var(--oblik-hover);
-  stroke-width: var(--oblik-stroke-selected);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.fillOutlineSelected {
-  stroke: var(--oblik-accent);
-}
-
-.fillOutlineHidden {
-  stroke: none;
 }
 
 .handle {
@@ -132,21 +115,13 @@
   stroke-width: 1.5;
 }
 
-.hotFill {
-  fill: var(--oblik-hover);
-}
-
-.selectedFill {
-  fill: var(--oblik-accent);
-}
-
 .muted {
   opacity: 0.32;
 }
 
 .ghost {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-ghost);
   stroke-width: var(--oblik-stroke);
   stroke-dasharray: 5 4;
   stroke-linecap: round;
@@ -155,14 +130,14 @@
 }
 
 .ghostFill {
-  fill: color-mix(in srgb, var(--oblik-accent) 12%, transparent);
+  fill: color-mix(in srgb, var(--oblik-ghost) 18%, transparent);
   stroke: none;
   pointer-events: none;
 }
 
 .ghostArrow {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-ghost);
   stroke-width: var(--oblik-stroke-selected);
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -171,19 +146,19 @@
 }
 
 .ghostArrowHead {
-  fill: var(--oblik-accent);
+  fill: var(--oblik-ghost);
   stroke: none;
   pointer-events: none;
 }
 
 .ghostPoint {
-  fill: var(--oblik-accent);
+  fill: var(--oblik-ghost);
   stroke: none;
   pointer-events: none;
 }
 
 .ghostCorner {
-  fill: var(--oblik-accent);
+  fill: var(--oblik-ghost);
   stroke: var(--oblik-paper);
   stroke-width: 2;
   pointer-events: none;
@@ -191,20 +166,20 @@
 
 .ghostCornerRing {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-ghost);
   stroke-width: 2;
   pointer-events: none;
 }
 
 .snapDiamond {
-  fill: var(--oblik-accent);
+  fill: var(--oblik-ghost);
   stroke: var(--oblik-paper);
   stroke-width: 1.5;
 }
 
 .snapPoint {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-ghost);
   stroke-width: 2;
 }
 

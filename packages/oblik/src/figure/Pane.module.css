@@ -50,5 +50,5 @@
 }
 
 .statusError {
-  color: var(--oblik-accent);
+  color: var(--oblik-error);
 }

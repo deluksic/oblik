@@ -1,4 +1,4 @@
-import { createMemo } from "solid-js";
+import { For, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
 import { gliderAt, isGlider } from "@/geom/gliders";
@@ -6,6 +6,7 @@ import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
+import { chromeLayers } from "./chrome";
 
 import styles from "./View.module.css";
 
@@ -20,28 +21,43 @@ export function PointMark(props: {
   hot: boolean;
   selected: boolean;
   muted?: boolean;
+  overlay?: boolean;
+  knockout?: boolean;
 }) {
   const pos = createMemo(() => {
     const v = props.node.value;
     const at = v.kind === "point" ? (v as Point) : isGlider(v) ? gliderAt(v) : { x: 0, y: 0 };
     return worldToScreen(at, props.camera, props.size);
   });
+  const layers = createMemo(() =>
+    chromeLayers(1.5, {
+      selected: props.selected,
+      hover: props.hot && !props.selected,
+      overlay: props.overlay === true,
+      knockout: props.knockout !== false,
+    }),
+  );
   return (
     <>
-      <circle
-        class={[
-          styles.point,
-          {
-            [styles.hotFill]: props.hot && !props.selected,
-            [styles.selectedFill]: props.selected,
-            [styles.muted]: !!props.muted && !props.hot && !props.selected,
-          },
-        ]}
-        cx={pos().x}
-        cy={pos().y}
-        r={POINT_R}
-      />
-      {props.node.bind ? (
+      <For each={layers()}>
+        {(layer) => (
+          <circle
+            class={
+              layer.kind === "knockout"
+                ? styles.knockout
+                : layer.kind === "outline"
+                  ? styles.outline
+                  : [styles.point, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]
+            }
+            cx={pos().x}
+            cy={pos().y}
+            r={POINT_R}
+            fill={layer.kind === "paint" ? undefined : "none"}
+            stroke-width={layer.width}
+          />
+        )}
+      </For>
+      {props.overlay || !props.node.bind ? null : (
         <text
           class={[styles.label, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]}
           x={pos().x + 10}
@@ -50,7 +66,7 @@ export function PointMark(props: {
         >
           {props.node.bind}
         </text>
-      ) : null}
+      )}
     </>
   );
 }

@@ -108,7 +108,7 @@
 }
 
 .exposeBlocked {
-  border-color: color-mix(in srgb, var(--oblik-accent) 45%, var(--oblik-line));
+  border-color: color-mix(in srgb, var(--oblik-error) 45%, var(--oblik-line));
 }
 
 .exposeText {

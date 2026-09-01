@@ -91,7 +91,7 @@
 }
 
 .preview :global(.slot) {
-  color: var(--accent, #e8876a);
+  color: var(--accent, #3b82c4);
   font-weight: 600;
 }
 
@@ -135,7 +135,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  color: var(--accent, #e8876a);
+  color: var(--accent, #3b82c4);
   opacity: 0.38;
   font-weight: 600;
   pointer-events: none;
@@ -154,13 +154,13 @@
   padding: 0;
   background: transparent;
   border: 0;
-  color: var(--accent, #e8876a);
+  color: var(--accent, #3b82c4);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.45;
   outline: none;
-  caret-color: var(--accent, #e8876a);
+  caret-color: var(--accent, #3b82c4);
 }
 
 .hint {
@@ -204,7 +204,7 @@
 }
 
 .cmd {
-  color: var(--accent, #e8876a);
+  color: var(--accent, #3b82c4);
   font-weight: 600;
 }
 

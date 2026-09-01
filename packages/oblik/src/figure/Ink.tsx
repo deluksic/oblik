@@ -1,4 +1,4 @@
-import { Show, createMemo } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "../eval/context";
 import type { FigureStyle } from "../eval/paint";
@@ -7,6 +7,7 @@ import { isGlider } from "../geom/gliders";
 import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
+import { chromeLayers, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
 
 import styles from "./View.module.css";
 
@@ -14,6 +15,22 @@ const ONION: FigureStyle = { kind: "style", stroke: "#8a8478", width: 1.05 };
 
 function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
+}
+
+function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean }): ChromeLayer[] {
+  const w = (opts.onion ? ONION.width : opts.look.width) ?? 1.35;
+  return chromeLayers(w, {
+    selected: opts.selected,
+    hover: opts.hot && !opts.selected,
+    overlay: opts.overlay === true,
+    knockout: opts.knockout !== false,
+  });
+}
+
+function layerClass(kind: ChromeKind, muted: boolean, onion: boolean): string | Array<string | Record<string, boolean>> {
+  if (kind === "knockout") return styles.knockout;
+  if (kind === "outline") return styles.outline;
+  return [styles.stroke, { [styles.muted]: muted && !onion }];
 }
 
 type StrokeProps = {
@@ -26,6 +43,8 @@ type StrokeProps = {
   size: PaneSize;
   preview?: boolean;
   replaced?: boolean;
+  overlay?: boolean;
+  knockout?: boolean;
 };
 
 /** `node` is `TraceNode | null` because Solid compiles JSX props as getters — a live preview can go null mid-update. */
@@ -44,6 +63,8 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
           size={props.size}
           preview={props.preview}
           replaced={props.replaced}
+          overlay={props.overlay}
+          knockout={props.knockout}
         />
       )}
     </Show>
@@ -52,40 +73,60 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
 
 function StrokeInk(props: { node: TraceNode } & StrokeProps) {
   const kind = createMemo(() => props.node.value.kind);
+  const layers = createMemo(() =>
+    layersOf({
+      look: props.look,
+      onion: props.onion,
+      hot: props.hot,
+      selected: props.selected,
+      overlay: props.overlay,
+      knockout: props.knockout,
+    }),
+  );
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       <Show when={kind() === "segment"}>
-        <Seg node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} />
+        <Seg node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
       </Show>
       <Show when={kind() === "line" || kind() === "parallelLine"}>
         <Inf
           node={props.node}
           look={props.look}
           onion={props.onion}
-          hot={props.hot}
-          selected={props.selected}
           muted={props.muted}
+          overlay={props.overlay === true}
+          layers={layers()}
           camera={props.camera}
           size={props.size}
         />
       </Show>
       <Show when={kind() === "circle"}>
-        <Circ node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} />
+        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
       </Show>
       <Show when={kind() === "profile"}>
-        <Face node={props.node} look={props.look} onion={props.onion} hot={props.hot} selected={props.selected} muted={props.muted} />
+        <Face node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
       </Show>
     </g>
   );
+}
+
+function paintStroke(look: FigureStyle, layer: ChromeLayer): string | undefined {
+  return layer.kind === "paint" ? (look.stroke ?? "#1c1917") : undefined;
+}
+
+function paintFill(look: FigureStyle, onion: boolean, layer: ChromeLayer, closed: boolean): string {
+  if (layer.kind !== "paint") return "none";
+  if (onion || !closed) return "none";
+  return look.fill ?? "none";
 }
 
 function Seg(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;
-  hot: boolean;
-  selected: boolean;
   muted: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
 }) {
   const s = createMemo(() => {
     const v = props.node?.value;
@@ -96,30 +137,36 @@ function Seg(props: {
     <Show when={s()}>
       {(seg) => (
         <>
-          <line
-            data-role="hit"
-            class={styles.hit}
-            data-ink={traceKey(props.node)}
-            x1={seg().a.x}
-            y1={seg().a.y}
-            x2={seg().b.x}
-            y2={seg().b.y}
-          />
-          <line
-            data-role={props.onion ? "onion" : "paint"}
-            class={[styles.stroke, { [styles.hot]: props.hot, [styles.selected]: props.selected, [styles.muted]: props.muted }]}
-            fill="none"
-            stroke={look().stroke ?? "#1c1917"}
-            stroke-width={look().width ?? 1.35}
-            stroke-dasharray={dash(look())}
-            stroke-linecap="round"
-            vector-effect="non-scaling-stroke"
-            opacity={props.onion ? 0.4 : 1}
-            x1={seg().a.x}
-            y1={seg().a.y}
-            x2={seg().b.x}
-            y2={seg().b.y}
-          />
+          {props.overlay ? null : (
+            <line
+              data-role="hit"
+              class={styles.hit}
+              data-ink={traceKey(props.node)}
+              x1={seg().a.x}
+              y1={seg().a.y}
+              x2={seg().b.x}
+              y2={seg().b.y}
+            />
+          )}
+          <For each={props.layers}>
+            {(layer) => (
+              <line
+                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
+                class={layerClass(layer.kind, props.muted, props.onion)}
+                fill="none"
+                stroke={paintStroke(look(), layer)}
+                stroke-width={layer.width}
+                stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                stroke-linecap="round"
+                vector-effect="non-scaling-stroke"
+                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
+                x1={seg().a.x}
+                y1={seg().a.y}
+                x2={seg().b.x}
+                y2={seg().b.y}
+              />
+            )}
+          </For>
         </>
       )}
     </Show>
@@ -130,41 +177,46 @@ function Circ(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;
-  hot: boolean;
-  selected: boolean;
   muted: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
 }) {
   const c = createMemo(() => {
     const v = props.node?.value;
     return v?.kind === "circle" ? v : null;
   });
   const look = () => (props.onion ? ONION : props.look);
-  const fill = () => (props.onion ? "none" : (look().fill ?? "none"));
   return (
     <Show when={c()}>
       {(circ) => (
         <>
-          <circle
-            data-role="hit"
-            class={styles.hit}
-            data-ink={traceKey(props.node)}
-            cx={circ().center.x}
-            cy={circ().center.y}
-            r={Math.abs(circ().radius)}
-          />
-          <circle
-            data-role={props.onion ? "onion" : "paint"}
-            class={[styles.stroke, { [styles.hot]: props.hot, [styles.selected]: props.selected, [styles.muted]: props.muted }]}
-            fill={fill()}
-            stroke={look().stroke ?? "#1c1917"}
-            stroke-width={look().width ?? 1.35}
-            stroke-dasharray={dash(look())}
-            vector-effect="non-scaling-stroke"
-            opacity={props.onion ? 0.4 : 1}
-            cx={circ().center.x}
-            cy={circ().center.y}
-            r={Math.abs(circ().radius)}
-          />
+          {props.overlay ? null : (
+            <circle
+              data-role="hit"
+              class={styles.hit}
+              data-ink={traceKey(props.node)}
+              cx={circ().center.x}
+              cy={circ().center.y}
+              r={Math.abs(circ().radius)}
+            />
+          )}
+          <For each={props.layers}>
+            {(layer) => (
+              <circle
+                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
+                class={layerClass(layer.kind, props.muted, props.onion)}
+                fill={paintFill(look(), props.onion, layer, true)}
+                stroke={paintStroke(look(), layer)}
+                stroke-width={layer.width}
+                stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                vector-effect="non-scaling-stroke"
+                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
+                cx={circ().center.x}
+                cy={circ().center.y}
+                r={Math.abs(circ().radius)}
+              />
+            )}
+          </For>
         </>
       )}
     </Show>
@@ -175,9 +227,9 @@ function Inf(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;
-  hot: boolean;
-  selected: boolean;
   muted: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
   camera: Camera2;
   size: PaneSize;
 }) {
@@ -191,30 +243,36 @@ function Inf(props: {
     <Show when={ends()}>
       {(e) => (
         <>
-          <line
-            data-role="hit"
-            class={styles.hit}
-            data-ink={traceKey(props.node)}
-            x1={e().a.x}
-            y1={e().a.y}
-            x2={e().b.x}
-            y2={e().b.y}
-          />
-          <line
-            data-role={props.onion ? "onion" : "paint"}
-            class={[styles.stroke, { [styles.hot]: props.hot, [styles.selected]: props.selected, [styles.muted]: props.muted }]}
-            fill="none"
-            stroke={look().stroke ?? "#1c1917"}
-            stroke-width={look().width ?? 1.35}
-            stroke-dasharray={dash(look())}
-            stroke-linecap="round"
-            vector-effect="non-scaling-stroke"
-            opacity={props.onion ? 0.4 : 1}
-            x1={e().a.x}
-            y1={e().a.y}
-            x2={e().b.x}
-            y2={e().b.y}
-          />
+          {props.overlay ? null : (
+            <line
+              data-role="hit"
+              class={styles.hit}
+              data-ink={traceKey(props.node)}
+              x1={e().a.x}
+              y1={e().a.y}
+              x2={e().b.x}
+              y2={e().b.y}
+            />
+          )}
+          <For each={props.layers}>
+            {(layer) => (
+              <line
+                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
+                class={layerClass(layer.kind, props.muted, props.onion)}
+                fill="none"
+                stroke={paintStroke(look(), layer)}
+                stroke-width={layer.width}
+                stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                stroke-linecap="round"
+                vector-effect="non-scaling-stroke"
+                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
+                x1={e().a.x}
+                y1={e().a.y}
+                x2={e().b.x}
+                y2={e().b.y}
+              />
+            )}
+          </For>
         </>
       )}
     </Show>
@@ -225,34 +283,37 @@ function Face(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;
-  hot: boolean;
-  selected: boolean;
   muted: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
 }) {
   const d = createMemo(() => {
     const v = props.node?.value;
     return v?.kind === "profile" ? profileSvgPath(v) : null;
   });
   const look = () => (props.onion ? ONION : props.look);
-  const fill = () => (props.onion ? "none" : (look().fill ?? "none"));
   return (
     <Show when={d()}>
       {(path) => (
         <>
-          <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />
-          <path
-            data-role={props.onion ? "onion" : "paint"}
-            class={[styles.stroke, { [styles.hot]: props.hot, [styles.selected]: props.selected, [styles.muted]: props.muted }]}
-            d={path()}
-            fill={fill()}
-            stroke={look().stroke ?? "#1c1917"}
-            stroke-width={look().width ?? 1.35}
-            stroke-dasharray={dash(look())}
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            vector-effect="non-scaling-stroke"
-            opacity={props.onion ? 0.35 : 1}
-          />
+          {props.overlay ? null : <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />}
+          <For each={props.layers}>
+            {(layer) => (
+              <path
+                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
+                class={layerClass(layer.kind, props.muted, props.onion)}
+                d={path()}
+                fill={paintFill(look(), props.onion, layer, true)}
+                stroke={paintStroke(look(), layer)}
+                stroke-width={layer.width}
+                stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+                opacity={props.onion && layer.kind === "paint" ? 0.35 : 1}
+              />
+            )}
+          </For>
         </>
       )}
     </Show>
@@ -268,6 +329,8 @@ type PointProps = {
   camera: Camera2;
   preview?: boolean;
   replaced?: boolean;
+  overlay?: boolean;
+  knockout?: boolean;
 };
 
 /** Same live-getter contract as `FigureStroke`: `node` may go null while Brush preview unmounts. */
@@ -285,6 +348,8 @@ export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
           camera={props.camera}
           preview={props.preview}
           replaced={props.replaced}
+          overlay={props.overlay}
+          knockout={props.knockout}
         />
       )}
     </Show>
@@ -305,30 +370,44 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     if (props.onion || mark() === "open") return "none";
     return stroke();
   };
+  const layers = createMemo(() =>
+    chromeLayers(props.look?.width ?? 1.2, {
+      selected: props.selected,
+      hover: props.hot && !props.selected,
+      overlay: props.overlay === true,
+      knockout: props.knockout !== false,
+    }),
+  );
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
-          <circle
-            data-role="hit"
-            class={styles.hitFill}
-            data-ink={traceKey(props.node)}
-            cx={at().x}
-            cy={at().y}
-            r={r() * 2.4}
-          />
-          <circle
-            data-role={props.onion ? "onion" : "paint"}
-            class={[styles.point, { [styles.hot]: props.hot, [styles.selected]: props.selected, [styles.muted]: props.muted }]}
-            cx={at().x}
-            cy={at().y}
-            r={r()}
-            fill={fill() ?? "none"}
-            stroke={stroke()}
-            stroke-width={props.look?.width ?? 1.2}
-            vector-effect="non-scaling-stroke"
-            opacity={props.onion ? 0.45 : 1}
-          />
+          {props.overlay ? null : (
+            <circle
+              data-role="hit"
+              class={styles.hitFill}
+              data-ink={traceKey(props.node)}
+              cx={at().x}
+              cy={at().y}
+              r={r() * 2.4}
+            />
+          )}
+          <For each={layers()}>
+            {(layer) => (
+              <circle
+                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
+                class={layer.kind === "paint" ? [styles.point, { [styles.muted]: props.muted }] : layerClass(layer.kind, props.muted, props.onion)}
+                cx={at().x}
+                cy={at().y}
+                r={r()}
+                fill={layer.kind === "paint" ? (fill() ?? "none") : "none"}
+                stroke={layer.kind === "paint" ? stroke() : undefined}
+                stroke-width={layer.width}
+                vector-effect="non-scaling-stroke"
+                opacity={props.onion && layer.kind === "paint" ? 0.45 : 1}
+              />
+            )}
+          </For>
         </>
       )}
     </g>

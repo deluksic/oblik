@@ -1,0 +1,38 @@
+import { describe, expect, test } from "vitest";
+
+import { CONSTRUCTION_STROKE_PX, FIGURE_HOVER_PX, FIGURE_PAPER_PX, FIGURE_SELECT_PX, chromeLayers } from "./chrome";
+
+describe("chromeLayers", () => {
+  test("base pass is paint only", () => {
+    expect(chromeLayers(2.8, { selected: true, hover: true, overlay: false, knockout: true })).toEqual([
+      { kind: "paint", width: 2.8 },
+    ]);
+  });
+
+  test("selected overlay is knockout, outline, paint", () => {
+    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true, knockout: true })).toEqual([
+      { kind: "knockout", width: 2.8 + 2 * FIGURE_PAPER_PX + 2 * FIGURE_SELECT_PX },
+      { kind: "outline", width: 2.8 + 2 * FIGURE_SELECT_PX },
+      { kind: "paint", width: 2.8 },
+    ]);
+  });
+
+  test("hover overlay also knockouts, with a thinner ring", () => {
+    expect(chromeLayers(1, { selected: false, hover: true, overlay: true, knockout: true })).toEqual([
+      { kind: "knockout", width: 1 + 2 * FIGURE_PAPER_PX + 2 * FIGURE_HOVER_PX },
+      { kind: "outline", width: 1 + 2 * FIGURE_HOVER_PX },
+      { kind: "paint", width: 1 },
+    ]);
+  });
+
+  test("dragging drops knockout and keeps the outline", () => {
+    expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true, knockout: false })).toEqual([
+      { kind: "outline", width: CONSTRUCTION_STROKE_PX + 2 * FIGURE_SELECT_PX },
+      { kind: "paint", width: CONSTRUCTION_STROKE_PX },
+    ]);
+  });
+
+  test("idle overlay draws nothing", () => {
+    expect(chromeLayers(1.35, { selected: false, hover: false, overlay: true, knockout: true })).toEqual([]);
+  });
+});
