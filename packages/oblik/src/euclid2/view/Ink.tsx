@@ -7,7 +7,7 @@ import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
-import { CONSTRUCTION_STROKE_PX, chromeClipUrl, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, chromeClipUrl, chromeLayers, chromeOutsideClipId, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
 import { ChromeOutsideClip } from "./ChromeClip";
 import { readChromeMetrics } from "./chrome-metrics";
 
@@ -108,11 +108,8 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
 
 function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolean; layers: ChromeLayer[] }) {
   const c = () => props.node.value as Circle;
-  const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
-  const clipD = () => circleClipD(c().center.x, c().center.y, c().radius);
   return (
     <>
-      {props.overlay ? <ChromeOutsideClip id={outsideId()} d={clipD()} /> : null}
       {props.overlay ? null : (
         <circle class={styles.hit} data-ink={traceKey(props.node)} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
       )}
@@ -120,7 +117,6 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
         {(layer) => (
           <circle
             class={layerClass(layer.kind, props.node.editable, !!props.muted)}
-            clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
             opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}

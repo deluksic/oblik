@@ -7,7 +7,7 @@ import { isGlider } from "../geom/gliders";
 import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
-import { chromeClipUrl, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
+import { chromeClipUrl, chromeLayers, chromeOutsideClipId, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
 import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 
@@ -194,16 +194,10 @@ function Circ(props: {
     return v?.kind === "circle" ? v : null;
   });
   const look = () => (props.onion ? ONION : props.look);
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const clipD = () => {
-    const circ = c();
-    return circ ? circleClipD(circ.center.x, circ.center.y, circ.radius) : "";
-  };
   return (
     <Show when={c()}>
       {(circ) => (
         <>
-          {props.overlay ? <ChromeOutsideClip id={outsideId()} d={clipD()} /> : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -219,7 +213,6 @@ function Circ(props: {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
                 opacity={layerOpacity(layer, props.onion)}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
@@ -396,13 +389,10 @@ function PointInk(props: { node: TraceNode } & PointProps) {
       knockout: props.knockout !== false,
     }, readChromeMetrics()),
   );
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const clipD = () => circleClipD(at().x, at().y, r());
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
-          {props.overlay === true ? <ChromeOutsideClip id={outsideId()} d={clipD()} /> : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -418,7 +408,6 @@ function PointInk(props: { node: TraceNode } & PointProps) {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layer.kind === "paint" ? [styles.point, { [styles.muted]: props.muted }] : layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay === true ? chromeClipUrl(outsideId()) : undefined}
                 cx={at().x}
                 cy={at().y}
                 r={r()}

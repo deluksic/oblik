@@ -6,8 +6,7 @@ import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
-import { POINT_STROKE_PX, chromeClipUrl, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth } from "./chrome";
-import { ChromeOutsideClip } from "./ChromeClip";
+import { POINT_STROKE_PX, chromeLayers, layerStrokeWidth } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
@@ -40,11 +39,8 @@ export function PointMark(props: {
       screenSpace: true,
     }, readChromeMetrics()),
   );
-  const outsideId = () => chromeOutsideClipId(`hud-${traceKey(props.node)}`);
-  const clipD = () => circleClipD(pos().x, pos().y, POINT_R);
   return (
     <>
-      {props.overlay === true ? <ChromeOutsideClip id={outsideId()} d={clipD()} /> : null}
       <For each={layers()}>
         {(layer) => (
           <circle
@@ -55,7 +51,6 @@ export function PointMark(props: {
                   ? styles.outline
                   : [styles.point, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]
             }
-            clip-path={props.overlay === true ? chromeClipUrl(outsideId()) : undefined}
             opacity={layer.opacity}
             cx={pos().x}
             cy={pos().y}

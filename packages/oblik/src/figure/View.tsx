@@ -322,6 +322,70 @@ export function FigureView(props: FigureViewProps) {
             <Show when={page()}>
               {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} />}
             </Show>
+            <For each={inkStrokes()}>
+              {(s) => (
+                <InkStroke
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
+                  scope={props.scope}
+                  camera={camera()}
+                  size={size()}
+                  knockout={drag.phase() !== "dragging"}
+                  ghosting={props.shift === true}
+                />
+              )}
+            </For>
+            <For each={inkPts()}>
+              {(s) => (
+                <InkPoint
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
+                  scope={props.scope}
+                  camera={camera()}
+                  knockout={drag.phase() !== "dragging"}
+                  ghosting={props.shift === true}
+                />
+              )}
+            </For>
+            <For each={chromeInkStrokes()}>
+              {(s) => (
+                <InkStroke
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
+                  scope={props.scope}
+                  camera={camera()}
+                  size={size()}
+                  overlay={true}
+                  knockout={drag.phase() !== "dragging"}
+                  ghosting={props.shift === true}
+                />
+              )}
+            </For>
+            <For each={chromeInkPts()}>
+              {(s) => (
+                <InkPoint
+                  s={s}
+                  hoverKey={props.hoverKey}
+                  selectedKey={props.selectedKey}
+                  eraser={props.tool === "eraser"}
+                  replacePreview={props.tool === "brush" && !props.shift}
+                  scope={props.scope}
+                  camera={camera()}
+                  overlay={true}
+                  knockout={drag.phase() !== "dragging"}
+                  ghosting={props.shift === true}
+                />
+              )}
+            </For>
             <Show when={props.shift}>
               <For each={onionInk()}>
                 {(n) => (
@@ -339,23 +403,6 @@ export function FigureView(props: FigureViewProps) {
                   />
                 )}
               </For>
-            </Show>
-            <For each={inkStrokes()}>
-              {(s) => (
-                <InkStroke
-                  s={s}
-                  hoverKey={props.hoverKey}
-                  selectedKey={props.selectedKey}
-                  eraser={props.tool === "eraser"}
-                  replacePreview={props.tool === "brush" && !props.shift}
-                  scope={props.scope}
-                  camera={camera()}
-                  size={size()}
-                  knockout={drag.phase() !== "dragging"}
-                />
-              )}
-            </For>
-            <Show when={props.shift}>
               <For each={onionPts()}>
                 {(n) => (
                   <FigurePoint
@@ -371,53 +418,6 @@ export function FigureView(props: FigureViewProps) {
                   />
                 )}
               </For>
-            </Show>
-            <For each={inkPts()}>
-              {(s) => (
-                <InkPoint
-                  s={s}
-                  hoverKey={props.hoverKey}
-                  selectedKey={props.selectedKey}
-                  eraser={props.tool === "eraser"}
-                  replacePreview={props.tool === "brush" && !props.shift}
-                  scope={props.scope}
-                  camera={camera()}
-                  knockout={drag.phase() !== "dragging"}
-                />
-              )}
-            </For>
-            <For each={chromeInkStrokes()}>
-              {(s) => (
-                <InkStroke
-                  s={s}
-                  hoverKey={props.hoverKey}
-                  selectedKey={props.selectedKey}
-                  eraser={props.tool === "eraser"}
-                  replacePreview={props.tool === "brush" && !props.shift}
-                  scope={props.scope}
-                  camera={camera()}
-                  size={size()}
-                  overlay={true}
-                  knockout={drag.phase() !== "dragging"}
-                />
-              )}
-            </For>
-            <For each={chromeInkPts()}>
-              {(s) => (
-                <InkPoint
-                  s={s}
-                  hoverKey={props.hoverKey}
-                  selectedKey={props.selectedKey}
-                  eraser={props.tool === "eraser"}
-                  replacePreview={props.tool === "brush" && !props.shift}
-                  scope={props.scope}
-                  camera={camera()}
-                  overlay={true}
-                  knockout={drag.phase() !== "dragging"}
-                />
-              )}
-            </For>
-            <Show when={props.shift}>
               <For each={chromeOnionInk()}>
                 {(n) => (
                   <FigureStroke
@@ -516,6 +516,7 @@ function InkStroke(props: {
   size: PaneSize;
   overlay?: boolean;
   knockout?: boolean;
+  ghosting?: boolean;
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
   const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
@@ -528,7 +529,7 @@ function InkStroke(props: {
       onion={false}
       hot={hot()}
       selected={selected()}
-      muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
+      muted={geomMuted() || props.ghosting === true || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
       size={props.size}
       replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
@@ -548,6 +549,7 @@ function InkPoint(props: {
   camera: Camera2;
   overlay?: boolean;
   knockout?: boolean;
+  ghosting?: boolean;
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
   const geomMuted = () => !!props.scope && mutedForScope(props.s.geom, props.scope);
@@ -560,7 +562,7 @@ function InkPoint(props: {
       onion={false}
       hot={hot()}
       selected={selected()}
-      muted={geomMuted() || (props.eraser === true && paintKeyNow() === props.hoverKey)}
+      muted={geomMuted() || props.ghosting === true || (props.eraser === true && paintKeyNow() === props.hoverKey)}
       camera={props.camera}
       replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
       overlay={props.overlay === true}

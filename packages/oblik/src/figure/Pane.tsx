@@ -325,7 +325,7 @@ export function FigurePane(props: FigurePaneProps) {
     const t = tool();
     if (t === "brush") {
       return shift()
-        ? "Brush — hover previews, click onion to add ink. Ink stays on top. Escape leaves the brush."
+        ? "Brush — hover previews, click construction to add ink. Ink fades while construction is up. Escape leaves the brush."
         : "Brush — click ink to replace. Hold Shift to see construction and add. Escape leaves the brush.";
     }
     if (t === "eraser") return "Eraser — click ink to remove it. Construction stays. Escape leaves the eraser.";
