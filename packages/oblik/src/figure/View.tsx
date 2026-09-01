@@ -99,21 +99,13 @@ export function FigureView(props: FigureViewProps) {
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
   const chromeKey = (key: string) => key === props.hoverKey || key === props.selectedKey;
-  const baseInkStrokes = createMemo(() => inkStrokes().filter((s) => !chromeKey(traceKey(s.paint))));
   const chromeInkStrokes = createMemo(() => inkStrokes().filter((s) => chromeKey(traceKey(s.paint))));
-  const baseInkPts = createMemo(() => inkPts().filter((s) => !chromeKey(traceKey(s.paint))));
   const chromeInkPts = createMemo(() => inkPts().filter((s) => chromeKey(traceKey(s.paint))));
   const chromeOnionInk = createMemo(() =>
     onionInk().filter((n) => traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey),
   );
   const chromeOnionPts = createMemo(() =>
     onionPts().filter((n) => traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey),
-  );
-  const baseOnionInk = createMemo(() =>
-    onionInk().filter((n) => traceKey(n) !== props.hoverKey && traceKey(n) !== props.selectedKey),
-  );
-  const baseOnionPts = createMemo(() =>
-    onionPts().filter((n) => traceKey(n) !== props.hoverKey && traceKey(n) !== props.selectedKey),
   );
   const frameXywh = createMemo<FrameXywh | null>(() => {
     const r = page();
@@ -331,7 +323,7 @@ export function FigureView(props: FigureViewProps) {
               {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} />}
             </Show>
             <Show when={props.shift}>
-              <For each={baseOnionInk()}>
+              <For each={onionInk()}>
                 {(n) => (
                   <FigureStroke
                     node={n}
@@ -343,11 +335,12 @@ export function FigureView(props: FigureViewProps) {
                     camera={camera()}
                     size={size()}
                     replaced={previewKey() === traceKey(n)}
+                    knockout={drag.phase() !== "dragging"}
                   />
                 )}
               </For>
             </Show>
-            <For each={baseInkStrokes()}>
+            <For each={inkStrokes()}>
               {(s) => (
                 <InkStroke
                   s={s}
@@ -358,11 +351,12 @@ export function FigureView(props: FigureViewProps) {
                   scope={props.scope}
                   camera={camera()}
                   size={size()}
+                  knockout={drag.phase() !== "dragging"}
                 />
               )}
             </For>
             <Show when={props.shift}>
-              <For each={baseOnionPts()}>
+              <For each={onionPts()}>
                 {(n) => (
                   <FigurePoint
                     node={n}
@@ -373,11 +367,12 @@ export function FigureView(props: FigureViewProps) {
                     muted={!!props.scope && mutedForScope(n, props.scope)}
                     camera={camera()}
                     replaced={previewKey() === traceKey(n)}
+                    knockout={drag.phase() !== "dragging"}
                   />
                 )}
               </For>
             </Show>
-            <For each={baseInkPts()}>
+            <For each={inkPts()}>
               {(s) => (
                 <InkPoint
                   s={s}
@@ -387,6 +382,7 @@ export function FigureView(props: FigureViewProps) {
                   replacePreview={props.tool === "brush" && !props.shift}
                   scope={props.scope}
                   camera={camera()}
+                  knockout={drag.phase() !== "dragging"}
                 />
               )}
             </For>

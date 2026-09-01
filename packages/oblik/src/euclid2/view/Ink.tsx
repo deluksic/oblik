@@ -168,9 +168,28 @@ function InfiniteStroke(props: {
   );
 }
 
-export function ProfileFill(props: { node: TraceNode }) {
+export function ProfileFill(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  knockout?: boolean;
+}) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  return <path class={styles.fill} data-ink={traceKey(props.node)} d={d()} stroke="none" />;
+  const layers = createMemo(() => layersOf(props.hot, props.selected, false, props.knockout !== false));
+  return (
+    <For each={layers()}>
+      {(layer) => (
+        <path
+          class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
+          data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
+          d={d()}
+          fill={layer.kind === "paint" ? undefined : "none"}
+          stroke={layer.kind === "paint" ? "none" : undefined}
+          stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+        />
+      )}
+    </For>
+  );
 }
 
 export function ProfileOutline(props: {

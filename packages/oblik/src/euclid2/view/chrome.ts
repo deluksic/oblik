@@ -36,8 +36,8 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
 }
 
 /**
- * Base pass: paint only when idle. Overlay pass (hover/selected): knockout,
- * outline, then paint — drawn on top of the scene.
+ * Base pass keeps paint order: knockout (if any) immediately before paint.
+ * Overlay pass is outline only, drawn after the whole scene.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -45,20 +45,20 @@ export function chromeLayers(
   metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
 ): ChromeLayer[] {
   const w = paintWidth > 0 ? paintWidth : 1;
-  if (!opts.overlay) {
-    if (opts.hover || opts.selected) return [];
-    return [{ kind: "paint", width: w }];
+  const hot = opts.selected || opts.hover;
+  if (opts.overlay) {
+    if (!hot || !opts.knockout) return [];
+    const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
+    return [{ kind: "outline", width: w, opacity: outlineOpacity }];
   }
-  if (!opts.selected && !opts.hover) return [];
-  if (!opts.knockout) return [];
-  const px = opts.screenSpace ? 1 : chromeDprScale();
-  const knockoutWidth = metrics.knockoutPx * px;
-  const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
-  return [
-    { kind: "knockout", width: knockoutWidth },
-    { kind: "outline", width: w, opacity: outlineOpacity },
-    { kind: "paint", width: w },
-  ];
+  if (hot && opts.knockout) {
+    const px = opts.screenSpace ? 1 : chromeDprScale();
+    return [
+      { kind: "knockout", width: metrics.knockoutPx * px },
+      { kind: "paint", width: w },
+    ];
+  }
+  return [{ kind: "paint", width: w }];
 }
 
 /** Scale CSS px to device px for world-space non-scaling strokes. */

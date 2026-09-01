@@ -227,11 +227,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
       : null,
   );
   const chromeNode = (n: TraceNode) => isHot(n, props.hoverId, props.selectedKey) || isSelected(n, props.selectedKey);
-  const baseFills = createMemo(() => fills().filter((n) => !chromeNode(n)));
   const chromeFills = createMemo(() => fills().filter(chromeNode));
-  const baseInk = createMemo(() => ink().filter((n) => !chromeNode(n)));
   const chromeInk = createMemo(() => ink().filter(chromeNode));
-  const basePoints = createMemo(() => points().filter((n) => !chromeNode(n)));
   const chromePoints = createMemo(() => points().filter(chromeNode));
 
   return (
@@ -256,10 +253,17 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
-          <For each={baseFills()}>
-            {(n) => <ProfileFill node={n} />}
+          <For each={fills()}>
+            {(n) => (
+              <ProfileFill
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+                knockout={drag.phase() !== "dragging"}
+              />
+            )}
           </For>
-          <For each={baseInk()}>
+          <For each={ink()}>
             {(n) => (
               <Stroke
                 node={n}
@@ -272,6 +276,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
                 }
                 camera={camera()}
                 size={size()}
+                knockout={drag.phase() !== "dragging"}
               />
             )}
           </For>
@@ -310,7 +315,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
-        <For each={basePoints()}>
+        <For each={points()}>
           {(n) => (
             <PointMark
               node={n}
@@ -319,6 +324,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               hot={isHot(n, props.hoverId, props.selectedKey)}
               selected={isSelected(n, props.selectedKey)}
               muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
+              knockout={drag.phase() !== "dragging"}
             />
           )}
         </For>
