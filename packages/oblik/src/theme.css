@@ -90,6 +90,8 @@ h6 {
   --oblik-stroke-selected: 2.25px;
   --oblik-chrome-knockout: 7px;
   --oblik-chrome-knockout-selected: 4px;
+  --oblik-chrome-point: 14px;
+  --oblik-chrome-point-selected: 9px;
   --oblik-chrome-outline-hover: 0.5;
   --oblik-chrome-outline-selected: 1;
   --oblik-hit: 14px;

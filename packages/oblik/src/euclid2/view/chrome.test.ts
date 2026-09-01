@@ -77,6 +77,22 @@ describe("chromeLayers", () => {
   test("idle overlay draws nothing", () => {
     expect(chromeLayers(1.35, { selected: false, hover: false, overlay: true, knockout: true }, M)).toEqual([]);
   });
+
+  test("point hover overlay uses a wider band than strokes", () => {
+    expect(chromeLayers(2, { selected: false, hover: true, overlay: true, knockout: true, point: true }, M)).toEqual([
+      { kind: "outline", width: M.pointKnockoutPx, opacity: M.hoverOutlineOpacity },
+    ]);
+    expect(M.pointKnockoutPx).toBeGreaterThan(M.knockoutPx);
+  });
+
+  test("point selected overlay uses a wider opaque ring and gap", () => {
+    expect(chromeLayers(2, { selected: true, hover: false, overlay: true, knockout: true, point: true }, M)).toEqual([
+      { kind: "outline", width: M.pointKnockoutPx, opacity: M.selectOutlineOpacity },
+      { kind: "knockout", width: M.pointSelectKnockoutPx },
+    ]);
+    expect(M.pointSelectKnockoutPx).toBeLessThan(M.pointKnockoutPx);
+    expect(M.pointSelectKnockoutPx).toBeGreaterThan(M.selectKnockoutPx);
+  });
 });
 
 describe("outsideClipD", () => {

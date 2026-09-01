@@ -16,11 +16,15 @@ export type ChromeOpts = {
   knockout: boolean;
   /** HUD / screen-space SVG where viewBox units are already CSS px. */
   screenSpace?: boolean;
+  /** Points use a wider halo; the disc is small compared to a stroke. */
+  point?: boolean;
 };
 
 export type ChromeMetrics = {
   knockoutPx: number;
   selectKnockoutPx: number;
+  pointKnockoutPx: number;
+  pointSelectKnockoutPx: number;
   hoverOutlineOpacity: number;
   selectOutlineOpacity: number;
 };
@@ -28,6 +32,8 @@ export type ChromeMetrics = {
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
   knockoutPx: 7,
   selectKnockoutPx: 4,
+  pointKnockoutPx: 14,
+  pointSelectKnockoutPx: 9,
   hoverOutlineOpacity: 0.5,
   selectOutlineOpacity: 1,
 };
@@ -50,7 +56,9 @@ export function chromeLayers(
   const w = paintWidth > 0 ? paintWidth : 1;
   const hot = opts.selected || opts.hover;
   const px = opts.screenSpace ? 1 : chromeDprScale();
-  const band = metrics.knockoutPx * px;
+  const outlinePx = opts.point ? metrics.pointKnockoutPx : metrics.knockoutPx;
+  const gapPx = opts.point ? metrics.pointSelectKnockoutPx : metrics.selectKnockoutPx;
+  const band = outlinePx * px;
   if (opts.overlay) {
     if (!hot || !opts.knockout) return [];
     const outline: ChromeLayer = {
@@ -59,7 +67,7 @@ export function chromeLayers(
       opacity: opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity,
     };
     if (!opts.selected) return [outline];
-    return [outline, { kind: "knockout", width: metrics.selectKnockoutPx * px }];
+    return [outline, { kind: "knockout", width: gapPx * px }];
   }
   return [{ kind: "paint", width: w }];
 }

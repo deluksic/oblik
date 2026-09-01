@@ -34,6 +34,7 @@ export function PointMark(props: {
       overlay: props.overlay === true,
       knockout: props.knockout !== false,
       screenSpace: true,
+      point: true,
     }, readChromeMetrics()),
   );
   return (

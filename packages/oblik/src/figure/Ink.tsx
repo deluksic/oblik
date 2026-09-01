@@ -393,6 +393,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
       knockout: props.knockout !== false,
+      point: true,
     }, readChromeMetrics()),
   );
   return (
