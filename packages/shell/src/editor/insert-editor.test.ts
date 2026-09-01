@@ -22,6 +22,9 @@ import {
 import { injectSceneSites } from "./inject-sites";
 import { collectEditCalls } from "./patch-widget";
 
+const matchSegmentCp = (line: { a?: { x: number; y: number }; b?: { x: number; y: number } }) =>
+  line.a?.x === 0 && line.a?.y === 0 && line.b?.x === 5 && line.b?.y === 0;
+
 function at(source: string, i = 0): { line: number; column: number } {
   const sf = ts.createSourceFile(
     "scene.ts",
@@ -275,9 +278,7 @@ export function scene() {
     ["c", { x: 0, y: 0 }],
     ["p", { x: 5, y: 0 }],
   ]);
-  const match = (line: { a?: { x: number; y: number }; b?: { x: number; y: number } }) =>
-    line.a?.x === 0 && line.a?.y === 0 && line.b?.x === 5 && line.b?.y === 0;
-  const promoted = promoteInlineLineBinding(src, match, env);
+  const promoted = promoteInlineLineBinding(src, matchSegmentCp, env);
   expect(promoted?.name).toBe("s");
   expect(promoted?.source).toMatch(/const s = segment\(c, p\);/);
   expect(promoted?.source).toMatch(/return \[__scene, s\];/);

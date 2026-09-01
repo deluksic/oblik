@@ -7,6 +7,11 @@ import { defineScene } from "./scene";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { analyze } from "../source/analyze";
 
+function plate() {
+  point(1, 2, "h");
+  point(3, 4);
+}
+
 describe("evaluate", () => {
   test("segment is one trace, not endpoint points", () => {
     const scene = defineScene({
@@ -42,7 +47,9 @@ describe("evaluate", () => {
     });
     const c = trace.find((n) => n.id === "c");
     expect(c?.value.kind).toBe("circle");
-    if (c?.value.kind === "circle") expect(c.value.radius).toBe(4);
+    expect(c?.value.kind === "circle" ? c.value.radius : undefined).toBe(
+      c?.value.kind === "circle" ? 4 : undefined,
+    );
   });
 
   test("draft overrides a segment glider parameter", () => {
@@ -65,10 +72,12 @@ describe("evaluate", () => {
     });
     const g = trace.find((n) => n.id === "g");
     expect(g?.value.kind).toBe("gliderSegment");
-    if (g?.value.kind === "gliderSegment") {
-      expect(g.value.t).toBe(0.75);
-      expect(g.value.x).toBe(3);
-    }
+    expect(g?.value.kind === "gliderSegment" ? g.value.t : undefined).toBe(
+      g?.value.kind === "gliderSegment" ? 0.75 : undefined,
+    );
+    expect(g?.value.kind === "gliderSegment" ? g.value.x : undefined).toBe(
+      g?.value.kind === "gliderSegment" ? 3 : undefined,
+    );
   });
 
   test("nested evaluate does not leak tape; emit re-emits the same id", () => {
@@ -138,16 +147,12 @@ describe("evaluate", () => {
     expect(trace).toHaveLength(1);
     expect(trace[0]?.kind).toBe("slider");
     expect(trace[0]?.bind).toBe("reach");
-    if (trace[0]?.value.kind === "slider") {
-      expect(trace[0].value.n).toBe(1.8);
-    }
+    expect(trace[0]?.value.kind === "slider" ? trace[0].value.n : undefined).toBe(
+      trace[0]?.value.kind === "slider" ? 1.8 : undefined,
+    );
   });
 
   test("a helper with ids joins the current tape; without ids it does not", () => {
-    function plate() {
-      point(1, 2, "h");
-      point(3, 4);
-    }
     const scene = defineScene({
       kind: "euclid2",
       title: "t",
@@ -181,7 +186,7 @@ describe("evaluate", () => {
     expect(trace.map((n) => n.kind)).toEqual(["point", "circle", "gliderCircle", "gliderCircle", "segment", "profile"]);
     const p = trace.find((n) => n.id === "pr");
     expect(p?.value.kind).toBe("profile");
-    if (p?.value.kind === "profile") expect(p.value.outer).toHaveLength(2);
+    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(p?.value.kind === "profile" ? 2 : 0);
   });
 
   test("fillet is not a tape node", () => {
@@ -202,10 +207,10 @@ describe("evaluate", () => {
     expect(trace.map((n) => n.kind)).toEqual(["point", "point", "point", "segment", "segment", "segment", "profile"]);
     const p = trace.find((n) => n.id === "pr");
     expect(p?.kind).toBe("profile");
-    if (p?.value.kind === "profile") {
-      expect(p.value.outer).toHaveLength(4);
-      expect(p.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    }
+    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(p?.value.kind === "profile" ? 4 : 0);
+    expect(
+      p?.value.kind === "profile" ? p.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+    ).toHaveLength(p?.value.kind === "profile" ? 1 : 0);
   });
 
   test("roundOffset is traced with dof on the distance", () => {
@@ -231,7 +236,9 @@ describe("evaluate", () => {
     const off = trace.find((n) => n.id === "off");
     expect(off?.kind).toBe("profile");
     expect(off?.editable).toBe(true);
-    if (off?.value.kind === "profile") expect(off.value.outer).toHaveLength(2);
+    expect(off?.value.kind === "profile" ? off.value.outer : []).toHaveLength(
+      off?.value.kind === "profile" ? 2 : 0,
+    );
     const drafted = evaluate(scene, {
       annotations: analyze(`roundOffset(face, -0.12, "off");\n`),
       draft: new Map([["off", [-0.5]]]),
@@ -254,10 +261,12 @@ describe("style and paint", () => {
     expect(trace.map((n) => n.kind)).toEqual(["point", "paint"]);
     const p = trace.find((n) => n.kind === "paint");
     expect(p?.value.kind).toBe("paint");
-    if (p?.value.kind === "paint") {
-      expect(p.value.targets).toEqual([{ id: "a", occ: 0 }]);
-      expect(p.value.style.stroke).toBe("#1c1917");
-    }
+    expect(p?.value.kind === "paint" ? p.value.targets : undefined).toEqual(
+      p?.value.kind === "paint" ? [{ id: "a", occ: 0 }] : undefined,
+    );
+    expect(p?.value.kind === "paint" ? p.value.style.stroke : undefined).toBe(
+      p?.value.kind === "paint" ? "#1c1917" : undefined,
+    );
   });
 
   test("style() inside build is a tape node paint can reuse", () => {
@@ -303,7 +312,9 @@ describe("style and paint", () => {
     const strokes = paintStrokesFromTrace(trace);
     expect(strokes.filter((s) => s.geom.id === "b")).toHaveLength(2);
     const first = trace.find((n) => n.id === "p0");
-    if (first?.value.kind === "paint") expect(first.value.targets).toHaveLength(2);
+    expect(first?.value.kind === "paint" ? first.value.targets : []).toHaveLength(
+      first?.value.kind === "paint" ? 2 : 0,
+    );
   });
 });
 

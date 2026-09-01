@@ -8,7 +8,7 @@ const RING = { kind: "euclid2", title: "Ring", build: () => ({}) } as Scene;
 
 describe("applyHotScenes", () => {
   test("caches every updated module by glob key, not only the active scene", () => {
-    const onHot = vi.fn();
+    const onHot = vi.fn<(key: string, scene: Scene) => void>();
     registerSceneHot({ onHot });
     applyHotScenes(
       ["./scenes/shelf.ts", "./scenes/ring.ts"],

@@ -21,6 +21,17 @@ export default {
 }
 `;
 
+function plate() {
+  const origin = point(0, 0, "o_origin");
+  for (let i = 0; i < 2; i++) circle(origin, 0.1, "o_hole");
+  const drill = circle(origin, 0.2, "o_drill");
+  return { origin, drill };
+}
+
+function bolts() {
+  for (let i = 0; i < 3; i++) circle({ x: i, y: 0 }, 0.1, "o_bolt");
+}
+
 describe("assignInv", () => {
   test("splits two plate() calls; holes follow the surrounding origin/drill", () => {
     const file = "apps/demo/src/scenes/t.ts";
@@ -29,12 +40,6 @@ describe("assignInv", () => {
       kind: "euclid2",
       title: "t",
       build() {
-        function plate() {
-          const origin = point(0, 0, "o_origin");
-          for (let i = 0; i < 2; i++) circle(origin, 0.1, "o_hole");
-          const drill = circle(origin, 0.2, "o_drill");
-          return { origin, drill };
-        }
         plate();
         plate();
       },
@@ -69,9 +74,6 @@ function bolts() {
       kind: "euclid2",
       title: "t",
       build() {
-        function bolts() {
-          for (let i = 0; i < 3; i++) circle({ x: i, y: 0 }, 0.1, "o_bolt");
-        }
         bolts();
         bolts();
       },

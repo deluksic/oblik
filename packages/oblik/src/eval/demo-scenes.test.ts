@@ -36,9 +36,11 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "cellar" && n.value.kind === "parallelLine")).toBe(true);
     const cellar = trace.find((n) => n.bind === "cellar");
     const shelfN = trace.find((n) => n.bind === "shelf");
-    if (cellar?.value.kind === "parallelLine" && shelfN?.value.kind === "parallelLine") {
-      expect(cellar.value.distance).toBeCloseTo(-shelfN.value.distance);
-    }
+    const cellarShelfDistance =
+      cellar?.value.kind === "parallelLine" && shelfN?.value.kind === "parallelLine"
+        ? cellar.value.distance + shelfN.value.distance
+        : 0;
+    expect(cellarShelfDistance).toBeCloseTo(0);
     expect(trace.some((n) => n.bind === "lamp" && n.value.kind === "gliderLine")).toBe(true);
     expect(trace.some((n) => n.bind === "beam" && n.kind === "circle")).toBe(true);
     expect(trace.some((n) => n.bind === "Q")).toBe(true);
@@ -93,7 +95,9 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "gap" && n.kind === "slider")).toBe(true);
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("profile");
-    if (one?.value.kind === "profile") expect(one.value.outer).toHaveLength(3);
+    expect(one?.value.kind === "profile" ? one.value.outer : []).toHaveLength(
+      one?.value.kind === "profile" ? 3 : 0,
+    );
   });
 
   test("plate figure paints returned fields from the same helper", () => {
@@ -117,30 +121,42 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
     const flat = trace.find((n) => n.bind === "flat");
     expect(flat?.kind).toBe("profile");
-    if (flat?.value.kind === "profile") {
-      expect(flat.value.outer).toHaveLength(3);
-      expect(flat.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    }
+    expect(flat?.value.kind === "profile" ? flat.value.outer : []).toHaveLength(
+      flat?.value.kind === "profile" ? 3 : 0,
+    );
+    expect(
+      flat?.value.kind === "profile" ? flat.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+    ).toHaveLength(flat?.value.kind === "profile" ? 1 : 0);
     const mix = trace.find((n) => n.bind === "mix");
     expect(mix?.kind).toBe("profile");
-    if (mix?.value.kind === "profile") {
-      expect(mix.value.outer).toHaveLength(6);
-      expect(mix.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
-    }
+    expect(mix?.value.kind === "profile" ? mix.value.outer : []).toHaveLength(
+      mix?.value.kind === "profile" ? 6 : 0,
+    );
+    expect(
+      mix?.value.kind === "profile" ? mix.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+    ).toHaveLength(mix?.value.kind === "profile" ? 2 : 0);
     const ell = trace.find((n) => n.bind === "ell");
-    if (ell?.value.kind === "profile") {
-      expect(ell.value.outer).toHaveLength(7);
-      expect(ell.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    }
+    expect(ell?.value.kind === "profile" ? ell.value.outer : []).toHaveLength(
+      ell?.value.kind === "profile" ? 7 : 0,
+    );
+    expect(
+      ell?.value.kind === "profile" ? ell.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+    ).toHaveLength(ell?.value.kind === "profile" ? 1 : 0);
     const rim = trace.find((n) => n.bind === "rim");
-    if (rim?.value.kind === "profile") expect(rim.value.outer).toHaveLength(5);
+    expect(rim?.value.kind === "profile" ? rim.value.outer : []).toHaveLength(
+      rim?.value.kind === "profile" ? 5 : 0,
+    );
     const tip = trace.find((n) => n.bind === "tip");
-    if (tip?.value.kind === "profile") expect(tip.value.outer).toHaveLength(4);
+    expect(tip?.value.kind === "profile" ? tip.value.outer : []).toHaveLength(
+      tip?.value.kind === "profile" ? 4 : 0,
+    );
     const adj = trace.find((n) => n.bind === "adj");
-    if (adj?.value.kind === "profile") expect(adj.value.outer).toHaveLength(6);
+    expect(adj?.value.kind === "profile" ? adj.value.outer : []).toHaveLength(
+      adj?.value.kind === "profile" ? 6 : 0,
+    );
     const inset = trace.find((n) => n.bind === "inset");
-    if (inset?.value.kind === "profile") {
-      expect(inset.value.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
-    }
+    expect(
+      inset?.value.kind === "profile" ? inset.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+    ).toHaveLength(inset?.value.kind === "profile" ? 4 : 0);
   });
 });

@@ -9,13 +9,9 @@ test("every writable site has a consecutive patch span; dof sites are known", ()
     expect(callSiteSpec(spec.name)).toBe(spec);
     expect(SITE_CALL_NAMES.has(spec.name)).toBe(true);
     const span = patchSpan(spec);
-    if (spec.patch?.length) {
-      expect(WRITABLE_CALL_NAMES.has(spec.name)).toBe(true);
-      expect(span).toEqual({ start: spec.patch[0], count: spec.patch.length });
-    } else {
-      expect(span).toBeUndefined();
-      expect(WRITABLE_CALL_NAMES.has(spec.name)).toBe(false);
-    }
+    const hasPatch = Boolean(spec.patch?.length);
+    expect(WRITABLE_CALL_NAMES.has(spec.name)).toBe(hasPatch);
+    expect(span).toEqual(hasPatch ? { start: spec.patch![0], count: spec.patch!.length } : undefined);
   }
 });
 
