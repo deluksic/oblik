@@ -10,7 +10,7 @@ import { isGlider } from "@/geom/gliders";
 import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
-import { applyDrag, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
+import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
 import { createDragHandler } from "../host/createDragHandler";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
@@ -66,9 +66,7 @@ export function FigureView(props: FigureViewProps) {
   });
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
-  const [grabbing, setGrabbing] = createSignal(false);
   const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
-  let drag: Drag | null = null;
 
   createEffect(
     () => paneEl(),
@@ -110,30 +108,25 @@ export function FigureView(props: FigureViewProps) {
     return screenToWorld(panePoint(e, el), camera(), size());
   }
 
-  const dragOpts = { deadZoneRadius: PICK_CLICK_PX, preventDefault: false } as const;
+  const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
-  const startPan = createDragHandler((e, hits: TraceNode[]) => {
+  const startPan = drag.start((e, hits: TraceNode[]) => {
     const start = panDrag(e, camera());
-    drag = start;
     const pick = hits.length > 0 ? hits : null;
     let moved = false;
     return {
       onPointerMove(ev) {
         moved = true;
-        start.moved = true;
-        if (!grabbing()) setGrabbing(true);
         const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
         if (next.camera) setCamera(next.camera);
       },
       onDone() {
-        drag = null;
-        setGrabbing(false);
         if (!moved) props.onPick?.(pick ?? []);
       },
     };
-  }, dragOpts);
+  });
 
-  const onFrameMove = createDragHandler((e) => {
+  const onFrameMove = drag.start((e) => {
     const el = paneEl();
     const start = frameXywh();
     if (!el || !start) return;
@@ -148,9 +141,9 @@ export function FigureView(props: FigureViewProps) {
         props.onFrameCommit?.(last);
       },
     };
-  });
+  }, { preventDefault: true });
 
-  const onFrameResize = createDragHandler((_e) => {
+  const onFrameResize = drag.start((_e) => {
     const el = paneEl();
     const start = frameXywh();
     if (!el || !start) return;
@@ -165,7 +158,7 @@ export function FigureView(props: FigureViewProps) {
         props.onFrameCommit?.(last);
       },
     };
-  });
+  }, { preventDefault: true });
 
   function onPointerDown(e: PointerEvent) {
     noteShift(e);
@@ -212,7 +205,7 @@ export function FigureView(props: FigureViewProps) {
   }
 
   function noteHover(e: PointerEvent) {
-    if (drag?.moved) return;
+    if (drag.phase() === "dragging") return;
     const el = paneEl();
     if (!el) return;
     const hits = hitsOf(e, el);
@@ -238,8 +231,8 @@ export function FigureView(props: FigureViewProps) {
           styles.paper,
           props.paper === "white" ? styles.white : styles.cream,
           {
-            [styles.grabbing]: grabbing(),
-            [styles.grab]: !grabbing() && !props.tool,
+            [styles.grabbing]: drag.phase() === "dragging",
+            [styles.grab]: drag.phase() !== "dragging" && !props.tool,
             [styles.placing]: props.tool === "brush",
             [styles.erasing]: props.tool === "eraser",
           },

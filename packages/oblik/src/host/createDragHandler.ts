@@ -1,9 +1,12 @@
-import { onCleanup } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 
 export type DragSession = {
   onPointerMove?: (event: PointerEvent) => void;
   onDone?: (event?: PointerEvent) => void;
 };
+
+/** Pointer-session phase. Read `phase()` from JSX. */
+export type DragPhase = "not-started" | "down" | "dragging";
 
 export type CreateDragHandlers<T extends unknown[] = []> = (
   event: PointerEvent,
@@ -14,6 +17,14 @@ export type DragHandlerOptions = {
   /** Manhattan distance in CSS pixels before `onPointerMove` runs. */
   deadZoneRadius?: number;
   preventDefault?: boolean;
+};
+
+export type DragHandler = {
+  phase: () => DragPhase;
+  start: <T extends unknown[]>(
+    createHandlers: CreateDragHandlers<T>,
+    options?: DragHandlerOptions,
+  ) => (event: PointerEvent, ...args: T) => void;
 };
 
 type ClientPoint = { clientX: number; clientY: number };
@@ -46,82 +57,91 @@ function captureTarget(event: PointerEvent): Element | null {
 }
 
 /**
- * Click-and-drag helper for pointer sessions.
+ * Call once per view. `phase` is for JSX; `start` registers a named gesture.
  *
- * Call from a component, then put the returned function on `onPointerDown`
- * (or call it from a classifier that passes extra start arguments).
  * Move/up/cancel listen on `document` so the drag keeps going if the pointer
  * leaves the original node. Unmount or a second touch ends the session.
  */
-export function createDragHandler<T extends unknown[] = []>(
-  createHandlers: CreateDragHandlers<T>,
-  { deadZoneRadius = 0, preventDefault = true }: DragHandlerOptions = {},
-): (event: PointerEvent, ...args: T) => void {
+export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandler {
+  const [phase, setPhase] = createSignal<DragPhase>("not-started");
   const unmount = new AbortController();
   onCleanup(() => unmount.abort());
 
-  return (initEvent: PointerEvent, ...args: T) => {
-    if (initEvent.button !== 0) return;
-    const handlers = createHandlers(initEvent, ...args);
-    if (!handlers) return;
+  function start<T extends unknown[]>(
+    createHandlers: CreateDragHandlers<T>,
+    options?: DragHandlerOptions,
+  ): (event: PointerEvent, ...args: T) => void {
+    const deadZoneRadius = options?.deadZoneRadius ?? defaults.deadZoneRadius ?? 0;
+    const preventDefault = options?.preventDefault ?? defaults.preventDefault ?? true;
 
-    const cleanup = new AbortController();
-    const signal = anyAbort(unmount.signal, cleanup.signal);
+    return (initEvent: PointerEvent, ...args: T) => {
+      if (initEvent.button !== 0) return;
+      const handlers = createHandlers(initEvent, ...args);
+      if (!handlers) return;
 
-    if (preventDefault) {
-      initEvent.preventDefault();
-      initEvent.stopImmediatePropagation();
-    }
+      const cleanup = new AbortController();
+      const signal = anyAbort(unmount.signal, cleanup.signal);
+      setPhase("down");
 
-    const captured = captureTarget(initEvent);
-    captured?.setPointerCapture(initEvent.pointerId);
+      if (preventDefault) {
+        initEvent.preventDefault();
+        initEvent.stopImmediatePropagation();
+      }
 
-    const { onPointerMove, onDone } = handlers;
-    let moved = false;
+      const captured = captureTarget(initEvent);
+      captured?.setPointerCapture(initEvent.pointerId);
 
-    function finish(event?: Event) {
-      if (cleanup.signal.aborted) return;
-      cleanup.abort();
-      event?.preventDefault();
-      event?.stopImmediatePropagation();
-      if (captured && typeof captured.releasePointerCapture === "function") {
-        try {
-          captured.releasePointerCapture(initEvent.pointerId);
-        } catch {
-          /* already released */
+      const { onPointerMove, onDone } = handlers;
+      let moved = false;
+
+      function finish(event?: Event) {
+        if (cleanup.signal.aborted) return;
+        cleanup.abort();
+        event?.preventDefault();
+        event?.stopImmediatePropagation();
+        if (captured && typeof captured.releasePointerCapture === "function") {
+          try {
+            captured.releasePointerCapture(initEvent.pointerId);
+          } catch {
+            /* already released */
+          }
+        }
+        const pointer = event && "clientX" in event ? (event as PointerEvent) : undefined;
+        setPhase("not-started");
+        onDone?.(pointer);
+      }
+
+      function onPointerMove_(event: PointerEvent) {
+        if (preventDefault) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+        if (moved || manhattanDistance(initEvent, event) >= deadZoneRadius) {
+          if (!moved) setPhase("dragging");
+          moved = true;
+          onPointerMove?.(event);
         }
       }
-      const pointer = event && "clientX" in event ? (event as PointerEvent) : undefined;
-      onDone?.(pointer);
-    }
 
-    function onPointerMove_(event: PointerEvent) {
-      if (preventDefault) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+      function preventClickIfMoved(event: Event) {
+        if (moved && preventDefault) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
       }
-      if (moved || manhattanDistance(initEvent, event) >= deadZoneRadius) {
-        moved = true;
-        onPointerMove?.(event);
+
+      function onTouchStart(event: TouchEvent) {
+        if (event.touches.length >= 2) finish();
       }
-    }
 
-    function preventClickIfMoved(event: Event) {
-      if (moved && preventDefault) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    }
+      document.addEventListener("pointermove", onPointerMove_, { signal });
+      document.addEventListener("pointerup", finish, { signal });
+      document.addEventListener("pointercancel", finish, { signal });
+      document.addEventListener("touchstart", onTouchStart, { signal });
+      document.addEventListener("click", preventClickIfMoved, { capture: true, signal });
+      signal.addEventListener("abort", () => finish());
+    };
+  }
 
-    function onTouchStart(event: TouchEvent) {
-      if (event.touches.length >= 2) finish();
-    }
-
-    document.addEventListener("pointermove", onPointerMove_, { signal });
-    document.addEventListener("pointerup", finish, { signal });
-    document.addEventListener("pointercancel", finish, { signal });
-    document.addEventListener("touchstart", onTouchStart, { signal });
-    document.addEventListener("click", preventClickIfMoved, { capture: true, signal });
-    signal.addEventListener("abort", () => finish());
-  };
+  return { phase, start };
 }

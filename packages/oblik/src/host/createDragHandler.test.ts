@@ -111,14 +111,14 @@ describe("createDragHandler", () => {
 
   test("ignores non-left buttons", () => {
     install();
-    const { start, dispose } = withHandler(() => createDragHandler(refuseNonLeft));
+    const { start, dispose } = withHandler(() => createDragHandler().start(refuseNonLeft));
     expect(() => start(pointerEvent({ button: 1 }))).not.toThrow();
     dispose();
   });
 
   test("does nothing when the factory returns undefined", () => {
     const doc = install();
-    const { start, dispose } = withHandler(() => createDragHandler(() => undefined));
+    const { start, dispose } = withHandler(() => createDragHandler().start(() => undefined));
     start(pointerEvent({ clientX: 10, clientY: 10 }));
     expect(doc.listenerCount("pointermove")).toBe(0);
     dispose();
@@ -129,20 +129,17 @@ describe("createDragHandler", () => {
     const moves: number[] = [];
     const done: Array<number | undefined> = [];
     const { start, dispose } = withHandler(() =>
-      createDragHandler(
-        (e) => {
-          const x0 = e.clientX;
-          return {
-            onPointerMove(ev) {
-              moves.push(ev.clientX - x0);
-            },
-            onDone(ev) {
-              done.push(ev?.clientX);
-            },
-          };
-        },
-        { deadZoneRadius: 4, preventDefault: false },
-      ),
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start((e) => {
+        const x0 = e.clientX;
+        return {
+          onPointerMove(ev) {
+            moves.push(ev.clientX - x0);
+          },
+          onDone(ev) {
+            done.push(ev?.clientX);
+          },
+        };
+      }),
     );
     start(pointerEvent({ clientX: 0, clientY: 0 }));
     doc.fire("pointermove", pointerEvent({ clientX: 2, clientY: 0 }));
@@ -163,7 +160,7 @@ describe("createDragHandler", () => {
     const doc = install();
     let finished = 0;
     const { start, dispose } = withHandler(() =>
-      createDragHandler(() => ({ onDone() { finished += 1; } }), { preventDefault: false }),
+      createDragHandler({ preventDefault: false }).start(() => ({ onDone() { finished += 1; } })),
     );
     start(pointerEvent({ clientX: 0, clientY: 0 }));
     doc.fire("touchstart", { touches: { length: 2 } } as TouchEvent);
@@ -176,7 +173,7 @@ describe("createDragHandler", () => {
     const doc = install();
     let finished = 0;
     const { start, dispose } = withHandler(() =>
-      createDragHandler(() => ({ onDone() { finished += 1; } }), { preventDefault: false }),
+      createDragHandler({ preventDefault: false }).start(() => ({ onDone() { finished += 1; } })),
     );
     start(pointerEvent({ clientX: 0, clientY: 0 }));
     expect(doc.listenerCount("pointermove")).toBe(1);
@@ -188,18 +185,35 @@ describe("createDragHandler", () => {
   test("forwards start arguments into the session factory", () => {
     install();
     let received: { id: string } | undefined;
-    const { start, dispose } = withHandler<[ { id: string } ]>(() =>
-      createDragHandler(
-        (_e, node: { id: string }) => {
-          received = node;
-          return {};
-        },
-        { preventDefault: false },
-      ),
+    const { start, dispose } = withHandler<[{ id: string }]>(() =>
+      createDragHandler({ preventDefault: false }).start((_e, node: { id: string }) => {
+        received = node;
+        return {};
+      }),
     );
     const hit = { id: "p0" };
     start(pointerEvent({ clientX: 0, clientY: 0 }), hit);
     expect(received).toBe(hit);
+    dispose();
+  });
+
+  test("exposes not-started, down, and dragging on phase()", () => {
+    const doc = install();
+    let phase!: () => string;
+    const { start, dispose } = withHandler(() => {
+      const drag = createDragHandler({ deadZoneRadius: 4, preventDefault: false });
+      phase = drag.phase;
+      return drag.start(() => ({ onPointerMove() {}, onDone() {} }));
+    });
+    expect(phase()).toBe("not-started");
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    expect(phase()).toBe("down");
+    doc.fire("pointermove", pointerEvent({ clientX: 2, clientY: 0 }));
+    expect(phase()).toBe("down");
+    doc.fire("pointermove", pointerEvent({ clientX: 4, clientY: 0 }));
+    expect(phase()).toBe("dragging");
+    doc.fire("pointerup", pointerEvent({ clientX: 4, clientY: 0 }));
+    expect(phase()).toBe("not-started");
     dispose();
   });
 });

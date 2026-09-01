@@ -34,7 +34,6 @@ import {
   sliderDrag,
   topHit,
   worldOf,
-  type Drag,
   type EditDrag,
 } from "./pointer";
 import { createDragHandler, type DragSession } from "../../host/createDragHandler";
@@ -79,8 +78,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
   });
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
-  const [grabbing, setGrabbing] = createSignal(false);
-  let drag: Drag | null = null;
 
   createEffect(
     () => paneEl(),
@@ -110,22 +107,17 @@ export function Euclid2View(props: Euclid2ViewProps) {
     props.onPlace?.(hit);
   }
 
-  const dragOpts = { deadZoneRadius: PICK_CLICK_PX, preventDefault: false } as const;
+  const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
   function editSession(session: EditDrag): DragSession {
-    drag = session;
     let moved = false;
     return {
       onPointerMove(ev) {
         moved = true;
-        session.moved = true;
-        if (!grabbing()) setGrabbing(true);
         const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
         if (next.draft) props.onDraft(next.draft.id, next.draft.values);
       },
       onDone(ev) {
-        drag = null;
-        setGrabbing(false);
         if (!moved) {
           props.onPick?.([session.node]);
           return;
@@ -137,48 +129,43 @@ export function Euclid2View(props: Euclid2ViewProps) {
     };
   }
 
-  const startPoint = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
+  const startPoint = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(pointDrag(hit, worldOf(e, el, camera(), size()), e));
-  }, dragOpts);
+  });
 
-  const startGlider = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
+  const startGlider = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
     const g = gliderDrag(hit, worldOf(e, el, camera(), size()), e);
     if (!g) return;
     return editSession(g);
-  }, dragOpts);
+  });
 
-  const startRadius = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
+  const startRadius = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(radiusDrag(hit, worldOf(e, el, camera(), size()), e));
-  }, dragOpts);
+  });
 
-  const startParallel = createDragHandler((e, el: HTMLDivElement, hit: TraceNode) => {
+  const startParallel = drag.start((e, el: HTMLDivElement, hit: TraceNode) => {
     return editSession(parallelDrag(hit, worldOf(e, el, camera(), size()), e));
-  }, dragOpts);
+  });
 
-  const startSlider = createDragHandler((e, slider: TraceNode) => {
+  const startSlider = drag.start((e, slider: TraceNode) => {
     return editSession(sliderDrag(slider, e));
-  }, dragOpts);
+  });
 
-  const startPan = createDragHandler((e, hits: TraceNode[]) => {
+  const startPan = drag.start((e, hits: TraceNode[]) => {
     const start = panDrag(e, camera());
-    drag = start;
     const pick = hits.length > 0 ? hits : null;
     let moved = false;
     return {
       onPointerMove(ev) {
         moved = true;
-        start.moved = true;
-        if (!grabbing()) setGrabbing(true);
         const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
         if (next.camera) setCamera(next.camera);
       },
       onDone() {
-        drag = null;
-        setGrabbing(false);
         if (!moved) props.onPick?.(pick ?? []);
       },
     };
-  }, dragOpts);
+  });
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
@@ -226,7 +213,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   }
 
   function noteHover(e: PointerEvent) {
-    if (props.placing || drag?.moved) return;
+    if (props.placing || drag.phase() === "dragging") return;
     const el = paneEl();
     if (!el) return;
     const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
@@ -279,8 +266,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
       class={[
         styles.paper,
         {
-          [styles.grabbing]: grabbing(),
-          [styles.grab]: grabbingHover() && !grabbing() && !props.placing,
+          [styles.grabbing]: drag.phase() === "dragging",
+          [styles.grab]: grabbingHover() && drag.phase() !== "dragging" && !props.placing,
           [styles.placing]: !!props.placing,
         },
       ]}
