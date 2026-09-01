@@ -7,7 +7,8 @@ import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
-import { CONSTRUCTION_STROKE_PX, chromeLayers, type ChromeKind, type ChromeLayer } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, chromeLayers, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
+import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
 
@@ -33,7 +34,7 @@ function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: b
     hover: hot && !selected,
     overlay,
     knockout,
-  });
+  }, readChromeMetrics());
 }
 
 export function Stroke(props: {
@@ -91,7 +92,7 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
         {(layer) => (
           <line
             class={layerClass(layer.kind, false, !!props.muted)}
-            stroke-width={layer.width}
+            stroke-width={layerStrokeWidth(layer)}
             x1={s().a.x}
             y1={s().a.y}
             x2={s().b.x}
@@ -114,7 +115,7 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
         {(layer) => (
           <circle
             class={layerClass(layer.kind, props.node.editable, !!props.muted)}
-            stroke-width={layer.width}
+            stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
             cy={c().center.y}
             r={Math.abs(c().radius)}
@@ -150,7 +151,7 @@ function InfiniteStroke(props: {
             {(layer) => (
               <line
                 class={layerClass(layer.kind, editable(), !!props.muted)}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 x1={e().a.x}
                 y1={e().a.y}
                 x2={e().b.x}
@@ -186,7 +187,7 @@ export function ProfileOutline(props: {
           d={d()}
           fill={layer.kind === "paint" ? undefined : "none"}
           stroke={layer.kind === "paint" ? "none" : undefined}
-          stroke-width={layer.kind === "paint" ? undefined : layer.width}
+          stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
         />
       )}
     </For>

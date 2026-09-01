@@ -6,7 +6,8 @@ import type { Point } from "@/geom";
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
 import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
-import { chromeLayers } from "./chrome";
+import { chromeLayers, layerStrokeWidth } from "./chrome";
+import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
 
@@ -35,7 +36,7 @@ export function PointMark(props: {
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
       knockout: props.knockout !== false,
-    }),
+    }, readChromeMetrics()),
   );
   return (
     <>
@@ -53,7 +54,7 @@ export function PointMark(props: {
             cy={pos().y}
             r={POINT_R}
             fill={layer.kind === "paint" ? undefined : "none"}
-            stroke-width={layer.width}
+            stroke-width={layerStrokeWidth(layer)}
           />
         )}
       </For>

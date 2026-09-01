@@ -7,7 +7,8 @@ import { isGlider } from "../geom/gliders";
 import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
-import { chromeLayers, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
+import { chromeLayers, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
+import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 
 import styles from "./View.module.css";
 
@@ -24,7 +25,7 @@ function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selec
     hover: opts.hot && !opts.selected,
     overlay: opts.overlay === true,
     knockout: opts.knockout !== false,
-  });
+  }, readChromeMetrics());
 }
 
 function layerClass(kind: ChromeKind, muted: boolean, onion: boolean): string | Array<string | Record<string, boolean>> {
@@ -155,7 +156,7 @@ function Seg(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 fill="none"
                 stroke={paintStroke(look(), layer)}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 vector-effect="non-scaling-stroke"
@@ -207,7 +208,7 @@ function Circ(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 vector-effect="non-scaling-stroke"
                 opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
@@ -261,7 +262,7 @@ function Inf(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 fill="none"
                 stroke={paintStroke(look(), layer)}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 vector-effect="non-scaling-stroke"
@@ -305,7 +306,7 @@ function Face(props: {
                 d={path()}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -376,7 +377,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
       knockout: props.knockout !== false,
-    }),
+    }, readChromeMetrics()),
   );
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
@@ -402,7 +403,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
                 r={r()}
                 fill={layer.kind === "paint" ? (fill() ?? "none") : "none"}
                 stroke={layer.kind === "paint" ? stroke() : undefined}
-                stroke-width={layer.width}
+                stroke-width={layerStrokeWidth(layer)}
                 vector-effect="non-scaling-stroke"
                 opacity={props.onion && layer.kind === "paint" ? 0.45 : 1}
               />
