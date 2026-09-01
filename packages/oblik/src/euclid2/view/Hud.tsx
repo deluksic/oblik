@@ -49,8 +49,8 @@ export function PointMark(props: {
                   : [
                       styles.point,
                       {
-                        [styles.editable]: props.node.editable && !props.selected,
-                        [styles.selected]: props.selected,
+                        [styles.editable]: props.node.editable && !props.selected && !props.hot,
+                        [styles.selected]: props.selected || props.hot,
                         [styles.muted]: !!props.muted && !props.hot && !props.selected,
                       },
                     ]

@@ -61,6 +61,7 @@
 }
 
 .selected {
+  /* Hover and selection share cream/white paint in construction. */
   stroke: var(--oblik-selected-paint);
 }
 
