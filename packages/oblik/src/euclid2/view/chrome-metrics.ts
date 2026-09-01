@@ -14,21 +14,15 @@ function cssNumber(style: CSSStyleDeclaration, prop: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Device pixel ratio for mapping CSS px to non-scaling SVG strokes in world space. */
-export function screenDpr(): number {
-  if (typeof window === "undefined") return 1;
-  return window.devicePixelRatio || 1;
-}
-
-/** Theme tokens for hover/select chrome. */
+/** Theme tokens for hover/select chrome. See docs/chrome.md. */
 export function readChromeMetrics(): ChromeMetrics {
   if (typeof document === "undefined") return DEFAULT_CHROME_METRICS;
   const style = getComputedStyle(document.documentElement);
   return {
+    outlinePx: cssLengthPx(style, "--oblik-chrome-outline") ?? DEFAULT_CHROME_METRICS.outlinePx,
     knockoutPx: cssLengthPx(style, "--oblik-chrome-knockout") ?? DEFAULT_CHROME_METRICS.knockoutPx,
-    selectKnockoutPx: cssLengthPx(style, "--oblik-chrome-knockout-selected") ?? DEFAULT_CHROME_METRICS.selectKnockoutPx,
-    pointKnockoutPx: cssLengthPx(style, "--oblik-chrome-point") ?? DEFAULT_CHROME_METRICS.pointKnockoutPx,
-    pointSelectKnockoutPx: cssLengthPx(style, "--oblik-chrome-point-selected") ?? DEFAULT_CHROME_METRICS.pointSelectKnockoutPx,
+    pointOutlinePx: cssLengthPx(style, "--oblik-chrome-point-outline") ?? DEFAULT_CHROME_METRICS.pointOutlinePx,
+    pointKnockoutPx: cssLengthPx(style, "--oblik-chrome-point-knockout") ?? DEFAULT_CHROME_METRICS.pointKnockoutPx,
     hoverOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-hover") ?? DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
     selectOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-selected") ?? DEFAULT_CHROME_METRICS.selectOutlineOpacity,
   };

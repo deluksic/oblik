@@ -88,10 +88,11 @@ h6 {
   --oblik-code: #c8c3b6;
   --oblik-stroke: 1.5px;
   --oblik-stroke-selected: 2.25px;
-  --oblik-chrome-knockout: 7px;
-  --oblik-chrome-knockout-selected: 4px;
-  --oblik-chrome-point: 14px;
-  --oblik-chrome-point-selected: 9px;
+  /* Hover/selection halo widths — docs/chrome.md */
+  --oblik-chrome-outline: 7px;
+  --oblik-chrome-knockout: 4px;
+  --oblik-chrome-point-outline: 14px;
+  --oblik-chrome-point-knockout: 9px;
   --oblik-chrome-outline-hover: 0.5;
   --oblik-chrome-outline-selected: 1;
   --oblik-hit: 14px;

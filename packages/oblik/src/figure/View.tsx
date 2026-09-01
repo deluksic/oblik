@@ -11,7 +11,7 @@ import { isProfile } from "@/geom/profile";
 import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
-import { splitChrome, type ChromeSplit } from "../euclid2/view/marks";
+import { chromePasses, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
 import { createDragHandler } from "../euclid2/view/createDragHandler";
 import { lookFromBrush, type BrushSettings } from "./chips";
@@ -338,7 +338,7 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
-              knockout={drag.phase() !== "dragging"}
+              halos={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
             <InkStrokeChrome
@@ -350,7 +350,7 @@ export function FigureView(props: FigureViewProps) {
               scope={props.scope}
               camera={camera()}
               size={size()}
-              knockout={drag.phase() !== "dragging"}
+              halos={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
             <InkPointChrome
@@ -361,7 +361,7 @@ export function FigureView(props: FigureViewProps) {
               replacePreview={props.tool === "brush" && !props.shift}
               scope={props.scope}
               camera={camera()}
-              knockout={drag.phase() !== "dragging"}
+              halos={drag.phase() !== "dragging"}
               ghosting={props.shift === true}
             />
             <Show when={props.shift}>
@@ -373,7 +373,7 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
-                knockout={drag.phase() !== "dragging"}
+                halos={drag.phase() !== "dragging"}
               />
               <OnionStrokeChrome
                 band={onionEdgeBand()}
@@ -383,7 +383,7 @@ export function FigureView(props: FigureViewProps) {
                 camera={camera()}
                 size={size()}
                 previewKey={previewKey()}
-                knockout={drag.phase() !== "dragging"}
+                halos={drag.phase() !== "dragging"}
               />
               <OnionPointChrome
                 band={onionPtBand()}
@@ -392,7 +392,7 @@ export function FigureView(props: FigureViewProps) {
                 scope={props.scope}
                 camera={camera()}
                 previewKey={previewKey()}
-                knockout={drag.phase() !== "dragging"}
+                halos={drag.phase() !== "dragging"}
               />
             </Show>
             <Show when={props.tool === "brush" ? previewGeom() : undefined} keyed>
@@ -457,32 +457,30 @@ function InkStrokeChrome(props: {
   scope?: Scope;
   camera: Camera2;
   size: PaneSize;
-  knockout?: boolean;
+  halos?: boolean;
   ghosting?: boolean;
 }) {
-  const pass = (strokes: PaintStroke[], overlay?: boolean) => (
-    <InkStrokeList
-      strokes={strokes}
-      hoverKey={props.hoverKey}
-      selectedKey={props.selectedKey}
-      eraser={props.eraser}
-      replacePreview={props.replacePreview}
-      scope={props.scope}
-      camera={props.camera}
-      size={props.size}
-      overlay={overlay}
-      knockout={props.knockout}
-      ghosting={props.ghosting}
-    />
-  );
   return (
-    <>
-      {pass(props.band.rest)}
-      {pass(props.band.hover, true)}
-      {pass(props.band.hover)}
-      {pass(props.band.lifted, true)}
-      {pass(props.band.lifted)}
-    </>
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(s) => (
+            <InkStroke
+              s={s}
+              hoverKey={props.hoverKey}
+              selectedKey={props.selectedKey}
+              eraser={props.eraser}
+              replacePreview={props.replacePreview}
+              scope={props.scope}
+              camera={props.camera}
+              size={props.size}
+              overlay={pass.overlay}
+              ghosting={props.ghosting}
+            />
+          )}
+        </For>
+      )}
+    </For>
   );
 }
 
@@ -494,31 +492,29 @@ function InkPointChrome(props: {
   replacePreview?: boolean;
   scope?: Scope;
   camera: Camera2;
-  knockout?: boolean;
+  halos?: boolean;
   ghosting?: boolean;
 }) {
-  const pass = (points: PaintStroke[], overlay?: boolean) => (
-    <InkPointList
-      points={points}
-      hoverKey={props.hoverKey}
-      selectedKey={props.selectedKey}
-      eraser={props.eraser}
-      replacePreview={props.replacePreview}
-      scope={props.scope}
-      camera={props.camera}
-      overlay={overlay}
-      knockout={props.knockout}
-      ghosting={props.ghosting}
-    />
-  );
   return (
-    <>
-      {pass(props.band.rest)}
-      {pass(props.band.hover, true)}
-      {pass(props.band.hover)}
-      {pass(props.band.lifted, true)}
-      {pass(props.band.lifted)}
-    </>
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(s) => (
+            <InkPoint
+              s={s}
+              hoverKey={props.hoverKey}
+              selectedKey={props.selectedKey}
+              eraser={props.eraser}
+              replacePreview={props.replacePreview}
+              scope={props.scope}
+              camera={props.camera}
+              overlay={pass.overlay}
+              ghosting={props.ghosting}
+            />
+          )}
+        </For>
+      )}
+    </For>
   );
 }
 
@@ -530,29 +526,29 @@ function OnionStrokeChrome(props: {
   camera: Camera2;
   size: PaneSize;
   previewKey: string | null;
-  knockout?: boolean;
+  halos?: boolean;
 }) {
-  const pass = (nodes: TraceNode[], overlay?: boolean) => (
-    <OnionStrokeList
-      nodes={nodes}
-      hoverKey={props.hoverKey}
-      selectedKey={props.selectedKey}
-      scope={props.scope}
-      camera={props.camera}
-      size={props.size}
-      previewKey={props.previewKey}
-      overlay={overlay}
-      knockout={props.knockout}
-    />
-  );
   return (
-    <>
-      {pass(props.band.rest)}
-      {pass(props.band.hover, true)}
-      {pass(props.band.hover)}
-      {pass(props.band.lifted, true)}
-      {pass(props.band.lifted)}
-    </>
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(n) => (
+            <FigureStroke
+              node={n}
+              look={ONION}
+              onion={true}
+              hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+              selected={traceKey(n) === props.selectedKey}
+              muted={!!props.scope && mutedForScope(n, props.scope)}
+              camera={props.camera}
+              size={props.size}
+              replaced={props.previewKey === traceKey(n)}
+              overlay={pass.overlay === true}
+            />
+          )}
+        </For>
+      )}
+    </For>
   );
 }
 
@@ -563,154 +559,26 @@ function OnionPointChrome(props: {
   scope?: Scope;
   camera: Camera2;
   previewKey: string | null;
-  knockout?: boolean;
-}) {
-  const pass = (nodes: TraceNode[], overlay?: boolean) => (
-    <OnionPointList
-      nodes={nodes}
-      hoverKey={props.hoverKey}
-      selectedKey={props.selectedKey}
-      scope={props.scope}
-      camera={props.camera}
-      previewKey={props.previewKey}
-      overlay={overlay}
-      knockout={props.knockout}
-    />
-  );
-  return (
-    <>
-      {pass(props.band.rest)}
-      {pass(props.band.hover, true)}
-      {pass(props.band.hover)}
-      {pass(props.band.lifted, true)}
-      {pass(props.band.lifted)}
-    </>
-  );
-}
-
-function InkStrokeList(props: {
-  strokes: PaintStroke[];
-  hoverKey?: string | null;
-  selectedKey?: string | null;
-  eraser?: boolean;
-  replacePreview?: boolean;
-  scope?: Scope;
-  camera: Camera2;
-  size: PaneSize;
-  overlay?: boolean;
-  knockout?: boolean;
-  ghosting?: boolean;
+  halos?: boolean;
 }) {
   return (
-    <For each={props.strokes}>
-      {(s) => (
-        <InkStroke
-          s={s}
-          hoverKey={props.hoverKey}
-          selectedKey={props.selectedKey}
-          eraser={props.eraser}
-          replacePreview={props.replacePreview}
-          scope={props.scope}
-          camera={props.camera}
-          size={props.size}
-          overlay={props.overlay}
-          knockout={props.knockout}
-          ghosting={props.ghosting}
-        />
-      )}
-    </For>
-  );
-}
-
-function InkPointList(props: {
-  points: PaintStroke[];
-  hoverKey?: string | null;
-  selectedKey?: string | null;
-  eraser?: boolean;
-  replacePreview?: boolean;
-  scope?: Scope;
-  camera: Camera2;
-  overlay?: boolean;
-  knockout?: boolean;
-  ghosting?: boolean;
-}) {
-  return (
-    <For each={props.points}>
-      {(s) => (
-        <InkPoint
-          s={s}
-          hoverKey={props.hoverKey}
-          selectedKey={props.selectedKey}
-          eraser={props.eraser}
-          replacePreview={props.replacePreview}
-          scope={props.scope}
-          camera={props.camera}
-          overlay={props.overlay}
-          knockout={props.knockout}
-          ghosting={props.ghosting}
-        />
-      )}
-    </For>
-  );
-}
-
-function OnionStrokeList(props: {
-  nodes: TraceNode[];
-  hoverKey?: string | null;
-  selectedKey?: string | null;
-  scope?: Scope;
-  camera: Camera2;
-  size: PaneSize;
-  previewKey: string | null;
-  overlay?: boolean;
-  knockout?: boolean;
-}) {
-  return (
-    <For each={props.nodes}>
-      {(n) => (
-        <FigureStroke
-          node={n}
-          look={ONION}
-          onion={true}
-          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-          selected={traceKey(n) === props.selectedKey}
-          muted={!!props.scope && mutedForScope(n, props.scope)}
-          camera={props.camera}
-          size={props.size}
-          replaced={props.previewKey === traceKey(n)}
-          overlay={props.overlay === true}
-          knockout={props.knockout !== false}
-        />
-      )}
-    </For>
-  );
-}
-
-function OnionPointList(props: {
-  nodes: TraceNode[];
-  hoverKey?: string | null;
-  selectedKey?: string | null;
-  scope?: Scope;
-  camera: Camera2;
-  previewKey: string | null;
-  overlay?: boolean;
-  knockout?: boolean;
-}) {
-  return (
-    <For each={props.nodes}>
-      {(n) => (
-        <FigurePoint
-          node={n}
-          look={undefined}
-          onion={true}
-          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-          selected={traceKey(n) === props.selectedKey}
-          muted={!!props.scope && mutedForScope(n, props.scope)}
-          camera={props.camera}
-          replaced={props.previewKey === traceKey(n)}
-          overlay={props.overlay === true}
-          knockout={props.knockout !== false}
-        />
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(n) => (
+            <FigurePoint
+              node={n}
+              look={undefined}
+              onion={true}
+              hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+              selected={traceKey(n) === props.selectedKey}
+              muted={!!props.scope && mutedForScope(n, props.scope)}
+              camera={props.camera}
+              replaced={props.previewKey === traceKey(n)}
+              overlay={pass.overlay === true}
+            />
+          )}
+        </For>
       )}
     </For>
   );
@@ -726,7 +594,6 @@ function InkStroke(props: {
   camera: Camera2;
   size: PaneSize;
   overlay?: boolean;
-  knockout?: boolean;
   ghosting?: boolean;
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
@@ -746,7 +613,6 @@ function InkStroke(props: {
       size={props.size}
       replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
       overlay={props.overlay === true}
-      knockout={props.knockout !== false}
     />
   );
 }
@@ -760,7 +626,6 @@ function InkPoint(props: {
   scope?: Scope;
   camera: Camera2;
   overlay?: boolean;
-  knockout?: boolean;
   ghosting?: boolean;
 }) {
   const paintKeyNow = () => traceKey(props.s.paint);
@@ -779,7 +644,6 @@ function InkPoint(props: {
       camera={props.camera}
       replaced={props.replacePreview === true && paintKeyNow() === props.hoverKey}
       overlay={props.overlay === true}
-      knockout={props.knockout !== false}
     />
   );
 }

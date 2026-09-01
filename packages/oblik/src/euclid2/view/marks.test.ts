@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "@/eval/context";
-import { hoverNode, isGrabbable, isHot, liftSelected, splitChrome } from "./marks";
+import { chromePasses, hoverNode, isGrabbable, isHot, isHover, isSelected, liftSelected, splitChrome } from "./marks";
 
 const A = {
   id: "o_a",
@@ -69,6 +69,28 @@ describe("splitChrome", () => {
   });
 });
 
+describe("chromePasses", () => {
+  test("idle then hover overlay+paint then selected overlay+paint", () => {
+    const band = splitChrome(["a", "b", "c"], (x) => x === "c", (x) => x === "b");
+    expect(chromePasses(band)).toEqual([
+      { items: ["a"] },
+      { items: ["b"], overlay: true },
+      { items: ["b"] },
+      { items: ["c"], overlay: true },
+      { items: ["c"] },
+    ]);
+  });
+
+  test("dragging skips overlay passes and still lifts paint", () => {
+    const band = splitChrome(["a", "b", "c"], (x) => x === "c", (x) => x === "b");
+    expect(chromePasses(band, false)).toEqual([
+      { items: ["a"] },
+      { items: ["b"] },
+      { items: ["c"] },
+    ]);
+  });
+});
+
 describe("liftSelected", () => {
   test("moves selected items after the rest, preserving order in each group", () => {
     expect(liftSelected(["a", "b", "c", "d"], (x) => x === "b" || x === "d")).toEqual({
@@ -90,5 +112,8 @@ describe("hoverNode", () => {
   test("hot highlight uses the same id", () => {
     expect(isHot(A, "o_a", null)).toBe(true);
     expect(isHot(CIRCLE, "o_a", null)).toBe(false);
+    expect(isHover(A, "o_a", null)).toBe(true);
+    expect(isHover(A, "o_a", "o_a:0")).toBe(false);
+    expect(isSelected(A, "o_a:0")).toBe(true);
   });
 });

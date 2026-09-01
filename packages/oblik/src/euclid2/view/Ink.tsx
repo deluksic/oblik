@@ -31,12 +31,11 @@ function layerClass(kind: ChromeKind, editable: boolean, muted: boolean, selecte
   return inkClass(editable, muted, selected, hot);
 }
 
-function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean): ChromeLayer[] {
+function layersOf(hot: boolean, selected: boolean, overlay: boolean): ChromeLayer[] {
   return chromeLayers(CONSTRUCTION_STROKE_PX, {
     selected,
     hover: hot && !selected,
     overlay,
-    knockout,
   }, readChromeMetrics());
 }
 
@@ -48,10 +47,9 @@ export function Stroke(props: {
   camera: Camera2;
   size: PaneSize;
   overlay?: boolean;
-  knockout?: boolean;
 }) {
   const kind = createMemo(() => props.node.value.kind);
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   return (
     <>
       {kind() === "segment" ? (
@@ -183,10 +181,9 @@ export function ProfileFill(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
-  knockout?: boolean;
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  const layers = createMemo(() => layersOf(props.hot, props.selected, false, props.knockout !== false));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, false));
   return (
     <For each={layers()}>
       {(layer) => (
@@ -208,10 +205,9 @@ export function ProfileOutline(props: {
   hot: boolean;
   selected: boolean;
   overlay?: boolean;
-  knockout?: boolean;
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
   return (
     <>

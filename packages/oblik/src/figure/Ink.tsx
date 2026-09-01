@@ -19,13 +19,12 @@ function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
 }
 
-function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean }): ChromeLayer[] {
+function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean }): ChromeLayer[] {
   const w = (opts.onion ? ONION.width : opts.look.width) ?? 1.35;
   return chromeLayers(w, {
     selected: opts.selected,
     hover: opts.hot && !opts.selected,
     overlay: opts.overlay === true,
-    knockout: opts.knockout !== false,
   }, readChromeMetrics());
 }
 
@@ -46,7 +45,6 @@ type StrokeProps = {
   preview?: boolean;
   replaced?: boolean;
   overlay?: boolean;
-  knockout?: boolean;
   erase?: boolean;
 };
 
@@ -67,7 +65,6 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
           preview={props.preview}
           replaced={props.replaced}
           overlay={props.overlay}
-          knockout={props.knockout}
           erase={props.erase}
         />
       )}
@@ -84,7 +81,6 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
       hot: props.hot,
       selected: props.selected,
       overlay: props.overlay,
-      knockout: props.knockout,
     }),
   );
   return (
@@ -344,7 +340,6 @@ type PointProps = {
   preview?: boolean;
   replaced?: boolean;
   overlay?: boolean;
-  knockout?: boolean;
   erase?: boolean;
 };
 
@@ -364,7 +359,6 @@ export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
           preview={props.preview}
           replaced={props.replaced}
           overlay={props.overlay}
-          knockout={props.knockout}
           erase={props.erase}
         />
       )}
@@ -392,7 +386,6 @@ function PointInk(props: { node: TraceNode } & PointProps) {
       selected: props.selected,
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
-      knockout: props.knockout !== false,
       point: true,
     }, readChromeMetrics()),
   );

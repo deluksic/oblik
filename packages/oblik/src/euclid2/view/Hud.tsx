@@ -20,7 +20,6 @@ export function PointMark(props: {
   selected: boolean;
   muted?: boolean;
   overlay?: boolean;
-  knockout?: boolean;
 }) {
   const pos = createMemo(() => {
     const v = props.node.value;
@@ -32,7 +31,6 @@ export function PointMark(props: {
       selected: props.selected,
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
-      knockout: props.knockout !== false,
       screenSpace: true,
       point: true,
     }, readChromeMetrics()),

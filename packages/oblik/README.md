@@ -7,7 +7,7 @@ pnpm --filter oblik test
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Charter: [docs/prototypes/8.md](../../docs/prototypes/8.md).
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Charter: [docs/prototypes/8.md](../../docs/prototypes/8.md). Hover/selection: [docs/chrome.md](../../docs/chrome.md).
 
 App imports: `oblik` (eval/geom/source), `oblik/host` (`mountOblik`, scene picker), `virtual:oblik-catalog` + `virtual:oblik-annotations` (annotations + mention analysis) + `scene-loaders.ts` in the demo. The Vite plugin stamps/analyzes all `apps/demo/src/**/*.ts` helpers.
 

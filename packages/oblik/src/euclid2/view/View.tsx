@@ -21,7 +21,7 @@ import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { NumberSliders } from "./NumberSliders";
 import { ProfileFill, ProfileGhost, ProfileOutline, Stroke } from "./Ink";
-import { isGrabbable, isHot, isSelected, hoverNode, liftSelected, splitChrome } from "./marks";
+import { isGrabbable, isHot, isHover, isSelected, hoverNode, liftSelected, splitChrome, chromePasses, type ChromeSplit } from "./marks";
 import { hitSlider, sliderNodes } from "./sliderHud";
 import {
   applyDrag,
@@ -227,25 +227,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
       : null,
   );
   const fillBand = createMemo(() =>
-    splitChrome(
-      fills(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHot(n, props.hoverId, props.selectedKey) && !isSelected(n, props.selectedKey),
-    ),
+    splitChrome(fills(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
   );
   const inkBand = createMemo(() =>
-    splitChrome(
-      ink(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHot(n, props.hoverId, props.selectedKey) && !isSelected(n, props.selectedKey),
-    ),
+    splitChrome(ink(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
   );
   const pointBand = createMemo(() =>
-    splitChrome(
-      points(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHot(n, props.hoverId, props.selectedKey) && !isSelected(n, props.selectedKey),
-    ),
+    splitChrome(points(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
   );
   const handleBand = createMemo(() => liftSelected(handles(), (n) => isSelected(n, props.selectedKey)));
 
@@ -271,218 +259,40 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
-          <For each={fillBand().rest}>
-            {(n) => (
-              <ProfileFill
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={fillBand().hover}>
-            {(n) => (
-              <ProfileOutline
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                overlay={true}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={fillBand().hover}>
-            {(n) => (
-              <ProfileFill
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={fillBand().lifted}>
-            {(n) => (
-              <ProfileOutline
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                overlay={true}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={fillBand().lifted}>
-            {(n) => (
-              <ProfileFill
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={inkBand().rest}>
-            {(n) => (
-              <Stroke
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                muted={
-                  chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
-                  (!!props.scope && mutedForScope(n, props.scope))
-                }
-                camera={camera()}
-                size={size()}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={inkBand().hover}>
-            {(n) => (
-              <Stroke
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                muted={
-                  chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
-                  (!!props.scope && mutedForScope(n, props.scope))
-                }
-                camera={camera()}
-                size={size()}
-                overlay={true}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={inkBand().hover}>
-            {(n) => (
-              <Stroke
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                muted={
-                  chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
-                  (!!props.scope && mutedForScope(n, props.scope))
-                }
-                camera={camera()}
-                size={size()}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={inkBand().lifted}>
-            {(n) => (
-              <Stroke
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                muted={
-                  chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
-                  (!!props.scope && mutedForScope(n, props.scope))
-                }
-                camera={camera()}
-                size={size()}
-                overlay={true}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
-          <For each={inkBand().lifted}>
-            {(n) => (
-              <Stroke
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                muted={
-                  chrome().muteStrokes ||
-                  (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
-                  (!!props.scope && mutedForScope(n, props.scope))
-                }
-                camera={camera()}
-                size={size()}
-                knockout={drag.phase() !== "dragging"}
-              />
-            )}
-          </For>
+          <ProfileChrome
+            band={fillBand()}
+            hoverId={props.hoverId}
+            selectedKey={props.selectedKey}
+            halos={drag.phase() !== "dragging"}
+          />
+          <StrokeChrome
+            band={inkBand()}
+            hoverId={props.hoverId}
+            selectedKey={props.selectedKey}
+            muted={(n) =>
+              chrome().muteStrokes ||
+              (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
+              (!!props.scope && mutedForScope(n, props.scope))
+            }
+            camera={camera()}
+            size={size()}
+            halos={drag.phase() !== "dragging"}
+          />
           {props.ghost?.kind === "profile" ? (
             <ProfileGhost ghost={props.ghost} camera={camera()} />
           ) : null}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
-        <For each={pointBand().rest}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              knockout={drag.phase() !== "dragging"}
-            />
-          )}
-        </For>
-        <For each={pointBand().hover}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              overlay={true}
-              knockout={drag.phase() !== "dragging"}
-            />
-          )}
-        </For>
-        <For each={pointBand().hover}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              knockout={drag.phase() !== "dragging"}
-            />
-          )}
-        </For>
-        <For each={pointBand().lifted}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              overlay={true}
-              knockout={drag.phase() !== "dragging"}
-            />
-          )}
-        </For>
-        <For each={pointBand().lifted}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={size()}
-              camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
-              knockout={drag.phase() !== "dragging"}
-            />
-          )}
-        </For>
+        <PointChrome
+          band={pointBand()}
+          hoverId={props.hoverId}
+          selectedKey={props.selectedKey}
+          muted={(n) => chrome().mutePoints || (!!props.scope && mutedForScope(n, props.scope))}
+          camera={camera()}
+          size={size()}
+          halos={drag.phase() !== "dragging"}
+        />
         <For each={handleBand().rest}>
           {(n) => (
             <Handle
@@ -516,5 +326,97 @@ export function Euclid2View(props: Euclid2ViewProps) {
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
     </div>
+  );
+}
+
+function ProfileChrome(props: {
+  band: ChromeSplit<TraceNode>;
+  hoverId?: string | null;
+  selectedKey?: string | null;
+  halos?: boolean;
+}) {
+  return (
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(n) =>
+            pass.overlay ? (
+              <ProfileOutline
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+                overlay
+              />
+            ) : (
+              <ProfileFill
+                node={n}
+                hot={isHot(n, props.hoverId, props.selectedKey)}
+                selected={isSelected(n, props.selectedKey)}
+              />
+            )
+          }
+        </For>
+      )}
+    </For>
+  );
+}
+
+function StrokeChrome(props: {
+  band: ChromeSplit<TraceNode>;
+  hoverId?: string | null;
+  selectedKey?: string | null;
+  muted: (n: TraceNode) => boolean;
+  camera: Camera2;
+  size: PaneSize;
+  halos?: boolean;
+}) {
+  return (
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(n) => (
+            <Stroke
+              node={n}
+              hot={isHot(n, props.hoverId, props.selectedKey)}
+              selected={isSelected(n, props.selectedKey)}
+              muted={props.muted(n)}
+              camera={props.camera}
+              size={props.size}
+              overlay={pass.overlay}
+            />
+          )}
+        </For>
+      )}
+    </For>
+  );
+}
+
+function PointChrome(props: {
+  band: ChromeSplit<TraceNode>;
+  hoverId?: string | null;
+  selectedKey?: string | null;
+  muted: (n: TraceNode) => boolean;
+  camera: Camera2;
+  size: PaneSize;
+  halos?: boolean;
+}) {
+  return (
+    <For each={chromePasses(props.band, props.halos !== false)}>
+      {(pass) => (
+        <For each={pass.items}>
+          {(n) => (
+            <PointMark
+              node={n}
+              size={props.size}
+              camera={props.camera}
+              hot={isHot(n, props.hoverId, props.selectedKey)}
+              selected={isSelected(n, props.selectedKey)}
+              muted={props.muted(n)}
+              overlay={pass.overlay}
+            />
+          )}
+        </For>
+      )}
+    </For>
   );
 }

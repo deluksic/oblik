@@ -10,7 +10,13 @@ export function isSelected(node: TraceNode, selectedKey: string | null | undefin
   return traceKey(node) === selectedKey;
 }
 
+export function isHover(node: TraceNode, hoverId: string | null | undefined, selectedKey: string | null | undefined): boolean {
+  return isHot(node, hoverId, selectedKey) && !isSelected(node, selectedKey);
+}
+
 export type ChromeSplit<T> = { rest: T[]; hover: T[]; lifted: T[] };
+
+export type ChromePass<T> = { items: T[]; overlay?: true };
 
 /** Idle, then hovered, then selected — hover/select paint draws after their overlay. */
 export function splitChrome<T>(
@@ -27,6 +33,20 @@ export function splitChrome<T>(
     else rest.push(item);
   }
   return { rest, hover: hovered, lifted };
+}
+
+/** Draw order for a band. `halos` is false while dragging (paint still lifts). */
+export function chromePasses<T>(band: ChromeSplit<T>, halos = true): ChromePass<T>[] {
+  if (!halos) {
+    return [{ items: band.rest }, { items: band.hover }, { items: band.lifted }];
+  }
+  return [
+    { items: band.rest },
+    { items: band.hover, overlay: true },
+    { items: band.hover },
+    { items: band.lifted, overlay: true },
+    { items: band.lifted },
+  ];
 }
 
 /** Keep original order, then selected items — for drawing a node above same-priority siblings. */

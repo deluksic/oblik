@@ -13,7 +13,6 @@ export type ChromeOpts = {
   selected: boolean;
   hover: boolean;
   overlay: boolean;
-  knockout: boolean;
   /** HUD / screen-space SVG where viewBox units are already CSS px. */
   screenSpace?: boolean;
   /** Points use a wider halo; the disc is small compared to a stroke. */
@@ -21,19 +20,19 @@ export type ChromeOpts = {
 };
 
 export type ChromeMetrics = {
+  outlinePx: number;
   knockoutPx: number;
-  selectKnockoutPx: number;
+  pointOutlinePx: number;
   pointKnockoutPx: number;
-  pointSelectKnockoutPx: number;
   hoverOutlineOpacity: number;
   selectOutlineOpacity: number;
 };
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
-  knockoutPx: 7,
-  selectKnockoutPx: 4,
-  pointKnockoutPx: 14,
-  pointSelectKnockoutPx: 9,
+  outlinePx: 7,
+  knockoutPx: 4,
+  pointOutlinePx: 14,
+  pointKnockoutPx: 9,
   hoverOutlineOpacity: 0.5,
   selectOutlineOpacity: 1,
 };
@@ -44,10 +43,9 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
 }
 
 /**
- * Base pass is paint only. Overlay sits under that paint:
- * hover is a translucent outline (no gap); selection is an opaque outline
- * with a thinner knockout on top to cut a paper gap inside the ring.
- * Stroke knockout grows with paint width so thick figure ink still shows a gap.
+ * Overlay under paint. Hover: translucent outline, no gap.
+ * Selected: opaque outline, then thinner paper knockout on top.
+ * See docs/chrome.md. Views skip overlay passes while dragging.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -57,36 +55,35 @@ export function chromeLayers(
   const w = paintWidth > 0 ? paintWidth : 1;
   const hot = opts.selected || opts.hover;
   const px = opts.screenSpace ? 1 : chromeDprScale();
-  const bands = overlayBands(w, opts, metrics);
   if (opts.overlay) {
-    if (!hot || !opts.knockout) return [];
-    const outline: ChromeLayer = {
+    if (!hot) return [];
+    const { outline, knockout } = overlayBands(w, opts, metrics);
+    const halo: ChromeLayer = {
       kind: "outline",
-      width: bands.outline * px,
+      width: outline * px,
       opacity: opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity,
     };
-    if (!opts.selected) return [outline];
-    return [outline, { kind: "knockout", width: bands.knockout * px }];
+    if (!opts.selected) return [halo];
+    return [halo, { kind: "knockout", width: knockout * px }];
   }
   return [{ kind: "paint", width: w }];
 }
 
-/** Outline and gap widths in CSS px, before device-pixel scaling. */
+/** Outline / knockout widths in CSS px, before device-pixel scaling. See docs/chrome.md. */
 export function overlayBands(
   paintWidth: number,
   opts: Pick<ChromeOpts, "selected" | "point">,
   metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
 ): { outline: number; knockout: number } {
   if (opts.point) {
-    return { outline: metrics.pointKnockoutPx, knockout: metrics.pointSelectKnockoutPx };
+    return { outline: metrics.pointOutlinePx, knockout: metrics.pointKnockoutPx };
   }
-  const outline = metrics.knockoutPx;
-  const knockout = metrics.selectKnockoutPx;
-  if (!opts.selected) return { outline, knockout };
-  const gapPad = metrics.selectKnockoutPx - CONSTRUCTION_STROKE_PX;
-  const ringPad = metrics.knockoutPx - metrics.selectKnockoutPx;
-  const nextKnockout = Math.max(knockout, paintWidth + gapPad);
-  return { outline: Math.max(outline, nextKnockout + ringPad), knockout: nextKnockout };
+  if (!opts.selected) return { outline: metrics.outlinePx, knockout: metrics.knockoutPx };
+  // 7/4 was designed around a 1.5px stroke: 2.5px paper extra, 3px ring extra.
+  const paper = metrics.knockoutPx - CONSTRUCTION_STROKE_PX;
+  const ring = metrics.outlinePx - metrics.knockoutPx;
+  const knockout = Math.max(metrics.knockoutPx, paintWidth + paper);
+  return { outline: Math.max(metrics.outlinePx, knockout + ring), knockout };
 }
 
 /** Scale CSS px to device px for world-space non-scaling strokes. */
@@ -112,10 +109,6 @@ export function outsideClipD(inner: string, extent = CLIP_EXTENT): string {
 
 export function chromeOutsideClipId(key: string): string {
   return `chrome-out-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-}
-
-export function chromeInsideClipId(key: string): string {
-  return `chrome-in-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 export function chromeClipUrl(id: string): string {
