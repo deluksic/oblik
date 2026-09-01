@@ -1,0 +1,8 @@
+---
+description: Manual GUI testing policy for agents
+alwaysApply: true
+---
+
+- Do not run the `computerUse` subagent or perform manual GUI/browser testing unless the user explicitly asks for it.
+- Prefer non-GUI verification (unit/integration tests via `pnpm -r test`, `curl` against the dev servers, terminal output, and logs) to demonstrate that changes work.
+- Only start a `computerUse` session when the user has clearly requested manual/visual testing of the UI.
