@@ -1,4 +1,4 @@
-import { For, createEffect, createSignal } from "solid-js";
+import { For, createSignal } from "solid-js";
 
 import { formatNum } from "@/source/patch";
 
@@ -24,12 +24,8 @@ function FrameField(props: {
   value: number;
   onCommit: (next: number) => void;
 }) {
-  const [draft, setDraft] = createSignal(formatNum(props.value));
+  const [draft, setDraft] = createSignal("");
   const [editing, setEditing] = createSignal(false);
-
-  createEffect(() => {
-    if (!editing()) setDraft(formatNum(props.value));
-  });
 
   function commit() {
     const n = Number(draft());
