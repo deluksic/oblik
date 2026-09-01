@@ -1,7 +1,7 @@
 import { printExpr } from "@/source/expr";
 import { asPoint, exprOfPlace, hoverPlace, isPinnedPoint, previewCall } from "./common";
 import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
-import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession } from "./types";
+import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession, ToolSpec } from "./types";
 
 type TwoPointId = "line" | "segment";
 type TwoPointSession = Extract<ToolSession, { verb: TwoPointId }>;
@@ -14,7 +14,7 @@ function label(ref: string, placed: Placed | undefined, fallback: string, place:
   return fallback;
 }
 
-export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPointSession> {
+export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPointSession> {
   const fields: Field<TwoPointSession>[] = [
     refField("a", "<a>", "point", (s) => s.aRef, (s, raw) => ({ ...s, aRef: raw })),
     refField("b", "<b>", "point", (s) => s.bRef, (s, raw) => ({ ...s, bRef: raw })),
@@ -58,13 +58,13 @@ export function defineTwoPoint(spec: Tool<TwoPointSession>["spec"]): Tool<TwoPoi
       const cursor = place?.point.at;
       const a = resolvePoint(session.aRef, session.a, scope);
       const b = resolvePoint(session.bRef, session.b, scope);
-      if (a && b) return { kind: spec.id, a: a.at, b: b.at };
+      if (a && b) return { kind: spec.id as "line" | "segment", a: a.at, b: b.at };
       if (!cursor) {
         if (a) return { kind: "point", at: a.at };
         return null;
       }
       if (!a) return { kind: "point", at: cursor };
-      return { kind: spec.id, a: a.at, b: cursor };
+      return { kind: spec.id as "line" | "segment", a: a.at, b: cursor };
     },
     preview(session, place, scope): Preview {
       const bind = previewName(session, spec.prefix);

@@ -188,7 +188,7 @@ export function snapLineCarrier(
   trace: readonly TraceNode[],
   world: Vec2,
   camera: Camera2,
-  size: PaneSize,
+  _size: PaneSize,
   maxPx = GEOM_PX,
   filter?: SnapFilter,
 ): { bind: string; geom: LineLike } | null {

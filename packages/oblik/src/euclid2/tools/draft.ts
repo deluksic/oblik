@@ -123,7 +123,9 @@ export function hitRef(hit: import("./types").PlaceHit): string {
   return hit.point.kind === "ref" ? hit.point.bind : "";
 }
 
-export function nameField<S extends { name: string }>(open: (session: S) => boolean = () => true): Field<S> {
+export function nameField<S extends ToolSession & { name: string }>(
+  open: (session: S) => boolean = () => true,
+): Field<S> {
   return {
     id: "name",
     kind: "ident",
@@ -134,7 +136,7 @@ export function nameField<S extends { name: string }>(open: (session: S) => bool
   };
 }
 
-export function typedField<S extends { typed: string }>(open: (session: S) => boolean): Field<S> {
+export function typedField<S extends ToolSession & { typed: string }>(open: (session: S) => boolean): Field<S> {
   return {
     id: "typed",
     kind: "number",
@@ -146,7 +148,7 @@ export function typedField<S extends { typed: string }>(open: (session: S) => bo
 }
 
 /** Numeric literal, slider ref, or geometry field (e.g. reach.radius). */
-export function lengthField<S extends LengthDraft>(placeholder = "<n>"): Field<S> {
+export function lengthField<S extends ToolSession & LengthDraft>(placeholder = "<n>"): Field<S> {
   return {
     id: "typed",
     kind: "length",

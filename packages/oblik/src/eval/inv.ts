@@ -82,7 +82,7 @@ function stampGroup(fn: MentionFn, caller: CallSite, nodes: TraceNode[]): void {
       lastAt.set(n.occ, i);
     }
     let prev = -1;
-    const occs = [...lastAt.keys()].sort((a, b) => a - b);
+    const occs = [...lastAt.keys()].toSorted((a, b) => a - b);
     for (const occ of occs) {
       const end = lastAt.get(occ)!;
       for (let i = prev + 1; i <= end; i++) assign(nodes[i]!, occ);
@@ -97,7 +97,7 @@ function stampGroup(fn: MentionFn, caller: CallSite, nodes: TraceNode[]): void {
     if (!once.has(n.id)) continue;
     if (!firstAt.has(n.occ)) firstAt.set(n.occ, i);
   }
-  const occs = [...firstAt.keys()].sort((a, b) => a - b);
+  const occs = [...firstAt.keys()].toSorted((a, b) => a - b);
   for (let k = 0; k < occs.length; k++) {
     const occ = occs[k]!;
     const start = firstAt.get(occ)!;

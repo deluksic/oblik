@@ -22,7 +22,7 @@ import {
   type Branch,
   type Circle,
   type Fillet,
-  type Geom,
+  type Glider,
   type Line,
   type LineLike,
   type ParallelLine,
@@ -201,8 +201,8 @@ export const profile = mark((cycle: readonly unknown[], id?: string): Profile =>
   return traced(profileValue(cycle), id);
 }, { dof: [] });
 
-export const roundOffset = mark((face: Profile, dist: number, id?: string): Profile => {
-  const d = draftAt(id, 0, dist);
+export const roundOffset = mark((face: Profile, distance: number, id?: string): Profile => {
+  const d = draftAt(id, 0, distance);
   if (!face || typeof face !== "object" || !isProfile(face)) return nanProfile();
   return traced(roundOffsetValue(face, d)[0] ?? nanProfile(), id);
 }, { dof: [1] });

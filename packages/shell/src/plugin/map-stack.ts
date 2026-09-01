@@ -55,7 +55,10 @@ export function originalFromMap(
   return { line: orig.line, column: orig.column + 1 };
 }
 
-function mapFromTransform(result: { code: string; map?: EncodedSourceMap | string | null }): EncodedSourceMap | null {
+function mapFromTransform(result: {
+  code: string;
+  map?: EncodedSourceMap | string | { mappings: string; version?: number } | null;
+}): EncodedSourceMap | null {
   const raw = result.map;
   if (raw && typeof raw === "string") {
     try {

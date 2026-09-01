@@ -6,7 +6,6 @@ import {
   applyStyleAtSite,
   applyStyleOverlays,
   drawInkFromStyle,
-  hasStoredStyle,
   parseHex,
   restInkFromDraw,
   siteKey,
@@ -84,10 +83,10 @@ describe("siteKey / applyStyleAtSite", () => {
 
   test("style applies to every drawable and gizmo at the site", () => {
     const a = { geom: { site: at, style: undefined as { line?: { color: string } } | undefined } };
-    const b = { geom: { site: at } };
-    const c = { geom: { site: { file: at.file, line: 9, column: 1 } } };
+    const b = { geom: { site: at, style: undefined as { line?: { color: string } } | undefined } };
+    const c = { geom: { site: { file: at.file, line: 9, column: 1 }, style: undefined as { line?: { color: string } } | undefined } };
     const g1 = { at, style: undefined as { line?: { color: string } } | undefined };
-    const g2 = { at: { file: at.file, line: 9, column: 1 } };
+    const g2 = { at: { file: at.file, line: 9, column: 1 }, style: undefined as { line?: { color: string } } | undefined };
     const style = { line: { color: "#e8876a", width: 2, dash: "dashed" as const } };
     applyStyleAtSite(at, style, [a, b, c], [g1, g2]);
     expect(a.geom.style).toEqual(style);
@@ -102,9 +101,9 @@ describe("siteKey / applyStyleAtSite", () => {
   });
 
   test("overlays restamp style after a fresh evaluate", () => {
-    const first = { geom: { site: at } };
+    const first = { geom: { site: at, style: undefined as { line?: { width: number } } | undefined } };
     applyStyleAtSite(at, { line: { width: 3.5 } }, [first], []);
-    const again = { geom: { site: at } };
+    const again = { geom: { site: at, style: undefined as { line?: { width: number } } | undefined } };
     applyStyleOverlays([again], []);
     expect(again.geom.style).toEqual({ line: { width: 3.5 } });
   });

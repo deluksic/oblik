@@ -7,7 +7,7 @@ import { hitSlider, sliderNodes } from "../view/sliderHud";
 import { round } from "./common";
 import { parseNum } from "./draft";
 import { toolScope } from "./scope";
-import type { Field, PlaceCtx, PlaceHit, Scope } from "./types";
+import type { Field, PlaceCtx, PlaceHit, Scope, ToolSession } from "./types";
 
 export type LengthDraft = { typed: string; lengthPick?: Expr };
 
@@ -98,8 +98,8 @@ export function parseLengthTyped(raw: string, scope: Scope, opts?: { min?: numbe
     rest = rest.slice(1).trim();
     if (rest === "") return null;
   }
-  const member = parseMember(rest, scope);
-  if (member) return wrapLengthNeg(member, neg);
+  const parsedMember = parseMember(rest, scope);
+  if (parsedMember) return wrapLengthNeg(parsedMember, neg);
   if (scope.lengths[rest] != null) {
     return wrapLengthNeg({ kind: "ref", name: rest }, neg);
   }
@@ -271,7 +271,7 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   return null;
 }
 
-export function numberField<S>(
+export function numberField<S extends ToolSession>(
   id: string,
   placeholder: string,
   get: (session: S) => string,

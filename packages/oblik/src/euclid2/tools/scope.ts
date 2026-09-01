@@ -241,10 +241,24 @@ export function toolScope(ctx: { scope?: Scope; trace: readonly TraceNode[] }): 
   return ctx.scope ?? scopeFromTrace(ctx.trace);
 }
 
-export function scopeOf(x?: Scope | readonly string[]): Scope {
+type LooseScope = {
+  used: readonly string[];
+  points?: Record<string, unknown>;
+  carriers?: Record<string, unknown>;
+  circles?: Record<string, unknown>;
+  profiles?: Record<string, unknown>;
+  lengths?: Record<string, number>;
+  byId?: Record<string, unknown>;
+  prints?: Record<string, unknown>;
+  liveKeys?: ReadonlySet<string>;
+};
+
+export type ScopeInput = Scope | readonly string[] | LooseScope;
+
+export function scopeOf(x?: ScopeInput): Scope {
   if (!x) return EMPTY_SCOPE;
-  if (Array.isArray(x)) return { used: x, points: {}, carriers: {}, circles: {}, profiles: {}, lengths: {}, byId: {} };
-  return x;
+  if (Array.isArray(x)) return { ...EMPTY_SCOPE, used: x };
+  return { ...EMPTY_SCOPE, ...(x as Partial<Scope>) };
 }
 
 export type { TraceInv };

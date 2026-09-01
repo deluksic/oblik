@@ -4,7 +4,7 @@ import type { Camera } from "./camera";
 import { worldToScreen } from "./camera";
 import { layoutNumberSliders } from "./hud";
 import { handleOwnsInk } from "./ink";
-import { angleDisplayRad, angleWorldRad, gizmoIsPointLike, type Gizmo } from "./widgets";
+import { angleDisplayRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
 const COL = {
   bg: "#12141c",

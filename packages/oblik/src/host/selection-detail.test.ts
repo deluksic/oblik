@@ -462,7 +462,7 @@ export default defineScene({
 }
 `;
     const mentions = [analyzeMentions(helperSrc, helperFile)];
-    const node = {
+    const traceNode = {
       id: "o_inl",
       occ: 0,
       kind: "line",
@@ -472,17 +472,17 @@ export default defineScene({
       at: { line: 3, column: 4 },
       module: helperFile,
       stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
-    } as TraceNode;
+    } as unknown as TraceNode;
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
-      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: node.stack }), { status: 200 });
+      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
       return new Response("no", { status: 404 });
     }) as typeof fetch;
     try {
       const detail = await selectionDetailForScope({
-        node,
+        node: traceNode,
         focus: { file: helperFile, name: "plate", serial: 0 },
         mentions,
       });
@@ -505,7 +505,7 @@ export default defineScene({
 }
 `;
     const mentions = [analyzeMentions(helperSrc, helperFile)];
-    const node = {
+    const traceNode = {
       id: "o_inl",
       occ: 0,
       kind: "line",
@@ -515,17 +515,17 @@ export default defineScene({
       at: { line: 3, column: 4 },
       module: helperFile,
       stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
-    } as TraceNode;
+    } as unknown as TraceNode;
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
-      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: node.stack }), { status: 200 });
+      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
       return new Response("no", { status: 404 });
     }) as typeof fetch;
     try {
       const detail = await selectionDetailForScope({
-        node,
+        node: traceNode,
         focus: { file: helperFile, name: "plate", serial: 0 },
         mentions,
       });

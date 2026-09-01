@@ -415,7 +415,7 @@ export default defineScene({
   });
 
   test("inserts into a named helper before its return", () => {
-    const src = `import { point, segment } from "oblik";
+    const plateSrc = `import { point, segment } from "oblik";
 
 export function plate() {
   const origin = point(0, 0, "o_origin");
@@ -423,7 +423,7 @@ export function plate() {
   return { origin, opp };
 }
 `;
-    const next = insertCall(src, {
+    const next = insertCall(plateSrc, {
       dest: "plate",
       from: "segment",
       args: [
@@ -450,13 +450,13 @@ export function plate() {
   });
 
   test("insert into a helper can refer to a parameter", () => {
-    const src = `import { point, circle } from "oblik";
+    const paramSrc = `import { point, circle } from "oblik";
 export function plate(origin) {
   return { origin };
 }
 `;
-    expect(namesInFunctionScope(src, "plate").has("origin")).toBe(true);
-    const next = insertCall(src, {
+    expect(namesInFunctionScope(paramSrc, "plate").has("origin")).toBe(true);
+    const next = insertCall(paramSrc, {
       dest: "plate",
       from: "circle",
       args: [
@@ -484,7 +484,7 @@ export function plate(origin) {
   });
 
   test("inserts plate.hBottom when that name is in build()", () => {
-    const src = `import { point, defineScene } from "oblik";
+    const mountSrc = `import { point, defineScene } from "oblik";
 import { mountingPlateLayout } from "../layout/mounting-plate";
 export default defineScene({
   kind: "euclid2",
@@ -494,7 +494,7 @@ export default defineScene({
   },
 });
 `;
-    const next = insertCall(src, {
+    const next = insertCall(mountSrc, {
       from: "segment",
       args: [
         { kind: "member", object: { kind: "ref", name: "plate" }, field: "c0" },
@@ -668,7 +668,7 @@ export function plate() {
   });
 
   test("adds a field to a multiline return bag with a trailing comma", () => {
-    const src = `export function plate() {
+    const multilineSrc = `export function plate() {
   const origin = point(0, 0, "o_origin");
   const hLeft = origin;
   return {
@@ -676,7 +676,7 @@ export function plate() {
   };
 }
 `;
-    expect(exposeReturnBag(src, "plate", "hLeft")).toContain(`return {
+    expect(exposeReturnBag(multilineSrc, "plate", "hLeft")).toContain(`return {
     origin,
     hLeft,
   };`);
@@ -687,21 +687,21 @@ export function plate() {
   });
 
   test("adds return { bind } when the function has no return", () => {
-    const src = `export function plate() {
+    const noReturnSrc = `export function plate() {
   const origin = point(0, 0, "o_origin");
 }
 `;
-    expect(exposeReturnBag(src, "plate", "origin")).toContain("return { origin };");
+    expect(exposeReturnBag(noReturnSrc, "plate", "origin")).toContain("return { origin };");
   });
 
   test("refuses to wrap a single-value return", () => {
-    const src = `export function plate() {
+    const singleReturnSrc = `export function plate() {
   const origin = point(0, 0, "o_origin");
   const hLeft = origin;
   return origin;
 }
 `;
-    expect(() => exposeReturnBag(src, "plate", "hLeft")).toThrow(/return bag/);
+    expect(() => exposeReturnBag(singleReturnSrc, "plate", "hLeft")).toThrow(/return bag/);
   });
 
   test("refuses a bind that is not a local in dest", () => {

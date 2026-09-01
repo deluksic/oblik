@@ -485,7 +485,8 @@ function callerFromMentions(
     if (hit) return hit;
   }
   if (focus.callerFile) {
-    const inFile = hits.find((h) => sourceFileKey(h.file) === sourceFileKey(focus.callerFile));
+    const callerFile = focus.callerFile;
+    const inFile = hits.find((h) => sourceFileKey(h.file) === sourceFileKey(callerFile));
     if (inFile) return inFile;
   }
   return hits[0];

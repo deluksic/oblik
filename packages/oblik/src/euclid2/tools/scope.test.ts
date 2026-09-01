@@ -111,7 +111,7 @@ export default defineScene({
         const origin = point(0, 0, "o_origin");
         const edge = segment(origin, { x: 1, y: 0 }, "o_edge");
         parallelLine(edge, 0.2, "o_inl");
-        const drill = circle(origin, 0.2, "o_drill");
+        circle(origin, 0.2, "o_drill");
         circle(origin, 0.2, "o_h1");
       },
     });
@@ -179,10 +179,10 @@ export default defineScene({
       title: "t",
       build() {
         const origin = point(0, 0, "o_origin");
-        const drill = circle(origin, 0.2, "o_drill");
+        circle(origin, 0.2, "o_drill");
         point(1, 1, "o_hid");
         const originB = point(0, 0, "o_origin");
-        const drillB = circle(originB, 0.2, "o_drill");
+        circle(originB, 0.2, "o_drill");
         point(1, 1, "o_hid");
       },
     });
@@ -268,10 +268,10 @@ export default defineScene({
       title: "t",
       build() {
         const origin = point(0, 0, "o_origin");
-        const drill = circle(origin, 0.2, "o_drill");
+        circle(origin, 0.2, "o_drill");
         point(1, 1, "o_hid");
         const originB = point(0, 0, "o_origin");
-        const drillB = circle(originB, 0.2, "o_drill");
+        circle(originB, 0.2, "o_drill");
         point(1, 1, "o_hid");
       },
     });
@@ -345,7 +345,7 @@ export default defineScene({
       title: "t",
       build() {
         const origin = point(0, 0, "o_nest");
-        const hub = circle(origin, 0.4, "o_nest_hub");
+        circle(origin, 0.4, "o_nest_hub");
         circle(origin, 1.5, "o_nest_halo");
         circle(origin, 0.9, "o_nest_rim");
         circle(origin, 0.2, "o_nest_bead");

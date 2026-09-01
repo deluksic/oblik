@@ -89,7 +89,7 @@ export function BrushDock(props: BrushDockProps) {
   );
 }
 
-function Group(props: { label: string; children: unknown }) {
+function Group(props: { label: string; children: import("solid-js").Element }) {
   return (
     <div class={styles.group}>
       <p class={styles.label}>{props.label}</p>
@@ -108,10 +108,10 @@ function Swatch(props: {
   return (
     <button
       type="button"
-      class={[styles.swatch, { [styles.swatchOn]: props.current, [styles.swatchNone]: props.none === true }]}
+      class={`${styles.swatch}${props.current ? ` ${styles.swatchOn}` : ""}${props.none === true ? ` ${styles.swatchNone}` : ""}`}
       style={props.none ? undefined : { background: props.color }}
       aria-label={props.label}
-      aria-pressed={props.current}
+      aria-pressed={props.current ? "true" : "false"}
       onClick={props.onPick}
     />
   );
@@ -126,7 +126,7 @@ function ColorInput(props: {
 }) {
   const hex = () => (props.value.startsWith("#") ? props.value : props.fallback);
   return (
-    <label class={[styles.colorWrap, { [styles.colorOn]: props.current }]}>
+    <label class={`${styles.colorWrap}${props.current ? ` ${styles.colorOn}` : ""}`}>
       <span class={styles.srOnly}>{props.label}</span>
       <input
         type="color"
@@ -149,9 +149,9 @@ function WidthBtn(props: { width: number; current: boolean; onPick: () => void }
   return (
     <button
       type="button"
-      class={[styles.iconBtn, { [styles.iconOn]: props.current }]}
+      class={`${styles.iconBtn}${props.current ? ` ${styles.iconOn}` : ""}`}
       aria-label={widthName(props.width)}
-      aria-pressed={props.current}
+      aria-pressed={props.current ? "true" : "false"}
       onClick={props.onPick}
     >
       <svg viewBox="0 0 28 16" aria-hidden="true">
@@ -175,9 +175,9 @@ function StyleBtn(props: { id: LineStyleId; current: boolean; onPick: () => void
   return (
     <button
       type="button"
-      class={[styles.iconBtn, { [styles.iconOn]: props.current }]}
+      class={`${styles.iconBtn}${props.current ? ` ${styles.iconOn}` : ""}`}
       aria-label={label()}
-      aria-pressed={props.current}
+      aria-pressed={props.current ? "true" : "false"}
       onClick={props.onPick}
     >
       <svg viewBox="0 0 28 16" aria-hidden="true">

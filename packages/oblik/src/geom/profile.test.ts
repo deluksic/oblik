@@ -107,14 +107,14 @@ describe("profileValue", () => {
   test("fillet radius past the edge collapses", () => {
     const a = { x: 0, y: 0 };
     const b = { x: 1, y: 0 };
-    const c = { x: 0, y: 1 };
+    const cpt = { x: 0, y: 1 };
     const p = profileValue([
       filletValue(a, 1.1),
       { kind: "segment", a, b } satisfies Segment,
       b,
-      { kind: "segment", a: b, b: c } satisfies Segment,
-      c,
-      { kind: "segment", a: c, b: a } satisfies Segment,
+      { kind: "segment", a: b, b: cpt } satisfies Segment,
+      cpt,
+      { kind: "segment", a: cpt, b: a } satisfies Segment,
     ]);
     expect(p.outer).toHaveLength(0);
   });

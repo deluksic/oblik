@@ -6,6 +6,7 @@ export type {
   InspectPatch,
   OriginView,
   OriginFrame,
+  OriginCodeLine,
   OriginDisplayLine,
   LineDash,
   LineStyle,

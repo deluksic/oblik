@@ -166,8 +166,8 @@ export function App(props: WorkspaceProps) {
     setSceneId(id);
   }
 
-  async function onWelcomeCreated(id: string, entry: SceneEntry): Promise<void> {
-    await props.onSceneCreated?.(entry);
+  async function onWelcomeCreated(id: string, sceneEntry: SceneEntry): Promise<void> {
+    await props.onSceneCreated?.(sceneEntry);
     selectScene(id);
   }
 
@@ -272,7 +272,7 @@ export function App(props: WorkspaceProps) {
         return;
       }
       const ident = bar.draftKind === "ident";
-      if (e.key.length === 1 && (ident ? /[A-Za-z0-9_]/.test(e.key) : /[0-9.\-]/.test(e.key))) {
+      if (e.key.length === 1 && (ident ? /[A-Za-z0-9_]/.test(e.key) : /[0-9.-]/.test(e.key))) {
         e.preventDefault();
         bar.onNumberDraft(draft + e.key);
         return;

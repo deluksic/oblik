@@ -89,7 +89,7 @@ export const perpendicularLine: Tool<PerpSession> = {
   click(session, hit, scope) {
     const carrier = carrierOf(session, scope);
     if (!carrier) {
-      if (!hit.carrier) return { session };
+      if (!hit.carrier || hit.carrier.geom.kind === "circle") return { session };
       return {
         session: {
           ...session,

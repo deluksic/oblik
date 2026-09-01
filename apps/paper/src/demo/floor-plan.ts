@@ -75,7 +75,7 @@ function wallRun(a: Vec2, b: Vec2, thickness: number, gaps: { t0: number; t1: nu
       t1: clamp(Math.max(g.t0, g.t1), 0, 1),
     }))
     .filter((g) => g.t1 - g.t0 > 1e-4)
-    .sort((x, y) => x.t0 - y.t0);
+    .toSorted((x, y) => x.t0 - y.t0);
 
   const box = (p: Vec2, q: Vec2): Geom =>
     polyline([

@@ -115,23 +115,31 @@ function isEmptyPoint(point: PointStyle | undefined): boolean {
 }
 
 export function mergeLineStyle(stored: LineStyle | undefined, patch: Partial<LineStyle>): LineStyle | undefined {
-  const next: LineStyle = { ...(stored ?? {}) };
-  for (const key of ["color", "width", "dash"] as const) {
-    if (!(key in patch)) continue;
-    const value = patch[key];
-    if (value === undefined) delete next[key];
-    else next[key] = value;
+  const next: LineStyle = { ...stored };
+  if ("color" in patch) {
+    if (patch.color === undefined) delete next.color;
+    else next.color = patch.color;
+  }
+  if ("width" in patch) {
+    if (patch.width === undefined) delete next.width;
+    else next.width = patch.width;
+  }
+  if ("dash" in patch) {
+    if (patch.dash === undefined) delete next.dash;
+    else next.dash = patch.dash;
   }
   return isEmptyLine(next) ? undefined : next;
 }
 
 export function mergePointStyle(stored: PointStyle | undefined, patch: Partial<PointStyle>): PointStyle | undefined {
-  const next: PointStyle = { ...(stored ?? {}) };
-  for (const key of ["color", "size"] as const) {
-    if (!(key in patch)) continue;
-    const value = patch[key];
-    if (value === undefined) delete next[key];
-    else next[key] = value;
+  const next: PointStyle = { ...stored };
+  if ("color" in patch) {
+    if (patch.color === undefined) delete next.color;
+    else next.color = patch.color;
+  }
+  if ("size" in patch) {
+    if (patch.size === undefined) delete next.size;
+    else next.size = patch.size;
   }
   return isEmptyPoint(next) ? undefined : next;
 }
@@ -151,7 +159,7 @@ export function withStyleChannel(
   channel: "line" | "point",
   value: LineStyle | PointStyle | undefined,
 ): ObjectStyle | null {
-  const next: ObjectStyle = { ...(current ?? {}) };
+  const next: ObjectStyle = { ...current };
   if (value === undefined) delete next[channel];
   else next[channel] = value;
   if (isEmptyLine(next.line) && isEmptyPoint(next.point)) return null;

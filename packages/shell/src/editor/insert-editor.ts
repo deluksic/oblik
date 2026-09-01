@@ -449,9 +449,10 @@ export function evalDerivedScenePoints(
         const x = evalNumber(ax, env);
         const y = evalNumber(ay, env);
         if (x == null || y == null) continue;
-        env.set(decl.name.text, { x, y });
-        if (known.some((k) => k.name === decl.name.text)) continue;
-        out.push({ name: decl.name.text, x, y });
+        const bind = decl.name.text;
+        env.set(bind, { x, y });
+        if (known.some((k) => k.name === bind)) continue;
+        out.push({ name: bind, x, y });
       } else if (fnName === "circle") {
         const cName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
         const center = cName ? env.get(cName) : null;
@@ -903,10 +904,10 @@ export function insertEditors(source: string, edits: EditorInsert[]): string {
 
   let next = source;
   if (geomImports.size > 0) {
-    next = ensureNamedImport(next, "@design-scenes/geom", [...geomImports].sort());
+    next = ensureNamedImport(next, "@design-scenes/geom", [...geomImports].toSorted());
   }
   if (euclidImports.size > 0) {
-    next = ensureNamedImport(next, "@design-scenes/euclid2", [...euclidImports].sort());
+    next = ensureNamedImport(next, "@design-scenes/euclid2", [...euclidImports].toSorted());
   }
 
   const sf = parse(next);

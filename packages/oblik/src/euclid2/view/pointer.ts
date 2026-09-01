@@ -1,5 +1,5 @@
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Glider, LineLike, ParallelLine, Point, Segment } from "@/geom";
+import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "@/geom";
 import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "@/geom/gliders";
 import { lineBasis, signedDist } from "@/geom/ops";
 import { mul, perp, sub } from "@/geom/vec";

@@ -206,8 +206,8 @@ describe("profile pick", () => {
   });
 
   test("namedStrokesThrough keeps only strokes that pass the vertex", () => {
-    expect([...namedStrokesThrough([AB, BC, CA], Pa, camera)].sort()).toEqual(["ab", "ca"]);
-    expect([...namedStrokesThrough([AB, BC, CA], Pb, camera)].sort()).toEqual(["ab", "bc"]);
+    expect([...namedStrokesThrough([AB, BC, CA], Pa, camera)].toSorted()).toEqual(["ab", "ca"]);
+    expect([...namedStrokesThrough([AB, BC, CA], Pb, camera)].toSorted()).toEqual(["ab", "bc"]);
   });
 
   test("namedStrokesThrough with keys uses that invocation, not occ 0", () => {

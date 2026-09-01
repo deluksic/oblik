@@ -27,8 +27,8 @@ describe("infiniteLineAxis", () => {
 
   test("returns null for other kinds and missing fields", () => {
     expect(infiniteLineAxis(undefined)).toBeNull();
-    expect(infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 })).toBeNull();
-    expect(infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } })).toBeNull();
+    expect(infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 } as never)).toBeNull();
+    expect(infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } as never)).toBeNull();
     expect(infiniteLineAxis({ kind: "parallelLine" })).toBeNull();
     expect(infiniteLineAxis({ kind: "line" })).toBeNull();
   });

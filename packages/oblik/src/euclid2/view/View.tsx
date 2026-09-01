@@ -66,6 +66,11 @@ function readPaneSize(el: Element): PaneSize | null {
   return { w: r.width, h: r.height };
 }
 
+function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
+  const rect = el.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
 export function Euclid2View(props: Euclid2ViewProps) {
   const [paneEl, setPaneEl] = createSignal<HTMLDivElement | null>(null);
   const initialCameraMemo = createMemo(() => props.initialCamera, {
@@ -106,11 +111,6 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (pane.w < 8 || pane.h < 8) return;
     const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     setCamera(zoomAt(camera(), screen, pane, wheelZoomFactor(e.deltaY, e.deltaMode)));
-  }
-
-  function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
-    const rect = el.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
   function onPointerDown(e: PointerEvent) {

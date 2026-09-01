@@ -86,10 +86,15 @@ test("perpendicularLine passes through point and is normal to carrier", () => {
   expect(Math.abs(signedDist(p, perpLn))).toBeLessThan(1e-9);
 });
 
+function doorLeaf() {
+  return segment(point(0, 0), point(1, 0));
+}
+
+function drawFloorPlanCallerFrame(g: { provenance: { stack: { name?: string; line: number }[] } }) {
+  return g.provenance.stack.find((f) => f.name === "drawFloorPlan");
+}
+
 test("nested helpers appear on provenance.stack, innermost first", () => {
-  function doorLeaf() {
-    return segment(point(0, 0), point(1, 0));
-  }
   function drawFloorPlan() {
     return doorLeaf();
   }
@@ -101,9 +106,6 @@ test("nested helpers appear on provenance.stack, innermost first", () => {
 });
 
 test("two doorLeaf calls from different lines keep distinct caller frames", () => {
-  function doorLeaf() {
-    return segment(point(0, 0), point(1, 0));
-  }
   function drawFloorPlan() {
     const a = doorLeaf();
     const b = doorLeaf();
@@ -111,9 +113,7 @@ test("two doorLeaf calls from different lines keep distinct caller frames", () =
   }
   beginGeomFrame();
   const [a, b] = drawFloorPlan();
-  const caller = (g: { provenance: { stack: { name?: string; line: number }[] } }) =>
-    g.provenance.stack.find((f) => f.name === "drawFloorPlan");
-  expect(caller(a)?.line).not.toBe(caller(b)?.line);
+  expect(drawFloorPlanCallerFrame(a)?.line).not.toBe(drawFloorPlanCallerFrame(b)?.line);
 });
 
 test("constructor style stamps onto the geom, not nested points", () => {

@@ -139,7 +139,7 @@ export function applyStyleOverlays(
 export function clearStyleOverlaysForFile(file: string): void {
   const norm = file.replace(/\\/g, "/");
   const base = norm.split("/").pop() ?? norm;
-  for (const [key, rec] of [...styleOverlays]) {
+  for (const [key, rec] of styleOverlays) {
     const f = rec.at.file.replace(/\\/g, "/");
     if (f === norm || f === base || f.endsWith(`/${base}`) || f.endsWith(`/${norm}`)) {
       styleOverlays.delete(key);

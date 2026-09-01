@@ -10,7 +10,7 @@ import { profile } from "./profile";
 import { roundOffset } from "./roundOffset";
 import { segment } from "./segment";
 import { slider } from "./slider";
-import { scopeFromTrace, scopeOf } from "./scope";
+import { scopeOf, type ScopeInput } from "./scope";
 import type { PlaceCtx, PlaceHit, Scope, Tool, ToolId, ToolKey, ToolSession, ToolSpec } from "./types";
 
 export type {
@@ -50,7 +50,7 @@ const byId = {
   profile,
   roundOffset,
   fillet,
-} as const satisfies Record<ToolId, Tool>;
+} as Record<ToolId, Tool>;
 
 export const TOOLS = [
   point.spec,
@@ -105,7 +105,7 @@ export function startTool(id: ToolId): ToolSession {
   return byId[id].start();
 }
 
-export function clickTool(session: ToolSession, hit: PlaceHit, scope: Scope | readonly string[] = []) {
+export function clickTool(session: ToolSession, hit: PlaceHit, scope: ScopeInput = []) {
   const sc = scopeOf(scope);
   const tool = of(session);
   const next = tool.click(session as never, hit, sc);
@@ -113,14 +113,14 @@ export function clickTool(session: ToolSession, hit: PlaceHit, scope: Scope | re
   return next;
 }
 
-export function ghostOf(session: ToolSession, place: PlaceHit | null, scope: Scope | readonly string[] = []) {
+export function ghostOf(session: ToolSession, place: PlaceHit | null, scope: ScopeInput = []) {
   return of(session).ghost(session as never, place, scopeOf(scope));
 }
 
 export function previewOf(
   session: ToolSession,
   place: PlaceHit | null = null,
-  scope: Scope | readonly string[] = [],
+  scope: ScopeInput = [],
 ) {
   const tool = of(session);
   const sc = scopeOf(scope);
@@ -139,14 +139,14 @@ export function keyTool(
   session: ToolSession,
   e: ToolKey,
   place: PlaceHit | null = null,
-  scope: Scope | readonly string[] = [],
+  scope: ScopeInput = [],
 ) {
   const out = keySession(of(session), session as never, e, place, scopeOf(scope));
   if ("ignore" in out) return undefined;
   return out;
 }
 
-export function commitTool(session: ToolSession, place: PlaceHit | null = null, scope: Scope | readonly string[] = []) {
+export function commitTool(session: ToolSession, place: PlaceHit | null = null, scope: ScopeInput = []) {
   const sc = scopeOf(scope);
   const tool = of(session);
   if (firstInvalid(tool, session as never, sc)) return undefined;

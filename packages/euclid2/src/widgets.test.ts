@@ -229,6 +229,16 @@ test("paired offset shares site; overlay moves both sides together", () => {
   expect(cellar.line.origin.y).toBeCloseTo(-2.2);
 });
 
+type AngleGizmo = ReturnType<typeof getGizmos>[number];
+
+function gizmoStackNames(g: AngleGizmo): (string | undefined)[] {
+  return (g.stack ?? []).map((f) => f.name);
+}
+
+function floorPlanCallerFrame(g: AngleGizmo) {
+  return g.stack?.find((f) => f.name === "floorPlanLayout");
+}
+
 test("nested angle helpers keep distinct caller frames", () => {
   const site = { __annotations__: { file: F, at: [20, 1] as [number, number], editable: true } };
   function doorOpen(hinge: { x: number; y: number }) {
@@ -245,11 +255,9 @@ test("nested angle helpers keep distinct caller frames", () => {
   expect(gs[0]!.site).toBe(gs[1]!.site);
   expect(gs[0]!.id).toBe(`${gs[0]!.site}#0`);
   expect(gs[1]!.id).toBe(`${gs[1]!.site}#1`);
-  const names = (g: (typeof gs)[0]) => (g.stack ?? []).map((f) => f.name);
-  expect(names(gs[0]!)).toContain("doorOpen");
-  expect(names(gs[0]!)).toContain("floorPlanLayout");
-  const caller = (g: (typeof gs)[0]) => g.stack?.find((f) => f.name === "floorPlanLayout");
-  expect(caller(gs[0]!)?.line).not.toBe(caller(gs[1]!)?.line);
+  expect(gizmoStackNames(gs[0]!)).toContain("doorOpen");
+  expect(gizmoStackNames(gs[0]!)).toContain("floorPlanLayout");
+  expect(floorPlanCallerFrame(gs[0]!)?.line).not.toBe(floorPlanCallerFrame(gs[1]!)?.line);
 });
 
 test("withBind labels nested angles at a shared site", () => {

@@ -677,11 +677,6 @@ describe("clickTool", () => {
       origin: { x: 0, y: 0 },
       direction: { x: 1, y: 0 },
     };
-    const shelfGeom = {
-      kind: "parallelLine" as const,
-      line: { kind: "line" as const, origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
-      distance: 1.76,
-    };
     const session = {
       verb: "parallelLine" as const,
       focus: "typed" as const,
@@ -1339,7 +1334,7 @@ describe("roundOffset tool", () => {
       },
     );
     expect(g?.kind).toBe("profile");
-    if (g?.kind === "profile") expect(g.edges).toHaveLength(8);
+    expect((g as { kind: "profile"; edges: unknown[] }).edges).toHaveLength(8);
   });
 });
 
@@ -1499,9 +1494,8 @@ describe("fillet tool", () => {
       scope,
     );
     expect(g?.kind).toBe("profile");
-    if (g?.kind === "profile") {
-      expect(g.edges).toHaveLength(5);
-      expect(g.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    }
+    const profileGhost = g as { kind: "profile"; edges: { carrier: { kind: string } }[] };
+    expect(profileGhost.edges).toHaveLength(5);
+    expect(profileGhost.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
   });
 });

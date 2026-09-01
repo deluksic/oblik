@@ -32,8 +32,7 @@ test("geom point wins over an offset line through it", () => {
 test("point gizmo wins over an offset gizmo at the same place", () => {
   const pt: Gizmo = { kind: "point", site: "f.ts:2:1", id: "f.ts:2:1#0", at, x: 0, y: 0 };
   const hit = hitTest({ x: 100, y: 100 }, cam, W, H, [offsetThroughOrigin(), pt], []);
-  expect(hit?.target).toBe("gizmo");
-  if (hit?.target === "gizmo") expect(hit.gizmo).toEqual(pt);
+  expect(hit).toEqual({ target: "gizmo", gizmo: pt });
 });
 
 test("offset still hits when the pointer is away from the point", () => {

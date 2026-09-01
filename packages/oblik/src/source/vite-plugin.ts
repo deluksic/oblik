@@ -89,7 +89,7 @@ function invalidateSceneLoaders(server: ViteDevServer): void {
 function invalidateCatalogConsumers(server: ViteDevServer): void {
   const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
   if (!catalog) return;
-  for (const importer of [...catalog.importers]) void server.reloadModule(importer);
+  for (const importer of catalog.importers) void server.reloadModule(importer);
 }
 
 export function oblikPlugin(opts: OblikPluginOpts): Plugin {
@@ -136,7 +136,11 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
       server.watcher.on("add", onSceneTree);
       server.watcher.on("unlink", onSceneTree);
 
-      server.middlewares.use(async (req, res, next) => {
+      async function handleOblikMiddleware(
+        req: IncomingMessage,
+        res: ServerResponse,
+        next: () => void,
+      ): Promise<void> {
         if (req.method === "POST" && req.url === "/__oblik-patch") {
           let body: unknown;
           try {
@@ -153,12 +157,12 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           try {
             const abs = resolveUnder(workspaceRoot, patch.file);
             const src = fs.readFileSync(abs, "utf8");
-            const next = patchLiterals(src, patch.id, patch.values);
-            if (next == null) {
+            const patched = patchLiterals(src, patch.id, patch.values);
+            if (patched == null) {
               json(res, 400, { ok: false, error: "could not patch id" });
               return;
             }
-            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -181,8 +185,8 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           try {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
-            const next = insertCall(src, job);
-            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            const patched = insertCall(src, job);
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -205,8 +209,8 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           try {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
-            const next = exposeReturnBag(src, job.dest, job.bind);
-            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            const patched = exposeReturnBag(src, job.dest, job.bind);
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -229,8 +233,8 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           try {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
-            const next = patchPaintStyle(src, job.id, job.style);
-            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            const patched = patchPaintStyle(src, job.id, job.style);
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -281,8 +285,8 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           try {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
-            const next = removePaintCall(src, job.id);
-            await enqueue(abs, () => fs.writeFileSync(abs, next));
+            const patched = removePaintCall(src, job.id);
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -328,6 +332,10 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         next();
+      }
+
+      server.middlewares.use((req, res, next) => {
+        void handleOblikMiddleware(req, res, next).catch(next);
       });
     },
     resolveId(id) {

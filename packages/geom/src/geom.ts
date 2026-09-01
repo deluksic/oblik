@@ -387,14 +387,14 @@ export function getDrawn(): Drawable[] {
 export function collectDrawables(returned?: Geom | Geom[] | void | null): Drawable[] {
   const out: Drawable[] = [];
   const seen = new Set<string>();
-  const add = (d: Drawable) => {
+  const track = (d: Drawable) => {
     if (seen.has(d.geom.id)) return;
     seen.add(d.geom.id);
     out.push(d);
   };
-  for (const d of getDrawn()) add(d);
+  for (const d of getDrawn()) track(d);
   if (returned != null) {
-    for (const d of flatten(returned)) add(d);
+    for (const d of flatten(returned)) track(d);
   }
   return out;
 }

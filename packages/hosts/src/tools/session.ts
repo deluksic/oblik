@@ -903,33 +903,6 @@ export function hoverSession(session: ToolSession, ctx: PickCtx): SessionHover {
     return { snap: null, ghost: "ring", hoverId: null };
   }
 
-  if (session.verb === "perpendicular" && session.line) {
-    const p = resolvePoint(ctx);
-    if (p === "ignore") return { snap: null, ghost: "none", hoverId: null };
-    return {
-      snap: {
-        kind: p.kind === "intersection" || p.kind === "circleLine" ? "intersection" : "point",
-        x: p.x,
-        y: p.y,
-      },
-      ghost: "point",
-      hoverId: null,
-    };
-  }
-
-  if (session.verb === "perpendicular" && !session.line) {
-    const hit = resolveLineOnly(ctx);
-    if (hit.kind === "line") {
-      const hoverId =
-        ctx.hit?.target === "geom" &&
-        (ctx.hit.drawable.geom.kind === "segment" || ctx.hit.drawable.geom.kind === "line")
-          ? ctx.hit.drawable.geom.id
-          : null;
-      return { snap: null, ghost: "none", hoverId };
-    }
-    return { snap: null, ghost: "none", hoverId: null };
-  }
-
   if (session.verb === "offset" && session.from?.kind === "line") {
     return {
       snap: null,
@@ -1137,16 +1110,16 @@ function resolveLineOnly(ctx: PickCtx): DistanceFromHit {
 
 export function compilePerpendicular(
   src: string,
-  line: LineBind,
+  baseLine: LineBind,
   through: PointBind,
   as?: string,
 ): ScenePatch | { error: string } {
-  const sites = uniqueHoists([line, ...collectLines(through)]);
+  const sites = uniqueHoists([baseLine, ...collectLines(through)]);
   try {
     const { src: working, map } = hoistNames(src, sites);
     const statements: string[] = [];
     const imports = { euclid: new Set<string>(), geom: new Set<string>() };
-    const lineE = lineText(line, map, imports);
+    const lineE = lineText(baseLine, map, imports);
     const pe = pointExpr(working, statements, through, map, imports);
     imports.geom.add("perpendicularLine");
     const name = bindName(`${working}\n${statements.join("\n")}`, as, "perp");
@@ -1247,10 +1220,10 @@ export function compileCircle(
     const statements: string[] = [];
     const imports = { euclid: new Set<string>(), geom: new Set<string>() };
     const c = pointExpr(working, statements, center, map, imports);
-    const arg = lengthArg(working, statements, length, map, imports, c);
+    const radiusArg = lengthArg(working, statements, length, map, imports, c);
     imports.geom.add("circle");
     const name = bindName(`${working}\n${statements.join("\n")}`, as, "k");
-    statements.push(`const ${name} = circle(${c}, ${arg});`);
+    statements.push(`const ${name} = circle(${c}, ${radiusArg});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -1269,10 +1242,10 @@ export function compileOffset(
     const statements: string[] = [];
     const imports = { euclid: new Set<string>(), geom: new Set<string>() };
     const lineE = lineText(from.line, map, imports);
-    const arg = lengthArg(working, statements, length, map, imports, undefined, lineE);
+    const offsetArg = lengthArg(working, statements, length, map, imports, undefined, lineE);
     imports.geom.add("offsetLine");
     const name = bindName(`${working}\n${statements.join("\n")}`, as, "off");
-    statements.push(`const ${name} = offsetLine(${lineE}, ${arg});`);
+    statements.push(`const ${name} = offsetLine(${lineE}, ${offsetArg});`);
     return patchOf(sites, imports, statements);
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -1327,7 +1300,7 @@ export function compileDistance(
       const p = pointExpr(working, statements, from.point, map, imports);
       imports.geom.add("circle");
       const dName = bindName(`${working}\n${statements.join("\n")}`, as, "d");
-      const arg =
+      const radiusArg =
         length.kind === "reuse"
           ? length.name
           : length.kind === "fresh"
@@ -1335,12 +1308,12 @@ export function compileDistance(
             : length.kind === "field"
               ? `${length.object}.${length.field}`
               : fmt(0);
-      statements.push(`const ${dName} = circle(${p}, ${arg});`);
+      statements.push(`const ${dName} = circle(${p}, ${radiusArg});`);
     } else {
       const lineE = lineText(from.line, map, imports);
       imports.geom.add("offsetLine");
       const off = bindName(`${working}\n${statements.join("\n")}`, as, "off");
-      const arg =
+      const offsetArg =
         length.kind === "reuse"
           ? length.negate
             ? `-${length.name}`
@@ -1350,7 +1323,7 @@ export function compileDistance(
             : length.kind === "field"
               ? `${length.negate ? "-" : ""}${length.object}.${length.field}`
               : fmt(0);
-      statements.push(`const ${off} = offsetLine(${lineE}, ${arg});`);
+      statements.push(`const ${off} = offsetLine(${lineE}, ${offsetArg});`);
     }
     return patchOf(sites, imports, statements);
   } catch (e) {

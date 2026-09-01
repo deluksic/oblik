@@ -303,15 +303,15 @@ describe("profileCorners / filletAtVertex", () => {
   });
 
   test("a stadium semicircle is not skipped as a join", () => {
-    const A = { x: 0, y: 0 };
-    const B = { x: 2, y: 0 };
+    const ptA = { x: 0, y: 0 };
+    const ptB = { x: 2, y: 0 };
     const C = { x: 2, y: 1 };
     const D = { x: 0, y: 1 };
-    const bot: Segment = { kind: "segment", a: A, b: B };
+    const bot: Segment = { kind: "segment", a: ptA, b: ptB };
     const top: Segment = { kind: "segment", a: C, b: D };
     const cR: Circle = { kind: "circle", center: { x: 2, y: 0.5 }, radius: 0.5 };
     const cL: Circle = { kind: "circle", center: { x: 0, y: 0.5 }, radius: 0.5 };
-    const face = profileValue([B, alongValue(cR, 1), C, top, D, alongValue(cL, 1), A, bot]);
+    const face = profileValue([ptB, alongValue(cR, 1), C, top, D, alongValue(cL, 1), ptA, bot]);
     expect(face.outer).toHaveLength(4);
     const corners = profileCorners(face);
     expect(corners).toHaveLength(4);

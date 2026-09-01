@@ -327,10 +327,15 @@ describe("resolvePlacePoint", () => {
       value: { kind: "point", x: 0.05, y: 0 },
     });
     const keys = new Set(["o_origin:0"]);
-    const print = (n: TraceNode) => (n.id === "o_origin" ? "plate.origin" : n.bind);
-    const hit = resolvePlacePoint([origin, hidden], { x: 0, y: 0 }, 0.3, 0.3, { keys, print });
+    const hit = resolvePlacePoint([origin, hidden], { x: 0, y: 0 }, 0.3, 0.3, {
+      keys,
+      print: (n) => (n.id === "o_origin" ? "plate.origin" : n.bind),
+    });
     expect(hit).toMatchObject({ kind: "ref", bind: "plate.origin", id: "o_origin" });
-    const miss = resolvePlacePoint([hidden], { x: 0.05, y: 0 }, 0.3, 0.3, { keys, print });
+    const miss = resolvePlacePoint([hidden], { x: 0.05, y: 0 }, 0.3, 0.3, {
+      keys,
+      print: (n) => (n.id === "o_origin" ? "plate.origin" : n.bind),
+    });
     expect(miss.kind).toBe("free");
   });
 });

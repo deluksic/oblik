@@ -36,6 +36,11 @@ export function stamp(
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  const map = ms.generateMap({ hires: true, includeContent: true, source: file });
+  const map = ms.generateMap({ hires: true, includeContent: true, source: file }) as {
+    mappings: string;
+    names: string[];
+    sources: string[];
+    version: 3;
+  };
   return { source: ms.toString(), added, map };
 }

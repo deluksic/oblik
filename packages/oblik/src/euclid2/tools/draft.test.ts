@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import { clickTool, keyTool, previewOf, startTool, tabTool, typeTool } from "../tool";
 import { inSlot, splitSlot, unmarkSlot } from "./draft";
-import type { PlaceHit, Scope, ToolSession, ToolStep } from "./types";
+import type { PlaceHit, Placed, Scope, ToolSession, ToolStep } from "./types";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +31,7 @@ function typeChars(session: ToolSession, chars: string): ToolSession {
 }
 
 function pointScope(...pts: { bind: string; x: number; y: number }[]): Scope {
-  const points: Scope["points"] = {};
+  const points: Record<string, Placed> = {};
   const used: string[] = [];
   for (const p of pts) {
     used.push(p.bind);

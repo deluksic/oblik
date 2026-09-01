@@ -211,7 +211,7 @@ export function annotateCallSites(source: string, file: string, mapSource = file
   return {
     code: ms.toString(),
     warnings,
-    map: ms.generateMap({ hires: true, includeContent: true, source: mapSource }),
+    map: ms.generateMap({ hires: true, includeContent: true, source: mapSource }) as AnnotateResult["map"],
   };
 }
 

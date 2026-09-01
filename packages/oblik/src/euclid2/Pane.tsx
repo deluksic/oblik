@@ -64,9 +64,21 @@ function parentFocus(
     .find((f) => sourceFileKey(f.file) === key && inv.callerLine >= f.startLine && inv.callerLine <= f.endLine);
   if (!fn) return entry;
   const parentNode = trace.find(
-    (node) => node.inv?.name === fn.name && sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
+    (node) =>
+      node.inv?.name === fn.name && node.inv && sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
   );
   return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
+}
+
+function focusFromNode(n: TraceNode): ScopeFocus | null {
+  if (!n.inv) return null;
+  return {
+    file: n.inv.file,
+    name: n.inv.name,
+    serial: n.inv.serial,
+    callerFile: n.inv.callerFile,
+    callerLine: n.inv.callerLine,
+  };
 }
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -128,17 +140,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       callerFile: pick.callerFile,
       callerLine: pick.callerLine,
     });
-  }
-
-  function focusFromNode(n: TraceNode): ScopeFocus | null {
-    if (!n.inv) return null;
-    return {
-      file: n.inv.file,
-      name: n.inv.name,
-      serial: n.inv.serial,
-      callerFile: n.inv.callerFile,
-      callerLine: n.inv.callerLine,
-    };
   }
 
   createEffect(

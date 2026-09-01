@@ -335,9 +335,7 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   for (const h of hoists) {
     if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
   }
-  const statements: { bind?: string; from: string; args: Expr[]; id: string }[] = [
-    ...hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() })),
-  ];
+  const statements: { bind?: string; from: string; args: Expr[]; id: string }[] = hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() }));
   if (EFFECT_CTORS.has(job.from)) {
     statements.push({ from: job.from, args, id: job.id ?? nextId() });
   } else {

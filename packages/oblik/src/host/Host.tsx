@@ -18,8 +18,8 @@ import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 import { originFileLabel } from "./selection-detail";
 
-import "../theme.css";
 import styles from "./Host.module.css";
+import "./theme.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;
 export type MentionBundle = Record<string, MentionFile>;
@@ -125,8 +125,8 @@ function Host(props: {
     () => true,
     () => {
       registerSceneHot({
-        onHot(key, scene) {
-          sceneCache.set(key, scene);
+        onHot(key, hotScene) {
+          sceneCache.set(key, hotScene);
           setSceneRev((r) => r + 1);
         },
       });
@@ -168,7 +168,7 @@ function Host(props: {
     if (kind === "euclid2") {
       return (
         <Euclid2Pane
-          scene={scene()}
+          scene={scene() as import("../eval/scene").Euclid2Scene}
           file={file}
           annotations={annotations()}
           mentions={Object.values(props.mentions)}

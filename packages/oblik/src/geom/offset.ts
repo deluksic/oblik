@@ -128,13 +128,16 @@ function carrierHits(a: LineLike | Circle, b: LineLike | Circle): Vec2[] {
   if (a.kind === "circle" && b.kind === "circle") {
     return [circleCircleIntersectionValue(a, b, 1), circleCircleIntersectionValue(a, b, -1)];
   }
-  if (a.kind === "circle") {
+  if (a.kind === "circle" && b.kind !== "circle") {
     return [circleLineIntersectionValue(a, b, 1), circleLineIntersectionValue(a, b, -1)];
   }
-  if (b.kind === "circle") {
+  if (b.kind === "circle" && a.kind !== "circle") {
     return [circleLineIntersectionValue(b, a, 1), circleLineIntersectionValue(b, a, -1)];
   }
-  return [lineIntersectionValue(a, b)];
+  if (a.kind !== "circle" && b.kind !== "circle") {
+    return [lineIntersectionValue(a, b)];
+  }
+  return [];
 }
 
 function closestHit(hits: readonly Vec2[], hint: Vec2): Vec2 | null {

@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import MagicString from "magic-string";
+import type { EncodedSourceMap } from "@jridgewell/trace-mapping";
 
 import { originalFromMap, sourceMapFromCode, viteUrlForRepoFile } from "./map-stack";
 
@@ -23,7 +24,7 @@ test("originalFromMap undoes a transform that inserted lines", () => {
   const ms = new MagicString(original);
   ms.prepend('import { segment } from "oblik";\n\n');
   const generated = ms.toString();
-  const map = ms.generateMap({ hires: true, source: "shelf.ts" });
+  const map = ms.generateMap({ hires: true, source: "shelf.ts" }) as EncodedSourceMap;
   const genLine = generated.split("\n").findIndex((l) => l.includes("return segment")) + 1;
   const orig = originalFromMap(map, genLine, 10);
   expect(orig?.line).toBe(2);
