@@ -93,13 +93,22 @@ export function FigurePane(props: FigurePaneProps) {
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [writeError, setWriteError] = createSignal<string | null>(null);
   const [frameSelected, setFrameSelected] = createSignal(() => (props.file, false));
+  const [editedFrame, setEditedFrame] = createSignal<FrameXywh | null>(() => (props.scene, null));
 
   const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
 
   const frameXywh = createMemo<FrameXywh | null>(() => {
+    const local = editedFrame();
+    if (local) return local;
     const r = frameRect(props.scene.frame, props.scene.camera);
     return r ? { x: r.x, y: r.y, width: r.w, height: r.h } : null;
+  });
+  const liveFrame = createMemo(() => {
+    const local = editedFrame();
+    const base = props.scene.frame;
+    if (!local || !base) return base;
+    return { ...base, x: local.x, y: local.y, width: local.width, height: local.height };
   });
 
   const world = createMemo(() => {
@@ -265,6 +274,7 @@ export function FigurePane(props: FigurePaneProps) {
   }
 
   async function commitFrame(next: FrameXywh) {
+    setEditedFrame(next);
     await postJson("/__oblik-frame", { file: props.file, frame: next });
   }
 
@@ -327,7 +337,7 @@ export function FigurePane(props: FigurePaneProps) {
             trace={world().trace}
             initialCamera={props.scene.camera}
             paper={props.scene.paper}
-            frame={props.scene.frame}
+            frame={liveFrame()}
             tool={tool()}
             shift={shift()}
             brush={brush()}

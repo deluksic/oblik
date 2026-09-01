@@ -1,0 +1,36 @@
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.label {
+  flex: none;
+  width: 1.1rem;
+  font-size: 0.72rem;
+  color: var(--oblik-muted);
+}
+
+.input {
+  box-sizing: border-box;
+  width: 4.25rem;
+  padding: 0.28rem 0.35rem;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--oblik-text);
+  background: var(--oblik-paper);
+  border: 1px solid var(--oblik-line);
+  border-radius: 0.3rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--oblik-hover);
+}
+
+.invalid,
+.invalid:focus {
+  border-color: #c45c3e;
+  text-decoration: underline wavy #c45c3e;
+  text-decoration-skip-ink: none;
+}

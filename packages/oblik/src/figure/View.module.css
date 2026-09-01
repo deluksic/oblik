@@ -97,15 +97,9 @@
   opacity: 0.28;
 }
 
-.pageWrap {
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-}
-
 .page {
   position: absolute;
-  inset: 0;
+  z-index: 0;
   pointer-events: none;
   border: 1px solid #d4c7b4;
   box-shadow:
@@ -113,19 +107,20 @@
     0 6px 18px rgba(42, 34, 24, 0.1);
 }
 
-.cream > .pageWrap > .page {
+.cream > .page {
   background: #faf6ee;
 }
 
-.white > .pageWrap > .page {
+.white > .page {
   background: #fff;
   border-color: #e4ddd0;
 }
 
 .frameTitle {
   position: absolute;
+  z-index: 2;
   left: 0;
-  bottom: 100%;
+  transform: translateY(-100%);
   margin: 0;
   padding: 2px 6px 5px 0;
   border: none;
@@ -134,7 +129,6 @@
   letter-spacing: 0.02em;
   color: #8a8278;
   white-space: nowrap;
-  pointer-events: auto;
   cursor: pointer;
 }
 

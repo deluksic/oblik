@@ -201,26 +201,33 @@ export function FigureView(props: FigureViewProps) {
         <Show when={pageBox()}>
           {(box) => (
             <div
-              class={styles.pageWrap}
+              class={styles.page}
+              aria-hidden="true"
               style={{
                 left: `${box().left}px`,
                 top: `${box().top}px`,
                 width: `${box().width}px`,
                 height: `${box().height}px`,
               }}
+            />
+          )}
+        </Show>
+        <Show when={pageBox()}>
+          {(box) => (
+            <button
+              type="button"
+              class={[styles.frameTitle, { [styles.frameTitleSelected]: props.frameSelected === true }]}
+              style={{
+                left: `${box().left}px`,
+                top: `${box().top}px`,
+              }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                props.onPickFrame?.();
+              }}
             >
-              <button
-                type="button"
-                class={[styles.frameTitle, { [styles.frameTitleSelected]: props.frameSelected === true }]}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  props.onPickFrame?.();
-                }}
-              >
-                Frame
-              </button>
-              <div class={styles.page} aria-hidden="true" />
-            </div>
+              Frame
+            </button>
           )}
         </Show>
         <svg class={styles.world} viewBox={vb()}>
