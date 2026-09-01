@@ -36,6 +36,7 @@ export function PointMark(props: {
       hover: props.hot && !props.selected,
       overlay: props.overlay === true,
       knockout: props.knockout !== false,
+      screenSpace: true,
     }, readChromeMetrics()),
   );
   return (

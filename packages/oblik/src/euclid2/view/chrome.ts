@@ -12,6 +12,8 @@ export type ChromeOpts = {
   hover: boolean;
   overlay: boolean;
   knockout: boolean;
+  /** HUD / screen-space SVG where viewBox units are already CSS px. */
+  screenSpace?: boolean;
 };
 
 export type ChromeMetrics = {
@@ -21,9 +23,9 @@ export type ChromeMetrics = {
 };
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
-  gapPx: 1,
-  selectRingPx: 1.5,
-  hoverRingPx: 1,
+  gapPx: 4,
+  selectRingPx: 2,
+  hoverRingPx: 2,
 };
 
 /** CSS `stroke-width` for a chrome layer (logical px). */
@@ -41,11 +43,20 @@ export function chromeLayers(
   if (!opts.overlay) return [{ kind: "paint", width: w }];
   if (!opts.selected && !opts.hover) return [];
   if (!opts.knockout) return [];
-  const ring = opts.selected ? metrics.selectRingPx : metrics.hoverRingPx;
-  const gap = w + 2 * metrics.gapPx;
+  const ringCss = opts.selected ? metrics.selectRingPx : metrics.hoverRingPx;
+  const px = opts.screenSpace ? 1 : chromeDprScale();
+  const gapBand = metrics.gapPx * px;
+  const ringBand = ringCss * px;
+  const gap = w + 2 * gapBand;
   return [
-    { kind: "outline", width: gap + 2 * ring },
+    { kind: "outline", width: gap + 2 * ringBand },
     { kind: "knockout", width: gap },
     { kind: "paint", width: w },
   ];
+}
+
+/** Scale CSS px to device px for world-space non-scaling strokes. */
+export function chromeDprScale(): number {
+  if (typeof window === "undefined") return 1;
+  return window.devicePixelRatio || 1;
 }

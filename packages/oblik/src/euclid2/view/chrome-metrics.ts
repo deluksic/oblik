@@ -7,6 +7,12 @@ function cssLengthPx(style: CSSStyleDeclaration, prop: string): number | null {
   return Number.isFinite(px) ? px : null;
 }
 
+/** Device pixel ratio for mapping CSS px to non-scaling SVG strokes in world space. */
+export function screenDpr(): number {
+  if (typeof window === "undefined") return 1;
+  return window.devicePixelRatio || 1;
+}
+
 /** Theme tokens for hover/select chrome, in CSS logical pixels. */
 export function readChromeMetrics(): ChromeMetrics {
   if (typeof document === "undefined") return DEFAULT_CHROME_METRICS;

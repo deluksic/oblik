@@ -87,9 +87,9 @@ h6 {
   --oblik-code: #c8c3b6;
   --oblik-stroke: 1.5px;
   --oblik-stroke-selected: 2.25px;
-  --oblik-chrome-gap: 1px;
-  --oblik-chrome-ring: 1.5px;
-  --oblik-chrome-ring-hover: 1px;
+  --oblik-chrome-gap: 4px;
+  --oblik-chrome-ring: 2px;
+  --oblik-chrome-ring-hover: 2px;
   --oblik-hit: 14px;
   --oblik-scrollbar-thumb: color-mix(in srgb, var(--oblik-muted) 42%, transparent);
   --oblik-scrollbar-thumb-hover: color-mix(in srgb, var(--oblik-text) 28%, transparent);

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeLayers, layerStrokeWidth } from "./chrome";
 
@@ -27,6 +27,32 @@ describe("chromeLayers", () => {
       { kind: "knockout", width: gap },
       { kind: "paint", width: 1 },
     ]);
+  });
+
+  test("world overlay scales gap and ring by device pixel ratio", () => {
+    vi.stubGlobal("window", { devicePixelRatio: 2 });
+    const gap = 1 + 2 * M.gapPx * 2;
+    expect(chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true }, M)).toEqual([
+      { kind: "outline", width: gap + 2 * M.selectRingPx * 2 },
+      { kind: "knockout", width: gap },
+      { kind: "paint", width: 1 },
+    ]);
+  });
+
+  test("screen-space overlay does not scale by dpr", () => {
+    vi.stubGlobal("window", { devicePixelRatio: 2 });
+    const gap = 1 + 2 * M.gapPx;
+    expect(
+      chromeLayers(1, { selected: true, hover: false, overlay: true, knockout: true, screenSpace: true }, M),
+    ).toEqual([
+      { kind: "outline", width: gap + 2 * M.selectRingPx },
+      { kind: "knockout", width: gap },
+      { kind: "paint", width: 1 },
+    ]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   test("dragging skips overlay chrome", () => {
