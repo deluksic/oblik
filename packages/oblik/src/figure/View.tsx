@@ -98,6 +98,23 @@ export function FigureView(props: FigureViewProps) {
   const onionPts = createMemo(() => geom().filter(isPointish));
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
+  const chromeKey = (key: string) => key === props.hoverKey || key === props.selectedKey;
+  const baseInkStrokes = createMemo(() => inkStrokes().filter((s) => !chromeKey(traceKey(s.paint))));
+  const chromeInkStrokes = createMemo(() => inkStrokes().filter((s) => chromeKey(traceKey(s.paint))));
+  const baseInkPts = createMemo(() => inkPts().filter((s) => !chromeKey(traceKey(s.paint))));
+  const chromeInkPts = createMemo(() => inkPts().filter((s) => chromeKey(traceKey(s.paint))));
+  const chromeOnionInk = createMemo(() =>
+    onionInk().filter((n) => traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey),
+  );
+  const chromeOnionPts = createMemo(() =>
+    onionPts().filter((n) => traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey),
+  );
+  const baseOnionInk = createMemo(() =>
+    onionInk().filter((n) => traceKey(n) !== props.hoverKey && traceKey(n) !== props.selectedKey),
+  );
+  const baseOnionPts = createMemo(() =>
+    onionPts().filter((n) => traceKey(n) !== props.hoverKey && traceKey(n) !== props.selectedKey),
+  );
   const frameXywh = createMemo<FrameXywh | null>(() => {
     const r = page();
     if (!r) return null;
@@ -314,7 +331,7 @@ export function FigureView(props: FigureViewProps) {
               {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} />}
             </Show>
             <Show when={props.shift}>
-              <For each={onionInk()}>
+              <For each={baseOnionInk()}>
                 {(n) => (
                   <FigureStroke
                     node={n}
@@ -330,7 +347,7 @@ export function FigureView(props: FigureViewProps) {
                 )}
               </For>
             </Show>
-            <For each={inkStrokes()}>
+            <For each={baseInkStrokes()}>
               {(s) => (
                 <InkStroke
                   s={s}
@@ -345,7 +362,7 @@ export function FigureView(props: FigureViewProps) {
               )}
             </For>
             <Show when={props.shift}>
-              <For each={onionPts()}>
+              <For each={baseOnionPts()}>
                 {(n) => (
                   <FigurePoint
                     node={n}
@@ -360,7 +377,7 @@ export function FigureView(props: FigureViewProps) {
                 )}
               </For>
             </Show>
-            <For each={inkPts()}>
+            <For each={baseInkPts()}>
               {(s) => (
                 <InkPoint
                   s={s}
@@ -373,7 +390,7 @@ export function FigureView(props: FigureViewProps) {
                 />
               )}
             </For>
-            <For each={inkStrokes()}>
+            <For each={chromeInkStrokes()}>
               {(s) => (
                 <InkStroke
                   s={s}
@@ -389,7 +406,7 @@ export function FigureView(props: FigureViewProps) {
                 />
               )}
             </For>
-            <For each={inkPts()}>
+            <For each={chromeInkPts()}>
               {(s) => (
                 <InkPoint
                   s={s}
@@ -405,7 +422,7 @@ export function FigureView(props: FigureViewProps) {
               )}
             </For>
             <Show when={props.shift}>
-              <For each={onionInk()}>
+              <For each={chromeOnionInk()}>
                 {(n) => (
                   <FigureStroke
                     node={n}
@@ -422,7 +439,7 @@ export function FigureView(props: FigureViewProps) {
                   />
                 )}
               </For>
-              <For each={onionPts()}>
+              <For each={chromeOnionPts()}>
                 {(n) => (
                   <FigurePoint
                     node={n}

@@ -2,12 +2,11 @@ export const CONSTRUCTION_STROKE_PX = 1.5;
 export const POINT_STROKE_PX = 2;
 
 export type ChromeKind = "knockout" | "outline" | "paint";
-export type ChromeClip = "outside" | "inside";
 
 export type ChromeLayer = {
   kind: ChromeKind;
   width: number;
-  clip?: ChromeClip;
+  opacity?: number;
 };
 
 export type ChromeOpts = {
@@ -15,25 +14,20 @@ export type ChromeOpts = {
   hover: boolean;
   overlay: boolean;
   knockout: boolean;
-  /** Filled regions (profiles): boundary chrome only, no paint or inner knockout. */
-  filled?: boolean;
   /** HUD / screen-space SVG where viewBox units are already CSS px. */
   screenSpace?: boolean;
 };
 
 export type ChromeMetrics = {
-  gapPx: number;
-  selectRingPx: number;
-  hoverRingPx: number;
-  /** Paper underlap on the inside of a closed path, in CSS px. */
-  bleedPx: number;
+  knockoutPx: number;
+  hoverOutlineOpacity: number;
+  selectOutlineOpacity: number;
 };
 
 export const DEFAULT_CHROME_METRICS: ChromeMetrics = {
-  gapPx: 4,
-  selectRingPx: 2,
-  hoverRingPx: 2,
-  bleedPx: 1,
+  knockoutPx: 7,
+  hoverOutlineOpacity: 0.1,
+  selectOutlineOpacity: 0.3,
 };
 
 /** CSS `stroke-width` for a chrome layer (logical px). */
@@ -42,9 +36,8 @@ export function layerStrokeWidth(layer: ChromeLayer): string {
 }
 
 /**
- * Drawn back to front: outline, outer knockout, inner knockout, paint.
- * Outer knockout is paper in the gap; inner knockout is paper under the paint
- * and 1px into the interior so neighbor edges cannot leak through.
+ * Base pass: paint only when idle. Overlay pass (hover/selected): knockout,
+ * outline, then paint — drawn on top of the scene.
  */
 export function chromeLayers(
   paintWidth: number,
@@ -52,25 +45,18 @@ export function chromeLayers(
   metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
 ): ChromeLayer[] {
   const w = paintWidth > 0 ? paintWidth : 1;
-  if (!opts.overlay) return [{ kind: "paint", width: w }];
+  if (!opts.overlay) {
+    if (opts.hover || opts.selected) return [];
+    return [{ kind: "paint", width: w }];
+  }
   if (!opts.selected && !opts.hover) return [];
   if (!opts.knockout) return [];
-  const ringCss = opts.selected ? metrics.selectRingPx : metrics.hoverRingPx;
   const px = opts.screenSpace ? 1 : chromeDprScale();
-  const gapBand = metrics.gapPx * px;
-  const ringBand = ringCss * px;
-  const bleedBand = metrics.bleedPx * px;
-  const gap = w + 2 * gapBand;
-  if (opts.filled) {
-    return [
-      { kind: "outline", width: gap + 2 * ringBand, clip: "outside" },
-      { kind: "knockout", width: gap, clip: "outside" },
-    ];
-  }
+  const knockoutWidth = metrics.knockoutPx * px;
+  const outlineOpacity = opts.selected ? metrics.selectOutlineOpacity : metrics.hoverOutlineOpacity;
   return [
-    { kind: "outline", width: gap + 2 * ringBand, clip: "outside" },
-    { kind: "knockout", width: gap, clip: "outside" },
-    { kind: "knockout", width: w + 2 * bleedBand, clip: "inside" },
+    { kind: "knockout", width: knockoutWidth },
+    { kind: "outline", width: w, opacity: outlineOpacity },
     { kind: "paint", width: w },
   ];
 }
@@ -102,9 +88,4 @@ export function chromeOutsideClipId(key: string): string {
 
 export function chromeInsideClipId(key: string): string {
   return `chrome-in-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-}
-
-export function chromeClipUrl(outsideId: string, insideId: string, layer: ChromeLayer): string | undefined {
-  if (!layer.clip) return undefined;
-  return `url(#${layer.clip === "inside" ? insideId : outsideId})`;
 }

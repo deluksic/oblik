@@ -7,8 +7,7 @@ import { isGlider } from "../geom/gliders";
 import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
-import { chromeClipUrl, chromeInsideClipId, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
-import { ChromeClosedClips, ChromeOutsideClip } from "../euclid2/view/ChromeClip";
+import { chromeLayers, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 
 import styles from "./View.module.css";
@@ -19,14 +18,13 @@ function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
 }
 
-function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean; filled?: boolean }): ChromeLayer[] {
+function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean; knockout?: boolean }): ChromeLayer[] {
   const w = (opts.onion ? ONION.width : opts.look.width) ?? 1.35;
   return chromeLayers(w, {
     selected: opts.selected,
     hover: opts.hot && !opts.selected,
     overlay: opts.overlay === true,
     knockout: opts.knockout !== false,
-    filled: opts.filled === true,
   }, readChromeMetrics());
 }
 
@@ -84,7 +82,6 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
       selected: props.selected,
       overlay: props.overlay,
       knockout: props.knockout,
-      filled: kind() === "profile" && props.overlay === true,
     }),
   );
   return (
@@ -112,6 +109,12 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
       </Show>
     </g>
   );
+}
+
+function layerOpacity(layer: ChromeLayer, onion: boolean, onionPaint = 0.4): number | undefined {
+  if (layer.opacity != null) return layer.opacity;
+  if (onion && layer.kind === "paint") return onionPaint;
+  return undefined;
 }
 
 function paintStroke(look: FigureStyle, layer: ChromeLayer): string | undefined {
@@ -157,13 +160,13 @@ function Seg(props: {
               <line
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
+                opacity={layerOpacity(layer, props.onion)}
                 fill="none"
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 vector-effect="non-scaling-stroke"
-                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
                 x1={seg().a.x}
                 y1={seg().a.y}
                 x2={seg().b.x}
@@ -190,17 +193,10 @@ function Circ(props: {
     return v?.kind === "circle" ? v : null;
   });
   const look = () => (props.onion ? ONION : props.look);
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const insideId = () => chromeInsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const clipD = () => {
-    const circ = c();
-    return circ ? circleClipD(circ.center.x, circ.center.y, circ.radius) : "";
-  };
   return (
     <Show when={c()}>
       {(circ) => (
         <>
-          {props.overlay ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={clipD()} /> : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -216,13 +212,12 @@ function Circ(props: {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
+                opacity={layerOpacity(layer, props.onion)}
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 vector-effect="non-scaling-stroke"
-                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
                 cx={circ().center.x}
                 cy={circ().center.y}
                 r={Math.abs(circ().radius)}
@@ -271,13 +266,13 @@ function Inf(props: {
               <line
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
+                opacity={layerOpacity(layer, props.onion)}
                 fill="none"
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 vector-effect="non-scaling-stroke"
-                opacity={props.onion && layer.kind === "paint" ? 0.4 : 1}
                 x1={e().a.x}
                 y1={e().a.y}
                 x2={e().b.x}
@@ -304,29 +299,25 @@ function Face(props: {
     return v?.kind === "profile" ? profileSvgPath(v) : null;
   });
   const look = () => (props.onion ? ONION : props.look);
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const insideId = () => chromeInsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
   return (
     <Show when={d()}>
       {(path) => (
         <>
-          {props.overlay ? <ChromeOutsideClip id={outsideId()} d={path()} /> : null}
           {props.overlay ? null : <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />}
           <For each={props.layers}>
             {(layer) => (
               <path
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
                 d={path()}
-                fill={props.overlay ? "none" : paintFill(look(), props.onion, layer, true)}
-                stroke={props.overlay ? undefined : paintStroke(look(), layer)}
+                fill={paintFill(look(), props.onion, layer, true)}
+                stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 vector-effect="non-scaling-stroke"
-                opacity={props.onion && layer.kind === "paint" ? 0.35 : 1}
+                opacity={layerOpacity(layer, props.onion, 0.35)}
               />
             )}
           </For>
@@ -394,14 +385,10 @@ function PointInk(props: { node: TraceNode } & PointProps) {
       knockout: props.knockout !== false,
     }, readChromeMetrics()),
   );
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const insideId = () => chromeInsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
-  const clipD = () => circleClipD(at().x, at().y, r());
   return (
     <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true }}>
       {mark() === "none" && !props.onion ? null : (
         <>
-          {props.overlay === true ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={clipD()} /> : null}
           {props.overlay ? null : (
             <circle
               data-role="hit"
@@ -417,7 +404,6 @@ function PointInk(props: { node: TraceNode } & PointProps) {
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
                 class={layer.kind === "paint" ? [styles.point, { [styles.muted]: props.muted }] : layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay === true ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
                 cx={at().x}
                 cy={at().y}
                 r={r()}
@@ -425,7 +411,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
                 stroke={layer.kind === "paint" ? stroke() : undefined}
                 stroke-width={layerStrokeWidth(layer)}
                 vector-effect="non-scaling-stroke"
-                opacity={props.onion && layer.kind === "paint" ? 0.45 : 1}
+                opacity={layerOpacity(layer, props.onion, 0.45)}
               />
             )}
           </For>

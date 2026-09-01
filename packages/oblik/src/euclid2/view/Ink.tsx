@@ -7,8 +7,7 @@ import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
-import { CONSTRUCTION_STROKE_PX, chromeClipUrl, chromeInsideClipId, chromeLayers, chromeOutsideClipId, circleClipD, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
-import { ChromeClosedClips, ChromeOutsideClip } from "./ChromeClip";
+import { CONSTRUCTION_STROKE_PX, chromeLayers, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
 
 import styles from "./View.module.css";
@@ -29,13 +28,12 @@ function layerClass(kind: ChromeKind, editable: boolean, muted: boolean) {
   return inkClass(editable, muted);
 }
 
-function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean, filled = false): ChromeLayer[] {
+function layersOf(hot: boolean, selected: boolean, overlay: boolean, knockout: boolean): ChromeLayer[] {
   return chromeLayers(CONSTRUCTION_STROKE_PX, {
     selected,
     hover: hot && !selected,
     overlay,
     knockout,
-    filled,
   }, readChromeMetrics());
 }
 
@@ -94,6 +92,7 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
         {(layer) => (
           <line
             class={layerClass(layer.kind, false, !!props.muted)}
+            opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             x1={s().a.x}
             y1={s().a.y}
@@ -108,12 +107,8 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; overlay: boole
 
 function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolean; layers: ChromeLayer[] }) {
   const c = () => props.node.value as Circle;
-  const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
-  const insideId = () => chromeInsideClipId(`e2-${traceKey(props.node)}`);
-  const clipD = () => circleClipD(c().center.x, c().center.y, c().radius);
   return (
     <>
-      {props.overlay ? <ChromeClosedClips outsideId={outsideId()} insideId={insideId()} d={clipD()} /> : null}
       {props.overlay ? null : (
         <circle class={styles.hit} data-ink={traceKey(props.node)} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
       )}
@@ -121,7 +116,7 @@ function CircleStroke(props: { node: TraceNode; muted?: boolean; overlay: boolea
         {(layer) => (
           <circle
             class={layerClass(layer.kind, props.node.editable, !!props.muted)}
-            clip-path={props.overlay ? chromeClipUrl(outsideId(), insideId(), layer) : undefined}
+            opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
             cy={c().center.y}
@@ -158,6 +153,7 @@ function InfiniteStroke(props: {
             {(layer) => (
               <line
                 class={layerClass(layer.kind, editable(), !!props.muted)}
+                opacity={layer.opacity}
                 stroke-width={layerStrokeWidth(layer)}
                 x1={e().a.x}
                 y1={e().a.y}
@@ -185,23 +181,20 @@ export function ProfileOutline(props: {
   knockout?: boolean;
 }) {
   const d = createMemo(() => profileSvgPath(props.node.value as Profile));
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false, true));
-  const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true, props.knockout !== false));
   return (
-    <>
-      {props.overlay === true ? <ChromeOutsideClip id={outsideId()} d={d()} /> : null}
-      <For each={layers()}>
-        {(layer) => (
-          <path
-            class={layerClass(layer.kind, false, false)}
-            clip-path={props.overlay === true ? chromeClipUrl(outsideId(), "", layer) : undefined}
-            d={d()}
-            fill="none"
-            stroke-width={layerStrokeWidth(layer)}
-          />
-        )}
-      </For>
-    </>
+    <For each={layers()}>
+      {(layer) => (
+        <path
+          class={layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)}
+          opacity={layer.opacity}
+          d={d()}
+          fill={layer.kind === "paint" ? undefined : "none"}
+          stroke={layer.kind === "paint" ? "none" : undefined}
+          stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+        />
+      )}
+    </For>
   );
 }
 

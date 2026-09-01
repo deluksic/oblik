@@ -226,6 +226,13 @@ export function Euclid2View(props: Euclid2ViewProps) {
         )
       : null,
   );
+  const chromeNode = (n: TraceNode) => isHot(n, props.hoverId, props.selectedKey) || isSelected(n, props.selectedKey);
+  const baseFills = createMemo(() => fills().filter((n) => !chromeNode(n)));
+  const chromeFills = createMemo(() => fills().filter(chromeNode));
+  const baseInk = createMemo(() => ink().filter((n) => !chromeNode(n)));
+  const chromeInk = createMemo(() => ink().filter(chromeNode));
+  const basePoints = createMemo(() => points().filter((n) => !chromeNode(n)));
+  const chromePoints = createMemo(() => points().filter(chromeNode));
 
   return (
     <div
@@ -249,10 +256,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
-          <For each={fills()}>
+          <For each={baseFills()}>
             {(n) => <ProfileFill node={n} />}
           </For>
-          <For each={ink()}>
+          <For each={baseInk()}>
             {(n) => (
               <Stroke
                 node={n}
@@ -268,7 +275,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               />
             )}
           </For>
-          <For each={fills()}>
+          <For each={chromeFills()}>
             {(n) => (
               <ProfileOutline
                 node={n}
@@ -279,7 +286,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
               />
             )}
           </For>
-          <For each={ink()}>
+          <For each={chromeInk()}>
             {(n) => (
               <Stroke
                 node={n}
@@ -303,7 +310,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
-        <For each={points()}>
+        <For each={basePoints()}>
           {(n) => (
             <PointMark
               node={n}
@@ -315,7 +322,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
             />
           )}
         </For>
-        <For each={points()}>
+        <For each={chromePoints()}>
           {(n) => (
             <PointMark
               node={n}
