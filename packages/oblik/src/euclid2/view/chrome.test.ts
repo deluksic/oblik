@@ -25,11 +25,8 @@ describe("chromeLayers", () => {
     ]);
   });
 
-  test("dragging drops knockout and keeps the outline", () => {
-    expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true, knockout: false })).toEqual([
-      { kind: "outline", width: CONSTRUCTION_STROKE_PX + 2 * FIGURE_SELECT_PX },
-      { kind: "paint", width: CONSTRUCTION_STROKE_PX },
-    ]);
+  test("dragging skips overlay chrome", () => {
+    expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true, knockout: false })).toEqual([]);
   });
 
   test("idle overlay draws nothing", () => {
