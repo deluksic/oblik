@@ -90,3 +90,7 @@ export function chromeOutsideClipId(key: string): string {
 export function chromeInsideClipId(key: string): string {
   return `chrome-in-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
+
+export function chromeClipUrl(id: string): string {
+  return `url(#${id})`;
+}

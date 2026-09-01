@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeLayers, circleClipD, layerStrokeWidth, outsideClipD } from "./chrome";
+import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeClipUrl, chromeLayers, circleClipD, layerStrokeWidth, outsideClipD } from "./chrome";
 
 const M = DEFAULT_CHROME_METRICS;
 
@@ -92,6 +92,12 @@ describe("circleClipD", () => {
 
   test("skips degenerate radii", () => {
     expect(circleClipD(1, 1, 0)).toBe("");
+  });
+});
+
+describe("chromeClipUrl", () => {
+  test("wraps a clip id", () => {
+    expect(chromeClipUrl("chrome-out-abc")).toBe("url(#chrome-out-abc)");
   });
 });
 
