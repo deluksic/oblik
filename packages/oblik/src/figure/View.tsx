@@ -1,17 +1,19 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import IconFrame from "~icons/lucide/frame";
+import IconMove from "~icons/lucide/move";
+import IconScaling from "~icons/lucide/scaling";
 
 import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
 import { isGlider } from "@/geom/gliders";
-import { kWorldToNdc, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
+import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { applyDrag, dragMoved, panDrag, topHit, type Drag } from "../euclid2/view/pointer";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import { FigurePoint, FigureStroke } from "./Ink";
-import { frameRect, pageScreenRect, type FigureFrame, type FrameRect } from "./frame";
+import { frameRect, frameMoved, frameResized, pageScreenRect, type FigureFrame, type FrameRect, type FrameXywh } from "./frame";
 import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -31,6 +33,8 @@ export type FigureViewProps = {
   hoverKey?: string | null;
   selectedKey?: string | null;
   frameSelected?: boolean;
+  onFrameDraft?: (next: FrameXywh) => void;
+  onFrameCommit?: (next: FrameXywh) => void;
   scope?: Scope;
   onShift?: (on: boolean) => void;
   onHoverKey?: (key: string | null) => void;
@@ -43,6 +47,11 @@ function readPaneSize(el: Element): PaneSize | null {
   const r = el.getBoundingClientRect();
   if (r.width < 8 || r.height < 8) return null;
   return { w: r.width, h: r.height };
+}
+
+function panePoint(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
+  const rect = el.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
 function isPointish(n: TraceNode): boolean {
@@ -60,6 +69,11 @@ export function FigureView(props: FigureViewProps) {
   const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
   let drag: Drag | null = null;
   let pendingPick: TraceNode[] | null = null;
+  let frameDrag:
+    | { kind: "move"; start: FrameXywh; world0: { x: number; y: number } }
+    | { kind: "resize"; anchor: { x: number; y: number } }
+    | null = null;
+  let frameDraft: FrameXywh | null = null;
 
   createEffect(
     () => paneEl(),
@@ -91,6 +105,55 @@ export function FigureView(props: FigureViewProps) {
   const onionPts = createMemo(() => geom().filter(isPointish));
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
+  const frameXywh = createMemo<FrameXywh | null>(() => {
+    const r = page();
+    if (!r) return null;
+    return { x: r.x, y: r.y, width: r.w, height: r.h };
+  });
+
+  function worldAt(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
+    return screenToWorld(panePoint(e, el), camera(), size());
+  }
+
+  function applyFrameDrag(e: PointerEvent) {
+    const el = paneEl();
+    const dragState = frameDrag;
+    if (!el || !dragState) return;
+    const world = worldAt(e, el);
+    const next =
+      dragState.kind === "move"
+        ? frameMoved(dragState.start, dragState.world0, world)
+        : frameResized(dragState.anchor, world);
+    frameDraft = next;
+    props.onFrameDraft?.(next);
+  }
+
+  function startFrameDrag(e: PointerEvent, kind: "move" | "resize") {
+    const el = paneEl();
+    const start = frameXywh();
+    if (!el || !start || props.tool) return;
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    if (kind === "move") {
+      frameDrag = { kind: "move", start, world0: worldAt(e, el) };
+    } else {
+      frameDrag = { kind: "resize", anchor: { x: start.x, y: start.y } };
+    }
+    applyFrameDrag(e);
+  }
+
+  function endFrameDrag(e: PointerEvent) {
+    const el = paneEl();
+    if (!frameDrag) return false;
+    if (el?.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    const next = frameDraft ?? frameXywh();
+    if (next) props.onFrameCommit?.(next);
+    frameDrag = null;
+    frameDraft = null;
+    return true;
+  }
+
   const previewKey = createMemo(() => {
     if (props.tool !== "brush") return null;
     const n = previewGeom();
@@ -152,6 +215,10 @@ export function FigureView(props: FigureViewProps) {
 
   function onPointerMove(e: PointerEvent) {
     noteShift(e);
+    if (frameDrag) {
+      applyFrameDrag(e);
+      return;
+    }
     noteHover(e);
     if (!drag) return;
     if (!drag.moved) {
@@ -165,7 +232,8 @@ export function FigureView(props: FigureViewProps) {
     if (next.camera) setCamera(next.camera);
   }
 
-  function endDrag() {
+  function endDrag(e: PointerEvent) {
+    if (endFrameDrag(e)) return;
     const d = drag;
     const pick = pendingPick;
     drag = null;
@@ -231,6 +299,36 @@ export function FigureView(props: FigureViewProps) {
               <IconFrame class={styles.frameIcon} aria-hidden="true" />
               Frame
             </button>
+          )}
+        </Show>
+        <Show when={props.frameSelected === true && pageBox()}>
+          {(box) => (
+            <>
+              <button
+                type="button"
+                class={[styles.frameHandle, styles.frameHandleMove]}
+                style={{
+                  left: `${box().left}px`,
+                  top: `${box().top + box().height}px`,
+                }}
+                aria-label="Move frame"
+                onPointerDown={(e) => startFrameDrag(e, "move")}
+              >
+                <IconMove class={styles.frameHandleIcon} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class={[styles.frameHandle, styles.frameHandleResize]}
+                style={{
+                  left: `${box().left + box().width}px`,
+                  top: `${box().top}px`,
+                }}
+                aria-label="Resize frame"
+                onPointerDown={(e) => startFrameDrag(e, "resize")}
+              >
+                <IconScaling class={styles.frameHandleIcon} aria-hidden="true" />
+              </button>
+            </>
           )}
         </Show>
         <svg class={styles.world} viewBox={vb()}>

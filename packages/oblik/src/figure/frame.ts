@@ -6,6 +6,31 @@ export type FrameRect = { x: number; y: number; w: number; h: number };
 
 export type FrameScreenRect = { left: number; top: number; width: number; height: number };
 
+export type FrameXywh = { x: number; y: number; width: number; height: number };
+
+export const FRAME_MIN_SIZE = 0.25;
+
+/** Drag the frame by a world-space delta. */
+export function frameMoved(start: FrameXywh, from: { x: number; y: number }, to: { x: number; y: number }): FrameXywh {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return { ...start, x: start.x + dx, y: start.y + dy };
+}
+
+/** Resize from a fixed min corner (x, y) toward a dragged max corner. */
+export function frameResized(
+  anchor: { x: number; y: number },
+  corner: { x: number; y: number },
+  min = FRAME_MIN_SIZE,
+): FrameXywh {
+  return {
+    x: anchor.x,
+    y: anchor.y,
+    width: Math.max(min, corner.x - anchor.x),
+    height: Math.max(min, corner.y - anchor.y),
+  };
+}
+
 /**
  * Axis-aligned artboard in world units. When the frame carries an explicit
  * `x`/`y` (min corner, y-up), it is used directly; otherwise the artboard is

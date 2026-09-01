@@ -278,6 +278,10 @@ export function FigurePane(props: FigurePaneProps) {
     await postJson("/__oblik-frame", { file: props.file, frame: next });
   }
 
+  function draftFrame(next: FrameXywh) {
+    setEditedFrame(next);
+  }
+
   function onToolHit(n: TraceNode) {
     const t = tool();
     if (t === "eraser") {
@@ -350,6 +354,8 @@ export function FigurePane(props: FigurePaneProps) {
             onPick={onPick}
             onToolHit={onToolHit}
             onPickFrame={onPickFrame}
+            onFrameDraft={draftFrame}
+            onFrameCommit={(next) => void commitFrame(next)}
           />
           <Show when={tool() === "brush"}>
             <BrushDock settings={brush()} onChange={setBrush} />

@@ -148,3 +148,46 @@
 .frameTitleSelected {
   color: #c45c3e;
 }
+
+.frameHandle {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #c45c3e;
+  border-radius: 6px;
+  background: #faf6ee;
+  color: #c45c3e;
+  box-shadow: 0 2px 8px rgba(42, 34, 24, 0.14);
+  transform: translate(-50%, -50%);
+  touch-action: none;
+}
+
+.frameHandleMove {
+  cursor: grab;
+}
+
+.frameHandleMove:active {
+  cursor: grabbing;
+}
+
+.frameHandleResize {
+  cursor: nesw-resize;
+}
+
+.frameHandle:hover {
+  background: #fff;
+  border-color: #a84d32;
+  color: #a84d32;
+}
+
+.frameHandleIcon {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
