@@ -17,7 +17,8 @@ import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
-import { compileRegion, isRegion, regionContains } from "../geom/region";
+import { compileOffsetBoundary } from "../geom/offset";
+import { compileRegion, isOffset, isRegion, regionContains } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
@@ -120,6 +121,15 @@ describe("migrated demo scenes", () => {
     expect(frameIn?.value.kind === "profile" ? frameIn.value.holes : []).toHaveLength(1);
     const twoHoles = trace.find((n) => n.bind === "twoHoles");
     expect(twoHoles?.value.kind === "profile" ? twoHoles.value.holes : []).toHaveLength(2);
+    const twoInset = trace.find((n) => n.bind === "twoInset");
+    if (!twoInset || !isRegion(twoInset.value) || !isOffset(twoInset.value.stock)) {
+      throw new Error("missing twoInset");
+    }
+    const twoShallow = compileOffsetBoundary(twoInset.value.stock);
+    expect(twoShallow).toHaveLength(1);
+    expect(twoShallow[0]?.holes).toHaveLength(2);
+    expect(regionContains(twoInset.value, { x: 7.45, y: 4.8 })).toBe(true);
+    expect(regionContains(twoInset.value, { x: 8.4, y: 4.8 })).toBe(false);
     const circHole = trace.find((n) => n.bind === "circHole");
     expect(circHole?.value.kind === "profile" ? circHole.value.outer.length : 0).toBeGreaterThan(0);
     expect(circHole?.value.kind === "profile" ? circHole.value.holes : []).toHaveLength(1);
@@ -145,6 +155,7 @@ describe("migrated demo scenes", () => {
       new Map([
         ["o_ro_sqi", [-0.4]],
         ["o_ro_bone", [-0.22]],
+        ["o_ro_tw", [-0.2]],
       ]),
     );
     const pulled = drafted.trace.find((n) => n.id === "o_ro_sqi");
@@ -153,6 +164,17 @@ describe("migrated demo scenes", () => {
     const splitBone = drafted.trace.find((n) => n.id === "o_ro_bone");
     if (!splitBone || !isRegion(splitBone.value)) throw new Error("missing split bone");
     expect(compileRegion(splitBone.value)).toHaveLength(2);
+    const pinched = drafted.trace.find((n) => n.id === "o_ro_tw");
+    if (!pinched || !isRegion(pinched.value) || !isOffset(pinched.value.stock)) {
+      throw new Error("missing twoInset");
+    }
+    expect(regionContains(pinched.value, { x: 7.45, y: 4.8 })).toBe(true);
+    expect(regionContains(pinched.value, { x: 8.4, y: 4.8 })).toBe(false);
+    expect(regionContains(pinched.value, { x: 10.3, y: 4.8 })).toBe(false);
+    expect(regionContains(pinched.value, { x: 9.35, y: 4.8 })).toBe(false);
+    const pinchedIslands = compileOffsetBoundary(pinched.value.stock);
+    expect(pinchedIslands).toHaveLength(1);
+    expect(pinchedIslands[0]?.holes.length).toBeGreaterThan(0);
   });
 
   test("pie traces three roundOffset slices from one gap slider", () => {

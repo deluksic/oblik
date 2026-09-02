@@ -500,7 +500,9 @@ function sameLineCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
   const lb = lineBasis(b.carrier);
   const da = norm(la.dir);
   const db = norm(lb.dir);
-  return Math.abs(cross2(da, db)) <= 1e-6 && Math.abs(cross2(da, sub(lb.origin, la.origin))) <= 1e-6;
+  return (
+    Math.abs(cross2(da, db)) <= 1e-6 && Math.abs(cross2(da, sub(lb.origin, la.origin))) <= 1e-6
+  );
 }
 
 function sameCircleCarrier(a: ProfileEdge, b: ProfileEdge): boolean {

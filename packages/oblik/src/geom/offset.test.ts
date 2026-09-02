@@ -370,6 +370,28 @@ describe("roundOffsetValue", () => {
       expect(out.some((q) => profileContains(q, { x: 2.1, y: 1 }))).toBe(false);
     }
   });
+
+  test("playground two-hole plate at -0.2 keeps the voids", () => {
+    const holes = [rectCycle(7.7, 4.15, 9.15, 5.45), rectCycle(9.55, 4.15, 11.0, 5.45)];
+    const reported = roundOffsetValue(
+      profileValue(rectCycle(7.2, 3.5, 11.4, 6.1), { holes }),
+      -0.2,
+    );
+    expect(reported.length).toBeGreaterThan(0);
+    expect(reported.some((q) => profileContains(q, { x: 7.45, y: 4.8 }))).toBe(true);
+    expect(reported.some((q) => profileContains(q, { x: 8.4, y: 4.8 }))).toBe(false);
+    expect(reported.some((q) => profileContains(q, { x: 10.3, y: 4.8 }))).toBe(false);
+    expect(reported.some((q) => profileContains(q, { x: 9.35, y: 4.8 }))).toBe(false);
+
+    const scene = roundOffsetValue(profileValue(rectCycle(7.2, 3.5, 11.8, 6.1), { holes }), -0.2);
+    expect(scene).toHaveLength(1);
+    expect(scene[0]?.holes.length).toBeGreaterThan(0);
+    expect(profileContains(scene[0]!, { x: 7.45, y: 4.8 })).toBe(true);
+    expect(profileContains(scene[0]!, { x: 11.4, y: 4.8 })).toBe(true);
+    expect(profileContains(scene[0]!, { x: 8.4, y: 4.8 })).toBe(false);
+    expect(profileContains(scene[0]!, { x: 10.3, y: 4.8 })).toBe(false);
+    expect(profileContains(scene[0]!, { x: 9.35, y: 4.8 })).toBe(false);
+  });
 });
 
 describe("profileCorners / filletAtVertex", () => {

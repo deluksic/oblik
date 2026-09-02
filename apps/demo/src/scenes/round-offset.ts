@@ -184,8 +184,8 @@ export default defineScene({
 
     // Two holes — drag inset until the web pinches.
     const Ta = point(7.2, 3.5, "o_ro_ta");
-    const Tb = point(11.4, 3.5, "o_ro_tb");
-    const Tc = point(11.4, 6.1, "o_ro_tc");
+    const Tb = point(11.8, 3.5, "o_ro_tb");
+    const Tc = point(11.8, 6.1, "o_ro_tc");
     const Td = point(7.2, 6.1, "o_ro_td");
     const T0 = point(7.7, 4.15, "o_ro_t0");
     const T1 = point(9.15, 4.15, "o_ro_t1");
