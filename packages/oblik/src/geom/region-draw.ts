@@ -24,6 +24,17 @@ export type RegionPaint = {
   islandClip?: string;
 };
 
+/** Luminance polarity. White is visible in the mask. */
+export const REGION_MASK = {
+  fill: { canvas: "#000", stock: "#fff", hole: "#000" },
+  /** Outside the stock profile — outward halo on the outer edge. */
+  outsideStock: { canvas: "#fff", stock: "#000" },
+  /** Interior of the stock profile, so hole halos cannot escape the plate. */
+  stock: { canvas: "#000", stock: "#fff" },
+  /** Complement of the CSG fill (void and holes). */
+  outside: { canvas: "#fff", stock: "#000", hole: "#fff" },
+} as const;
+
 const emptyPaint = (): RegionPaint => ({
   empty: true,
   box: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
@@ -147,7 +158,7 @@ export function regionPaint(r: Region): RegionPaint {
   if (flat.contains && isFiniteVec(flat.contains)) {
     const island = islandAabb(r);
     if (!island) return emptyPaint();
-    islandClip = aabbPath(padAabb(island, span * 0.02));
+    islandClip = aabbPath(padAabb(island, Math.max(span * 0.05, 0.12)));
   }
   const keepClip = keepClipPath(flat.keep, padded);
   if (keepClip === "") return emptyPaint();

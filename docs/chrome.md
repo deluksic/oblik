@@ -45,20 +45,20 @@ Points use a fixed wider halo instead of this growth: **14px outline / 9px selec
 
 ## Other
 
-- Overlay clip to the **outside of profiles only** (not circles or points).
+- Overlay clip to the **outside of profiles** (not circles or points). Regions use the same idea: an inverted luminance mask so the halo sits outside the CSG fill.
 - Figure Shift-onion draws construction **on top** of faded ink.
 
 ## Tokens
 
 On `:root` in `packages/oblik/src/theme.css`. `--oblik-knockout` is the **paper color**, not a width.
 
-| Token | Default | Role |
-| --- | --- | --- |
-| `--oblik-chrome-outline` | 7px | Hover and selected ring |
-| `--oblik-chrome-knockout` | 4px | Selected paper gap |
-| `--oblik-chrome-point-outline` | 14px | Point ring |
-| `--oblik-chrome-point-knockout` | 9px | Point selected gap |
-| `--oblik-chrome-outline-hover` | 0.5 | Hover ring opacity |
-| `--oblik-chrome-outline-selected` | 1 | Selected ring opacity |
-| `--oblik-selected-paint` | cream | Construction hover/select ink |
-| `--oblik-knockout` | paper | Gap fill color |
+| Token                             | Default | Role                          |
+| --------------------------------- | ------- | ----------------------------- |
+| `--oblik-chrome-outline`          | 7px     | Hover and selected ring       |
+| `--oblik-chrome-knockout`         | 4px     | Selected paper gap            |
+| `--oblik-chrome-point-outline`    | 14px    | Point ring                    |
+| `--oblik-chrome-point-knockout`   | 9px     | Point selected gap            |
+| `--oblik-chrome-outline-hover`    | 0.5     | Hover ring opacity            |
+| `--oblik-chrome-outline-selected` | 1       | Selected ring opacity         |
+| `--oblik-selected-paint`          | cream   | Construction hover/select ink |
+| `--oblik-knockout`                | paper   | Gap fill color                |

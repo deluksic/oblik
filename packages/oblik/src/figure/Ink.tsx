@@ -15,6 +15,7 @@ import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
 import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
 import {
   RegionClipped,
+  RegionHalo,
   RegionMaskDefs,
   RegionOp,
   regionMaskId,
@@ -429,44 +430,59 @@ function FaceRegion(props: {
   const ops = createMemo(() => [paint().stock, ...paint().holes]);
   return (
     <Show when={!paint().empty}>
-      <RegionMaskDefs paint={paint()} id={id()} />
-      <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
-        {props.overlay ? null : (
-          <RegionOp
-            op={paint().stock}
-            mask={regionMaskUrl(id())}
-            data-role="hit"
-            class={styles.hitFill}
-            data-ink={traceKey(props.node)}
-            fill="#fff"
-            stroke="none"
-          />
-        )}
-        <For each={props.layers}>
-          {(layer) => (
-            <For each={ops()}>
-              {(op) => (
-                <RegionOp
-                  op={op}
-                  mask={regionMaskUrl(id())}
-                  data-role={
-                    layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
-                  }
-                  class={layerClass(layer.kind, props.muted, props.onion)}
-                  fill={op === paint().stock ? paintFill(look(), props.onion, layer, true) : "none"}
-                  stroke={paintStroke(look(), layer)}
-                  stroke-width={layerStrokeWidth(layer)}
-                  stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  vector-effect="non-scaling-stroke"
-                  opacity={layerOpacity(layer, props.onion, 0.35)}
-                />
+      {props.overlay ? (
+        <RegionHalo
+          paint={paint()}
+          id={id()}
+          layers={props.layers}
+          class={(layer) => layerClass(layer.kind, props.muted, props.onion)}
+          opacity={(layer) => layerOpacity(layer, props.onion, 0.35)}
+          layerRole={(layer) =>
+            layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
+          }
+        />
+      ) : (
+        <>
+          <RegionMaskDefs paint={paint()} id={id()} />
+          <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
+            <RegionOp
+              op={paint().stock}
+              mask={regionMaskUrl(id())}
+              data-role="hit"
+              class={styles.hitFill}
+              data-ink={traceKey(props.node)}
+              fill="#fff"
+              stroke="none"
+            />
+            <For each={props.layers}>
+              {(layer) => (
+                <For each={ops()}>
+                  {(op) => (
+                    <RegionOp
+                      op={op}
+                      mask={regionMaskUrl(id())}
+                      data-role={
+                        layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
+                      }
+                      class={layerClass(layer.kind, props.muted, props.onion)}
+                      fill={
+                        op === paint().stock ? paintFill(look(), props.onion, layer, true) : "none"
+                      }
+                      stroke={paintStroke(look(), layer)}
+                      stroke-width={layerStrokeWidth(layer)}
+                      stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      vector-effect="non-scaling-stroke"
+                      opacity={layerOpacity(layer, props.onion, 0.35)}
+                    />
+                  )}
+                </For>
               )}
             </For>
-          )}
-        </For>
-      </RegionClipped>
+          </RegionClipped>
+        </>
+      )}
     </Show>
   );
 }

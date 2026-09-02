@@ -11,7 +11,7 @@ import {
   regionValue,
   rightOfValue,
 } from "./region";
-import { regionPaint } from "./region-draw";
+import { regionPaint, REGION_MASK } from "./region-draw";
 import type { Circle, Line, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -152,6 +152,16 @@ describe("region CSG field", () => {
     if (paint.stock.kind !== "profile") throw new Error("expected profile stock");
     expect(paint.stock.d).toContain("A ");
     expect(paint.holes).toEqual([{ kind: "circle", cx: 1, cy: 1, r: 0.3 }]);
+  });
+
+  test("overlay halo masks invert the fill so the ring sits outside", () => {
+    expect(REGION_MASK.fill.canvas).toBe("#000");
+    expect(REGION_MASK.fill.stock).toBe("#fff");
+    expect(REGION_MASK.fill.hole).toBe("#000");
+    expect(REGION_MASK.outsideStock.canvas).toBe("#fff");
+    expect(REGION_MASK.outsideStock.stock).toBe("#000");
+    expect(REGION_MASK.outside.hole).toBe("#fff");
+    expect(REGION_MASK.outside.stock).toBe("#000");
   });
 
   test("contains isolates one island with a clip rect, not a compiled outline", () => {

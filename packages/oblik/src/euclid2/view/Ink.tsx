@@ -21,7 +21,14 @@ import {
 } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
 import { ChromeOutsideClip } from "./ChromeClip";
-import { RegionClipped, RegionMaskDefs, RegionOp, regionMaskId, regionMaskUrl } from "./RegionInk";
+import {
+  RegionClipped,
+  RegionHalo,
+  RegionMaskDefs,
+  RegionOp,
+  regionMaskId,
+  regionMaskUrl,
+} from "./RegionInk";
 
 import styles from "./View.module.css";
 
@@ -360,31 +367,16 @@ function RegionOutline(props: {
   const paint = createMemo(() => regionPaint(props.node.value as Region));
   const id = () => regionMaskId(`e2o-${traceKey(props.node)}`);
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
-  const ops = createMemo(() => [paint().stock, ...paint().holes]);
   return (
-    <Show when={!paint().empty}>
-      <RegionMaskDefs paint={paint()} id={id()} />
-      <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
-        <For each={layers()}>
-          {(layer) => (
-            <For each={ops()}>
-              {(op) => (
-                <RegionOp
-                  op={op}
-                  mask={regionMaskUrl(id())}
-                  class={
-                    layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)
-                  }
-                  opacity={layer.opacity}
-                  fill={layer.kind === "paint" ? undefined : "none"}
-                  stroke={layer.kind === "paint" ? "none" : undefined}
-                  stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
-                />
-              )}
-            </For>
-          )}
-        </For>
-      </RegionClipped>
+    <Show when={!paint().empty && props.overlay === true}>
+      <RegionHalo
+        paint={paint()}
+        id={id()}
+        layers={layers()}
+        class={(layer) =>
+          layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)
+        }
+      />
     </Show>
   );
 }
