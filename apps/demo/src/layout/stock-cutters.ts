@@ -67,8 +67,8 @@ export function stockCuttersLayout() {
 
   const face = region(stock, { subtract: [d0, d1, d2, d3, slot] }, "o_sc_face");
   const hold = region(face, { contains: probe }, "o_sc_hold");
-  const left = region(face, { keep: leftOf(split) }, "o_sc_left");
-  const right = region(face, { keep: rightOf(split) }, "o_sc_right");
+  const left = region(face, { keep: [leftOf(split)] }, "o_sc_left");
+  const right = region(face, { keep: [rightOf(split)] }, "o_sc_right");
 
   return { origin, opp, stock, drillR, slot, split, probe, face, hold, left, right, d0, splitAt };
 }

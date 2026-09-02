@@ -123,7 +123,7 @@ describe("figureToSvg", () => {
       const stock = profile([a, ab, b, bc, c, cd, d, da], "o_rstock");
       const holeAt = point(2, 1.5, "o_rhc");
       const hole = circle(holeAt, 0.5, "o_rhole");
-      const face = region(stock, { subtract: hole }, "o_rface");
+      const face = region(stock, { subtract: [hole] }, "o_rface");
       paint(face, { stroke: "#1c1917", fill: "#cfe8d4", width: 1.2 }, "o_rp");
     });
 

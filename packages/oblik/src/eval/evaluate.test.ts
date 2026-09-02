@@ -342,7 +342,7 @@ describe("evaluate", () => {
         const da = segment(D, A, "da");
         const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
         const split = segment(point(1, -1, "s0"), point(1, 3, "s1"), "sp");
-        const left = region(stock, { keep: leftOf(split) }, "reg");
+        const left = region(stock, { keep: [leftOf(split)] }, "reg");
         return { stock, left };
       },
     });
@@ -367,7 +367,7 @@ describe("evaluate", () => {
         const da = segment(D, A, "da");
         const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
         const split = segment(point(Number.NaN, 0, "s0"), point(1, 3, "s1"), "sp");
-        region(stock, { keep: leftOf(split) }, "reg");
+        region(stock, { keep: [leftOf(split)] }, "reg");
         return stock;
       },
     });

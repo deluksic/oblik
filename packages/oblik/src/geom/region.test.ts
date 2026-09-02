@@ -13,6 +13,7 @@ import {
   compileRegion,
   distToRegion,
   formulaSdf,
+  isFiniteRegion,
   leftOfValue,
   offsetSourceSdf,
   offsetValue,
@@ -98,7 +99,7 @@ describe("profile as region stock", () => {
 
 describe("region CSG field", () => {
   test("square minus interior disk has a hole", () => {
-    const face = regionValue(rect(0, 0, 2, 2), { subtract: disk(1, 1, 0.4) });
+    const face = regionValue(rect(0, 0, 2, 2), { subtract: [disk(1, 1, 0.4)] });
     expect(formulaSdf(face, { x: 0.15, y: 0.15 })).toBeLessThan(0);
     expect(formulaSdf(face, { x: 1, y: 1 })).toBeGreaterThan(0);
     expect(regionContains(face, { x: 0.15, y: 0.15 })).toBe(true);
@@ -107,8 +108,16 @@ describe("region CSG field", () => {
     expect(compileRegion(face).length).toBeGreaterThanOrEqual(2);
   });
 
+  test("a bare subtract operand is empty, not a singleton list", () => {
+    const face = regionValue(rect(0, 0, 2, 2), {
+      // @ts-expect-error subtract is array-only
+      subtract: disk(1, 1, 0.4),
+    });
+    expect(isFiniteRegion(face)).toBe(false);
+  });
+
   test("escaping disk does not XOR a cap outside the stock", () => {
-    const face = regionValue(rect(0, 0, 2, 2), { subtract: disk(2.2, 1, 0.5) });
+    const face = regionValue(rect(0, 0, 2, 2), { subtract: [disk(2.2, 1, 0.5)] });
     expect(regionContains(face, { x: 1, y: 1 })).toBe(true);
     expect(regionContains(face, { x: 2.2, y: 1 })).toBe(false);
     expect(formulaSdf(face, { x: 2.2, y: 1 })).toBeGreaterThan(0);
@@ -117,7 +126,7 @@ describe("region CSG field", () => {
   test("slot that severs yields two islands; contains keeps one", () => {
     const stock = rect(0, 0, 4, 2);
     const slot = stadium(2, 1, 5, 0.35);
-    const face = regionValue(stock, { subtract: slot });
+    const face = regionValue(stock, { subtract: [slot] });
     expect(regionContains(face, { x: 2, y: 1.7 })).toBe(true);
     expect(regionContains(face, { x: 2, y: 0.3 })).toBe(true);
     expect(regionContains(face, { x: 2, y: 1 })).toBe(false);
@@ -135,7 +144,7 @@ describe("region CSG field", () => {
   });
 
   test("contains keeps a C-shape as one component through the spine", () => {
-    const face = regionValue(rect(0, 0, 4, 3), { subtract: rect(1, 1, 4.5, 2) });
+    const face = regionValue(rect(0, 0, 4, 3), { subtract: [rect(1, 1, 4.5, 2)] });
     const top = regionValue(face, { contains: { x: 3, y: 2.5 } });
     expect(regionContains(top, { x: 3, y: 2.5 })).toBe(true);
     expect(regionContains(top, { x: 3, y: 0.5 })).toBe(true);
@@ -144,7 +153,7 @@ describe("region CSG field", () => {
 
   test("contains clip is the occupied flood, not one island AABB", () => {
     const top = regionValue(rect(0, 0, 4, 2), {
-      subtract: stadium(2, 1, 5, 0.35),
+      subtract: [stadium(2, 1, 5, 0.35)],
       contains: { x: 2, y: 1.7 },
     });
     const clip = regionPaint(top).islandClip ?? "";
@@ -154,8 +163,8 @@ describe("region CSG field", () => {
 
   test("half-plane keep splits without trimming stock", () => {
     const face = regionValue(rect(0, 0, 4, 2));
-    const left = regionValue(face, { keep: leftOfValue(split) });
-    const right = regionValue(face, { keep: rightOfValue(split) });
+    const left = regionValue(face, { keep: [leftOfValue(split)] });
+    const right = regionValue(face, { keep: [rightOfValue(split)] });
     expect(regionContains(left, { x: 0.5, y: 1 })).toBe(true);
     expect(regionContains(left, { x: 3.5, y: 1 })).toBe(false);
     expect(regionContains(right, { x: 3.5, y: 1 })).toBe(true);
@@ -166,7 +175,7 @@ describe("region CSG field", () => {
   test("regionPaint keeps stadium arcs instead of marching-square polylines", () => {
     const stock = rect(0, 0, 4, 2);
     const slot = stadium(2, 1, 2, 0.8);
-    const face = regionValue(stock, { subtract: slot });
+    const face = regionValue(stock, { subtract: [slot] });
     const paint = regionPaint(face);
     expect(paint.empty).toBe(false);
     expect(paint.stock).toEqual({ kind: "profile", d: profileSvgPath(stock) });
@@ -195,7 +204,7 @@ describe("region CSG field", () => {
       cycle.push(filletValue(a, 0.2), seg(a, b));
     }
     const stock = profileValue(cycle);
-    const paint = regionPaint(regionValue(stock, { subtract: disk(1, 1, 0.3) }));
+    const paint = regionPaint(regionValue(stock, { subtract: [disk(1, 1, 0.3)] }));
     expect(paint.stock.kind).toBe("profile");
     if (paint.stock.kind !== "profile") throw new Error("expected profile stock");
     expect(paint.stock.d).toContain("A ");
@@ -213,7 +222,7 @@ describe("region CSG field", () => {
   });
 
   test("contains isolates one island with a clip rect, not a compiled outline", () => {
-    const face = regionValue(rect(0, 0, 4, 2), { subtract: stadium(2, 1, 5, 0.35) });
+    const face = regionValue(rect(0, 0, 4, 2), { subtract: [stadium(2, 1, 5, 0.35)] });
     const top = regionValue(face, { contains: { x: 2, y: 1.7 } });
     const paint = regionPaint(top);
     expect(paint.empty).toBe(false);
@@ -224,7 +233,7 @@ describe("region CSG field", () => {
   });
 
   test("half-plane keep is a clip polygon", () => {
-    const paint = regionPaint(regionValue(rect(0, 0, 4, 2), { keep: leftOfValue(split) }));
+    const paint = regionPaint(regionValue(rect(0, 0, 4, 2), { keep: [leftOfValue(split)] }));
     expect(paint.empty).toBe(false);
     expect(paint.keepClip).toMatch(/^M /);
     expect(paint.islandClip).toBeUndefined();
@@ -233,7 +242,7 @@ describe("region CSG field", () => {
   test("NaN keep operand NaNs the derived region, not the stock", () => {
     const face = regionValue(rect(0, 0, 2, 2));
     const bad: Line = { kind: "line", origin: { x: Number.NaN, y: 0 }, direction: { x: 0, y: 1 } };
-    const left = regionValue(face, { keep: leftOfValue(bad) });
+    const left = regionValue(face, { keep: [leftOfValue(bad)] });
     expect(left.subtract).toEqual([]);
     expect(face.stock.kind).toBe("profile");
     expect(regionContains(face, { x: 1, y: 1 })).toBe(true);

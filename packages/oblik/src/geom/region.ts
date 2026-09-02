@@ -4,8 +4,8 @@ import type { Circle, HalfPlane, LineLike, Offset, Profile, Region, RegionOperan
 import { dist, isFiniteVec, type Vec2 } from "./vec";
 
 export type RegionOpts = {
-  subtract?: RegionOperand | readonly RegionOperand[];
-  keep?: RegionOperand | readonly RegionOperand[];
+  subtract?: readonly RegionOperand[];
+  keep?: readonly RegionOperand[];
   contains?: Vec2;
 };
 
@@ -88,17 +88,14 @@ function asOperand(v: unknown): RegionOperand | null {
 
 function asList(v: unknown): RegionOperand[] | null {
   if (v == null) return [];
-  if (Array.isArray(v)) {
-    const out: RegionOperand[] = [];
-    for (const item of v) {
-      const op = asOperand(item);
-      if (!op) return null;
-      out.push(op);
-    }
-    return out;
+  if (!Array.isArray(v)) return null;
+  const out: RegionOperand[] = [];
+  for (const item of v) {
+    const op = asOperand(item);
+    if (!op) return null;
+    out.push(op);
   }
-  const one = asOperand(v);
-  return one ? [one] : null;
+  return out;
 }
 
 export function offsetValue(of: RegionOperand, d: number): Offset {
