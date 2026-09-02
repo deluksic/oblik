@@ -65,6 +65,7 @@ describe("enrichHit", () => {
         { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
         { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
       ],
+      holes: [],
     };
     const session = {
       verb: "roundOffset" as const,
@@ -1229,6 +1230,7 @@ describe("roundOffset tool", () => {
       { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
       { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
     ],
+    holes: [],
   };
   const faceHit = {
     world: { x: 0.5, y: 0.5 },
@@ -1347,6 +1349,7 @@ describe("fillet tool", () => {
       { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
       { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
     ],
+    holes: [],
   };
   const faceHit = {
     world: { x: 0.95, y: 0.95 },
@@ -1432,6 +1435,7 @@ describe("fillet tool", () => {
         { a: { x: 11, y: 1 }, b: { x: 10, y: 1 }, carrier: { kind: "segment" as const, a: { x: 11, y: 1 }, b: { x: 10, y: 1 } } },
         { a: { x: 10, y: 1 }, b: { x: 10, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 1 }, b: { x: 10, y: 0 } } },
       ],
+      holes: [],
     };
     const mix0 = {
       id: "o_pr",

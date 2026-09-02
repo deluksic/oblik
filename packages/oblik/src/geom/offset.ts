@@ -1,3 +1,4 @@
+import { circleUnitAt } from "./gliders";
 import {
   circleCircleIntersectionValue,
   circleLineIntersectionValue,
@@ -9,12 +10,12 @@ import {
   alongK,
   isFiniteProfile,
   nanProfile,
+  profileTopologyOk,
   projectOnCircle,
   projectOnLine,
   tessellateProfile,
 } from "./profile";
-import type { Branch, Circle, LineLike, Profile, ProfileEdge } from "./types";
-import { circleUnitAt } from "./gliders";
+import type { Branch, Circle, ClosedWalk, LineLike, Profile, ProfileEdge } from "./types";
 import {
   add,
   cross2,
@@ -34,15 +35,24 @@ const EPS = 1e-9;
 /** World-space hair for ray inclusion; same order as the fillet radius compare. */
 const HAIR = 1e-6;
 
+function cloneEdge(e: ProfileEdge): ProfileEdge {
+  return {
+    a: { x: e.a.x, y: e.a.y },
+    b: { x: e.b.x, y: e.b.y },
+    carrier: e.carrier,
+    ...(e.k === 1 || e.k === -1 ? { k: e.k } : {}),
+  };
+}
+
+function cloneWalk(edges: ClosedWalk): ClosedWalk {
+  return edges.map(cloneEdge);
+}
+
 function cloneProfile(p: Profile): Profile {
   return {
     kind: "profile",
-    outer: p.outer.map((e) => ({
-      a: { x: e.a.x, y: e.a.y },
-      b: { x: e.b.x, y: e.b.y },
-      carrier: e.carrier,
-      ...(e.k === 1 || e.k === -1 ? { k: e.k } : {}),
-    })),
+    outer: cloneWalk(p.outer),
+    holes: p.holes.map(cloneWalk),
   };
 }
 
@@ -167,7 +177,13 @@ function miterHint(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 
  * When the vertex is flat (collinear radii, a 180° sector) the normals
  * agree and this is `v + n d` — intersecting the offset lines is singular.
  */
-function lineMiter(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 1 | -1): Vec2 | null {
+function lineMiter(
+  prev: ProfileEdge,
+  next: ProfileEdge,
+  v: Vec2,
+  d: number,
+  w: 1 | -1,
+): Vec2 | null {
   const nIn = inwardNormal(prev, prev.b, w);
   const nOut = inwardNormal(next, next.a, w);
   const denom = 1 + dot(nIn, nOut);
@@ -289,12 +305,14 @@ function vertexJoin(
  * offsets along the shared normal. A carrier with `r' ≤ 0` is dropped and
  * the surviving offsets are joined at their hit (a filleted square inset
  * past `r` is a sharp inner square). Reverse, a missed hit, or fewer than
- * two surviving edges → `[]`. Does not split islands or clip non-adjacent
- * swallows.
+ * two surviving edges → `[]`. A profile with holes also returns `[]` (offset
+ * is a set operation; topology can change). Does not split islands or clip
+ * non-adjacent swallows.
  */
 export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
   if (Math.abs(d) < EPS) return [cloneProfile(p)];
+  if (p.holes.length > 0) return [];
   const inward = -d;
   const w = winding(p);
   if (w === 0) return [];
@@ -346,13 +364,19 @@ export function roundOffsetValue(p: Profile, d: number): Profile[] {
       outer.push(join);
     }
   }
-  const out: Profile = { kind: "profile", outer };
+  const out: Profile = { kind: "profile", outer, holes: [] };
   return isFiniteProfile(out) ? [out] : [];
 }
 
 type FilletJoin = { t0: Vec2; t1: Vec2; carrier: Circle; k: Branch };
 
-function filletJoin(prev: ProfileEdge, next: ProfileEdge, v: Vec2, r: number, w: 1 | -1): FilletJoin | "sharp" | null {
+function filletJoin(
+  prev: ProfileEdge,
+  next: ProfileEdge,
+  v: Vec2,
+  r: number,
+  w: 1 | -1,
+): FilletJoin | "sharp" | null {
   const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
   if (Math.abs(turn) <= EPS) return "sharp";
   const into = w * turn < -EPS ? -r : r;
@@ -420,8 +444,10 @@ export function filletVertices(p: Profile, radii: readonly number[]): Profile {
       outer.push(arc);
     }
   }
-  const out: Profile = { kind: "profile", outer };
-  return isFiniteProfile(out) ? out : nanProfile();
+  const out: Profile = { kind: "profile", outer, holes: p.holes.map(cloneWalk) };
+  if (!isFiniteProfile(out)) return nanProfile();
+  if (out.holes.length > 0 && !profileTopologyOk(out)) return nanProfile();
+  return out;
 }
 
 /** Join circle G1 with both neighbors, whose original carriers still meet near the center. */
@@ -510,7 +536,7 @@ export function filletAtVertex(p: Profile, index: number, r: number): Profile {
     if (!e) return nanProfile();
     outer.push(e);
   }
-  const sharp: Profile = { kind: "profile", outer };
+  const sharp: Profile = { kind: "profile", outer, holes: p.holes.map(cloneWalk) };
   if (!isFiniteProfile(sharp)) return nanProfile();
   const radii = corners.map((c, i) => (i === index ? r : c.r));
   return filletVertices(sharp, radii);

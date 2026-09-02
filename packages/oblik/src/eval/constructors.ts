@@ -33,6 +33,7 @@ import {
   type ParallelLine,
   type Point,
   type Profile,
+  type ProfileOpts,
   type Region,
   type RegionOpts,
   type Segment,
@@ -239,8 +240,9 @@ export function fillet(at: Vec2, r: number): Fillet {
 }
 
 export const profile = mark(
-  (cycle: readonly unknown[], id?: string): Profile => {
-    return traced(profileValue(cycle), id);
+  (cycle: readonly unknown[], optsOrId?: ProfileOpts | string, id?: string): Profile => {
+    if (typeof optsOrId === "string") return traced(profileValue(cycle), optsOrId);
+    return traced(profileValue(cycle, optsOrId), id);
   },
   { dof: [] },
 );

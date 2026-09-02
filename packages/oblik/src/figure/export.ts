@@ -146,7 +146,7 @@ function drawOpEl(op: DrawOp, attrs: string): string {
     return `<circle cx="${num(op.cx)}" cy="${num(op.cy)}" r="${num(op.r)}" ${attrs}/>`;
   }
   if (!op.d) return "";
-  return `<path d="${op.d}" ${attrs}/>`;
+  return `<path d="${op.d}" fill-rule="evenodd" ${attrs}/>`;
 }
 
 function regionToSvg(r: Region, style: FigureStyle, id: string): string {
@@ -195,7 +195,7 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
   if (v.kind === "profile") {
     const d = profileSvgPath(v);
     if (!d) return "";
-    return `<path d="${d}" ${styleAttrs(s.style, true)}/>`;
+    return `<path d="${d}" fill-rule="evenodd" ${styleAttrs(s.style, true)}/>`;
   }
   if (v.kind === "region") {
     return regionToSvg(v, s.style, `${s.geom.id}-${s.geom.occ}`);

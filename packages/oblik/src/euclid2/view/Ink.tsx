@@ -272,6 +272,7 @@ function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boole
           }
           data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
           d={d()}
+          fill-rule="evenodd"
           fill={layer.kind === "paint" ? undefined : "none"}
           stroke={layer.kind === "paint" ? "none" : undefined}
           stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}

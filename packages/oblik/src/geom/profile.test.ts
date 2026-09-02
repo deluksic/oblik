@@ -1,7 +1,14 @@
 import { describe, expect, test } from "vitest";
 
-import { alongValue, filletValue, profileContains, profileValue, signedDistToProfile } from "./profile";
 import { roundOffsetValue } from "./offset";
+import {
+  alongValue,
+  filletValue,
+  profileContains,
+  profileSvgPath,
+  profileValue,
+  signedDistToProfile,
+} from "./profile";
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -23,6 +30,14 @@ function closed(pts: readonly Vec2[], radii: readonly (number | undefined)[] = [
     cycle.push(r != null ? filletValue(a, r) : a, seg(a, b));
   }
   return profileValue(cycle);
+}
+
+function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
+  const bl = { x: x0, y: y0 };
+  const br = { x: x1, y: y0 };
+  const tr = { x: x1, y: y1 };
+  const tl = { x: x0, y: y1 };
+  return [bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)];
 }
 
 const squarePts = [
@@ -166,7 +181,14 @@ describe("profileValue", () => {
     const O = { x: 0, y: 0 };
     const oa = seg(O, A);
     const ob = seg(O, B);
-    const p = profileValue([O, oa, filletValue(A, 0.25), alongValue(c, 1), filletValue(B, 0.25), ob]);
+    const p = profileValue([
+      O,
+      oa,
+      filletValue(A, 0.25),
+      alongValue(c, 1),
+      filletValue(B, 0.25),
+      ob,
+    ]);
     expect(p.outer).toHaveLength(5);
     expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
     expect(profileContains(p, { x: 0.8, y: 0.8 })).toBe(true);
@@ -256,5 +278,65 @@ describe("signedDistToProfile", () => {
     const slice = profileValue([A, chord, B, alongValue(c, -1)]);
     expect(signedDistToProfile(slice, { x: 0.2, y: 0.2 })).toBeGreaterThan(0);
     expect(signedDistToProfile(slice, { x: 1.4, y: 1.4 })).toBeLessThan(0);
+  });
+});
+
+describe("profile holes", () => {
+  test("a hole punches the interior and is not XOR", () => {
+    const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(0.25, 0.25, 0.75, 0.75)] });
+    expect(p.holes).toHaveLength(1);
+    expect(profileContains(p, { x: 0.1, y: 0.1 })).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(false);
+    expect(profileContains(p, { x: 1.5, y: 0.5 })).toBe(false);
+    expect(signedDistToProfile(p, { x: 0.1, y: 0.1 })).toBeLessThan(0);
+    expect(signedDistToProfile(p, { x: 0.5, y: 0.5 })).toBeGreaterThan(0);
+    const d = profileSvgPath(p);
+    expect(d.match(/Z/g)?.length).toBe(2);
+  });
+
+  test("an arc hole keeps A commands in the svg path", () => {
+    const holeC: Circle = { kind: "circle", center: { x: 0.5, y: 0.5 }, radius: 0.2 };
+    const P = { x: 0.3, y: 0.5 };
+    const Q = { x: 0.7, y: 0.5 };
+    const p = profileValue(rectCycle(0, 0, 1, 1), {
+      holes: [[P, seg(P, Q), Q, alongValue(holeC, -1)]],
+    });
+    expect(p.holes).toHaveLength(1);
+    expect(profileContains(p, { x: 0.08, y: 0.08 })).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0.4 })).toBe(false);
+    expect(profileContains(p, { x: 0.5, y: 0.72 })).toBe(true);
+    expect(profileSvgPath(p)).toMatch(/A /);
+    expect(profileSvgPath(p).match(/Z/g)?.length).toBe(2);
+  });
+
+  test("a hole outside the outer is an empty profile", () => {
+    const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(2, 2, 3, 3)] });
+    expect(p.outer).toHaveLength(0);
+    expect(p.holes).toHaveLength(0);
+  });
+
+  test("overlapping holes are empty", () => {
+    const p = profileValue(rectCycle(0, 0, 2, 2), {
+      holes: [rectCycle(0.2, 0.2, 1.1, 1.1), rectCycle(0.9, 0.9, 1.8, 1.8)],
+    });
+    expect(p.outer).toHaveLength(0);
+  });
+
+  test("a hole nested in another hole is empty", () => {
+    const p = profileValue(rectCycle(0, 0, 2, 2), {
+      holes: [rectCycle(0.2, 0.2, 1.8, 1.8), rectCycle(0.6, 0.6, 1.4, 1.4)],
+    });
+    expect(p.outer).toHaveLength(0);
+  });
+
+  test("a hole that crosses the outer is empty", () => {
+    const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(0.5, 0.5, 1.5, 1.5)] });
+    expect(p.outer).toHaveLength(0);
+  });
+
+  test("roundOffset of a holed profile is empty until offset is a region", () => {
+    const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(0.3, 0.3, 0.7, 0.7)] });
+    expect(roundOffsetValue(p, 0.1)).toEqual([]);
+    expect(roundOffsetValue(p, 0)[0]?.holes).toHaveLength(1);
   });
 });

@@ -36,7 +36,12 @@ export function rightOfValue(line: LineLike): HalfPlane {
 }
 
 export function nanRegion(): Region {
-  return { kind: "region", stock: { kind: "profile", outer: [] }, subtract: [], keep: [] };
+  return {
+    kind: "region",
+    stock: { kind: "profile", outer: [], holes: [] },
+    subtract: [],
+    keep: [],
+  };
 }
 
 function isFiniteCircle(c: Circle): boolean {

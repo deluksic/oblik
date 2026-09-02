@@ -19,12 +19,16 @@ function seg(a: Vec2, b: Vec2): Segment {
   return { kind: "segment", a, b };
 }
 
-function rect(x0: number, y0: number, x1: number, y1: number): Profile {
+function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
   const bl = { x: x0, y: y0 };
   const br = { x: x1, y: y0 };
   const tr = { x: x1, y: y1 };
   const tl = { x: x0, y: y1 };
-  return profileValue([bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)]);
+  return [bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)];
+}
+
+function rect(x0: number, y0: number, x1: number, y1: number): Profile {
+  return profileValue(rectCycle(x0, y0, x1, y1));
 }
 
 function disk(cx: number, cy: number, r: number): Circle {
@@ -63,6 +67,22 @@ describe("stadium profile", () => {
     expect(profileContains(slot, { x: 0, y: 0 })).toBe(true);
     expect(profileContains(slot, { x: 0.9, y: 0 })).toBe(true);
     expect(profileContains(slot, { x: 0, y: 0.5 })).toBe(false);
+  });
+});
+
+describe("profile as region stock", () => {
+  test("swiss-cheese stock keeps the hole in the CSG field", () => {
+    const plate = profileValue(rectCycle(0, 0, 2, 2), {
+      holes: [rectCycle(0.6, 0.6, 1.4, 1.4)],
+    });
+    const face = regionValue(plate);
+    expect(regionContains(face, { x: 0.2, y: 0.2 })).toBe(true);
+    expect(regionContains(face, { x: 1, y: 1 })).toBe(false);
+    expect(formulaSdf(face, { x: 1, y: 1 })).toBeGreaterThan(0);
+    const paint = regionPaint(face);
+    const d = paint.stock.kind === "profile" ? paint.stock.d : "";
+    expect(paint.stock.kind).toBe("profile");
+    expect(d.match(/Z/g)?.length).toBe(2);
   });
 });
 

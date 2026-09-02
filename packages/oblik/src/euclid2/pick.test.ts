@@ -199,6 +199,7 @@ describe("profile pick", () => {
         { a: Pb, b: Pc, carrier: bc },
         { a: Pc, b: Pa, carrier: ca },
       ],
+      holes: [],
     },
     editable: false,
     stack: [],
@@ -302,6 +303,7 @@ describe("profile pick", () => {
             carrier: { kind: "segment" as const, a: { x: 10, y: 3 }, b: { x: 10, y: 0 } },
           },
         ],
+        holes: [],
       },
     };
     const at = { x: 11, y: 1 };

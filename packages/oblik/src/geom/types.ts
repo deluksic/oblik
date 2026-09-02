@@ -19,7 +19,9 @@ export type ProfileEdge = {
   carrier: LineLike | Circle;
   k?: Branch;
 };
-export type Profile = { kind: "profile"; outer: ProfileEdge[] };
+/** Closed cycle of spans. Outer and each hole of a profile are this. Not a tape node. */
+export type ClosedWalk = ProfileEdge[];
+export type Profile = { kind: "profile"; outer: ClosedWalk; holes: ClosedWalk[] };
 
 /**
  * Unmarked half-space, like `along` / `fillet`. Side `1` is left of the directed

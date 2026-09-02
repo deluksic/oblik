@@ -132,7 +132,9 @@ export function RegionOp(props: {
   return (
     <Show
       when={props.op.kind === "circle" ? props.op : undefined}
-      fallback={<path d={props.op.kind === "profile" ? props.op.d : ""} {...rest()} />}
+      fallback={
+        <path d={props.op.kind === "profile" ? props.op.d : ""} fill-rule="evenodd" {...rest()} />
+      }
     >
       {(c) => <circle cx={c().cx} cy={c().cy} r={c().r} {...rest()} />}
     </Show>

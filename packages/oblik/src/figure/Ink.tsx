@@ -387,6 +387,7 @@ function FaceProfile(props: {
               class={styles.hitFill}
               data-ink={traceKey(props.node)}
               d={path()}
+              fill-rule="evenodd"
             />
           )}
           <For each={props.layers}>
@@ -396,6 +397,7 @@ function FaceProfile(props: {
                 class={layerClass(layer.kind, props.muted, props.onion)}
                 clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
                 d={path()}
+                fill-rule="evenodd"
                 fill={paintFill(look(), props.onion, layer, true)}
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}

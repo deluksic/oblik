@@ -216,6 +216,41 @@ describe("evaluate", () => {
     );
   });
 
+  test("profile holes are walks, not tape nodes", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(2, 0, "b");
+        const C = point(2, 2, "c");
+        const D = point(0, 2, "d");
+        const ab = segment(A, B, "ab");
+        const bc = segment(B, C, "bc");
+        const cd = segment(C, D, "cd");
+        const da = segment(D, A, "da");
+        const h0 = point(0.5, 0.5, "h0");
+        const h1 = point(1.5, 0.5, "h1");
+        const h2 = point(1.5, 1.5, "h2");
+        const h3 = point(0.5, 1.5, "h3");
+        const hab = segment(h0, h1, "hab");
+        const hbc = segment(h1, h2, "hbc");
+        const hcd = segment(h2, h3, "hcd");
+        const hda = segment(h3, h0, "hda");
+        return profile(
+          [A, ab, B, bc, C, cd, D, da],
+          { holes: [[h0, hab, h1, hbc, h2, hcd, h3, hda]] },
+          "pr",
+        );
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(1);
+    const p = trace.find((n) => n.id === "pr");
+    expect(p?.value.kind === "profile" ? p.value.holes : []).toHaveLength(1);
+    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(4);
+  });
+
   test("fillet is not a tape node", () => {
     const scene = defineScene({
       kind: "euclid2",
