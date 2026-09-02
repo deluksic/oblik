@@ -16,13 +16,16 @@ function poly(pts: readonly Vec2[]): Profile {
   return profileValue(cycle);
 }
 
+function seg(a: Vec2, b: Vec2): Segment {
+  return { kind: "segment", a, b };
+}
+
 function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
   const bl = { x: x0, y: y0 };
   const br = { x: x1, y: y0 };
   const tr = { x: x1, y: y1 };
   const tl = { x: x0, y: y1 };
-  const s = (a: Vec2, b: Vec2): Segment => ({ kind: "segment", a, b });
-  return [bl, s(bl, br), br, s(br, tr), tr, s(tr, tl), tl, s(tl, bl)];
+  return [bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)];
 }
 
 function twoHoles(web: number): Profile {
