@@ -29,7 +29,13 @@ export type Profile = { kind: "profile"; outer: ClosedWalk; holes: ClosedWalk[] 
  */
 export type HalfPlane = { kind: "halfPlane"; line: LineLike; side: 1 | -1 };
 
-export type RegionOperand = Profile | Circle | Region | HalfPlane;
+/**
+ * Minkowski offset of an operand by a disk of radius `|d|`. Positive `d`
+ * grows (outward). Membership is `sdf(of) − d`. Compiled walks are ephemeral.
+ */
+export type Offset = { kind: "offset"; of: RegionOperand; d: number };
+
+export type RegionOperand = Profile | Circle | Region | HalfPlane | Offset;
 
 /** Named CSG formula. Compiled outlines are ephemeral. */
 export type Region = {

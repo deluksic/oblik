@@ -108,9 +108,8 @@ describe("migrated demo scenes", () => {
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("region");
     const stock = one?.value.kind === "region" ? one.value.stock : null;
-    expect(stock?.kind === "profile" ? stock.outer : []).toHaveLength(
-      stock?.kind === "profile" ? 3 : 0,
-    );
+    expect(stock?.kind).toBe("offset");
+    expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
   });
 
   test("plate figure paints returned fields from the same helper", () => {
@@ -177,11 +176,8 @@ describe("migrated demo scenes", () => {
     const inset = trace.find((n) => n.bind === "inset");
     expect(inset?.kind).toBe("region");
     const insetStock = inset?.value.kind === "region" ? inset.value.stock : null;
-    expect(
-      insetStock?.kind === "profile"
-        ? insetStock.outer.filter((e) => e.carrier.kind === "circle")
-        : [],
-    ).toHaveLength(insetStock?.kind === "profile" ? 4 : 0);
+    expect(insetStock?.kind).toBe("offset");
+    expect(insetStock?.kind === "offset" ? insetStock.d : 0).toBeCloseTo(-0.12);
   });
 
   test("stock-cutters traces one face formula plus hold/left/right", () => {

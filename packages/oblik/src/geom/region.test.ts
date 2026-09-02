@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 
+import { roundOffsetValue } from "./offset";
 import { alongValue, filletValue, profileContains, profileSvgPath, profileValue } from "./profile";
 import {
   compileRegion,
   distToRegion,
   formulaSdf,
   leftOfValue,
+  offsetValue,
   regionContains,
   regionSvgPath,
   regionValue,
@@ -252,5 +254,62 @@ describe("region CSG field", () => {
     const compileMs = performance.now() - tCompile;
     expect(paintMs).toBeLessThan(compileMs);
     expect(sdfMs).toBeLessThan(compileMs);
+  });
+});
+
+describe("offset operand", () => {
+  test("membership is sdf − d, paint is the compiled walk", () => {
+    const stock = rect(0, 0, 1, 1);
+    const face = regionValue(offsetValue(stock, 0.2));
+    expect(face.stock.kind).toBe("offset");
+    expect(regionContains(face, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(regionContains(face, { x: 1.1, y: 0.5 })).toBe(true);
+    expect(regionContains(face, { x: 1.25, y: 1.25 })).toBe(false);
+    const paint = regionPaint(face);
+    expect(paint.empty).toBe(false);
+    expect(paint.stock.kind).toBe("profile");
+    if (paint.stock.kind !== "profile") throw new Error("expected profile stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBe(1);
+    expect(
+      roundOffsetValue(stock, 0.2)[0]?.outer.filter((e) => e.carrier.kind === "circle"),
+    ).toHaveLength(4);
+  });
+
+  test("a split leftover is still one formula", () => {
+    const bone = profileValue([
+      { x: 0, y: 0 },
+      seg({ x: 0, y: 0 }, { x: 2, y: 0 }),
+      { x: 2, y: 0 },
+      seg({ x: 2, y: 0 }, { x: 2, y: 0.8 }),
+      { x: 2, y: 0.8 },
+      seg({ x: 2, y: 0.8 }, { x: 3, y: 0.8 }),
+      { x: 3, y: 0.8 },
+      seg({ x: 3, y: 0.8 }, { x: 3, y: 0 }),
+      { x: 3, y: 0 },
+      seg({ x: 3, y: 0 }, { x: 5, y: 0 }),
+      { x: 5, y: 0 },
+      seg({ x: 5, y: 0 }, { x: 5, y: 2 }),
+      { x: 5, y: 2 },
+      seg({ x: 5, y: 2 }, { x: 3, y: 2 }),
+      { x: 3, y: 2 },
+      seg({ x: 3, y: 2 }, { x: 3, y: 1.2 }),
+      { x: 3, y: 1.2 },
+      seg({ x: 3, y: 1.2 }, { x: 2, y: 1.2 }),
+      { x: 2, y: 1.2 },
+      seg({ x: 2, y: 1.2 }, { x: 2, y: 2 }),
+      { x: 2, y: 2 },
+      seg({ x: 2, y: 2 }, { x: 0, y: 2 }),
+      { x: 0, y: 2 },
+      seg({ x: 0, y: 2 }, { x: 0, y: 0 }),
+    ]);
+    const face = regionValue(offsetValue(bone, -0.3));
+    expect(regionContains(face, { x: 1, y: 1 })).toBe(true);
+    expect(regionContains(face, { x: 4, y: 1 })).toBe(true);
+    expect(regionContains(face, { x: 2.5, y: 1 })).toBe(false);
+    const paint = regionPaint(face);
+    expect(paint.empty).toBe(false);
+    if (paint.stock.kind !== "profile") throw new Error("expected profile stock");
+    expect((paint.stock.d.match(/Z/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 });

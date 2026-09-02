@@ -1,6 +1,7 @@
 import type { TraceNode } from "@/eval/context";
 import type { Branch, Circle, LineLike, Profile, ProfileEdge } from "@/geom";
 import type { Expr } from "@/source/expr";
+
 import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
@@ -107,8 +108,24 @@ export type ToolSession =
       name: string;
       lengthPick?: Expr;
     }
-  | { verb: "line"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
-  | { verb: "segment"; focus: "a" | "b" | "name"; a?: Placed; aRef: string; b?: Placed; bRef: string; name: string }
+  | {
+      verb: "line";
+      focus: "a" | "b" | "name";
+      a?: Placed;
+      aRef: string;
+      b?: Placed;
+      bRef: string;
+      name: string;
+    }
+  | {
+      verb: "segment";
+      focus: "a" | "b" | "name";
+      a?: Placed;
+      aRef: string;
+      b?: Placed;
+      bRef: string;
+      name: string;
+    }
   | {
       verb: "parallelLine";
       focus: "carrier" | "typed" | "name";
@@ -174,6 +191,8 @@ export type Ghost =
   | {
       kind: "profile";
       edges: ProfileEdge[];
+      /** Disjoint closed walks; when set, fill/stroke do not chain islands. */
+      loops?: ProfileEdge[][];
       hover?: ProfileEdge;
       arrow?: { at: Vec2; tx: number; ty: number };
     };
@@ -204,7 +223,13 @@ export type Preview = {
   token?: string;
 };
 
-export type ToolKey = { key: string; shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean };
+export type ToolKey = {
+  key: string;
+  shift?: boolean;
+  ctrl?: boolean;
+  meta?: boolean;
+  alt?: boolean;
+};
 
 export type ToolChrome = {
   hideFills?: boolean;

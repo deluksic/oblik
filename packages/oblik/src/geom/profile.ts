@@ -377,7 +377,8 @@ function distToWalkBoundary(edges: ClosedWalk, q: Vec2): number {
   return best;
 }
 
-function distToProfileBoundary(p: Profile, q: Vec2): number {
+/** Unsigned distance to outer and hole edges — not dist-to-set (0 inside). */
+export function distToProfileBoundary(p: Profile, q: Vec2): number {
   let best = distToWalkBoundary(p.outer, q);
   for (const hole of p.holes) {
     const d = distToWalkBoundary(hole, q);

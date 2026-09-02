@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { alongValue, filletValue, profileContains, profileValue } from "./profile";
-import { filletAtVertex, profileCorners, roundOffsetValue } from "./offset";
 import { pointOnCircleValue } from "./gliders";
+import { filletAtVertex, localOffset, profileCorners, roundOffsetValue } from "./offset";
+import { alongValue, filletValue, profileContains, profileValue } from "./profile";
 import type { Circle, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -247,6 +247,78 @@ describe("roundOffsetValue", () => {
     expect(profileContains(p, O)).toBe(true);
     expect(profileContains(p, { x: 3.69, y: 8.61 })).toBe(true);
     expect(profileContains(p, { x: 3.69, y: 8.2 })).toBe(false);
+  });
+
+  test("a swapped kernel is what roundOffsetValue runs", () => {
+    const stub = () => [square];
+    expect(roundOffsetValue(square, -0.2, stub)).toEqual([square]);
+  });
+
+  test("localOffset matches envelope on a convex inset", () => {
+    const a = localOffset(square, -0.2);
+    const b = roundOffsetValue(square, -0.2);
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
+    expect(a[0]?.outer).toHaveLength(b[0]!.outer.length);
+    expect(profileContains(b[0]!, { x: 0.5, y: 0.5 })).toBe(true);
+  });
+
+  test("a dogbone inset past the neck splits into two islands", () => {
+    const bone = poly([
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 0.8 },
+      { x: 3, y: 0.8 },
+      { x: 3, y: 0 },
+      { x: 5, y: 0 },
+      { x: 5, y: 2 },
+      { x: 3, y: 2 },
+      { x: 3, y: 1.2 },
+      { x: 2, y: 1.2 },
+      { x: 2, y: 2 },
+      { x: 0, y: 2 },
+    ]);
+    const connected = roundOffsetValue(bone, -0.1);
+    expect(connected).toHaveLength(1);
+    expect(profileContains(connected[0]!, { x: 1, y: 1 })).toBe(true);
+    expect(profileContains(connected[0]!, { x: 4, y: 1 })).toBe(true);
+    expect(profileContains(connected[0]!, { x: 2.5, y: 1 })).toBe(true);
+
+    const split = roundOffsetValue(bone, -0.3);
+    expect(split).toHaveLength(2);
+    const left = split.find((p) => profileContains(p, { x: 1, y: 1 }));
+    const right = split.find((p) => profileContains(p, { x: 4, y: 1 }));
+    expect(left).toBeTruthy();
+    expect(right).toBeTruthy();
+    expect(left).not.toBe(right);
+    expect(profileContains(left!, { x: 2.5, y: 1 })).toBe(false);
+    expect(profileContains(right!, { x: 2.5, y: 1 })).toBe(false);
+    const remnant = localOffset(bone, -0.3);
+    expect(remnant).toHaveLength(1);
+    expect(profileContains(remnant[0]!, { x: 2.5, y: 1 })).toBe(true);
+  });
+
+  test("outset of a U closes the bay into one outer", () => {
+    const u = poly([
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 3 },
+      { x: 2, y: 3 },
+      { x: 2, y: 1 },
+      { x: 1, y: 1 },
+      { x: 1, y: 3 },
+      { x: 0, y: 3 },
+    ]);
+    const open = roundOffsetValue(u, 0.2);
+    expect(open).toHaveLength(1);
+    expect(profileContains(open[0]!, { x: 1.5, y: 2 })).toBe(false);
+
+    const closed = roundOffsetValue(u, 0.6);
+    expect(closed).toHaveLength(1);
+    expect(closed[0]?.holes).toHaveLength(0);
+    expect(profileContains(closed[0]!, { x: 1.5, y: 0.5 })).toBe(true);
+    expect(profileContains(closed[0]!, { x: 1.5, y: 2 })).toBe(true);
+    expect(profileContains(closed[0]!, { x: 1.5, y: 3.7 })).toBe(false);
   });
 });
 

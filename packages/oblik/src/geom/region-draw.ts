@@ -1,7 +1,8 @@
+import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
 import { profileSvgPath } from "./profile";
 import { islandClipPath, isFiniteRegion, regionAabb, type Aabb } from "./region";
-import type { Circle, HalfPlane, Profile, Region, RegionOperand } from "./types";
+import type { Circle, HalfPlane, Offset, Profile, Region, RegionOperand } from "./types";
 import { isFiniteVec, lerp, type Vec2 } from "./vec";
 
 export type DrawOp =
@@ -55,6 +56,21 @@ function asSolid(op: RegionOperand): Profile | Circle | null {
   return op.kind === "profile" || op.kind === "circle" ? op : null;
 }
 
+/** Paint-only: extra island outers ride as evenodd subpaths. Membership is SDF. */
+function packOffsetIslands(islands: Profile[]): Profile | null {
+  if (islands.length === 0) return null;
+  if (islands.length === 1) return islands[0]!;
+  const extra: Profile["holes"] = [...islands[0]!.holes];
+  for (let i = 1; i < islands.length; i++) {
+    extra.push(islands[i]!.outer, ...islands[i]!.holes);
+  }
+  return { kind: "profile", outer: islands[0]!.outer, holes: extra };
+}
+
+function compileOffsetStock(op: Offset): Profile | Circle | null {
+  return packOffsetIslands(compileOffsetBoundary(op));
+}
+
 export function flattenRegion(r: Region): FlattenedRegion | null {
   const subtract: (Profile | Circle)[] = [];
   const keep: HalfPlane[] = [];
@@ -72,6 +88,11 @@ export function flattenRegion(r: Region): FlattenedRegion | null {
       if (k.kind === "halfPlane") keep.push(k);
     }
     node = node.stock;
+  }
+  if (node.kind === "offset") {
+    const compiled = compileOffsetStock(node);
+    if (!compiled) return null;
+    node = compiled;
   }
   if (node.kind !== "profile" && node.kind !== "circle") return null;
   const out: FlattenedRegion = { stock: node, subtract, keep };

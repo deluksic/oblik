@@ -388,11 +388,17 @@ export function ProfileGhost(props: {
 }) {
   const chain = createMemo(() => {
     const g = props.ghost;
+    if (g.loops && g.loops.length > 0) {
+      return g.loops.map((w) => edgesSvgPath(w, false)).join(" ");
+    }
     const edges = g.hover ? [...g.edges, g.hover] : g.edges;
     return edgesSvgPath(edges, false);
   });
   const fill = createMemo(() => {
     const g = props.ghost;
+    if (g.loops && g.loops.length > 0) {
+      return g.loops.map((w) => edgesSvgPath(w, true)).join(" ");
+    }
     if (g.edges.length < 2) return "";
     return edgesSvgPath(g.edges, true);
   });

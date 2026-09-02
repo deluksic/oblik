@@ -309,14 +309,19 @@ describe("evaluate", () => {
     expect(off?.kind).toBe("region");
     expect(off?.editable).toBe(true);
     const stock = off?.value.kind === "region" ? off.value.stock : null;
-    expect(stock?.kind === "profile" ? stock.outer : []).toHaveLength(
-      stock?.kind === "profile" ? 2 : 0,
-    );
+    expect(stock?.kind).toBe("offset");
+    expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
     const drafted = evaluate(scene, {
       annotations: analyze(`roundOffset(face, -0.12, "off");\n`),
       draft: new Map([["off", [-0.5]]]),
     }).trace.find((n) => n.id === "off");
-    expect(drafted).toBeUndefined();
+    expect(drafted?.kind).toBe("region");
+    expect(drafted?.value.kind === "region" ? drafted.value.stock.kind : null).toBe("offset");
+    expect(
+      drafted?.value.kind === "region" && drafted.value.stock.kind === "offset"
+        ? drafted.value.stock.d
+        : 0,
+    ).toBeCloseTo(-0.5);
   });
 
   test("region is traced; leftOf is not", () => {

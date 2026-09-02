@@ -334,9 +334,13 @@ describe("profile holes", () => {
     expect(p.outer).toHaveLength(0);
   });
 
-  test("roundOffset of a holed profile is empty at the walk kernel", () => {
+  test("roundOffset of a holed profile shrinks the hole when growing", () => {
     const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(0.3, 0.3, 0.7, 0.7)] });
-    expect(roundOffsetValue(p, 0.1)).toEqual([]);
-    expect(roundOffsetValue(p, 0)[0]?.holes).toHaveLength(1);
+    const out = roundOffsetValue(p, 0.1);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.holes).toHaveLength(1);
+    expect(profileContains(out[0]!, { x: 0.08, y: 0.08 })).toBe(true);
+    expect(profileContains(out[0]!, { x: 0.5, y: 0.5 })).toBe(false);
+    expect(profileContains(out[0]!, { x: 0.35, y: 0.35 })).toBe(true);
   });
 });

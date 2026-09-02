@@ -2,8 +2,18 @@ import type { Profile } from "@/geom";
 import { roundOffsetValue } from "@/geom/offset";
 import { signedDistToProfile } from "@/geom/profile";
 import { printExpr } from "@/source/expr";
+
 import { snapProfile } from "../pick";
 import { exprOfPrint, hoverBind, previewCall, round } from "./common";
+import {
+  inSlot,
+  lengthField,
+  nameField,
+  previewName,
+  refField,
+  resolveProfile,
+  withBind,
+} from "./draft";
 import {
   attachLengthHit,
   lengthHover,
@@ -11,7 +21,6 @@ import {
   lengthValue,
   resolveLengthExpr,
 } from "./length";
-import { inSlot, lengthField, nameField, previewName, refField, resolveProfile, withBind } from "./draft";
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -56,9 +65,10 @@ function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null)
 
 function offsetGhost(face: Profile, d: number) {
   const islands = roundOffsetValue(face, d);
-  const edges = islands[0]?.outer;
-  if (!edges || edges.length < 2) return null;
-  return { kind: "profile" as const, edges };
+  const loops = islands.map((p) => p.outer);
+  const edges = loops.flat();
+  if (edges.length < 2) return null;
+  return { kind: "profile" as const, edges, loops };
 }
 
 export const roundOffset: Tool<OffsetSession> = {
@@ -110,7 +120,10 @@ export const roundOffset: Tool<OffsetSession> = {
       };
     }
     return {
-      insert: withBind(session, { from: "roundOffset", args: [face.expr, distExpr(session, hit, scope)] }),
+      insert: withBind(session, {
+        from: "roundOffset",
+        args: [face.expr, distExpr(session, hit, scope)],
+      }),
     };
   },
   commit(session, _place, scope) {
@@ -169,13 +182,15 @@ export const roundOffset: Tool<OffsetSession> = {
       };
     }
     const bound = resolveLengthExpr(session, scope);
-    const shown = dLabel !== "distance" ? dLabel : place ? String(round(distAt(place, face.geom))) : "distance";
+    const shown =
+      dLabel !== "distance" ? dLabel : place ? String(round(distAt(place, face.geom))) : "distance";
     return {
       line: previewCall(
         "roundOffset",
         [face.expr, ...(bound ? [bound] : [])],
         scope.used,
-        ([g, n]) => `roundOffset(${inSlot(session.focus === "face", g)}, ${inSlot(session.focus === "typed", n ?? shown)})`,
+        ([g, n]) =>
+          `roundOffset(${inSlot(session.focus === "face", g)}, ${inSlot(session.focus === "typed", n ?? shown)})`,
         name,
       ),
       hint: "Type a distance, slider, or field (reach.radius, -shelf.distance), click to reuse, or click to measure. Tab to name it.",

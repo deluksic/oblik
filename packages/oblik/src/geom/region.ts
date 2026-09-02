@@ -1,6 +1,6 @@
 import { signedDist } from "./ops";
 import { isFiniteProfile, signedDistToProfile, tessellateProfile } from "./profile";
-import type { Circle, HalfPlane, LineLike, Profile, Region, RegionOperand } from "./types";
+import type { Circle, HalfPlane, LineLike, Offset, Profile, Region, RegionOperand } from "./types";
 import { dist, isFiniteVec, type Vec2 } from "./vec";
 
 export type RegionOpts = {
@@ -17,6 +17,10 @@ const compiled = new WeakMap<Region, Vec2[][]>();
 
 export function isHalfPlane(v: unknown): v is HalfPlane {
   return !!v && typeof v === "object" && (v as { kind?: string }).kind === "halfPlane";
+}
+
+export function isOffset(v: unknown): v is Offset {
+  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "offset";
 }
 
 export function isRegion(v: { kind: string }): v is Region {
@@ -60,6 +64,7 @@ export function isFiniteOperand(op: RegionOperand): boolean {
   if (op.kind === "profile") return isFiniteProfile(op);
   if (op.kind === "circle") return isFiniteCircle(op);
   if (op.kind === "halfPlane") return isFiniteHalfPlane(op);
+  if (op.kind === "offset") return isFiniteOperand(op.of) && Number.isFinite(op.d);
   return isFiniteRegion(op);
 }
 
@@ -71,7 +76,7 @@ export function isFiniteRegion(r: Region): boolean {
 function asOperand(v: unknown): RegionOperand | null {
   if (!v || typeof v !== "object") return null;
   const k = (v as { kind?: string }).kind;
-  if (k === "profile" || k === "circle" || k === "region" || k === "halfPlane")
+  if (k === "profile" || k === "circle" || k === "region" || k === "halfPlane" || k === "offset")
     return v as RegionOperand;
   return null;
 }
@@ -89,6 +94,10 @@ function asList(v: unknown): RegionOperand[] | null {
   }
   const one = asOperand(v);
   return one ? [one] : null;
+}
+
+export function offsetValue(of: RegionOperand, d: number): Offset {
+  return { kind: "offset", of, d };
 }
 
 export function regionValue(stock: unknown, opts?: RegionOpts): Region {
@@ -109,6 +118,7 @@ function operandSdf(op: RegionOperand, p: Vec2): number {
     const s = signedDist(p, op.line);
     return op.side === 1 ? -s : s;
   }
+  if (op.kind === "offset") return operandSdf(op.of, p) - op.d;
   const d = formulaSdf(op, p);
   if (op.contains && isFiniteVec(op.contains) && !islandContains(op, p)) {
     return Number.isFinite(d) ? Math.max(Math.abs(d), 1e-6) : Number.NaN;
@@ -173,6 +183,17 @@ function operandAabb(op: RegionOperand): Aabb | null {
   if (op.kind === "halfPlane") return null;
   if (op.kind === "circle") return isFiniteCircle(op) ? circleAabb(op) : null;
   if (op.kind === "profile") return isFiniteProfile(op) ? profileAabb(op) : null;
+  if (op.kind === "offset") {
+    const inner = operandAabb(op.of);
+    if (!inner) return null;
+    const pad = Math.abs(op.d);
+    return {
+      minX: inner.minX - pad,
+      minY: inner.minY - pad,
+      maxX: inner.maxX + pad,
+      maxY: inner.maxY + pad,
+    };
+  }
   return regionAabb(op);
 }
 
