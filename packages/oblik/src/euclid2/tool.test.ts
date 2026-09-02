@@ -1489,7 +1489,7 @@ describe("profile tool", () => {
       carrier: { bind: "axis", geom: xAxis },
     });
     expect(g).toMatchObject({
-      kind: "region",
+      kind: "profile",
       arrow: { at: { x: 0, y: 0 }, tx: 1, ty: 0 },
     });
   });
