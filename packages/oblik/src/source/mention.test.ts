@@ -129,7 +129,7 @@ function plate() {
   const B = point(1, 0, "o_b");
   const ab = segment(A, B, "o_ab");
   const d = dist(A, B);
-  region([fillet(A, 0.1), ab, B, along({ kind: "circle", center: A, radius: 1 }, 1)], "o_pr");
+  region([fillet(A, 0.1), ab, B, along({ kind: "circle", center: A, radius: 1 }, 1)], [], "o_pr");
 }
 `;
     const file = analyzeMentions(src, "g.ts");

@@ -29,7 +29,7 @@ export function stockCuttersLayout() {
   const rhs = segment(br, tr, "o_sc_rhs");
   const top = segment(tr, tl, "o_sc_top");
   const lhs = segment(tl, bl, "o_sc_lhs");
-  const stock = region([bl, bot, br, rhs, tr, top, tl, lhs], "o_sc_stock");
+  const stock = region([bl, bot, br, rhs, tr, top, tl, lhs], [], "o_sc_stock");
 
   const drillR = slider(0.16, { min: 0.04, max: 0.45, step: 0.01 }, "o_sc_drillR");
   const inset = 0.42;
@@ -60,6 +60,7 @@ export function stockCuttersLayout() {
   const slotBot = segment(botR, T);
   const slot = region(
     [P, slotTop, Q, along(rightC, -1), botR, slotBot, T, along(leftC, -1)],
+    [],
     "o_sc_slot",
   );
 
@@ -67,10 +68,10 @@ export function stockCuttersLayout() {
   const split = perpendicularLine(bot, splitAt, "o_sc_split");
   const probe = point(1.05, 1.6, "o_sc_probe");
 
-  const face = diff(stock, d0, d1, d2, d3, slot, "o_sc_face");
+  const face = diff(stock, [d0, d1, d2, d3, slot], "o_sc_face");
   const hold = pick(face, probe, "o_sc_hold");
-  const left = intersect(face, leftOf(split), "o_sc_left");
-  const right = intersect(face, rightOf(split), "o_sc_right");
+  const left = intersect([face, leftOf(split)], "o_sc_left");
+  const right = intersect([face, rightOf(split)], "o_sc_right");
 
   return { origin, opp, stock, drillR, slot, split, probe, face, hold, left, right, d0, splitAt };
 }

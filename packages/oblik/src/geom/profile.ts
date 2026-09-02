@@ -146,7 +146,6 @@ function asVertex(v: unknown): { at: Vec2; r: number } | null {
 }
 
 export type WalkInput = Circle | readonly unknown[];
-export type RegionOpts = { holes?: readonly WalkInput[] };
 
 function asCircleWalk(v: unknown): Circle | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
@@ -255,16 +254,16 @@ export function regionTopologyOk(p: Region): boolean {
   return true;
 }
 
-export function regionValue(cycle: WalkInput, opts?: RegionOpts): Region {
+export function regionValue(cycle: WalkInput, holes: readonly WalkInput[]): Region {
   const outer = asWalk(cycle);
   if (!outer) return nanRegion();
-  const holes: Loop[] = [];
-  for (const holeCycle of opts?.holes ?? []) {
+  const parsed: Loop[] = [];
+  for (const holeCycle of holes) {
     const hole = asWalk(holeCycle);
     if (!hole) return nanRegion();
-    holes.push(hole);
+    parsed.push(hole);
   }
-  const p: Region = { kind: "region", outer, holes };
+  const p: Region = { kind: "region", outer, holes: parsed };
   if (!regionTopologyOk(p)) return nanRegion();
   return p;
 }

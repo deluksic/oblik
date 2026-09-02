@@ -45,7 +45,7 @@ function squareProfile(): Region {
     const b = pts[(i + 1) % pts.length]!;
     cycle.push(a, { kind: "segment", a, b } satisfies Segment);
   }
-  return regionValue(cycle);
+  return regionValue(cycle, []);
 }
 
 const OFFSET_REGION = {

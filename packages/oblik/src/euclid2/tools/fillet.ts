@@ -221,14 +221,14 @@ export const fillet: Tool<FilletSession> = {
     if (!vertex) {
       const r = inSlot(session.focus === "typed", rLabel);
       return {
-        line: `region([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …], [])`,
         hint: place?.corner ? `Click to fillet this corner. Tab for radius.` : spec.hint,
       };
     }
     if (place?.length && place.length.value >= 0 && resolveLengthExpr(session, scope) == null) {
       const r = printExpr(place.length.expr);
       return {
-        line: `region([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …], [])`,
         hint: "Click to reuse that length.",
       };
     }
@@ -241,7 +241,7 @@ export const fillet: Tool<FilletSession> = {
     ) {
       const r = `dist(${printExpr(session.vertexExpr)}, ${printExpr(exprOfPlace(place.point))})`;
       return {
-        line: `region([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …], [])`,
         hint: "Click to pin the radius to that distance.",
       };
     }
@@ -255,12 +255,12 @@ export const fillet: Tool<FilletSession> = {
     const rTok = inSlot(session.focus === "typed", bound ? printExpr(bound) : shown);
     if (bound?.kind === "num" && bound.value === 0) {
       return {
-        line: `region([…, ${vTok}, …])`,
+        line: `region([…, ${vTok}, …], [])`,
         hint: "Radius 0 leaves the corner sharp.",
       };
     }
     return {
-      line: `region([…, fillet(${vTok}, ${rTok}), …])`,
+      line: `region([…, fillet(${vTok}, ${rTok}), …], [])`,
       hint: "Type a radius, slider, or field (reach.radius), click to reuse, or click to measure.",
     };
   },

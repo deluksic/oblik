@@ -20,6 +20,7 @@ import {
   leftOfValue,
   nanCsg2,
   nanPick,
+  nanRegion,
   regionValue,
   csg2Value,
   wrapCsg,
@@ -37,7 +38,7 @@ import {
   type ParallelLine,
   type Point,
   type Region,
-  type RegionOpts,
+  type WalkInput,
   type Csg2,
   type Pick,
   type Segment,
@@ -246,9 +247,9 @@ export function fillet(at: Vec2, r: number): Fillet {
 }
 
 export const region = mark(
-  (cycle: Circle | readonly unknown[], optsOrId?: RegionOpts | string, id?: string): Region => {
-    if (typeof optsOrId === "string") return traced(regionValue(cycle), optsOrId);
-    return traced(regionValue(cycle, optsOrId), id);
+  (cycle: WalkInput, holes: readonly WalkInput[], id?: string): Region => {
+    if (!Array.isArray(holes)) return traced(nanRegion(), id);
+    return traced(regionValue(cycle, holes), id);
   },
   { dof: [] },
 );
@@ -275,37 +276,26 @@ export function rightOf(geom: LineLike): HalfPlane {
   return rightOfValue(geom);
 }
 
-function trailingId(args: unknown[]): { rest: unknown[]; id?: string } {
-  if (args.length > 0 && typeof args[args.length - 1] === "string") {
-    return { rest: args.slice(0, -1), id: args[args.length - 1] as string };
-  }
-  return { rest: args };
-}
-
-function tracedCsg(op: "union" | "diff" | "intersect", operands: unknown[], id?: string): Csg2 {
-  return traced(csg2Value(op, operands), id);
-}
-
 export const diff = mark(
-  (stock: unknown, ...args: unknown[]): Csg2 => {
-    const { rest, id } = trailingId(args);
-    return tracedCsg("diff", [stock, ...rest], id);
+  (stock: unknown, cutters: readonly unknown[], id?: string): Csg2 => {
+    if (!Array.isArray(cutters)) return traced(nanCsg2(), id);
+    return traced(csg2Value("diff", [stock, ...cutters]), id);
   },
   { dof: [] },
 );
 
 export const union = mark(
-  (...args: unknown[]): Csg2 => {
-    const { rest, id } = trailingId(args);
-    return tracedCsg("union", rest, id);
+  (operands: readonly unknown[], id?: string): Csg2 => {
+    if (!Array.isArray(operands)) return traced(nanCsg2(), id);
+    return traced(csg2Value("union", operands), id);
   },
   { dof: [] },
 );
 
 export const intersect = mark(
-  (...args: unknown[]): Csg2 => {
-    const { rest, id } = trailingId(args);
-    return tracedCsg("intersect", rest, id);
+  (operands: readonly unknown[], id?: string): Csg2 => {
+    if (!Array.isArray(operands)) return traced(nanCsg2(), id);
+    return traced(csg2Value("intersect", operands), id);
   },
   { dof: [] },
 );

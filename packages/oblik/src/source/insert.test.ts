@@ -396,10 +396,11 @@ describe("insertCall", () => {
             },
           ],
         },
+        { kind: "array", items: [] },
       ],
       id: "o_slice",
     });
-    expect(next).toContain('const slice = region([A, chord, B, along(c, -1)], "o_slice");');
+    expect(next).toContain('const slice = region([A, chord, B, along(c, -1)], [], "o_slice");');
     expect(next).toMatch(/import \{ point, region, along \} from "oblik"/);
   });
 
@@ -426,6 +427,7 @@ export default defineScene({
               { kind: "ref", name: "bottom" },
             ],
           },
+          { kind: "array", items: [] },
         ],
         id: "o_pr",
       }),
@@ -537,7 +539,7 @@ export default defineScene({
     const ab = segment(A, B, "o_ab");
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
-    const mix = region([A, ab, B, bc, C, ca], "o_mix");
+    const mix = region([A, ab, B, bc, C, ca], [], "o_mix");
     return { mix };
   },
 });
@@ -547,7 +549,7 @@ export default defineScene({
       args: [{ kind: "num", value: 0.35 }],
       patchVertex: { id: "o_mix", index: 1 },
     });
-    expect(next).toContain('region([A, ab, fillet(B, 0.35), bc, C, ca], "o_mix")');
+    expect(next).toContain('region([A, ab, fillet(B, 0.35), bc, C, ca], [], "o_mix")');
     expect(next).toMatch(/import \{ point, segment, region, fillet \} from "oblik"/);
     expect(next).not.toContain("const fillet");
   });
@@ -566,7 +568,7 @@ export default defineScene({
     const ab = segment(A, B, "o_ab");
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
-    const mix = region([fillet(A, 0.2), ab, B, bc, C, ca], "o_mix");
+    const mix = region([fillet(A, 0.2), ab, B, bc, C, ca], [], "o_mix");
     return { mix };
   },
 });
@@ -576,13 +578,13 @@ export default defineScene({
       args: [{ kind: "ref", name: "r" }],
       patchVertex: { id: "o_mix", index: 0 },
     });
-    expect(replaced).toContain('region([fillet(A, r), ab, B, bc, C, ca], "o_mix")');
+    expect(replaced).toContain('region([fillet(A, r), ab, B, bc, C, ca], [], "o_mix")');
     const unwrapped = insertCall(faceSrc, {
       from: "fillet",
       args: [{ kind: "num", value: 0 }],
       patchVertex: { id: "o_mix", index: 0 },
     });
-    expect(unwrapped).toContain('region([A, ab, B, bc, C, ca], "o_mix")');
+    expect(unwrapped).toContain('region([A, ab, B, bc, C, ca], [], "o_mix")');
     expect(unwrapped).not.toContain("fillet(A");
   });
 
@@ -597,7 +599,7 @@ export default defineScene({
     const ground = line({ x: 0, y: 0 }, { x: 1, y: 0 }, "o_g");
     const wall = line({ x: 1, y: 0 }, { x: 1, y: 1 }, "o_w");
     const A = point(0, 1, "o_a");
-    const mix = region([lineIntersection(ground, wall), ground, A, wall], "o_mix");
+    const mix = region([lineIntersection(ground, wall), ground, A, wall], [], "o_mix");
     return { mix };
   },
 });
@@ -621,7 +623,7 @@ function plate() {
   const ab = segment(A, B, "o_ab");
   const bc = segment(B, C, "o_bc");
   const ca = segment(C, A, "o_ca");
-  return region([A, ab, B, bc, C, ca], "o_p");
+  return region([A, ab, B, bc, C, ca], [], "o_p");
 }
 
 export default defineScene({
@@ -637,7 +639,7 @@ export default defineScene({
       args: [{ kind: "num", value: 0.1 }],
       patchVertex: { id: "o_p", index: 0 },
     });
-    expect(next).toContain('region([fillet(A, 0.1), ab, B, bc, C, ca], "o_p")');
+    expect(next).toContain('region([fillet(A, 0.1), ab, B, bc, C, ca], [], "o_p")');
   });
 
   test("refuses a profile cycle that is not an array literal", () => {
@@ -655,7 +657,7 @@ export default defineScene({
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
     const cycle = [A, ab, B, bc, C, ca];
-    const mix = region(cycle, "o_mix");
+    const mix = region(cycle, [], "o_mix");
     return { mix };
   },
 });

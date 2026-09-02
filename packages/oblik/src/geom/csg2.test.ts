@@ -32,7 +32,7 @@ function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
 }
 
 function rect(x0: number, y0: number, x1: number, y1: number): Region {
-  return regionValue(rectCycle(x0, y0, x1, y1));
+  return regionValue(rectCycle(x0, y0, x1, y1), []);
 }
 
 function disk(cx: number, cy: number, r: number): Circle {
@@ -50,16 +50,10 @@ function stadium(cx: number, cy: number, length: number, width: number): Region 
   const Q = { x: R.x, y: R.y + r };
   const botR = { x: R.x, y: R.y - r };
   const T = { x: L.x, y: L.y - r };
-  return regionValue([
-    P,
-    seg(P, Q),
-    Q,
-    alongValue(rightC, -1),
-    botR,
-    seg(botR, T),
-    T,
-    alongValue(leftC, -1),
-  ]);
+  return regionValue(
+    [P, seg(P, Q), Q, alongValue(rightC, -1), botR, seg(botR, T), T, alongValue(leftC, -1)],
+    [],
+  );
 }
 
 const split: Line = { kind: "line", origin: { x: 2, y: 0 }, direction: { x: 0, y: 1 } };
@@ -76,9 +70,7 @@ describe("stadium region", () => {
 
 describe("region as CSG leaf", () => {
   test("swiss-cheese stock keeps the hole in the CSG field", () => {
-    const plate = regionValue(rectCycle(0, 0, 2, 2), {
-      holes: [rectCycle(0.6, 0.6, 1.4, 1.4)],
-    });
+    const plate = regionValue(rectCycle(0, 0, 2, 2), [rectCycle(0.6, 0.6, 1.4, 1.4)]);
     const face = wrapCsg(plate);
     expect(csgContains(face, { x: 0.2, y: 0.2 })).toBe(true);
     expect(csgContains(face, { x: 1, y: 1 })).toBe(false);
@@ -181,7 +173,7 @@ describe("Csg2 field", () => {
       const b = corners[(i + 1) % 4]!;
       cycle.push(filletValue(a, 0.2), seg(a, b));
     }
-    const stock = regionValue(cycle);
+    const stock = regionValue(cycle, []);
     const paint = csgPaint(csg2Value("diff", [stock, disk(1, 1, 0.3)]));
     expect(paint.stock.kind).toBe("path");
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
@@ -259,32 +251,35 @@ describe("offset operand", () => {
   });
 
   test("a split leftover is still one formula", () => {
-    const bone = regionValue([
-      { x: 0, y: 0 },
-      seg({ x: 0, y: 0 }, { x: 2, y: 0 }),
-      { x: 2, y: 0 },
-      seg({ x: 2, y: 0 }, { x: 2, y: 0.8 }),
-      { x: 2, y: 0.8 },
-      seg({ x: 2, y: 0.8 }, { x: 3, y: 0.8 }),
-      { x: 3, y: 0.8 },
-      seg({ x: 3, y: 0.8 }, { x: 3, y: 0 }),
-      { x: 3, y: 0 },
-      seg({ x: 3, y: 0 }, { x: 5, y: 0 }),
-      { x: 5, y: 0 },
-      seg({ x: 5, y: 0 }, { x: 5, y: 2 }),
-      { x: 5, y: 2 },
-      seg({ x: 5, y: 2 }, { x: 3, y: 2 }),
-      { x: 3, y: 2 },
-      seg({ x: 3, y: 2 }, { x: 3, y: 1.2 }),
-      { x: 3, y: 1.2 },
-      seg({ x: 3, y: 1.2 }, { x: 2, y: 1.2 }),
-      { x: 2, y: 1.2 },
-      seg({ x: 2, y: 1.2 }, { x: 2, y: 2 }),
-      { x: 2, y: 2 },
-      seg({ x: 2, y: 2 }, { x: 0, y: 2 }),
-      { x: 0, y: 2 },
-      seg({ x: 0, y: 2 }, { x: 0, y: 0 }),
-    ]);
+    const bone = regionValue(
+      [
+        { x: 0, y: 0 },
+        seg({ x: 0, y: 0 }, { x: 2, y: 0 }),
+        { x: 2, y: 0 },
+        seg({ x: 2, y: 0 }, { x: 2, y: 0.8 }),
+        { x: 2, y: 0.8 },
+        seg({ x: 2, y: 0.8 }, { x: 3, y: 0.8 }),
+        { x: 3, y: 0.8 },
+        seg({ x: 3, y: 0.8 }, { x: 3, y: 0 }),
+        { x: 3, y: 0 },
+        seg({ x: 3, y: 0 }, { x: 5, y: 0 }),
+        { x: 5, y: 0 },
+        seg({ x: 5, y: 0 }, { x: 5, y: 2 }),
+        { x: 5, y: 2 },
+        seg({ x: 5, y: 2 }, { x: 3, y: 2 }),
+        { x: 3, y: 2 },
+        seg({ x: 3, y: 2 }, { x: 3, y: 1.2 }),
+        { x: 3, y: 1.2 },
+        seg({ x: 3, y: 1.2 }, { x: 2, y: 1.2 }),
+        { x: 2, y: 1.2 },
+        seg({ x: 2, y: 1.2 }, { x: 2, y: 2 }),
+        { x: 2, y: 2 },
+        seg({ x: 2, y: 2 }, { x: 0, y: 2 }),
+        { x: 0, y: 2 },
+        seg({ x: 0, y: 2 }, { x: 0, y: 0 }),
+      ],
+      [],
+    );
     const face = wrapCsg(offsetValue(bone, -0.3));
     expect(csgContains(face, { x: 1, y: 1 })).toBe(true);
     expect(csgContains(face, { x: 4, y: 1 })).toBe(true);

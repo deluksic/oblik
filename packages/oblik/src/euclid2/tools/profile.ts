@@ -234,7 +234,10 @@ export const profile: Tool<ProfileSession> = {
         return {
           insert: withBind(session, {
             from: "region",
-            args: [{ kind: "array", items: cycleItems(session) }],
+            args: [
+              { kind: "array", items: cycleItems(session) },
+              { kind: "array", items: [] },
+            ],
           }),
         };
       }
@@ -314,9 +317,12 @@ export const profile: Tool<ProfileSession> = {
     const shown = items.length > 0 ? items : extra;
     const line = previewCall(
       "region",
-      [{ kind: "array", items: shown }],
+      [
+        { kind: "array", items: shown },
+        { kind: "array", items: [] },
+      ],
       scope.used,
-      ([cycle]) => `region(${cycle ?? "[]"})`,
+      ([cycle, holes]) => `region(${cycle ?? "[]"}, ${holes ?? "[]"})`,
       name,
     );
     if (!session.vertices[0]) {

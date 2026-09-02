@@ -33,6 +33,7 @@ export default defineScene({
         Sd,
         segment(Sd, Sa, "o_ro_sda"),
       ],
+      [],
       "o_ro_sq",
     );
     const sqInset = roundOffset(sq, -0.22, "o_ro_sqi");
@@ -53,6 +54,7 @@ export default defineScene({
         Od,
         segment(Od, Oa, "o_ro_oda"),
       ],
+      [],
       "o_ro_sqo_p",
     );
     const sqOutset = roundOffset(sqOut, 0.24, "o_ro_sqo");
@@ -64,6 +66,7 @@ export default defineScene({
     const Sq = pointOnCircle(Sreach, 0, 1, "o_ro_sqp");
     const sector = region(
       [So, segment(So, Sp, "o_ro_soa"), Sp, along(Sreach, 1), Sq, segment(Sq, So, "o_ro_soq")],
+      [],
       "o_ro_sec_p",
     );
     const secInset = roundOffset(sector, -0.16, "o_ro_sec");
@@ -88,20 +91,18 @@ export default defineScene({
         fillet(Fd, 0.28),
         segment(Fd, Fa, "o_ro_fda"),
       ],
-      {
-        holes: [
-          [
-            Fh0,
-            segment(Fh0, Fh1, "o_ro_fhab"),
-            Fh1,
-            segment(Fh1, Fh2, "o_ro_fhbc"),
-            Fh2,
-            segment(Fh2, Fh3, "o_ro_fhcd"),
-            Fh3,
-            segment(Fh3, Fh0, "o_ro_fhda"),
-          ],
+      [
+        [
+          Fh0,
+          segment(Fh0, Fh1, "o_ro_fhab"),
+          Fh1,
+          segment(Fh1, Fh2, "o_ro_fhbc"),
+          Fh2,
+          segment(Fh2, Fh3, "o_ro_fhcd"),
+          Fh3,
+          segment(Fh3, Fh0, "o_ro_fhda"),
         ],
-      },
+      ],
       "o_ro_fil_p",
     );
     const filInset = roundOffset(filHole, -0.12, "o_ro_fil");
@@ -126,20 +127,18 @@ export default defineScene({
         Hd,
         segment(Hd, Ha, "o_ro_hda"),
       ],
-      {
-        holes: [
-          [
-            Hh0,
-            segment(Hh0, Hh1, "o_ro_hhab"),
-            Hh1,
-            segment(Hh1, Hh2, "o_ro_hhbc"),
-            Hh2,
-            segment(Hh2, Hh3, "o_ro_hhcd"),
-            Hh3,
-            segment(Hh3, Hh0, "o_ro_hhda"),
-          ],
+      [
+        [
+          Hh0,
+          segment(Hh0, Hh1, "o_ro_hhab"),
+          Hh1,
+          segment(Hh1, Hh2, "o_ro_hhbc"),
+          Hh2,
+          segment(Hh2, Hh3, "o_ro_hhcd"),
+          Hh3,
+          segment(Hh3, Hh0, "o_ro_hhda"),
         ],
-      },
+      ],
       "o_ro_hi_p",
     );
     const holeInset = roundOffset(frameIn, -0.14, "o_ro_hi");
@@ -164,20 +163,18 @@ export default defineScene({
         Gd,
         segment(Gd, Ga, "o_ro_gda"),
       ],
-      {
-        holes: [
-          [
-            Gh0,
-            segment(Gh0, Gh1, "o_ro_ghab"),
-            Gh1,
-            segment(Gh1, Gh2, "o_ro_ghbc"),
-            Gh2,
-            segment(Gh2, Gh3, "o_ro_ghcd"),
-            Gh3,
-            segment(Gh3, Gh0, "o_ro_ghda"),
-          ],
+      [
+        [
+          Gh0,
+          segment(Gh0, Gh1, "o_ro_ghab"),
+          Gh1,
+          segment(Gh1, Gh2, "o_ro_ghbc"),
+          Gh2,
+          segment(Gh2, Gh3, "o_ro_ghcd"),
+          Gh3,
+          segment(Gh3, Gh0, "o_ro_ghda"),
         ],
-      },
+      ],
       "o_ro_ho_p",
     );
     const holeOutset = roundOffset(frameOut, 0.18, "o_ro_ho");
@@ -206,30 +203,28 @@ export default defineScene({
         Td,
         segment(Td, Ta, "o_ro_tda"),
       ],
-      {
-        holes: [
-          [
-            T0,
-            segment(T0, T1, "o_ro_t01"),
-            T1,
-            segment(T1, T2, "o_ro_t12"),
-            T2,
-            segment(T2, T3, "o_ro_t23"),
-            T3,
-            segment(T3, T0, "o_ro_t30"),
-          ],
-          [
-            U0,
-            segment(U0, U1, "o_ro_u01"),
-            U1,
-            segment(U1, U2, "o_ro_u12"),
-            U2,
-            segment(U2, U3, "o_ro_u23"),
-            U3,
-            segment(U3, U0, "o_ro_u30"),
-          ],
+      [
+        [
+          T0,
+          segment(T0, T1, "o_ro_t01"),
+          T1,
+          segment(T1, T2, "o_ro_t12"),
+          T2,
+          segment(T2, T3, "o_ro_t23"),
+          T3,
+          segment(T3, T0, "o_ro_t30"),
         ],
-      },
+        [
+          U0,
+          segment(U0, U1, "o_ro_u01"),
+          U1,
+          segment(U1, U2, "o_ro_u12"),
+          U2,
+          segment(U2, U3, "o_ro_u23"),
+          U3,
+          segment(U3, U0, "o_ro_u30"),
+        ],
+      ],
       "o_ro_tw_p",
     );
     const twoInset = roundOffset(twoHoles, -0.12, "o_ro_tw");
@@ -252,7 +247,7 @@ export default defineScene({
         Cd,
         segment(Cd, Ca, "o_ro_cda"),
       ],
-      { holes: [Creach] },
+      [Creach],
       "o_ro_ch_p",
     );
     const circInset = roundOffset(circHole, -0.12, "o_ro_ch");
@@ -297,6 +292,7 @@ export default defineScene({
         B11,
         segment(B11, B0, "o_ro_b110"),
       ],
+      [],
       "o_ro_bone_p",
     );
     const boneInset = roundOffset(bone, -0.12, "o_ro_bone");
@@ -329,6 +325,7 @@ export default defineScene({
         V7,
         segment(V7, V0, "o_ro_v70"),
       ],
+      [],
       "o_ro_u_p",
     );
     const uOutset = roundOffset(u, 0.22, "o_ro_u");
@@ -354,20 +351,18 @@ export default defineScene({
         Pd,
         segment(Pd, Pa, "o_ro_pda"),
       ],
-      {
-        holes: [
-          [
-            Ph0,
-            segment(Ph0, Ph1, "o_ro_phab"),
-            Ph1,
-            segment(Ph1, Ph2, "o_ro_phbc"),
-            Ph2,
-            segment(Ph2, Ph3, "o_ro_phcd"),
-            Ph3,
-            segment(Ph3, Ph0, "o_ro_phda"),
-          ],
+      [
+        [
+          Ph0,
+          segment(Ph0, Ph1, "o_ro_phab"),
+          Ph1,
+          segment(Ph1, Ph2, "o_ro_phbc"),
+          Ph2,
+          segment(Ph2, Ph3, "o_ro_phcd"),
+          Ph3,
+          segment(Ph3, Ph0, "o_ro_phda"),
         ],
-      },
+      ],
       "o_ro_sh_p",
     );
     const shared = roundOffset(sharedPlate, -gap, "o_ro_sh");

@@ -1303,6 +1303,7 @@ describe("profile tool", () => {
               },
             ],
           },
+          { kind: "array", items: [] },
         ],
       },
     });
@@ -1360,6 +1361,7 @@ describe("profile tool", () => {
               { kind: "call", name: "along" },
             ],
           },
+          { kind: "array", items: [] },
         ],
       },
     });

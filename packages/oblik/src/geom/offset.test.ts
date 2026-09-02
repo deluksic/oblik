@@ -20,7 +20,7 @@ function poly(pts: readonly Vec2[]): Region {
     const b = pts[(i + 1) % pts.length]!;
     cycle.push(a, { kind: "segment", a, b } satisfies Segment);
   }
-  return regionValue(cycle);
+  return regionValue(cycle, []);
 }
 
 function seg(a: Vec2, b: Vec2): Segment {
@@ -47,9 +47,10 @@ function twoHoles(web: number): Region {
   const a2 = 1.9;
   const b1 = a2 + web;
   const b2 = b1 + 1.4;
-  return regionValue(rectCycle(0, 0, 4, 2), {
-    holes: [rectCycle(a1, 0.4, a2, 1.6), rectCycle(b1, 0.4, b2, 1.6)],
-  });
+  return regionValue(rectCycle(0, 0, 4, 2), [
+    rectCycle(a1, 0.4, a2, 1.6),
+    rectCycle(b1, 0.4, b2, 1.6),
+  ]);
 }
 
 const square = poly([
@@ -63,7 +64,7 @@ const A = { x: 2, y: 0 };
 const B = { x: 0, y: 2 };
 const chord: Segment = { kind: "segment", a: A, b: B };
 const reach: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
-const slice = regionValue([A, chord, B, alongValue(reach, -1)]);
+const slice = regionValue([A, chord, B, alongValue(reach, -1)], []);
 
 function roundedSquare(r: number): Region {
   const pts: Vec2[] = [
@@ -78,7 +79,7 @@ function roundedSquare(r: number): Region {
     const b = pts[(i + 1) % pts.length]!;
     cycle.push(filletValue(a, r), { kind: "segment", a, b } satisfies Segment);
   }
-  return regionValue(cycle);
+  return regionValue(cycle, []);
 }
 
 function sector(deg: number): Region {
@@ -90,7 +91,7 @@ function sector(deg: number): Region {
   const oa: Segment = { kind: "segment", a: O, b: P };
   const ob: Segment = { kind: "segment", a: O, b: Q };
   const c: Circle = { kind: "circle", center: O, radius: r };
-  return regionValue([O, oa, P, alongValue(c, 1), Q, ob]);
+  return regionValue([O, oa, P, alongValue(c, 1), Q, ob], []);
 }
 
 describe("roundOffsetValue", () => {
@@ -224,7 +225,7 @@ describe("roundOffsetValue", () => {
       const b = pts[(i + 1) % pts.length]!;
       cycle.push(i === 0 ? filletValue(a, 0.05) : a, { kind: "segment", a, b } satisfies Segment);
     }
-    const face = regionValue(cycle);
+    const face = regionValue(cycle, []);
     expect(face.outer).toHaveLength(5);
     const out = roundOffsetValue(face, -0.12);
     expect(out).toHaveLength(1);
@@ -273,14 +274,17 @@ describe("roundOffsetValue", () => {
     const tip = { x: 3.76, y: 10.12 };
     const left: Segment = { kind: "segment", a: { x: g.x, y: g.y }, b: tip };
     const right: Segment = { kind: "segment", a: tip, b: { x: g2.x, y: g2.y } };
-    const face = regionValue([
-      tip,
-      left,
-      filletValue({ x: g.x, y: g.y }, 0.36),
-      alongValue(c, 1),
-      filletValue({ x: g2.x, y: g2.y }, 0.36),
-      right,
-    ]);
+    const face = regionValue(
+      [
+        tip,
+        left,
+        filletValue({ x: g.x, y: g.y }, 0.36),
+        alongValue(c, 1),
+        filletValue({ x: g2.x, y: g2.y }, 0.36),
+        right,
+      ],
+      [],
+    );
     expect(walkEdges(face.outer).length).toBe(5);
     const out = roundOffsetValue(face, 0.359);
     expect(out).toHaveLength(1);
@@ -392,14 +396,14 @@ describe("roundOffsetValue", () => {
 
   test("playground two-hole plate at -0.2 keeps the voids", () => {
     const holes = [rectCycle(7.7, 4.15, 9.15, 5.45), rectCycle(9.55, 4.15, 11.0, 5.45)];
-    const reported = roundOffsetValue(regionValue(rectCycle(7.2, 3.5, 11.4, 6.1), { holes }), -0.2);
+    const reported = roundOffsetValue(regionValue(rectCycle(7.2, 3.5, 11.4, 6.1), holes), -0.2);
     expect(reported.length).toBeGreaterThan(0);
     expect(reported.some((q) => regionContains(q, { x: 7.45, y: 4.8 }))).toBe(true);
     expect(reported.some((q) => regionContains(q, { x: 8.4, y: 4.8 }))).toBe(false);
     expect(reported.some((q) => regionContains(q, { x: 10.3, y: 4.8 }))).toBe(false);
     expect(reported.some((q) => regionContains(q, { x: 9.35, y: 4.8 }))).toBe(false);
 
-    const scene = roundOffsetValue(regionValue(rectCycle(7.2, 3.5, 11.8, 6.1), { holes }), -0.2);
+    const scene = roundOffsetValue(regionValue(rectCycle(7.2, 3.5, 11.8, 6.1), holes), -0.2);
     expect(scene).toHaveLength(1);
     expect(scene[0]?.holes.length).toBeGreaterThan(0);
     expect(regionContains(scene[0]!, { x: 7.45, y: 4.8 })).toBe(true);
@@ -411,9 +415,7 @@ describe("roundOffsetValue", () => {
 
   test("two-arc circular hole stays a hole under inset and outset", () => {
     const center = { x: 13.7, y: 4.8 };
-    const p = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), {
-      holes: [twoArcCircle(center, 0.52)],
-    });
+    const p = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), [twoArcCircle(center, 0.52)]);
     expect(p.holes).toHaveLength(1);
 
     for (const d of [-0.12, -0.01, 0.12] as const) {
@@ -428,7 +430,7 @@ describe("roundOffsetValue", () => {
   test("circle hole stays a concentric circle under inset and outset", () => {
     const center = { x: 13.7, y: 4.8 };
     const hole: Circle = { kind: "circle", center, radius: 0.52 };
-    const p = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), { holes: [hole] });
+    const p = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), [hole]);
     expect(isCircleWalk(p.holes[0]!)).toBe(true);
 
     for (const d of [-0.12, -0.01, 0.12] as const) {
@@ -447,7 +449,7 @@ describe("roundOffsetValue", () => {
 
   test("circle outer insets to a concentric circle", () => {
     const out = roundOffsetValue(
-      regionValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 }),
+      regionValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 }, []),
       -0.2,
     );
     expect(out).toHaveLength(1);
@@ -460,7 +462,7 @@ describe("roundOffsetValue", () => {
   });
 
   test("two-arc circular disk insets to a smaller disk", () => {
-    const out = roundOffsetValue(regionValue(twoArcCircle({ x: 0, y: 0 }, 1)), -0.2);
+    const out = roundOffsetValue(regionValue(twoArcCircle({ x: 0, y: 0 }, 1), []), -0.2);
     expect(out).toHaveLength(1);
     expect(out[0]?.holes).toHaveLength(0);
     expect(regionContains(out[0]!, { x: 0, y: 0 })).toBe(true);
@@ -469,10 +471,9 @@ describe("roundOffsetValue", () => {
   });
 
   test("a washer offsets as two concentric circles", () => {
-    const p = regionValue(
-      { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
-      { holes: [{ kind: "circle", center: { x: 0, y: 0 }, radius: 0.8 }] },
-    );
+    const p = regionValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 2 }, [
+      { kind: "circle", center: { x: 0, y: 0 }, radius: 0.8 },
+    ]);
     expect(regionContains(p, { x: 1.2, y: 0 })).toBe(true);
     expect(regionContains(p, { x: 0, y: 0 })).toBe(false);
     const out = roundOffsetValue(p, -0.2);
@@ -546,7 +547,7 @@ describe("regionCorners / filletAtVertex", () => {
     const top: Segment = { kind: "segment", a: C, b: D };
     const cR: Circle = { kind: "circle", center: { x: 2, y: 0.5 }, radius: 0.5 };
     const cL: Circle = { kind: "circle", center: { x: 0, y: 0.5 }, radius: 0.5 };
-    const face = regionValue([ptB, alongValue(cR, 1), C, top, D, alongValue(cL, 1), ptA, bot]);
+    const face = regionValue([ptB, alongValue(cR, 1), C, top, D, alongValue(cL, 1), ptA, bot], []);
     expect(face.outer).toHaveLength(4);
     const corners = regionCorners(face);
     expect(corners).toHaveLength(4);

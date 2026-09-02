@@ -258,7 +258,7 @@ export function plate() {
   const ab = segment(origin, B, "o_ab");
   const bc = segment(B, C, "o_bc");
   const ca = segment(C, origin, "o_ca");
-  region([fillet(origin, 0.1), ab, B, bc, C, ca], "o_mix");
+  region([fillet(origin, 0.1), ab, B, bc, C, ca], [], "o_mix");
   return { origin, drill };
 }
 `;

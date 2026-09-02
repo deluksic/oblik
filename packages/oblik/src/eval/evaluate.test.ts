@@ -199,7 +199,7 @@ describe("evaluate", () => {
         const A = pointOnCircle(c, 1, 0, "a");
         const B = pointOnCircle(c, 0, 1, "b");
         const ch = segment(A, B, "ch");
-        return region([A, ch, B, along(c, -1)], "pr");
+        return region([A, ch, B, along(c, -1)], [], "pr");
       },
     });
     const { trace } = evaluate(scene);
@@ -239,11 +239,7 @@ describe("evaluate", () => {
         const hbc = segment(h1, h2, "hbc");
         const hcd = segment(h2, h3, "hcd");
         const hda = segment(h3, h0, "hda");
-        return region(
-          [A, ab, B, bc, C, cd, D, da],
-          { holes: [[h0, hab, h1, hbc, h2, hcd, h3, hda]] },
-          "pr",
-        );
+        return region([A, ab, B, bc, C, cd, D, da], [[h0, hab, h1, hbc, h2, hcd, h3, hda]], "pr");
       },
     });
     const { trace } = evaluate(scene);
@@ -264,7 +260,7 @@ describe("evaluate", () => {
         const ab = segment(A, B, "ab");
         const bc = segment(B, C, "bc");
         const ca = segment(C, A, "ca");
-        return region([fillet(A, 0.3), ab, B, bc, C, ca], "pr");
+        return region([fillet(A, 0.3), ab, B, bc, C, ca], [], "pr");
       },
     });
     const { trace } = evaluate(scene);
@@ -300,13 +296,13 @@ describe("evaluate", () => {
         const A = pointOnCircle(c, 1, 0, "a");
         const B = pointOnCircle(c, 0, 1, "b");
         const ch = segment(A, B, "ch");
-        const face = region([A, ch, B, along(c, -1)], "pr");
+        const face = region([A, ch, B, along(c, -1)], [], "pr");
         return roundOffset(face, -0.12, "off");
       },
     });
     const { trace } = evaluate(scene, {
       annotations: analyze(
-        `const face = region([A, ch, B, along(c, -1)], "pr");\nroundOffset(face, -0.12, "off");\n`,
+        `const face = region([A, ch, B, along(c, -1)], [], "pr");\nroundOffset(face, -0.12, "off");\n`,
       ),
     });
     const off = trace.find((n) => n.id === "off");
@@ -338,9 +334,9 @@ describe("evaluate", () => {
         const bc = segment(B, C, "bc");
         const cd = segment(C, D, "cd");
         const da = segment(D, A, "da");
-        const stock = region([A, ab, B, bc, C, cd, D, da], "pr");
+        const stock = region([A, ab, B, bc, C, cd, D, da], [], "pr");
         const split = segment(point(1, -1, "s0"), point(1, 3, "s1"), "sp");
-        const left = intersect(stock, leftOf(split), "reg");
+        const left = intersect([stock, leftOf(split)], "reg");
         return { stock, left };
       },
     });
@@ -363,9 +359,9 @@ describe("evaluate", () => {
         const bc = segment(B, C, "bc");
         const cd = segment(C, D, "cd");
         const da = segment(D, A, "da");
-        const stock = region([A, ab, B, bc, C, cd, D, da], "pr");
+        const stock = region([A, ab, B, bc, C, cd, D, da], [], "pr");
         const split = segment(point(Number.NaN, 0, "s0"), point(1, 3, "s1"), "sp");
-        intersect(stock, leftOf(split), "reg");
+        intersect([stock, leftOf(split)], "reg");
         return stock;
       },
     });
