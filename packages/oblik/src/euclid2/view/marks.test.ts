@@ -1,7 +1,17 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "@/eval/context";
-import { chromePasses, hoverNode, isGrabbable, isHot, isHover, isSelected, liftSelected, splitChrome } from "./marks";
+
+import {
+  chromePasses,
+  hoverNode,
+  isGrabbable,
+  isHot,
+  isHover,
+  isSelected,
+  liftSelected,
+  splitChrome,
+} from "./marks";
 
 const A = {
   id: "o_a",
@@ -43,25 +53,53 @@ const OFFSET = {
   stack: [],
 } as TraceNode;
 
+const OFFSET_REGION = {
+  id: "o_off",
+  occ: 0,
+  kind: "region",
+  value: {
+    kind: "region",
+    stock: { kind: "offset", of: { kind: "profile", outer: [], holes: [] }, d: -0.2 },
+    subtract: [],
+    keep: [],
+  },
+  editable: true,
+  stack: [],
+} as TraceNode;
+
 describe("isGrabbable", () => {
-  test("editable points, circles, and parallel lines", () => {
+  test("editable points, circles, parallel lines, and offset regions", () => {
     expect(isGrabbable(A)).toBe(true);
     expect(isGrabbable(CIRCLE)).toBe(true);
     expect(isGrabbable(OFFSET)).toBe(true);
+    expect(isGrabbable(OFFSET_REGION)).toBe(true);
     expect(isGrabbable(SEG)).toBe(false);
     expect(isGrabbable({ ...A, editable: false })).toBe(false);
+    expect(isGrabbable({ ...OFFSET_REGION, editable: false })).toBe(false);
     expect(isGrabbable(null)).toBe(false);
   });
 });
 
 describe("splitChrome", () => {
   test("peels hover and selected without mixing groups", () => {
-    expect(splitChrome(["a", "b", "c", "d"], (x) => x === "d", (x) => x === "b")).toEqual({
+    expect(
+      splitChrome(
+        ["a", "b", "c", "d"],
+        (x) => x === "d",
+        (x) => x === "b",
+      ),
+    ).toEqual({
       rest: ["a", "c"],
       hover: ["b"],
       lifted: ["d"],
     });
-    expect(splitChrome(["a", "b"], (x) => x === "b", (x) => x === "b")).toEqual({
+    expect(
+      splitChrome(
+        ["a", "b"],
+        (x) => x === "b",
+        (x) => x === "b",
+      ),
+    ).toEqual({
       rest: ["a"],
       hover: [],
       lifted: ["b"],
@@ -71,7 +109,11 @@ describe("splitChrome", () => {
 
 describe("chromePasses", () => {
   test("idle then hover overlay+paint then selected overlay+paint", () => {
-    const band = splitChrome(["a", "b", "c"], (x) => x === "c", (x) => x === "b");
+    const band = splitChrome(
+      ["a", "b", "c"],
+      (x) => x === "c",
+      (x) => x === "b",
+    );
     expect(chromePasses(band)).toEqual([
       { items: ["a"] },
       { items: ["b"], overlay: true },
@@ -82,7 +124,11 @@ describe("chromePasses", () => {
   });
 
   test("dragging skips overlay passes and still lifts paint", () => {
-    const band = splitChrome(["a", "b", "c"], (x) => x === "c", (x) => x === "b");
+    const band = splitChrome(
+      ["a", "b", "c"],
+      (x) => x === "c",
+      (x) => x === "b",
+    );
     expect(chromePasses(band, false)).toEqual([
       { items: ["a"] },
       { items: ["b"] },

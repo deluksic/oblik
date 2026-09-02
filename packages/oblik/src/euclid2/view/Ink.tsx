@@ -4,7 +4,7 @@ import type { TraceNode } from "@/eval/context";
 import type { Circle, Profile, Region, Segment } from "@/geom";
 import { infiniteLineAxis } from "@/geom/ops";
 import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
-import { isRegion } from "@/geom/region";
+import { isOffsetRegion, isRegion } from "@/geom/region";
 import { regionPaint } from "@/geom/region-draw";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
@@ -286,6 +286,8 @@ function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean })
   const paint = createMemo(() => regionPaint(props.node.value as Region));
   const id = () => regionMaskId(`e2-${traceKey(props.node)}`);
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
+  const offset = createMemo(() => isRegion(props.node.value) && isOffsetRegion(props.node.value));
+  const stock = createMemo(() => paint().stock);
   return (
     <Show when={!paint().empty}>
       <RegionMaskDefs paint={paint()} id={id()} />
@@ -293,7 +295,7 @@ function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean })
         <For each={layers()}>
           {(layer) => (
             <RegionOp
-              op={paint().stock}
+              op={stock()}
               mask={regionMaskUrl(id())}
               class={
                 layer.kind === "paint"
@@ -308,6 +310,14 @@ function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean })
           )}
         </For>
       </RegionClipped>
+      <Show when={offset()}>
+        <RegionOp op={stock()} class={styles.hit} data-ink={traceKey(props.node)} fill="none" />
+        <RegionOp
+          op={stock()}
+          class={inkClass(props.node.editable, false, props.selected, props.hot)}
+          fill="none"
+        />
+      </Show>
     </Show>
   );
 }

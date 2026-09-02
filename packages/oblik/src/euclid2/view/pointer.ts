@@ -1,11 +1,20 @@
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "@/geom";
+import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Region, Segment } from "@/geom";
 import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "@/geom/gliders";
 import { lineBasis, signedDist } from "@/geom/ops";
+import { isOffset, isOffsetRegion, isRegion, offsetSourceSdf } from "@/geom/region";
 import { mul, perp, sub } from "@/geom/vec";
+
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
-import { gliderOnTraceNode, gliderSnapWorld, isCrossing, placeAllowsGliders, placeSnapWorld, resolvePlacePoint } from "../place";
+import {
+  gliderOnTraceNode,
+  gliderSnapWorld,
+  isCrossing,
+  placeAllowsGliders,
+  placeSnapWorld,
+  resolvePlacePoint,
+} from "../place";
 import { enrichHit, type PlaceHit, type Scope, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
@@ -93,6 +102,16 @@ export type Drag =
       downX: number;
       downY: number;
       moved: boolean;
+    }
+  | {
+      kind: "offset";
+      id: string;
+      node: TraceNode;
+      startD: number;
+      grabSdf: number;
+      downX: number;
+      downY: number;
+      moved: boolean;
     };
 
 export type EditDrag = Exclude<Drag, { kind: "pan" }>;
@@ -113,7 +132,11 @@ export function worldOf(
   return ndcToWorld(ndc, camera, size);
 }
 
-export function pointDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "point" }> {
+export function pointDrag(
+  node: TraceNode,
+  w: { x: number; y: number },
+  e: PointerEvent,
+): Extract<Drag, { kind: "point" }> {
   const p = node.value as Point;
   return {
     kind: "point",
@@ -129,7 +152,11 @@ export function pointDrag(node: TraceNode, w: { x: number; y: number }, e: Point
   };
 }
 
-export function radiusDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "radius" }> {
+export function radiusDrag(
+  node: TraceNode,
+  w: { x: number; y: number },
+  e: PointerEvent,
+): Extract<Drag, { kind: "radius" }> {
   const c = node.value as Circle;
   return {
     kind: "radius",
@@ -153,7 +180,11 @@ function carrierLine(ol: ParallelLine): Line {
   };
 }
 
-export function parallelDrag(node: TraceNode, w: { x: number; y: number }, e: PointerEvent): Extract<Drag, { kind: "parallel" }> {
+export function parallelDrag(
+  node: TraceNode,
+  w: { x: number; y: number },
+  e: PointerEvent,
+): Extract<Drag, { kind: "parallel" }> {
   const ol = node.value as ParallelLine;
   const base = carrierLine(ol);
   return {
@@ -219,6 +250,28 @@ export function gliderDrag(
   return null;
 }
 
+export function offsetDrag(
+  node: TraceNode,
+  w: { x: number; y: number },
+  e: PointerEvent,
+): Extract<Drag, { kind: "offset" }> | null {
+  if (!isRegion(node.value) || !isOffsetRegion(node.value)) return null;
+  const off = node.value.stock;
+  if (!isOffset(off)) return null;
+  const grabSdf = offsetSourceSdf(off, w);
+  if (!Number.isFinite(grabSdf)) return null;
+  return {
+    kind: "offset",
+    id: node.id,
+    node,
+    startD: off.d,
+    grabSdf,
+    downX: e.clientX,
+    downY: e.clientY,
+    moved: false,
+  };
+}
+
 export function editDragOf(
   e: PointerEvent,
   el: HTMLDivElement | null,
@@ -231,6 +284,7 @@ export function editDragOf(
   if (isGlider(hit.value)) return gliderDrag(hit, w, e);
   if (hit.value.kind === "circle") return radiusDrag(hit, w, e);
   if (hit.value.kind === "parallelLine") return parallelDrag(hit, w, e);
+  if (isRegion(hit.value) && isOffsetRegion(hit.value)) return offsetDrag(hit, w, e);
   return null;
 }
 
@@ -319,7 +373,10 @@ export function placeFromEvent(
     }
   }
   const screen = el
-    ? { x: e.clientX - el.getBoundingClientRect().left, y: e.clientY - el.getBoundingClientRect().top }
+    ? {
+        x: e.clientX - el.getBoundingClientRect().left,
+        y: e.clientY - el.getBoundingClientRect().top,
+      }
     : undefined;
   if (!length && screen) {
     const slider = hitSlider(screen, sliderNodes(trace));
@@ -366,7 +423,10 @@ export function applyDrag(
     return {
       draft: {
         id: drag.id,
-        values: [round(drag.startX + (w.x - drag.pointerX)), round(drag.startY + (w.y - drag.pointerY))],
+        values: [
+          round(drag.startX + (w.x - drag.pointerX)),
+          round(drag.startY + (w.y - drag.pointerY)),
+        ],
       },
     };
   }
@@ -393,8 +453,17 @@ export function applyDrag(
     const { ux, uy } = circleUnitAt(drag.circle, w);
     return { draft: { id: drag.id, values: [round(ux), round(uy)] } };
   }
+  if (drag.kind === "offset") {
+    const stock = isRegion(drag.node.value) ? drag.node.value.stock : null;
+    if (!stock || !isOffset(stock)) return {};
+    const sdf = offsetSourceSdf(stock, w);
+    if (!Number.isFinite(sdf)) return {};
+    return { draft: { id: drag.id, values: [round(drag.startD + (sdf - drag.grabSdf))] } };
+  }
   const now = Math.hypot(w.x - drag.origin.x, w.y - drag.origin.y);
-  return { draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] } };
+  return {
+    draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] },
+  };
 }
 
 export function dragMoved(drag: Drag, e: PointerEvent): boolean {

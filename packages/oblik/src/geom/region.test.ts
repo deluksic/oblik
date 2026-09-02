@@ -7,6 +7,7 @@ import {
   distToRegion,
   formulaSdf,
   leftOfValue,
+  offsetSourceSdf,
   offsetValue,
   regionContains,
   regionSvgPath,
@@ -258,6 +259,13 @@ describe("region CSG field", () => {
 });
 
 describe("offset operand", () => {
+  test("offsetSourceSdf is the un-offset operand field", () => {
+    const off = offsetValue(rect(0, 0, 1, 1), -0.2);
+    expect(offsetSourceSdf(off, { x: 0.5, y: 0.2 })).toBeCloseTo(-0.2);
+    expect(offsetSourceSdf(off, { x: 0.5, y: 0.5 })).toBeCloseTo(-0.5);
+    expect(offsetSourceSdf(off, { x: 0.5, y: -0.1 })).toBeCloseTo(0.1);
+  });
+
   test("membership is sdf − d, paint is the compiled walk", () => {
     const stock = rect(0, 0, 1, 1);
     const face = regionValue(offsetValue(stock, 0.2));

@@ -27,6 +27,11 @@ export function isRegion(v: { kind: string }): v is Region {
   return v.kind === "region";
 }
 
+/** Round-offset leftover: stock is an `offset` operand, not a baked profile. */
+export function isOffsetRegion(r: Region): boolean {
+  return isOffset(r.stock);
+}
+
 export function isFillGeom(v: { kind: string }): v is Profile | Region {
   return v.kind === "profile" || v.kind === "region";
 }
@@ -124,6 +129,11 @@ function operandSdf(op: RegionOperand, p: Vec2): number {
     return Number.isFinite(d) ? Math.max(Math.abs(d), 1e-6) : Number.NaN;
   }
   return d;
+}
+
+/** Signed distance to the un-offset operand (before subtracting `d`). */
+export function offsetSourceSdf(op: Offset, p: Vec2): number {
+  return operandSdf(op.of, p);
 }
 
 /** CSG field of the formula, ignoring this region's `contains` filter. */

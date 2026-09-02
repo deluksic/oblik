@@ -107,6 +107,7 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "gap" && n.kind === "slider")).toBe(true);
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("region");
+    expect(one?.editable).toBe(false);
     const stock = one?.value.kind === "region" ? one.value.stock : null;
     expect(stock?.kind).toBe("offset");
     expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
@@ -175,6 +176,7 @@ describe("migrated demo scenes", () => {
     );
     const inset = trace.find((n) => n.bind === "inset");
     expect(inset?.kind).toBe("region");
+    expect(inset?.editable).toBe(true);
     const insetStock = inset?.value.kind === "region" ? inset.value.stock : null;
     expect(insetStock?.kind).toBe("offset");
     expect(insetStock?.kind === "offset" ? insetStock.d : 0).toBeCloseTo(-0.12);

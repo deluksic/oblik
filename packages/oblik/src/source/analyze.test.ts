@@ -30,6 +30,16 @@ describe("analyze", () => {
     expect(sites[0]?.line).toBe(1);
     expect(sites[1]?.line).toBe(2);
   });
+
+  test("roundOffset distance literal is editable; a name is not", () => {
+    const map = analyze(
+      `roundOffset(face, -0.12, "o_off");\nroundOffset(face, -gap, "o_pie");\n`,
+      "t.ts",
+    );
+    expect(map.get("o_off")?.editable).toBe(true);
+    expect(map.get("o_off")?.literals).toEqual([-0.12]);
+    expect(map.get("o_pie")?.editable).toBe(false);
+  });
 });
 
 describe("stamp", () => {
@@ -58,7 +68,11 @@ describe("stamp", () => {
   });
 
   test("emits a source map for the Vite module path", () => {
-    const { map, added } = stamp("export const c = circle(80);\n", () => "o_1", "src/layout/plate.ts");
+    const { map, added } = stamp(
+      "export const c = circle(80);\n",
+      () => "o_1",
+      "src/layout/plate.ts",
+    );
     expect(added).toEqual(["o_1"]);
     expect(map.sources).toContain("src/layout/plate.ts");
     expect(map.mappings.length).toBeGreaterThan(0);
@@ -69,5 +83,10 @@ describe("patchLiterals", () => {
   test("rewrites dof args for an id", () => {
     const next = patchLiterals(src, "o_bb", [3.1]);
     expect(next).toContain('circle(A, 3.1, "o_bb")');
+  });
+
+  test("rewrites a roundOffset distance literal", () => {
+    const next = patchLiterals(`roundOffset(face, -0.12, "o_off");\n`, "o_off", [-0.3]);
+    expect(next).toContain('roundOffset(face, -0.3, "o_off")');
   });
 });
