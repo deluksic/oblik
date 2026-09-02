@@ -15,5 +15,8 @@ export const FIGURE_TOOLS: readonly FigureToolSpec[] = [
 export function filterFigureTools(query: string): FigureToolSpec[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...FIGURE_TOOLS];
-  return FIGURE_TOOLS.filter((t) => t.title.toLowerCase().includes(q) || t.id.includes(q) || t.hint.toLowerCase().includes(q));
+  return FIGURE_TOOLS.filter(
+    (t) =>
+      t.title.toLowerCase().includes(q) || t.id.includes(q) || t.hint.toLowerCase().includes(q),
+  );
 }

@@ -1,6 +1,6 @@
+import type { MentionFile, MentionFn } from "../source/mention";
 import type { TraceInv, TraceNode } from "./context";
 import { isUserSourcePath, sourceFileKey, type CallSite } from "./stack";
-import type { MentionFile, MentionFn } from "../source/mention";
 
 export type { TraceInv } from "./context";
 
@@ -12,7 +12,11 @@ function sameSourceFile(a: string, b: string): boolean {
   return sourceFileKey(a) === sourceFileKey(b);
 }
 
-function fnContaining(files: readonly MentionFile[], file: string | undefined, line: number | undefined): MentionFn | undefined {
+function fnContaining(
+  files: readonly MentionFile[],
+  file: string | undefined,
+  line: number | undefined,
+): MentionFn | undefined {
   if (!file || line == null) return undefined;
   const bundle = files.find((f) => sameSourceFile(f.file, file));
   if (!bundle) return undefined;
@@ -125,13 +129,17 @@ export function assignInv(trace: TraceNode[], files: readonly MentionFile[]): Tr
   return trace;
 }
 
-export function invMatches(n: TraceNode, focus: { file: string; name?: string; serial?: number; callerFile?: string; callerLine?: number }): boolean {
+export function invMatches(
+  n: TraceNode,
+  focus: { file: string; name?: string; serial?: number; callerFile?: string; callerLine?: number },
+): boolean {
   const inv = n.inv;
   if (!inv) return false;
   if (sourceFileKey(inv.file) !== sourceFileKey(focus.file)) return false;
   if (focus.name != null && inv.name !== focus.name) return false;
   if (focus.serial != null && inv.serial !== focus.serial) return false;
-  if (focus.callerFile != null && sourceFileKey(inv.callerFile) !== sourceFileKey(focus.callerFile)) return false;
+  if (focus.callerFile != null && sourceFileKey(inv.callerFile) !== sourceFileKey(focus.callerFile))
+    return false;
   if (focus.callerLine != null && inv.callerLine !== focus.callerLine) return false;
   return true;
 }

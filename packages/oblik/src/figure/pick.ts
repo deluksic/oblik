@@ -1,7 +1,7 @@
-import type { TraceNode } from "../eval/context";
-import { isGeomKind, paintsCovering } from "../eval/paint";
 import { isFiniteTrace, traceKey } from "../euclid2/pick";
 import { mentionExpr, type Scope } from "../euclid2/tool";
+import type { TraceNode } from "../eval/context";
+import { isGeomKind, paintsCovering } from "../eval/paint";
 
 export function isDrawnGeom(n: TraceNode): boolean {
   if (!isFiniteTrace(n)) return false;
@@ -15,7 +15,10 @@ export function brushAddHits(geoms: readonly TraceNode[], scope?: Scope): TraceN
 }
 
 /** Map construction hits to covering paint nodes, topmost first. */
-export function inkFromGeomHits(trace: readonly TraceNode[], geoms: readonly TraceNode[]): TraceNode[] {
+export function inkFromGeomHits(
+  trace: readonly TraceNode[],
+  geoms: readonly TraceNode[],
+): TraceNode[] {
   const seen = new Set<string>();
   const out: TraceNode[] = [];
   for (const g of geoms) {

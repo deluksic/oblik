@@ -21,9 +21,15 @@ export function readChromeMetrics(): ChromeMetrics {
   return {
     outlinePx: cssLengthPx(style, "--oblik-chrome-outline") ?? DEFAULT_CHROME_METRICS.outlinePx,
     knockoutPx: cssLengthPx(style, "--oblik-chrome-knockout") ?? DEFAULT_CHROME_METRICS.knockoutPx,
-    pointOutlinePx: cssLengthPx(style, "--oblik-chrome-point-outline") ?? DEFAULT_CHROME_METRICS.pointOutlinePx,
-    pointKnockoutPx: cssLengthPx(style, "--oblik-chrome-point-knockout") ?? DEFAULT_CHROME_METRICS.pointKnockoutPx,
-    hoverOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-hover") ?? DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
-    selectOutlineOpacity: cssNumber(style, "--oblik-chrome-outline-selected") ?? DEFAULT_CHROME_METRICS.selectOutlineOpacity,
+    pointOutlinePx:
+      cssLengthPx(style, "--oblik-chrome-point-outline") ?? DEFAULT_CHROME_METRICS.pointOutlinePx,
+    pointKnockoutPx:
+      cssLengthPx(style, "--oblik-chrome-point-knockout") ?? DEFAULT_CHROME_METRICS.pointKnockoutPx,
+    hoverOutlineOpacity:
+      cssNumber(style, "--oblik-chrome-outline-hover") ??
+      DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
+    selectOutlineOpacity:
+      cssNumber(style, "--oblik-chrome-outline-selected") ??
+      DEFAULT_CHROME_METRICS.selectOutlineOpacity,
   };
 }

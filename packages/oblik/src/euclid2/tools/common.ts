@@ -1,7 +1,8 @@
 import { printExpr, parsePath, type Expr } from "@/source/expr";
 import { hoistIntersections, printHoist, takeBind } from "@/source/hoist";
-import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
+
 import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
+import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
 export { isConstructed, isGliderPlace, isPinnedPoint };
@@ -51,7 +52,11 @@ export function exprOfPlace(p: PlacePoint): Expr {
     return {
       kind: "call",
       name: "pointOnCircle",
-      args: [parsePath(p.bind), { kind: "num", value: round(p.ux) }, { kind: "num", value: round(p.uy) }],
+      args: [
+        parsePath(p.bind),
+        { kind: "num", value: round(p.ux) },
+        { kind: "num", value: round(p.uy) },
+      ],
     };
   }
   return {
@@ -89,7 +94,10 @@ export function constructedInsert(p: PlacePoint): InsertJob | null {
   return { from: p.kind, args: e.args };
 }
 
-export function hoverPlace(p: PlacePoint, trace: readonly { occ: number; bind?: string; id: string }[]): string | null {
+export function hoverPlace(
+  p: PlacePoint,
+  trace: readonly { occ: number; bind?: string; id: string }[],
+): string | null {
   if (p.kind === "ref") return p.id;
   if (isGliderPlace(p)) return p.id ?? hoverBind(trace, p.bind);
   if (p.kind === "lineIntersection") return hoverBind(trace, p.a);
@@ -108,7 +116,9 @@ export function previewCall(
   const used = new Set(usedNames);
   const { exprs, hoists } = hoistIntersections(args, used);
   const id = bind?.trim() ? bind.trim() : takeBind(used, from);
-  return [...hoists.map(printHoist), `const ${id} = ${call(exprs.map((e) => printExpr(e)))}`].join("\n");
+  return [...hoists.map(printHoist), `const ${id} = ${call(exprs.map((e) => printExpr(e)))}`].join(
+    "\n",
+  );
 }
 
 export function exprOfPrint(print: string): Expr {

@@ -2,9 +2,26 @@ import type { LineLike } from "@/geom";
 import { lineBasis } from "@/geom/ops";
 import { add, perp } from "@/geom/vec";
 import { printExpr } from "@/source/expr";
+
 import { snapLineCarrier } from "../pick";
-import { asPoint, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, isPinnedPoint, previewCall } from "./common";
-import { inSlot, nameField, previewName, refField, resolveCarrier, resolvePoint, withBind } from "./draft";
+import {
+  asPoint,
+  exprOfPlace,
+  exprOfPrint,
+  hoverBind,
+  hoverPlace,
+  isPinnedPoint,
+  previewCall,
+} from "./common";
+import {
+  inSlot,
+  nameField,
+  previewName,
+  refField,
+  resolveCarrier,
+  resolvePoint,
+  withBind,
+} from "./draft";
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -67,14 +84,27 @@ export const perpendicularLine: Tool<PerpSession> = {
     prefix: "perp",
     aliases: ["perpendicular", "normal"],
   },
-  start: () => ({ verb: "perpendicularLine", focus: "carrier", carrierRef: "", throughRef: "", name: "" }),
+  start: () => ({
+    verb: "perpendicularLine",
+    focus: "carrier",
+    carrierRef: "",
+    throughRef: "",
+    name: "",
+  }),
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as PerpSession["focus"] }),
   hit(session, hit, ctx) {
     if (!carrierOf(session, toolScope(ctx))) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
-      const carrier = snapLineCarrier(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
+      const carrier = snapLineCarrier(
+        ctx.trace,
+        hit.world,
+        ctx.camera,
+        ctx.size,
+        undefined,
+        filter,
+      );
       return carrier ? { ...hit, carrier } : hit;
     }
     return hit;
@@ -100,7 +130,10 @@ export const perpendicularLine: Tool<PerpSession> = {
       };
     }
     return {
-      insert: withBind(session, { from: "perpendicularLine", args: [carrier.expr, asPoint(hit).expr] }),
+      insert: withBind(session, {
+        from: "perpendicularLine",
+        args: [carrier.expr, asPoint(hit).expr],
+      }),
     };
   },
   commit(session, _place, scope) {
@@ -111,7 +144,12 @@ export const perpendicularLine: Tool<PerpSession> = {
       return null;
     }
     if (through) {
-      return { insert: withBind(session, { from: "perpendicularLine", args: [carrier.expr, through.expr] }) };
+      return {
+        insert: withBind(session, {
+          from: "perpendicularLine",
+          args: [carrier.expr, through.expr],
+        }),
+      };
     }
     if (session.focus === "name") return { session: { ...session, focus: "through" } };
     if (session.focus === "carrier") return { session: { ...session, focus: "through" } };

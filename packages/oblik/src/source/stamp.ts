@@ -17,13 +17,21 @@ export function stamp(
   source: string,
   nextId: () => string = freshSiteId,
   file = "scene.ts",
-): { source: string; added: string[]; map: { mappings: string; names: string[]; sources: string[]; version: 3 } } {
+): {
+  source: string;
+  added: string[];
+  map: { mappings: string; names: string[]; sources: string[]; version: 3 };
+} {
   const specs = siteSpecs();
   const sf = parse(source);
   const ms = new MagicString(source);
   const added: string[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && specs.has(node.expression.text)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      specs.has(node.expression.text)
+    ) {
       const { id } = trailingId(node);
       if (!id) {
         const fresh = nextId();

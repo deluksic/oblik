@@ -22,13 +22,20 @@ describe("infiniteLineAxis", () => {
       line: { kind: "line", origin: { x: 0, y: 1 }, direction: { x: 1, y: 0 } },
       distance: 1,
     };
-    expect(infiniteLineAxis(offset)).toEqual({ origin: offset.line.origin, dir: offset.line.direction });
+    expect(infiniteLineAxis(offset)).toEqual({
+      origin: offset.line.origin,
+      dir: offset.line.direction,
+    });
   });
 
   test("returns null for other kinds and missing fields", () => {
     expect(infiniteLineAxis(undefined)).toBeNull();
-    expect(infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 } as never)).toBeNull();
-    expect(infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } as never)).toBeNull();
+    expect(
+      infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 } as never),
+    ).toBeNull();
+    expect(
+      infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } as never),
+    ).toBeNull();
     expect(infiniteLineAxis({ kind: "parallelLine" })).toBeNull();
     expect(infiniteLineAxis({ kind: "line" })).toBeNull();
   });
@@ -72,7 +79,11 @@ describe("circleCircleIntersectionValue", () => {
 describe("circleLineIntersectionValue", () => {
   test("a numerically shy tangent still hits", () => {
     const c: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 1 };
-    const line = { kind: "line" as const, origin: { x: 1 + 1e-12, y: 0 }, direction: { x: 0, y: 1 } };
+    const line = {
+      kind: "line" as const,
+      origin: { x: 1 + 1e-12, y: 0 },
+      direction: { x: 0, y: 1 },
+    };
     const p = circleLineIntersectionValue(c, line, 1);
     expect(p.x).toBeCloseTo(1, 6);
     expect(p.y).toBeCloseTo(0, 6);

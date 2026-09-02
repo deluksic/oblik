@@ -8,7 +8,11 @@ type Listener = (event: Event) => void;
 function mockDocument() {
   const listeners = new Map<string, Set<{ fn: Listener; capture: boolean }>>();
   const doc = {
-    addEventListener(type: string, fn: EventListenerOrEventListenerObject, opts?: boolean | { signal?: AbortSignal; capture?: boolean }) {
+    addEventListener(
+      type: string,
+      fn: EventListenerOrEventListenerObject,
+      opts?: boolean | { signal?: AbortSignal; capture?: boolean },
+    ) {
       const capture = typeof opts === "object" ? opts.capture === true : opts === true;
       let set = listeners.get(type);
       if (!set) {
@@ -160,7 +164,11 @@ describe("createDragHandler", () => {
     const doc = install();
     let finished = 0;
     const { start, dispose } = withHandler(() =>
-      createDragHandler({ preventDefault: false }).start(() => ({ onDone() { finished += 1; } })),
+      createDragHandler({ preventDefault: false }).start(() => ({
+        onDone() {
+          finished += 1;
+        },
+      })),
     );
     start(pointerEvent({ clientX: 0, clientY: 0 }));
     doc.fire("touchstart", { touches: { length: 2 } } as TouchEvent);
@@ -173,7 +181,11 @@ describe("createDragHandler", () => {
     const doc = install();
     let finished = 0;
     const { start, dispose } = withHandler(() =>
-      createDragHandler({ preventDefault: false }).start(() => ({ onDone() { finished += 1; } })),
+      createDragHandler({ preventDefault: false }).start(() => ({
+        onDone() {
+          finished += 1;
+        },
+      })),
     );
     start(pointerEvent({ clientX: 0, clientY: 0 }));
     expect(doc.listenerCount("pointermove")).toBe(1);

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { CONSTRUCTION_STROKE_PX, DEFAULT_CHROME_METRICS, chromeClipUrl, chromeLayers, circleClipD, layerStrokeWidth, outsideClipD } from "./chrome";
+import {
+  CONSTRUCTION_STROKE_PX,
+  DEFAULT_CHROME_METRICS,
+  chromeClipUrl,
+  chromeLayers,
+  circleClipD,
+  layerStrokeWidth,
+  outsideClipD,
+} from "./chrome";
 
 const M = DEFAULT_CHROME_METRICS;
 
@@ -30,7 +38,9 @@ describe("chromeLayers", () => {
   });
 
   test("selected overlay is an opaque outline with a thinner knockout on top", () => {
-    expect(chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true }, M)).toEqual([
+    expect(
+      chromeLayers(CONSTRUCTION_STROKE_PX, { selected: true, hover: false, overlay: true }, M),
+    ).toEqual([
       { kind: "outline", width: M.outlinePx, opacity: M.selectOutlineOpacity },
       { kind: "knockout", width: M.knockoutPx },
     ]);
@@ -44,7 +54,9 @@ describe("chromeLayers", () => {
     const knock = layers.find((l) => l.kind === "knockout");
     expect(knock?.width).toBeGreaterThan(5.6);
     expect(outline?.width).toBeGreaterThan(knock!.width);
-    expect(chromeLayers(2.8, { selected: true, hover: false, overlay: true }, M)[1]?.width).toBeGreaterThan(2.8);
+    expect(
+      chromeLayers(2.8, { selected: true, hover: false, overlay: true }, M)[1]?.width,
+    ).toBeGreaterThan(2.8);
     // 5.6px paint: paper extra 2.5, ring extra 3 → knockout 8.1, outline 11.1
     expect(knock?.width).toBe(5.6 + (M.knockoutPx - CONSTRUCTION_STROKE_PX));
     expect(outline?.width).toBe(knock!.width + (M.outlinePx - M.knockoutPx));
@@ -84,14 +96,16 @@ describe("chromeLayers", () => {
   });
 
   test("point hover overlay uses a wider band than strokes", () => {
-    expect(chromeLayers(2, { selected: false, hover: true, overlay: true, point: true }, M)).toEqual([
-      { kind: "outline", width: M.pointOutlinePx, opacity: M.hoverOutlineOpacity },
-    ]);
+    expect(
+      chromeLayers(2, { selected: false, hover: true, overlay: true, point: true }, M),
+    ).toEqual([{ kind: "outline", width: M.pointOutlinePx, opacity: M.hoverOutlineOpacity }]);
     expect(M.pointOutlinePx).toBeGreaterThan(M.outlinePx);
   });
 
   test("point selected overlay uses a wider opaque ring and gap", () => {
-    expect(chromeLayers(2, { selected: true, hover: false, overlay: true, point: true }, M)).toEqual([
+    expect(
+      chromeLayers(2, { selected: true, hover: false, overlay: true, point: true }, M),
+    ).toEqual([
       { kind: "outline", width: M.pointOutlinePx, opacity: M.selectOutlineOpacity },
       { kind: "knockout", width: M.pointKnockoutPx },
     ]);

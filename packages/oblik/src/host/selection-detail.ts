@@ -1,9 +1,9 @@
-import type { CallSite } from "../eval/stack";
-import { isUserSourcePath, sourceFileKey } from "../eval/stack";
 import type { TraceNode } from "../eval/context";
 import { invMatches } from "../eval/inv";
-import { normalizeSceneRelPath } from "../source/scene-path";
+import type { CallSite } from "../eval/stack";
+import { isUserSourcePath, sourceFileKey } from "../eval/stack";
 import type { MentionFile, MentionFn } from "../source/mention";
+import { normalizeSceneRelPath } from "../source/scene-path";
 
 export type OriginCodeLine = {
   kind: "code";
@@ -53,7 +53,10 @@ export type OriginView =
 export const EMPTY_SELECTION_DETAIL: SelectionDetail = {
   crumb: "Nothing selected",
   meta: "Current scope, no geometry.",
-  origin: { kind: "empty", message: "Current scope, no geometry selected. Click a helper on the tape to dive." },
+  origin: {
+    kind: "empty",
+    message: "Current scope, no geometry selected. Click a helper on the tape to dive.",
+  },
 };
 
 function fileName(file: string): string {
@@ -100,7 +103,11 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function findFunctionHeaderRow(rows: readonly string[], line: number, name?: string): number | null {
+export function findFunctionHeaderRow(
+  rows: readonly string[],
+  line: number,
+  name?: string,
+): number | null {
   const target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
   for (let n = target; n >= 0; n--) {
     if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
@@ -126,7 +133,8 @@ function rowLooksLikeFunctionHeader(text: string, name?: string): boolean {
   }
   if (/^\s*export\s+(?:async\s+)?function\s+\w+/.test(text)) return true;
   if (/^\s*(?:async\s+)?function\s+\w+/.test(text)) return true;
-  if (/^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/.test(text) && /=>|function/.test(text)) return true;
+  if (/^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/.test(text) && /=>|function/.test(text))
+    return true;
   return false;
 }
 
@@ -229,7 +237,11 @@ function scanFunctionEnd(rows: readonly string[], headerIdx: number): number {
   return rows.length;
 }
 
-export function buildOriginFrameLines(text: string, line: number, name?: string): OriginDisplayLine[] {
+export function buildOriginFrameLines(
+  text: string,
+  line: number,
+  name?: string,
+): OriginDisplayLine[] {
   const rows = text.split("\n");
   const headerIdx = findFunctionHeaderRow(rows, line, name);
   let target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
@@ -316,7 +328,12 @@ export async function peekFile(
   file: string,
   module?: string,
 ): Promise<string> {
-  const keys = [...new Set([normalizeSceneRelPath(file, module), file.replace(/^\/+/, "").replace(/\?.*$/, "")])];
+  const keys = [
+    ...new Set([
+      normalizeSceneRelPath(file, module),
+      file.replace(/^\/+/, "").replace(/\?.*$/, ""),
+    ]),
+  ];
   for (const key of keys) {
     const cached = cache.get(key);
     if (cached != null) return cached;
@@ -404,7 +421,9 @@ export function stackForNode(node: TraceNode): CallSite[] {
   return fromStack;
 }
 
-function constructorSite(node: TraceNode): { file: string; line: number; column: number } | undefined {
+function constructorSite(
+  node: TraceNode,
+): { file: string; line: number; column: number } | undefined {
   if (!node.at || !node.module) return undefined;
   return { file: node.module, line: node.at.line, column: node.at.column };
 }
@@ -440,7 +459,11 @@ export async function selectionDetailForNode(node: TraceNode): Promise<Selection
   };
 }
 
-function fnAtLine(mentions: readonly MentionFile[], file: string, line: number): MentionFn | undefined {
+function fnAtLine(
+  mentions: readonly MentionFile[],
+  file: string,
+  line: number,
+): MentionFn | undefined {
   const key = sourceFileKey(file);
   let best: MentionFn | undefined;
   for (const bundle of mentions) {
@@ -586,7 +609,8 @@ export function emptyScopeDetail(focus: ScopePick): SelectionDetail {
     meta: originFileLabel(focus.file),
     origin: {
       kind: "empty",
-      message: "Current scope, no geometry selected. Click a helper on the tape or a parent frame to change scope.",
+      message:
+        "Current scope, no geometry selected. Click a helper on the tape or a parent frame to change scope.",
     },
     focus,
   };
@@ -608,7 +632,9 @@ export async function selectionDetailForScope(opts: {
       const fn = focus.name
         ? mentions
             .flatMap((m) => m.functions)
-            .find((f) => f.name === focus.name && sourceFileKey(f.file) === sourceFileKey(focus.file))
+            .find(
+              (f) => f.name === focus.name && sourceFileKey(f.file) === sourceFileKey(focus.file),
+            )
         : undefined;
       const span = functionSourceSpan(text, {
         startLine: fn?.startLine,

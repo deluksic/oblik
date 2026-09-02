@@ -375,7 +375,7 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, slider \} from "oblik"/);
   });
 
-  test("inserts profile as region([...], id) and imports along", () => {
+  test("inserts region as region([...], id) and imports along", () => {
     const next = insertCall(withBinds("chord", "B", "c"), {
       from: "region",
       bind: "slice",
@@ -525,7 +525,7 @@ export default defineScene({
     expect(next).toContain('const s = segment(plate.c0, plate.c1, "o_s");');
   });
 
-  test("patches fillet(A, r) into a profile array vertex", () => {
+  test("patches fillet(A, r) into a region array vertex", () => {
     const faceSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 
@@ -612,7 +612,7 @@ export default defineScene({
     expect(next).toContain("fillet(lineIntersection(ground, wall), 0.2)");
   });
 
-  test("patches a helper-scope profile array by id", () => {
+  test("patches a helper-scope region array by id", () => {
     const helperSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 
@@ -642,7 +642,7 @@ export default defineScene({
     expect(next).toContain('region([fillet(A, 0.1), ab, B, bc, C, ca], [], "o_p")');
   });
 
-  test("refuses a profile cycle that is not an array literal", () => {
+  test("refuses a region cycle that is not an array literal", () => {
     const varSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 

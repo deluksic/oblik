@@ -10,7 +10,7 @@ import {
 } from "./csg2";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
-import { regionSvgPath } from "./profile";
+import { regionSvgPath } from "./region";
 import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
 import { lerp, type Vec2 } from "./vec";
 
@@ -45,9 +45,9 @@ export type CsgPaint = {
 /** Luminance polarity. White is visible in the mask. */
 export const REGION_MASK = {
   fill: { canvas: "#000", stock: "#fff", hole: "#000" },
-  /** Outside the stock profile — outward halo on the outer edge. */
+  /** Outside the stock region — outward halo on the outer edge. */
   outsideStock: { canvas: "#fff", stock: "#000" },
-  /** Interior of the stock profile, so hole halos cannot escape the plate. */
+  /** Interior of the stock region, so hole halos cannot escape the plate. */
   stock: { canvas: "#000", stock: "#fff" },
   /** Complement of the CSG fill (void and holes). */
   outside: { canvas: "#fff", stock: "#000", hole: "#fff" },

@@ -58,7 +58,10 @@ export function BrushDock(props: BrushDockProps) {
         <ColorInput
           value={props.settings.fill}
           fallback="#cfe8d4"
-          current={props.settings.fill !== "none" && !FILL_COLORS.includes(props.settings.fill as (typeof FILL_COLORS)[number])}
+          current={
+            props.settings.fill !== "none" &&
+            !FILL_COLORS.includes(props.settings.fill as (typeof FILL_COLORS)[number])
+          }
           label="Custom fill"
           onPick={(fill) => props.onChange({ ...props.settings, fill })}
         />

@@ -28,7 +28,11 @@ export function patchLiterals(source: string, id: string, values: number[]): str
   const sf = parse(source);
   let target: ts.CallExpression | undefined;
   const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && specs.has(node.expression.text)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      specs.has(node.expression.text)
+    ) {
       const trail = trailingId(node);
       if (trail.id === id) target = node;
     }

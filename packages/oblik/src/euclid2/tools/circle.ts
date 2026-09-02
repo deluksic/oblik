@@ -1,12 +1,15 @@
 import { printExpr } from "@/source/expr";
-import { asPoint, dist, exprOfPlace, hoverPlace, isPinnedPoint, previewCall, round, sameRef } from "./common";
+
 import {
-  attachLengthHit,
-  lengthHover,
-  lengthLabel,
-  lengthValue,
-  resolveLengthExpr,
-} from "./length";
+  asPoint,
+  dist,
+  exprOfPlace,
+  hoverPlace,
+  isPinnedPoint,
+  previewCall,
+  round,
+  sameRef,
+} from "./common";
 import {
   hitRef,
   inSlot,
@@ -17,6 +20,13 @@ import {
   resolvePoint,
   withBind,
 } from "./draft";
+import {
+  attachLengthHit,
+  lengthHover,
+  lengthLabel,
+  lengthValue,
+  resolveLengthExpr,
+} from "./length";
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -103,7 +113,10 @@ export const circle: Tool<CircleSession> = {
       };
     }
     return {
-      insert: withBind(session, { from: "circle", args: [center.expr, radiusExpr(session, center, hit, scope)] }),
+      insert: withBind(session, {
+        from: "circle",
+        args: [center.expr, radiusExpr(session, center, hit, scope)],
+      }),
     };
   },
   commit(session, _place, scope) {
@@ -128,13 +141,25 @@ export const circle: Tool<CircleSession> = {
     }
     if (resolveLengthExpr(session, scope) != null) {
       const fallback = place?.length?.value ?? 0.05;
-      return { kind: "circle", center: center.at, radius: Math.max(0.05, lengthValue(session, scope, fallback)) };
+      return {
+        kind: "circle",
+        center: center.at,
+        radius: Math.max(0.05, lengthValue(session, scope, fallback)),
+      };
     }
     if (place && isPinnedPoint(place.point) && !sameRef(center.expr, place.point)) {
-      return { kind: "circle", center: center.at, radius: Math.max(0.05, dist(place.point.at, center.at)) };
+      return {
+        kind: "circle",
+        center: center.at,
+        radius: Math.max(0.05, dist(place.point.at, center.at)),
+      };
     }
     if (place?.length) {
-      return { kind: "circle", center: center.at, radius: Math.max(0.05, lengthValue(session, scope, place.length.value)) };
+      return {
+        kind: "circle",
+        center: center.at,
+        radius: Math.max(0.05, lengthValue(session, scope, place.length.value)),
+      };
     }
     if (!place) return { kind: "circle", center: center.at, radius: 0.05 };
     return {
@@ -155,13 +180,24 @@ export const circle: Tool<CircleSession> = {
     if (!center) {
       if (p && isPinnedPoint(p) && !session.centerRef.trim()) {
         return {
-          line: previewCall("circle", [exprOfPlace(p)], scope.used, ([c]) => `circle(${inSlot(session.focus === "center", c)}, ${radius})`, name),
+          line: previewCall(
+            "circle",
+            [exprOfPlace(p)],
+            scope.used,
+            ([c]) => `circle(${inSlot(session.focus === "center", c)}, ${radius})`,
+            name,
+          ),
           hint: "Type a point name or click to set the center. Tab for radius or name.",
         };
       }
       return { line: `const ${name} = circle(${cTok}, ${radius})`, hint: spec.hint };
     }
-    if (p && isPinnedPoint(p) && !sameRef(center.expr, p) && resolveLengthExpr(session, scope) == null) {
+    if (
+      p &&
+      isPinnedPoint(p) &&
+      !sameRef(center.expr, p) &&
+      resolveLengthExpr(session, scope) == null
+    ) {
       return {
         line: previewCall(
           "circle",
@@ -191,7 +227,8 @@ export const circle: Tool<CircleSession> = {
         "circle",
         [center.expr, ...(bound ? [bound] : [])],
         scope.used,
-        ([c, d]) => `circle(${inSlot(session.focus === "center", c)}, ${inSlot(session.focus === "typed", d ?? r)})`,
+        ([c, d]) =>
+          `circle(${inSlot(session.focus === "center", c)}, ${inSlot(session.focus === "typed", d ?? r)})`,
         name,
       ),
       hint: "Type a radius, slider, or field (reach.radius), click to reuse, measure, or click a point for dist(). Tab to name it.",

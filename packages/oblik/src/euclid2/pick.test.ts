@@ -7,7 +7,7 @@ import {
   namedStrokesThrough,
   snapBoundPoint,
   snapLineCarrier,
-  snapProfile,
+  snapRegion,
   snapStrokeCarrier,
 } from "./pick";
 
@@ -153,7 +153,7 @@ describe("snapLineCarrier", () => {
   });
 });
 
-describe("profile pick", () => {
+describe("region pick", () => {
   const Pa = { x: 0, y: 0 };
   const Pb = { x: 4, y: 0 };
   const Pc = { x: 0, y: 3 };
@@ -217,7 +217,7 @@ describe("profile pick", () => {
     expect(hits[hits.length - 1]?.kind).toBe("region");
   });
 
-  test("empty interior still picks the profile", () => {
+  test("empty interior still picks the region", () => {
     const hit = hitTest([FACE], { x: 1, y: 1 }, camera, size);
     expect(hit?.id).toBe("o_pr");
   });
@@ -253,14 +253,14 @@ describe("profile pick", () => {
     expect(onBc?.bind).toBe("bc");
   });
 
-  test("snapProfile picks a fill and ignores a nearby point", () => {
-    expect(snapProfile([FACE, A], { x: 1, y: 1 }, camera, size)?.bind).toBe("face");
-    expect(snapProfile([FACE, A], { x: 1, y: 1 }, camera, size)?.id).toBe("o_pr");
-    expect(snapProfile([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
-    expect(snapProfile([A], { x: 1, y: 1 }, camera, size)).toBeNull();
+  test("snapRegion picks a fill and ignores a nearby point", () => {
+    expect(snapRegion([FACE, A], { x: 1, y: 1 }, camera, size)?.bind).toBe("face");
+    expect(snapRegion([FACE, A], { x: 1, y: 1 }, camera, size)?.id).toBe("o_pr");
+    expect(snapRegion([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
+    expect(snapRegion([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });
 
-  test("region fill picks before the stock profile", () => {
+  test("region fill picks before the stock region", () => {
     const FACE_REGION = {
       id: "o_face",
       occ: 0,
@@ -279,7 +279,7 @@ describe("profile pick", () => {
     expect(hits.some((n) => n.id === "o_pr")).toBe(true);
   });
 
-  test("snapProfile with keys uses that invocation, not occ 0", () => {
+  test("snapRegion with keys uses that invocation, not occ 0", () => {
     const face1 = {
       ...FACE,
       occ: 1,
@@ -306,9 +306,9 @@ describe("profile pick", () => {
       },
     };
     const at = { x: 11, y: 1 };
-    expect(snapProfile([FACE, face1], at, camera, size)?.id).toBe("o_pr");
+    expect(snapRegion([FACE, face1], at, camera, size)?.id).toBe("o_pr");
     expect(
-      snapProfile([FACE, face1], at, camera, size, undefined, {
+      snapRegion([FACE, face1], at, camera, size, undefined, {
         keys: new Set(["o_pr:1"]),
         print: (n) => n.bind,
       })?.id,

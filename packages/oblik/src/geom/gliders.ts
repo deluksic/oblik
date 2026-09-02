@@ -1,5 +1,5 @@
-import type { Circle, LineLike, Segment } from "./types";
 import { lineBasis } from "./ops";
+import type { Circle, LineLike, Segment } from "./types";
 import { add, dot, isFiniteVec, lerp, mul, norm, sub, type Vec2 } from "./vec";
 
 export type GliderSegment = {
@@ -64,7 +64,15 @@ export function pointOnLineValue(geom: LineLike, s: number): GliderLine {
 export function pointOnCircleValue(c: Circle, ux: number, uy: number): GliderCircle {
   const { ux: uu, uy: vv } = unit2(ux, uy);
   const p = add(c.center, mul({ x: uu, y: vv }, c.radius));
-  return { kind: "gliderCircle", center: c.center, radius: c.radius, ux: uu, uy: vv, x: p.x, y: p.y };
+  return {
+    kind: "gliderCircle",
+    center: c.center,
+    radius: c.radius,
+    ux: uu,
+    uy: vv,
+    x: p.x,
+    y: p.y,
+  };
 }
 
 export function segmentTUnclamped(seg: Segment, p: Vec2): number {

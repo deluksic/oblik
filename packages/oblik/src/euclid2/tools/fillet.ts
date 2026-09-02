@@ -1,7 +1,7 @@
 import { filletAtVertex, isFiniteRegion, regionCorners, walkEdges, type Region } from "@/geom";
 import { printExpr, type Expr } from "@/source/expr";
 
-import { snapProfile } from "../pick";
+import { snapRegion } from "../pick";
 import { dist, exprOfPlace, hoverBind, isPinnedPoint, round, sameRef } from "./common";
 import { inSlot, lengthField } from "./draft";
 import {
@@ -39,8 +39,8 @@ function cornerOf(hit: PlaceHit, geom: Region) {
 }
 
 function faceGeom(session: FilletSession, scope: Scope): Region | undefined {
-  if (session.faceBind && scope.profiles[session.faceBind])
-    return scope.profiles[session.faceBind]!.geom;
+  if (session.faceBind && scope.regions[session.faceBind])
+    return scope.regions[session.faceBind]!.geom;
   return session.geom;
 }
 
@@ -126,7 +126,7 @@ export const fillet: Tool<FilletSession> = {
   spec: {
     id: "fillet",
     title: "Fillet",
-    hint: "Click a profile corner, then a length: radius, parallel distance, slider, or a click.",
+    hint: "Click a region corner, then a length: radius, parallel distance, slider, or a click.",
     prefix: "fil",
     aliases: ["corner"],
   },
@@ -141,35 +141,35 @@ export const fillet: Tool<FilletSession> = {
   hit(session, hit, ctx) {
     if (!vertexOf(session)) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
-      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
-      if (!profile) return hit;
-      const corner = closestCorner(profile.geom, hit.world);
-      if (!corner) return { ...hit, profile };
-      return { ...hit, profile, corner: { index: corner.index, at: corner.at } };
+      const picked = snapRegion(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
+      if (!picked) return hit;
+      const corner = closestCorner(picked.geom, hit.world);
+      if (!corner) return { ...hit, region: picked };
+      return { ...hit, region: picked, corner: { index: corner.index, at: corner.at } };
     }
     return attachLengthHit(hit, ctx, session, ["radius", "distance"]);
   },
   hover(session, hit, trace) {
     if (!vertexOf(session)) {
-      if (!hit.profile) return null;
-      return hoverBind(trace, hit.profile.bind);
+      if (!hit.region) return null;
+      return hoverBind(trace, hit.region.bind);
     }
     return lengthHover(hit, trace);
   },
   click(session, hit, scope) {
     const vertex = vertexOf(session);
     if (!vertex) {
-      if (!hit.profile) return { session };
-      const corner = cornerOf(hit, hit.profile.geom);
+      if (!hit.region) return { session };
+      const corner = cornerOf(hit, hit.region.geom);
       if (!corner) return { session };
-      const id = hit.profile.id;
+      const id = hit.region.id;
       if (!id) return { session };
       return {
         session: {
           ...session,
           faceId: id,
-          faceBind: hit.profile.bind,
-          geom: hit.profile.geom,
+          faceBind: hit.region.bind,
+          geom: hit.region.geom,
           vertex: corner.index,
           at: corner.at,
           vertexExpr: exprAtCorner(corner.at, hit, scope),
@@ -204,14 +204,14 @@ export const fillet: Tool<FilletSession> = {
     if (!vertex) {
       const at =
         place?.corner?.at ??
-        (place?.profile ? closestCorner(place.profile.geom, place.world)?.at : undefined);
+        (place?.region ? closestCorner(place.region.geom, place.world)?.at : undefined);
       return at ? { kind: "corner" as const, at } : null;
     }
     if (!geom) return null;
     const r = radiusNumber(session, place, scope);
     const out = filletAtVertex(geom, vertex.index, r);
     if (!isFiniteRegion(out)) return null;
-    return { kind: "profile", edges: walkEdges(out.outer) };
+    return { kind: "region", edges: walkEdges(out.outer) };
   },
   preview(session, place, scope): Preview {
     const spec = fillet.spec;

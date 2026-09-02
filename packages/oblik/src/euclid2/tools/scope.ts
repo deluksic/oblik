@@ -14,7 +14,7 @@ export const EMPTY_SCOPE: Scope = {
   points: {},
   carriers: {},
   circles: {},
-  profiles: {},
+  regions: {},
   lengths: {},
   byId: {},
   prints: {},
@@ -130,7 +130,7 @@ function put(
     points: Record<string, Placed>;
     carriers: Record<string, { expr: Expr; geom: LineLike }>;
     circles: Record<string, { expr: Expr; geom: Circle }>;
-    profiles: Record<string, { expr: Expr; geom: Region }>;
+    regions: Record<string, { expr: Expr; geom: Region }>;
     lengths: Record<string, number>;
     byId: Record<string, Expr>;
     prints: Record<string, Expr>;
@@ -154,7 +154,7 @@ function put(
     scope.circles[key] = { expr, geom: n.value as Circle };
   }
   if (n.value.kind === "region") {
-    scope.profiles[key] = { expr, geom: n.value as Region };
+    scope.regions[key] = { expr, geom: n.value as Region };
   }
   if (n.value.kind === "slider") {
     if (expr.kind === "ref") scope.lengths[expr.name] = n.value.n;
@@ -169,12 +169,12 @@ export function scopeFromTrace(
   const points: Record<string, Placed> = {};
   const carriers: Record<string, Scope["carriers"][string]> = {};
   const circles: Record<string, { expr: Expr; geom: Circle }> = {};
-  const profilesRec: Record<string, { expr: Expr; geom: Region }> = {};
+  const regionsRec: Record<string, { expr: Expr; geom: Region }> = {};
   const lengths: Record<string, number> = {};
   const byId: Record<string, Expr> = {};
   const prints: Record<string, Expr> = {};
   const live = new Set<string>();
-  const scope = { used, points, carriers, circles, profiles: profilesRec, lengths, byId, prints };
+  const scope = { used, points, carriers, circles, regions: regionsRec, lengths, byId, prints };
 
   const focus = opts?.focus;
   const mentions = opts?.mentions;
@@ -251,7 +251,7 @@ type LooseScope = {
   points?: Record<string, unknown>;
   carriers?: Record<string, unknown>;
   circles?: Record<string, unknown>;
-  profiles?: Record<string, unknown>;
+  regions?: Record<string, unknown>;
   lengths?: Record<string, number>;
   byId?: Record<string, unknown>;
   prints?: Record<string, unknown>;

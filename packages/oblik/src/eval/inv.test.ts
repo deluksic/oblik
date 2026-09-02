@@ -2,10 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import { analyze } from "../source/analyze";
 import { analyzeMentions } from "../source/mention";
-import { defineScene } from "./scene";
 import { circle, point } from "./constructors";
 import { evaluate } from "./evaluate";
 import { assignInv } from "./inv";
+import { defineScene } from "./scene";
 
 const src = `import { point, circle } from "oblik";
 function plate() {
@@ -87,8 +87,12 @@ function bolts() {
       ];
     }
     assignInv(trace, [mentions]);
-    expect(trace.filter((n) => n.inv?.callerLine === 8).every((n) => n.inv?.serial === 0)).toBe(true);
-    expect(trace.filter((n) => n.inv?.callerLine === 9).every((n) => n.inv?.serial === 0)).toBe(true);
+    expect(trace.filter((n) => n.inv?.callerLine === 8).every((n) => n.inv?.serial === 0)).toBe(
+      true,
+    );
+    expect(trace.filter((n) => n.inv?.callerLine === 9).every((n) => n.inv?.serial === 0)).toBe(
+      true,
+    );
     expect(new Set(trace.map((n) => n.inv?.callerLine)).size).toBe(2);
   });
 
@@ -118,7 +122,10 @@ function build() { plate(); }
         point(1, 0, "o_hid");
       },
     });
-    const { trace } = evaluate(scene, { annotations: analyze(src2, helperFile), module: helperFile });
+    const { trace } = evaluate(scene, {
+      annotations: analyze(src2, helperFile),
+      module: helperFile,
+    });
     for (const n of trace) {
       n.module = helperFile;
       n.stack = [

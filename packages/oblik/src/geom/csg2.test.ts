@@ -15,7 +15,7 @@ import {
   wrapCsg,
 } from "./csg2";
 import { roundOffsetValue } from "./offset";
-import { alongValue, filletValue, regionContains, regionSvgPath, regionValue } from "./profile";
+import { alongValue, filletValue, regionContains, regionSvgPath, regionValue } from "./region";
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 

@@ -1,5 +1,4 @@
 import { Show, createSignal } from "solid-js";
-
 import IconClipboard from "~icons/lucide/clipboard-copy";
 import IconDownload from "~icons/lucide/download";
 

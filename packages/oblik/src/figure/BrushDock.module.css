@@ -50,18 +50,14 @@
 }
 
 .swatchOn {
-  box-shadow: 0 0 0 2px var(--oblik-paper), 0 0 0 3.5px var(--oblik-hover);
+  box-shadow:
+    0 0 0 2px var(--oblik-paper),
+    0 0 0 3.5px var(--oblik-hover);
 }
 
 .swatchNone {
   background:
-    linear-gradient(
-      135deg,
-      transparent 46%,
-      #c23b22 46%,
-      #c23b22 54%,
-      transparent 54%
-    ),
+    linear-gradient(135deg, transparent 46%, #c23b22 46%, #c23b22 54%, transparent 54%),
     repeating-conic-gradient(#c8c3b6 0% 25%, #f4efe4 0% 50%) 0 0 / 8px 8px;
 }
 
@@ -110,7 +106,9 @@
 }
 
 .colorOn {
-  box-shadow: 0 0 0 2px var(--oblik-paper), 0 0 0 3.5px var(--oblik-hover);
+  box-shadow:
+    0 0 0 2px var(--oblik-paper),
+    0 0 0 3.5px var(--oblik-hover);
 }
 
 .color {

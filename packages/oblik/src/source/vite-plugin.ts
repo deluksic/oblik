@@ -12,13 +12,20 @@ import {
   sceneGlobKeys,
   sceneLoadersModule,
 } from "./catalog";
-import { insertCall, exposeReturnBag } from "./insert";
-import { patchPaintStyle, removePaintCall } from "./paint-edit";
 import { patchFrame } from "./frame-edit";
+import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
+import { patchPaintStyle, removePaintCall } from "./paint-edit";
 import { patchLiterals } from "./patch";
 import { resolveSceneFileAbs } from "./scene-path.server";
-import { parseErase, parseExpose, parseFrameEdit, parseInsert, parseLiteralPatch, parsePaintPatch } from "./schema";
+import {
+  parseErase,
+  parseExpose,
+  parseFrameEdit,
+  parseInsert,
+  parseLiteralPatch,
+  parsePaintPatch,
+} from "./schema";
 import { freshSiteId, stamp } from "./stamp";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 

@@ -10,7 +10,7 @@ import {
   regionValue,
   signedDistToRegion,
   walkEdges,
-} from "./profile";
+} from "./region";
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -284,7 +284,7 @@ describe("signedDistToRegion", () => {
   });
 });
 
-describe("profile holes", () => {
+describe("region holes", () => {
   test("a hole punches the interior and is not XOR", () => {
     const p = regionValue(rectCycle(0, 0, 1, 1), [rectCycle(0.25, 0.25, 0.75, 0.75)]);
     expect(p.holes).toHaveLength(1);
@@ -329,7 +329,7 @@ describe("profile holes", () => {
     expect(regionContains(p, { x: 1.01, y: 0 })).toBe(false);
   });
 
-  test("a hole outside the outer is an empty profile", () => {
+  test("a hole outside the outer is an empty region", () => {
     const p = regionValue(rectCycle(0, 0, 1, 1), [rectCycle(2, 2, 3, 3)]);
     expect(p.outer).toHaveLength(0);
     expect(p.holes).toHaveLength(0);
@@ -356,7 +356,7 @@ describe("profile holes", () => {
     expect(p.outer).toHaveLength(0);
   });
 
-  test("roundOffset of a holed profile shrinks the hole when growing", () => {
+  test("roundOffset of a holed region shrinks the hole when growing", () => {
     const p = regionValue(rectCycle(0, 0, 1, 1), [rectCycle(0.3, 0.3, 0.7, 0.7)]);
     const out = roundOffsetValue(p, 0.1);
     expect(out).toHaveLength(1);

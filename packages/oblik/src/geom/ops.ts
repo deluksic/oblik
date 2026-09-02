@@ -1,17 +1,5 @@
 import type { Branch, Circle, Line, LineLike, ParallelLine } from "./types";
-import {
-  add,
-  cross2,
-  dist,
-  dot,
-  isFiniteVec,
-  mul,
-  norm,
-  perp,
-  sub,
-  vec,
-  type Vec2,
-} from "./vec";
+import { add, cross2, dist, dot, isFiniteVec, mul, norm, perp, sub, vec, type Vec2 } from "./vec";
 
 export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   if (g.kind === "line") return { origin: g.origin, dir: g.direction };

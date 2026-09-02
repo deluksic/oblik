@@ -1,16 +1,37 @@
 import type { Expr } from "@/source/expr";
+
+import { round } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import { attachLengthHit, lengthRefName, numberField, resolveNumberExpr } from "./length";
-import { round } from "./common";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type SliderSession = Extract<ToolSession, { verb: "slider" }>;
 
 const fields: Field<SliderSession>[] = [
-  numberField("value", "<value>", (s) => s.value, (s, raw) => ({ ...s, value: raw })),
-  numberField("min", "<min>", (s) => s.min, (s, raw) => ({ ...s, min: raw })),
-  numberField("max", "<max>", (s) => s.max, (s, raw) => ({ ...s, max: raw })),
-  numberField("step", "<step>", (s) => s.step, (s, raw) => ({ ...s, step: raw })),
+  numberField(
+    "value",
+    "<value>",
+    (s) => s.value,
+    (s, raw) => ({ ...s, value: raw }),
+  ),
+  numberField(
+    "min",
+    "<min>",
+    (s) => s.min,
+    (s, raw) => ({ ...s, min: raw }),
+  ),
+  numberField(
+    "max",
+    "<max>",
+    (s) => s.max,
+    (s, raw) => ({ ...s, max: raw }),
+  ),
+  numberField(
+    "step",
+    "<step>",
+    (s) => s.step,
+    (s, raw) => ({ ...s, step: raw }),
+  ),
   nameField(),
 ];
 
@@ -34,14 +55,21 @@ function sliderArgs(session: SliderSession, value: Expr, scope: Scope): Expr[] {
 }
 
 function valueExpr(session: SliderSession, scope: Scope, fallback: number): Expr {
-  return resolveNumberExpr(session.value, scope, fallback) ?? { kind: "num", value: round(fallback) };
+  return (
+    resolveNumberExpr(session.value, scope, fallback) ?? { kind: "num", value: round(fallback) }
+  );
 }
 
 function insertValue(session: SliderSession, value: Expr, scope: Scope) {
   return { insert: withBind(session, { from: "slider", args: sliderArgs(session, value, scope) }) };
 }
 
-function optSlot(session: SliderSession, field: SliderSession["focus"], raw: string, label: string): string {
+function optSlot(
+  session: SliderSession,
+  field: SliderSession["focus"],
+  raw: string,
+  label: string,
+): string {
   return inSlot(session.focus === field, raw.trim() || label);
 }
 
@@ -54,7 +82,15 @@ export const slider: Tool<SliderSession> = {
     hint: "A named number. Tab for min, max, step. Click to measure from the origin.",
     prefix: "n",
   },
-  start: () => ({ verb: "slider", focus: "value", value: "", min: "", max: "", step: "", name: "" }),
+  start: () => ({
+    verb: "slider",
+    focus: "value",
+    value: "",
+    min: "",
+    max: "",
+    step: "",
+    name: "",
+  }),
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id as SliderSession["focus"] }),

@@ -65,7 +65,12 @@ function parse(source: string, file: string): ts.SourceFile {
 function isFnLike(
   n: ts.Node,
 ): n is ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration {
-  return ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n);
+  return (
+    ts.isFunctionDeclaration(n) ||
+    ts.isFunctionExpression(n) ||
+    ts.isArrowFunction(n) ||
+    ts.isMethodDeclaration(n)
+  );
 }
 
 function identName(name: ts.PropertyName | ts.BindingName | undefined): string | undefined {
@@ -75,7 +80,9 @@ function identName(name: ts.PropertyName | ts.BindingName | undefined): string |
   return undefined;
 }
 
-function fnName(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): string | undefined {
+function fnName(
+  node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+): string | undefined {
   if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name) {
     return identName(node.name);
   }
@@ -85,7 +92,9 @@ function fnName(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowF
   return undefined;
 }
 
-function fnBody(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): ts.Block | undefined {
+function fnBody(
+  node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+): ts.Block | undefined {
   if (!node.body) return undefined;
   if (ts.isBlock(node.body)) return node.body;
   return undefined;
@@ -160,11 +169,20 @@ function bindToIdInFn(
   if (!body) return out;
   const visit = (node: ts.Node) => {
     if (node !== fn && isFnLike(node)) return;
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && specs.has(node.expression.text)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      specs.has(node.expression.text)
+    ) {
       const { id } = trailingId(node);
       if (id) {
         let p: ts.Node = node.parent;
-        while (ts.isAsExpression(p) || ts.isParenthesizedExpression(p) || ts.isSatisfiesExpression(p)) p = p.parent;
+        while (
+          ts.isAsExpression(p) ||
+          ts.isParenthesizedExpression(p) ||
+          ts.isSatisfiesExpression(p)
+        )
+          p = p.parent;
         if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name) && isConstDecl(p)) {
           out[p.name.text] = id;
         }
@@ -186,7 +204,11 @@ function idsInFn(
   if (!body) return { ids, onceIds };
   const visit = (node: ts.Node) => {
     if (node !== fn && isFnLike(node)) return;
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && specs.has(node.expression.text)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      specs.has(node.expression.text)
+    ) {
       const { id } = trailingId(node);
       if (id) {
         ids.push(id);
@@ -199,7 +221,11 @@ function idsInFn(
   return { ids, onceIds };
 }
 
-function fieldFromInit(init: ts.Expression, bindToId: Record<string, string>, specs: Map<string, unknown>): Pick<ReturnField, "bind" | "id"> {
+function fieldFromInit(
+  init: ts.Expression,
+  bindToId: Record<string, string>,
+  specs: Map<string, unknown>,
+): Pick<ReturnField, "bind" | "id"> {
   const e = unwrap(init);
   if (ts.isIdentifier(e)) return { bind: e.text, id: bindToId[e.text] };
   if (ts.isCallExpression(e)) {
@@ -249,7 +275,11 @@ function analyzeReturn(
   return { kind: "other" };
 }
 
-function bagOf(obj: ts.ObjectLiteralExpression, bindToId: Record<string, string>, specs: Map<string, unknown>): FnReturn {
+function bagOf(
+  obj: ts.ObjectLiteralExpression,
+  bindToId: Record<string, string>,
+  specs: Map<string, unknown>,
+): FnReturn {
   const fields: ReturnField[] = [];
   for (const p of obj.properties) {
     if (ts.isShorthandPropertyAssignment(p)) {
@@ -267,7 +297,8 @@ function bagOf(obj: ts.ObjectLiteralExpression, bindToId: Record<string, string>
 
 function helperBinding(call: ts.CallExpression): HelperBinding {
   let n: ts.Node = call.parent;
-  while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n)) n = n.parent;
+  while (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n))
+    n = n.parent;
   if (ts.isVariableDeclaration(n)) {
     if (ts.isIdentifier(n.name)) return { kind: "const", name: n.name.text };
     if (ts.isObjectBindingPattern(n.name)) {
@@ -275,7 +306,8 @@ function helperBinding(call: ts.CallExpression): HelperBinding {
       for (const el of n.name.elements) {
         if (!ts.isBindingElement(el) || el.dotDotDotToken) continue;
         if (!ts.isIdentifier(el.name)) continue;
-        const field = el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : el.name.text;
+        const field =
+          el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : el.name.text;
         map[field] = el.name.text;
       }
       return { kind: "destructure", map };
@@ -330,7 +362,9 @@ function directConsts(body: ts.Block): string[] {
   return names;
 }
 
-function paramsOf(fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): string[] {
+function paramsOf(
+  fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+): string[] {
   const names: string[] = [];
   for (const p of fn.parameters) addBindingName(p.name, names);
   return names;

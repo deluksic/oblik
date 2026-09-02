@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js";
 
 import { parallelLineValue } from "@/geom/ops";
+
 import { infiniteClip, worldToScreen, type Camera2, type PaneSize } from "../camera";
 import type { Ghost } from "../tool";
 
@@ -77,7 +78,12 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
     <g pointer-events="none">
       {cornerPos() ? (
         <>
-          <circle class={styles.ghostCornerRing} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_RING_R} />
+          <circle
+            class={styles.ghostCornerRing}
+            cx={cornerPos()!.x}
+            cy={cornerPos()!.y}
+            r={CORNER_RING_R}
+          />
           <circle class={styles.ghostCorner} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_R} />
         </>
       ) : null}

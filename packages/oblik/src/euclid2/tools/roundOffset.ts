@@ -1,9 +1,9 @@
 import type { Region } from "@/geom";
 import { roundOffsetValue } from "@/geom/offset";
-import { signedDistToRegion, walkEdges } from "@/geom/profile";
+import { signedDistToRegion, walkEdges } from "@/geom/region";
 import { printExpr } from "@/source/expr";
 
-import { snapProfile } from "../pick";
+import { snapRegion } from "../pick";
 import { exprOfPrint, hoverBind, previewCall, round } from "./common";
 import {
   inSlot,
@@ -11,7 +11,7 @@ import {
   nameField,
   previewName,
   refField,
-  resolveProfile,
+  resolveRegion,
   withBind,
 } from "./draft";
 import {
@@ -29,8 +29,8 @@ type OffsetSession = Extract<ToolSession, { verb: "roundOffset" }>;
 const fields: Field<OffsetSession>[] = [
   refField(
     "face",
-    "<profile>",
-    "profile",
+    "<region>",
+    "region",
     (s) => s.faceRef,
     (s, raw) => ({ ...s, faceRef: raw }),
   ),
@@ -39,7 +39,7 @@ const fields: Field<OffsetSession>[] = [
 ];
 
 function faceOf(session: OffsetSession, scope: Scope) {
-  return resolveProfile(session.faceRef, session.face, scope);
+  return resolveRegion(session.faceRef, session.face, scope);
 }
 
 function distAt(hit: PlaceHit, geom: Region): number {
@@ -59,8 +59,8 @@ function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null)
   if (session.faceRef.trim()) return session.faceRef.trim();
   const face = faceOf(session, scope);
   if (face) return printExpr(face.expr);
-  if (place?.profile) return place.profile.bind;
-  return "profile";
+  if (place?.region) return place.region.bind;
+  return "region";
 }
 
 function offsetGhost(face: Region, d: number) {
@@ -68,14 +68,14 @@ function offsetGhost(face: Region, d: number) {
   const loops = islands.map((p) => p.outer);
   if (loops.length === 0) return null;
   const edges = loops.flatMap(walkEdges);
-  return { kind: "profile" as const, edges, loops };
+  return { kind: "region" as const, edges, loops };
 }
 
 export const roundOffset: Tool<OffsetSession> = {
   spec: {
     id: "roundOffset",
     title: "Round offset",
-    hint: "Click a profile, then a length: radius, parallel distance, slider, or a click.",
+    hint: "Click a region, then a length: radius, parallel distance, slider, or a click.",
     prefix: "off",
     aliases: ["inset", "outset"],
   },
@@ -86,27 +86,27 @@ export const roundOffset: Tool<OffsetSession> = {
   hit(session, hit, ctx) {
     if (!faceOf(session, toolScope(ctx))) {
       const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
-      const profile = snapProfile(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
-      return profile ? { ...hit, profile } : hit;
+      const picked = snapRegion(ctx.trace, hit.world, ctx.camera, ctx.size, undefined, filter);
+      return picked ? { ...hit, region: picked } : hit;
     }
     return attachLengthHit(hit, ctx, session, ["radius", "distance"]);
   },
   hover(session, hit, trace, scope) {
     if (!faceOf(session, scope ?? scopeFromTrace(trace))) {
-      if (!hit.profile) return null;
-      return hoverBind(trace, hit.profile.bind);
+      if (!hit.region) return null;
+      return hoverBind(trace, hit.region.bind);
     }
     return lengthHover(hit, trace);
   },
   click(session, hit, scope) {
     const face = faceOf(session, scope);
     if (!face) {
-      if (!hit.profile) return { session };
+      if (!hit.region) return { session };
       return {
         session: {
           ...session,
-          face: { expr: exprOfPrint(hit.profile.bind), geom: hit.profile.geom },
-          faceRef: hit.profile.bind,
+          face: { expr: exprOfPrint(hit.region.bind), geom: hit.region.geom },
+          faceRef: hit.region.bind,
           focus: session.focus === "name" ? "name" : "typed",
         },
       };
@@ -164,8 +164,8 @@ export const roundOffset: Tool<OffsetSession> = {
       const d = inSlot(session.focus === "typed", dLabel);
       return {
         line: `const ${name} = roundOffset(${gTok}, ${d})`,
-        hint: place?.profile
-          ? `Type a profile name or click ${place.profile.bind}. Tab for distance or name.`
+        hint: place?.region
+          ? `Type a region name or click ${place.region.bind}. Tab for distance or name.`
           : spec.hint,
       };
     }

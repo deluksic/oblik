@@ -1,6 +1,6 @@
 import type { Annotation } from "../source/analyze";
-import type { Scene } from "./scene";
 import { currentEval, nodeOf, withEval, type EvalCtx, type TraceNode } from "./context";
+import type { Scene } from "./scene";
 
 export type Draft = Map<string, number[]>;
 

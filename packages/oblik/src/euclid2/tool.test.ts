@@ -17,7 +17,7 @@ import {
   toolChrome,
   typeTool,
 } from "./tool";
-import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
+import { regionEligibleCarriers, regionHidesExisting } from "./tools/region";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -122,7 +122,7 @@ describe("enrichHit", () => {
         points: {},
         carriers: {},
         circles: {},
-        profiles: {},
+        regions: {},
         lengths: { gap: 0.12 },
       }),
     ).toEqual({
@@ -385,7 +385,7 @@ describe("clickTool", () => {
       points: {},
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       circles: {},
-      profiles: {},
+      regions: {},
       lengths: { reach: 1.25 },
     };
     expect(
@@ -417,7 +417,7 @@ describe("clickTool", () => {
       points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       carriers: {},
       circles: {},
-      profiles: {},
+      regions: {},
       lengths: { reach: 2.5 },
     };
     expect(
@@ -560,7 +560,7 @@ describe("clickTool", () => {
         shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
       },
       circles: {},
-      profiles: {},
+      regions: {},
       lengths: {},
       byId: {},
     };
@@ -649,7 +649,7 @@ describe("clickTool", () => {
         shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
       },
       circles: {},
-      profiles: {},
+      regions: {},
       lengths: {},
       byId: {},
     };
@@ -877,7 +877,7 @@ describe("clickTool", () => {
       points: { P: { expr: { kind: "ref", name: "P" }, at: { x: 0, y: 2 } } },
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       circles: {},
-      profiles: {},
+      regions: {},
       lengths: {},
       byId: {},
     };
@@ -945,7 +945,7 @@ describe("ghostOf", () => {
         points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
         carriers: {},
         circles: {},
-        profiles: {},
+        regions: {},
         lengths: { reach: 2.5 },
       },
     );
@@ -997,7 +997,7 @@ describe("ghostOf", () => {
         points: {},
         carriers: {},
         circles: {},
-        profiles: {},
+        regions: {},
         lengths: { reach: 1.25 },
       },
     );
@@ -1187,8 +1187,8 @@ describe("filterTools", () => {
     expect(filterTools("slider").map((t) => t.id)).toEqual(["slider"]);
   });
 
-  test("matches profile by face alias", () => {
-    expect(filterTools("face").map((t) => t.id)).toEqual(["profile"]);
+  test("matches region by face alias", () => {
+    expect(filterTools("face").map((t) => t.id)).toEqual(["region"]);
   });
 
   test("title hits beat description hits", () => {
@@ -1200,7 +1200,7 @@ describe("filterTools", () => {
   });
 
   test("falls back to aliases when the title does not match", () => {
-    expect(filterTools("fill").map((t) => t.id)).toEqual(["profile"]);
+    expect(filterTools("fill").map((t) => t.id)).toEqual(["region"]);
   });
 
   test("fillet matches fillet, fil, and the corner alias", () => {
@@ -1259,13 +1259,13 @@ describe("slider tool", () => {
   });
 });
 
-describe("profile tool", () => {
+describe("region tool", () => {
   const namedB: PlacePoint = { kind: "ref", bind: "B", id: "o_b", at: { x: 0, y: 2 } };
   const chord = { kind: "segment" as const, a: { x: 2, y: 0 }, b: { x: 0, y: 2 } };
   const reach = { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2 };
 
-  test("closes as profile([A, chord, B, along(c, k)], id) without extra constructors", () => {
-    let s = startTool("profile");
+  test("closes as region([A, chord, B, along(c, k)], id) without extra constructors", () => {
+    let s = startTool("region");
     const a = clickTool(s, { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in a)) throw new Error("expected A");
     const c1 = clickTool(a.session, {
@@ -1310,14 +1310,14 @@ describe("profile tool", () => {
   });
 
   test("ignores a free click in a point slot", () => {
-    const r = clickTool(startTool("profile"), { world: { x: 1, y: 1 }, point: free(1, 1) });
-    expect(r).toEqual({ session: startTool("profile") });
+    const r = clickTool(startTool("region"), { world: { x: 1, y: 1 }, point: free(1, 1) });
+    expect(r).toEqual({ session: startTool("region") });
   });
 
   test("point slot accepts a line crossing and hoists it on insert", () => {
-    let s = startTool("profile");
+    let s = startTool("region");
     const x = clickTool(s, { world: { x: 2, y: 0 }, point: ll });
-    if (!("session" in x) || x.session.verb !== "profile") throw new Error("expected crossing");
+    if (!("session" in x) || x.session.verb !== "region") throw new Error("expected crossing");
     expect(x.session.vertices[0]?.expr).toEqual({
       kind: "call",
       name: "lineIntersection",
@@ -1368,14 +1368,14 @@ describe("profile tool", () => {
   });
 
   test("point slot accepts circle-line and circle-circle crossings", () => {
-    const clHit = clickTool(startTool("profile"), { world: cl.at, point: cl });
-    if (!("session" in clHit) || clHit.session.verb !== "profile") throw new Error("expected cl");
+    const clHit = clickTool(startTool("region"), { world: cl.at, point: cl });
+    if (!("session" in clHit) || clHit.session.verb !== "region") throw new Error("expected cl");
     expect(clHit.session.vertices[0]?.expr).toMatchObject({
       kind: "call",
       name: "circleLineIntersection",
     });
-    const ccHit = clickTool(startTool("profile"), { world: cc.at, point: cc });
-    if (!("session" in ccHit) || ccHit.session.verb !== "profile") throw new Error("expected cc");
+    const ccHit = clickTool(startTool("region"), { world: cc.at, point: cc });
+    if (!("session" in ccHit) || ccHit.session.verb !== "region") throw new Error("expected cc");
     expect(ccHit.session.vertices[0]?.expr).toMatchObject({
       kind: "call",
       name: "circleCircleIntersection",
@@ -1383,7 +1383,7 @@ describe("profile tool", () => {
   });
 
   test("Tab flips along k on the last circle", () => {
-    let s = startTool("profile");
+    let s = startTool("region");
     const a = clickTool(s, { world: { x: 2, y: 0 }, point: namedA });
     if (!("session" in a)) throw new Error("expected A");
     const c1 = clickTool(a.session, {
@@ -1399,10 +1399,10 @@ describe("profile tool", () => {
       point: free(1.4, 1.4),
       carrier: { bind: "reach", geom: reach },
     });
-    if (!("session" in c2) || c2.session.verb !== "profile") throw new Error("expected along");
+    if (!("session" in c2) || c2.session.verb !== "region") throw new Error("expected along");
     expect(c2.session.carriers[1]?.k).toBe(-1);
     const flipped = tabTool(c2.session);
-    if (flipped.verb !== "profile") throw new Error("expected profile");
+    if (flipped.verb !== "region") throw new Error("expected region");
     expect(flipped.carriers[1]?.k).toBe(1);
   });
 
@@ -1430,16 +1430,16 @@ describe("profile tool", () => {
       camera: { x: 0, y: 0, scale: 48 },
       size: { w: 800, h: 600 },
     };
-    const a = clickTool(startTool("profile"), { world: { x: 0, y: 0 }, point: namedA });
-    if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected A");
-    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["axis"]);
+    const a = clickTool(startTool("region"), { world: { x: 0, y: 0 }, point: namedA });
+    if (!("session" in a) || a.session.verb !== "region") throw new Error("expected A");
+    expect([...regionEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["axis"]);
     const miss = enrichHit(a.session, { world: { x: 2, y: 3 }, point: free(2, 3) }, ctx);
     expect(miss.carrier).toBeUndefined();
     const hit = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
     expect(hit.carrier?.bind).toBe("axis");
   });
 
-  test("profile carrier pick follows the focused invocation, not occ 0", () => {
+  test("region carrier pick follows the focused invocation, not occ 0", () => {
     const namedC0 = { kind: "ref" as const, bind: "c0", id: "o_c0", at: { x: 10, y: 0 } };
     const bot0 = {
       id: "o_bot",
@@ -1463,10 +1463,10 @@ describe("profile tool", () => {
       keys: filter.keys,
       print: filter.print,
     };
-    const a = clickTool(startTool("profile"), { world: namedC0.at, point: namedC0 });
-    if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected c0");
-    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["bottom"]);
-    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual([
+    const a = clickTool(startTool("region"), { world: namedC0.at, point: namedC0 });
+    if (!("session" in a) || a.session.verb !== "region") throw new Error("expected c0");
+    expect([...regionEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["bottom"]);
+    expect([...regionEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual([
       "bottom",
     ]);
     const miss = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
@@ -1476,13 +1476,13 @@ describe("profile tool", () => {
   });
 
   test("hides existing fills for the whole Profile session", () => {
-    expect(profileHidesExisting(startTool("profile"))).toBe(true);
-    expect(profileHidesExisting(startTool("line"))).toBe(false);
-    expect(profileHidesExisting(null)).toBe(false);
+    expect(regionHidesExisting(startTool("region"))).toBe(true);
+    expect(regionHidesExisting(startTool("line"))).toBe(false);
+    expect(regionHidesExisting(null)).toBe(false);
   });
 
   test("ghost arrow sits on the carrier at the vertex, pointing along it", () => {
-    const a = clickTool(startTool("profile"), { world: { x: 0, y: 0 }, point: namedA });
+    const a = clickTool(startTool("region"), { world: { x: 0, y: 0 }, point: namedA });
     if (!("session" in a)) throw new Error("expected A");
     const xAxis = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
     const g = ghostOf(a.session, {
@@ -1491,7 +1491,7 @@ describe("profile tool", () => {
       carrier: { bind: "axis", geom: xAxis },
     });
     expect(g).toMatchObject({
-      kind: "profile",
+      kind: "region",
       arrow: { at: { x: 0, y: 0 }, tx: 1, ty: 0 },
     });
   });
@@ -1527,10 +1527,10 @@ describe("roundOffset tool", () => {
   const faceHit = {
     world: { x: 0.5, y: 0.5 },
     point: free(0.5, 0.5),
-    profile: { bind: "slice", geom: square },
+    region: { bind: "slice", geom: square },
   };
 
-  test("picks a profile then a slider length", () => {
+  test("picks a region then a slider length", () => {
     const mid = clickTool(startTool("roundOffset"), faceHit);
     if (!("session" in mid)) throw new Error("expected session");
     const scope = {
@@ -1538,7 +1538,7 @@ describe("roundOffset tool", () => {
       points: {},
       carriers: {},
       circles: {},
-      profiles: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
+      regions: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
       lengths: { n: 0.2 },
     };
     expect(
@@ -1570,7 +1570,7 @@ describe("roundOffset tool", () => {
       points: {},
       carriers: {},
       circles: {},
-      profiles: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
+      regions: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
       lengths: {},
       byId: {},
     };
@@ -1634,7 +1634,7 @@ describe("roundOffset tool", () => {
     });
   });
 
-  test("ghosts the offset profile from a length pick", () => {
+  test("ghosts the offset region from a length pick", () => {
     const mid = clickTool(startTool("roundOffset"), faceHit);
     if (!("session" in mid)) throw new Error("expected session");
     const g = ghostOf(
@@ -1649,12 +1649,12 @@ describe("roundOffset tool", () => {
         points: {},
         carriers: {},
         circles: {},
-        profiles: { slice: { expr: { kind: "ref", name: "slice" }, geom: square } },
+        regions: { slice: { expr: { kind: "ref", name: "slice" }, geom: square } },
         lengths: { n: 0.2 },
       },
     );
-    expect(g?.kind).toBe("profile");
-    expect((g as { kind: "profile"; edges: unknown[] }).edges).toHaveLength(8);
+    expect(g?.kind).toBe("region");
+    expect((g as { kind: "region"; edges: unknown[] }).edges).toHaveLength(8);
   });
 });
 
@@ -1688,7 +1688,7 @@ describe("fillet tool", () => {
   const faceHit = {
     world: { x: 0.95, y: 0.95 },
     point: free(0.95, 0.95),
-    profile: { bind: "mix", geom: square, id: "o_fil_mix" },
+    region: { bind: "mix", geom: square, id: "o_fil_mix" },
   };
   const scope = {
     used: ["mix", "r"],
@@ -1697,7 +1697,7 @@ describe("fillet tool", () => {
     },
     carriers: {},
     circles: {},
-    profiles: { mix: { expr: { kind: "ref" as const, name: "mix" }, geom: square } },
+    regions: { mix: { expr: { kind: "ref" as const, name: "mix" }, geom: square } },
     lengths: { r: 0.35 },
   };
 
@@ -1762,13 +1762,13 @@ describe("fillet tool", () => {
       { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) },
       ctx,
     );
-    expect(hit.profile?.id).toBe("o_fil_mix");
+    expect(hit.region?.id).toBe("o_fil_mix");
     expect(hit.corner?.index).toBe(0);
     expect(hit.corner?.at.x).toBeCloseTo(0);
     expect(hit.corner?.at.y).toBeCloseTo(0);
   });
 
-  test("fillet profile pick follows the focused invocation, not occ 0", () => {
+  test("fillet region pick follows the focused invocation, not occ 0", () => {
     const square1 = {
       kind: "region" as const,
       outer: [
@@ -1817,15 +1817,15 @@ describe("fillet tool", () => {
       { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) },
       ctx,
     );
-    expect(miss.profile).toBeUndefined();
+    expect(miss.region).toBeUndefined();
     expect(miss.corner).toBeUndefined();
     const hit = enrichHit(
       startTool("fillet"),
       { world: { x: 10.02, y: 0.01 }, point: free(10.02, 0.01) },
       ctx,
     );
-    expect(hit.profile?.id).toBe("o_pr");
-    expect(hit.profile?.bind).toBe("mix");
+    expect(hit.region?.id).toBe("o_pr");
+    expect(hit.region?.bind).toBe("mix");
     expect(hit.corner?.index).toBe(0);
     expect(hit.corner?.at.x).toBeCloseTo(10);
     expect(hit.corner?.at.y).toBeCloseTo(0);
@@ -1846,7 +1846,7 @@ describe("fillet tool", () => {
       mutePoints: false,
       hideSnap: false,
     });
-    expect(toolChrome(startTool("profile")).hideFills).toBe(true);
+    expect(toolChrome(startTool("region")).hideFills).toBe(true);
     expect(toolChrome(startTool("line")).hideFills).toBe(false);
   });
 
@@ -1871,10 +1871,10 @@ describe("fillet tool", () => {
       },
       scope,
     );
-    expect(g?.kind).toBe("profile");
-    const profileGhost = g as { kind: "profile"; edges: { carrier: { kind: string } }[] };
-    expect(profileGhost.edges).toHaveLength(5);
-    expect(profileGhost.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(g?.kind).toBe("region");
+    const regionGhost = g as { kind: "region"; edges: { carrier: { kind: string } }[] };
+    expect(regionGhost.edges).toHaveLength(5);
+    expect(regionGhost.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
   });
 
   test("fillet does not pick a roundOffset region", () => {
@@ -1897,7 +1897,7 @@ describe("fillet tool", () => {
         screen: { x: 10, y: 10 },
       },
     );
-    expect(hit.profile).toBeUndefined();
+    expect(hit.region).toBeUndefined();
     expect(hit.corner).toBeUndefined();
   });
 });

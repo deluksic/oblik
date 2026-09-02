@@ -3,9 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { TraceNode } from "../eval/context";
 import { gliderOnTraceNode, resolvePlacePoint } from "./place";
 
-function node(
-  partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>,
-): TraceNode {
+function node(partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>): TraceNode {
   return {
     occ: 0,
     editable: false,
@@ -230,7 +228,10 @@ describe("resolvePlacePoint", () => {
     expect(p.kind).toBe("pointOnLine");
     if (p.kind !== "pointOnLine") return;
     expect(p.bind).toBe("shelf");
-    expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toMatchObject({ kind: "pointOnLine", bind: "shelf" });
+    expect(gliderOnTraceNode(shelf, { x: 2, y: 1.85 })).toMatchObject({
+      kind: "pointOnLine",
+      bind: "shelf",
+    });
   });
 
   test("does not snap to a crossing past a segment's endpoints", () => {

@@ -20,7 +20,7 @@ export function isUserSourcePath(file: string): boolean {
   const key = normalizeStackFile(file);
   if (/(^|\/)node_modules(\/|$)/.test(key)) return false;
   if (/(^|\/)\.vite(\/|$)/.test(key)) return false;
-  if (key.startsWith('node:')) return false;
+  if (key.startsWith("node:")) return false;
   if (/\/oblik\//.test(key)) return false;
   return /\.(ts|tsx)$/.test(key);
 }
@@ -50,7 +50,12 @@ const ErrorWithStack = Error as typeof Error & {
   prepareStackTrace?: (err: Error, sites: V8CallSite[]) => unknown;
 };
 
-function callSiteFromParts(file: string, line: number, column: number, name?: string | null): CallSite | null {
+function callSiteFromParts(
+  file: string,
+  line: number,
+  column: number,
+  name?: string | null,
+): CallSite | null {
   const normalized = normalizeStackFile(file);
   if (!isUserSourcePath(normalized)) return null;
   const who = name?.trim();

@@ -1,20 +1,20 @@
 import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 
-import { tryEvaluate, type Draft } from "../eval/evaluate";
 import type { TraceNode } from "../eval/context";
+import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import { sourceFileKey } from "../eval/stack";
 import type { Euclid2Scene } from "../eval/scene";
-import type { Annotation } from "../source/analyze";
-import type { MentionFile } from "../source/mention";
-import { SelectionSidebar } from "../host/SelectionSidebar";
+import { sourceFileKey } from "../eval/stack";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
   type ScopePick,
 } from "../host/selection-detail";
-import { traceKey } from "./pick";
+import { SelectionSidebar } from "../host/SelectionSidebar";
+import type { Annotation } from "../source/analyze";
+import type { MentionFile } from "../source/mention";
 import { Palette } from "./Palette";
+import { traceKey } from "./pick";
 import {
   clickTool,
   ghostOf,
@@ -52,7 +52,10 @@ function parentFocus(
   trace: readonly TraceNode[],
   mentions: readonly MentionFile[],
 ): ScopeFocus {
-  if (sourceFileKey(focus.file) === sourceFileKey(entry.file) && (focus.name ?? "build") === (entry.name ?? "build")) {
+  if (
+    sourceFileKey(focus.file) === sourceFileKey(entry.file) &&
+    (focus.name ?? "build") === (entry.name ?? "build")
+  ) {
     return entry;
   }
   const n = trace.find((node) => node.inv && invMatches(node, focus));
@@ -61,11 +64,18 @@ function parentFocus(
   const key = sourceFileKey(inv.callerFile);
   const fn = mentions
     .flatMap((m) => m.functions)
-    .find((f) => sourceFileKey(f.file) === key && inv.callerLine >= f.startLine && inv.callerLine <= f.endLine);
+    .find(
+      (f) =>
+        sourceFileKey(f.file) === key &&
+        inv.callerLine >= f.startLine &&
+        inv.callerLine <= f.endLine,
+    );
   if (!fn) return entry;
   const parentNode = trace.find(
     (node) =>
-      node.inv?.name === fn.name && node.inv && sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
+      node.inv?.name === fn.name &&
+      node.inv &&
+      sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
   );
   return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
 }
@@ -299,7 +309,9 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   return (
     <div class={styles.workspace}>
       <div class={styles.wrap}>
-        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
+        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>
+          {status()}
+        </p>
         <Euclid2View
           trace={world().trace}
           initialCamera={props.scene.camera}

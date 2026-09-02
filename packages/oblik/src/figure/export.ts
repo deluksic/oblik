@@ -4,7 +4,7 @@ import { csgTreeSvg, fillPaint, type DrawOp } from "../geom/csg-draw";
 import { fillAabb } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { isCircleWalk, regionSvgPath, walkEdges } from "../geom/profile";
+import { isCircleWalk, regionSvgPath, walkEdges } from "../geom/region";
 import type { Csg2, Pick } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";

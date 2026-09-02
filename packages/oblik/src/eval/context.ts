@@ -1,8 +1,8 @@
 import type { Geom } from "../geom";
 import type { Annotation } from "../source/analyze";
-import type { CallSite } from "./stack";
-import { $node } from "./site";
 import type { FigureStyle, PaintValue } from "./paint";
+import { $node } from "./site";
+import type { CallSite } from "./stack";
 
 export type SliderValue = {
   kind: "slider";

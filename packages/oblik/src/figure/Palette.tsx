@@ -1,5 +1,4 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
-
 import IconDownload from "~icons/lucide/download";
 import IconEraser from "~icons/lucide/eraser";
 import IconPaintbrush from "~icons/lucide/paintbrush";
@@ -108,7 +107,11 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
   );
 }
 
-function ToolRow(props: { spec: FigureToolSpec; active: boolean; onPick: (id: FigureToolId) => void }) {
+function ToolRow(props: {
+  spec: FigureToolSpec;
+  active: boolean;
+  onPick: (id: FigureToolId) => void;
+}) {
   return (
     <li
       class={[styles.listItem, { [styles.listItemActive]: props.active }]}

@@ -1,17 +1,27 @@
 import type { TraceNode } from "@/eval/context";
-import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
+
 import { circle } from "./circle";
+import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";
+import { fillet } from "./fillet";
 import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
-import { fillet } from "./fillet";
-import { profile } from "./profile";
+import { region } from "./region";
 import { roundOffset } from "./roundOffset";
+import { scopeOf, type ScopeInput } from "./scope";
 import { segment } from "./segment";
 import { slider } from "./slider";
-import { scopeOf, type ScopeInput } from "./scope";
-import type { PlaceCtx, PlaceHit, Scope, Tool, ToolId, ToolKey, ToolSession, ToolSpec } from "./types";
+import type {
+  PlaceCtx,
+  PlaceHit,
+  Scope,
+  Tool,
+  ToolId,
+  ToolKey,
+  ToolSession,
+  ToolSpec,
+} from "./types";
 
 export type {
   Draft,
@@ -47,7 +57,7 @@ const byId = {
   parallelLine,
   perpendicularLine,
   slider,
-  profile,
+  region,
   roundOffset,
   fillet,
 } as Record<ToolId, Tool>;
@@ -60,7 +70,7 @@ export const TOOLS = [
   parallelLine.spec,
   perpendicularLine.spec,
   slider.spec,
-  profile.spec,
+  region.spec,
   roundOffset.spec,
   fillet.spec,
 ] as const;
@@ -79,7 +89,10 @@ function titleMatch(t: ToolSpec, q: string): boolean {
   if (title === q) return true;
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (new RegExp(`\\b${escaped}\\b`).test(title)) return true;
-  const parts = t.id.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(" ");
+  const parts = t.id
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(" ");
   return parts.includes(q);
 }
 
@@ -124,7 +137,10 @@ export function previewOf(
 ) {
   const tool = of(session);
   const sc = scopeOf(scope);
-  return withSlot(tool.preview(session as never, place, sc), focusedDraft(tool, session as never, sc));
+  return withSlot(
+    tool.preview(session as never, place, sc),
+    focusedDraft(tool, session as never, sc),
+  );
 }
 
 export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
@@ -146,7 +162,11 @@ export function keyTool(
   return out;
 }
 
-export function commitTool(session: ToolSession, place: PlaceHit | null = null, scope: ScopeInput = []) {
+export function commitTool(
+  session: ToolSession,
+  place: PlaceHit | null = null,
+  scope: ScopeInput = [],
+) {
   const sc = scopeOf(scope);
   const tool = of(session);
   if (firstInvalid(tool, session as never, sc)) return undefined;
@@ -157,7 +177,12 @@ export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): P
   return of(session).hit?.(session as never, hit, ctx) ?? hit;
 }
 
-export function hoverTool(session: ToolSession, hit: PlaceHit, trace: readonly TraceNode[], scope?: Scope): string | null {
+export function hoverTool(
+  session: ToolSession,
+  hit: PlaceHit,
+  trace: readonly TraceNode[],
+  scope?: Scope,
+): string | null {
   return of(session).hover?.(session as never, hit, trace, scope) ?? null;
 }
 

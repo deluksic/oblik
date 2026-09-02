@@ -19,7 +19,7 @@ import {
   tessellateWalk,
   walkContains,
   walkEdges,
-} from "./profile";
+} from "./region";
 import type { Branch, Circle, LineLike, Loop, LoopEdge, Region } from "./types";
 import {
   add,
@@ -784,7 +784,7 @@ export const envelopeOffset: OffsetKernel = composeOffset(rawRoundOffset);
 
 /**
  * Round offset boundary as islands of closed walks. Positive `d` grows.
- * Compiled geometry is not a declared profile — the constructor wraps a
+ * Compiled geometry is not a declared region — the constructor wraps a
  * region whose stock is an `offset` operand. Optional `kernel` is for tests
  * and later swaps; production uses `envelopeOffset`.
  */
@@ -796,7 +796,7 @@ export function roundOffsetValue(
   return kernel(p, d);
 }
 
-/** Flatten nested offsets to a profile source + net distance, then compile. */
+/** Flatten nested offsets to a region source + net distance, then compile. */
 export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: number }): Region[] {
   let d = op.d;
   let node: unknown = op.of;
@@ -840,7 +840,7 @@ function filletJoin(
 /**
  * Replace sharp vertices with tangent join arcs. `radii[i]` is the fillet at
  * `outer[i].a`. Zero / omitted / a flat (180°) vertex keeps the corner.
- * Too-large `r` → empty profile.
+ * Too-large `r` → empty region.
  */
 export function filletVertices(p: Region, radii: readonly number[]): Region {
   if (!isFiniteRegion(p)) return nanRegion();

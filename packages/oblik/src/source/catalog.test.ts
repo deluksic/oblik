@@ -1,8 +1,14 @@
-import { describe, expect, test } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { findDuplicateIds, parseOblikSceneSource, scanAnnotationsBundle, sceneLoadersModule } from "./catalog";
+import { describe, expect, test } from "vitest";
+
+import {
+  findDuplicateIds,
+  parseOblikSceneSource,
+  scanAnnotationsBundle,
+  sceneLoadersModule,
+} from "./catalog";
 import { listUserAppSources } from "./user-source";
 
 const src = `import { point, defineScene } from "oblik";
@@ -19,7 +25,11 @@ export default defineScene({
 
 describe("parseOblikSceneSource", () => {
   test("reads title and kind from defineScene", () => {
-    const e = parseOblikSceneSource("/repo/apps/demo/src/scenes/shelf.ts", src, "apps/demo/src/scenes/shelf.ts");
+    const e = parseOblikSceneSource(
+      "/repo/apps/demo/src/scenes/shelf.ts",
+      src,
+      "apps/demo/src/scenes/shelf.ts",
+    );
     expect(e).toEqual({
       id: "shelf",
       file: "shelf.ts",
@@ -64,7 +74,7 @@ export default defineScene({
     expect(mod).toContain("/* __oblik_scene_hmr */");
     expect(mod).toContain("applyHotScenes");
     expect(mod).not.toContain("notifyHelperHot");
-    expect(mod).not.toContain("import \"./layout/");
+    expect(mod).not.toContain('import "./layout/');
   });
 });
 
@@ -89,14 +99,19 @@ describe("findDuplicateIds", () => {
 
   test("a for-loop with one call site is not a collision", () => {
     expect(
-      findDuplicateIds([{ id: "o_ring", file: "apps/demo/src/scenes/shared-loop.ts", line: 16, column: 7 }]),
+      findDuplicateIds([
+        { id: "o_ring", file: "apps/demo/src/scenes/shared-loop.ts", line: 16, column: 7 },
+      ]),
     ).toEqual([]);
   });
 });
 
 describe("scanAnnotationsBundle", () => {
   test("demo user sources have unique ids", () => {
-    const demo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../apps/demo");
+    const demo = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../../../apps/demo",
+    );
     const workspace = path.resolve(demo, "../..");
     const { collisions } = scanAnnotationsBundle(listUserAppSources(demo), workspace);
     expect(collisions).toEqual([]);

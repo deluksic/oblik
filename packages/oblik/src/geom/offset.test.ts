@@ -9,7 +9,7 @@ import {
   regionContains,
   regionValue,
   walkEdges,
-} from "./profile";
+} from "./region";
 import type { Circle, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 

@@ -15,7 +15,11 @@ export function worldToNdc(
   return { x: k * (world.x - cam.x), y: -k * (world.y - cam.y) };
 }
 
-export function ndcToWorld(ndc: { x: number; y: number }, cam: Camera2, size: PaneSize): { x: number; y: number } {
+export function ndcToWorld(
+  ndc: { x: number; y: number },
+  cam: Camera2,
+  size: PaneSize,
+): { x: number; y: number } {
   const k = kWorldToNdc(cam, size);
   return { x: cam.x + ndc.x / k, y: cam.y - ndc.y / k };
 }

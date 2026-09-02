@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 
 import { filterTools, type Preview, type ToolId, type ToolSpec } from "./tool";
+
 import styles from "./Palette.module.css";
 
 export type PaletteProps = {
@@ -19,7 +20,16 @@ export function Palette(props: PaletteProps) {
       <Show when={props.picker}>
         <Picker onPick={props.onPick} onClose={props.onClosePicker} />
       </Show>
-      <Show when={props.prompt}>{(p) => <Prompt preview={p()} onDraft={props.onDraft} onTab={props.onTab} onCommit={props.onCommit} />}</Show>
+      <Show when={props.prompt}>
+        {(p) => (
+          <Prompt
+            preview={p()}
+            onDraft={props.onDraft}
+            onTab={props.onTab}
+            onCommit={props.onCommit}
+          />
+        )}
+      </Show>
     </div>
   );
 }
@@ -53,7 +63,9 @@ function Prompt(props: {
 
   return (
     <div class={styles.promptDock}>
-      <div class={[styles.prompt, { [styles.promptInvalid]: props.preview.draft?.invalid === true }]}>
+      <div
+        class={[styles.prompt, { [styles.promptInvalid]: props.preview.draft?.invalid === true }]}
+      >
         <Show
           when={props.preview.draft && props.preview.before != null}
           fallback={<p class={styles.preview}>{props.preview.line}</p>}

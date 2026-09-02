@@ -37,7 +37,7 @@ function pointScope(...pts: { bind: string; x: number; y: number }[]): Scope {
     used.push(p.bind);
     points[p.bind] = { expr: { kind: "ref", name: p.bind }, at: { x: p.x, y: p.y } };
   }
-  return { used, points, carriers: {}, circles: {}, profiles: {}, lengths: {}, byId: {} };
+  return { used, points, carriers: {}, circles: {}, regions: {}, lengths: {}, byId: {} };
 }
 
 describe("keyTool", () => {
@@ -150,7 +150,9 @@ describe("keyTool", () => {
       id: "center",
       invalid: true,
     });
-    expect(keyTool(s, { key: "Enter" }, null, pointScope({ bind: "A", x: 0, y: 0 }))).toBeUndefined();
+    expect(
+      keyTool(s, { key: "Enter" }, null, pointScope({ bind: "A", x: 0, y: 0 })),
+    ).toBeUndefined();
   });
 
   test("invalid number is flagged and blocks insert", () => {
@@ -220,7 +222,8 @@ describe("keyTool", () => {
       used: ["A", "reach"],
       points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       carriers: {},
-      circles: {}, profiles: {},
+      circles: {},
+      regions: {},
       lengths: { reach: 2.5 },
     };
     const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
@@ -244,7 +247,7 @@ describe("keyTool", () => {
         points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
         carriers: {},
         circles: {},
-        profiles: {},
+        regions: {},
         lengths: { reach: 1 },
       }).draft,
     ).toMatchObject({ id: "typed", invalid: true });
@@ -307,7 +310,8 @@ describe("keyTool", () => {
       used: ["ground", "reach"],
       points: {},
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
-      circles: {}, profiles: {},
+      circles: {},
+      regions: {},
       lengths: { reach: 1.25 },
     };
     const mid = asSession(
@@ -333,7 +337,8 @@ describe("keyTool", () => {
       used: ["reach"],
       points: {},
       carriers: {},
-      circles: {}, profiles: {},
+      circles: {},
+      regions: {},
       lengths: { reach: 3 },
     };
     const mid = typeChars(startTool("point"), "reach");
@@ -360,7 +365,12 @@ describe("keyTool", () => {
       }),
     );
     expect(mid).toMatchObject({ verb: "perpendicularLine", focus: "through" });
-    expect(keyTool(typeChars(mid, "P"), { key: "Enter" }, null, { ...scope, carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } } })).toEqual({
+    expect(
+      keyTool(typeChars(mid, "P"), { key: "Enter" }, null, {
+        ...scope,
+        carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      }),
+    ).toEqual({
       insert: {
         from: "perpendicularLine",
         args: [

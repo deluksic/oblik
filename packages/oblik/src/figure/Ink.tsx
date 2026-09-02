@@ -28,7 +28,7 @@ import { fillPaint } from "../geom/csg-draw";
 import { isCsg2, isPick } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { regionSvgPath } from "../geom/profile";
+import { regionSvgPath } from "../geom/region";
 import type { Csg2, Pick } from "../geom/types";
 
 import styles from "./View.module.css";

@@ -10,27 +10,27 @@ import { dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, previewCall } fr
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
-type ProfileSession = Extract<ToolSession, { verb: "profile" }>;
-type CycleCarrier = ProfileSession["carriers"][number];
+type RegionSession = Extract<ToolSession, { verb: "region" }>;
+type CycleCarrier = RegionSession["carriers"][number];
 
 /** Fat snap so closing the cycle is easy even over other points. */
-export const PROFILE_CLOSE_PX = 80;
+export const REGION_CLOSE_PX = 80;
 
-const fields: Field<ProfileSession>[] = [nameField((s) => s.focus === "name")];
+const fields: Field<RegionSession>[] = [nameField((s) => s.focus === "name")];
 
-function needPoint(s: ProfileSession): boolean {
+function needPoint(s: RegionSession): boolean {
   return s.vertices.length === s.carriers.length;
 }
 
-function needCarrier(s: ProfileSession): boolean {
+function needCarrier(s: RegionSession): boolean {
   return s.vertices.length === s.carriers.length + 1;
 }
 
-function canClose(s: ProfileSession): boolean {
+function canClose(s: RegionSession): boolean {
   return needPoint(s) && s.vertices.length >= 2 && s.carriers.length >= 2;
 }
 
-function startLabel(s: ProfileSession): string {
+function startLabel(s: RegionSession): string {
   const e = s.vertices[0]?.expr;
   return e ? printExpr(e) : "start";
 }
@@ -89,7 +89,7 @@ function carrierExpr(c: CycleCarrier): Expr {
   return c.expr;
 }
 
-function cycleItems(s: ProfileSession, extra: Expr[] = []): Expr[] {
+function cycleItems(s: RegionSession, extra: Expr[] = []): Expr[] {
   const items: Expr[] = [];
   const n = Math.max(s.vertices.length, s.carriers.length);
   for (let i = 0; i < n; i++) {
@@ -114,12 +114,12 @@ function edgeOn(
   return { a: projectOnLine(carrier, a), b: projectOnLine(carrier, b), carrier };
 }
 
-function lastCircle(s: ProfileSession): CycleCarrier | undefined {
+function lastCircle(s: RegionSession): CycleCarrier | undefined {
   const c = s.carriers[s.carriers.length - 1];
   return c?.geom.kind === "circle" ? c : undefined;
 }
 
-function flipLastK(s: ProfileSession): ProfileSession {
+function flipLastK(s: RegionSession): RegionSession {
   const i = s.carriers.length - 1;
   const c = s.carriers[i];
   if (!c || c.geom.kind !== "circle") return s;
@@ -161,34 +161,34 @@ function arrowAt(
   return { at, tx: dir.x * sign, ty: dir.y * sign };
 }
 
-/** True while Profile is the live tool — existing fills stay out of the way. */
-export function profileHidesExisting(session: ToolSession | null | undefined): boolean {
-  return session?.verb === "profile";
+/** True while Region is the live tool — existing fills stay out of the way. */
+export function regionHidesExisting(session: ToolSession | null | undefined): boolean {
+  return session?.verb === "region";
 }
 
 /** Named strokes through the current vertex, or `null` when not picking a carrier. */
-export function profileEligibleCarriers(
+export function regionEligibleCarriers(
   session: ToolSession | null | undefined,
   trace: readonly TraceNode[],
   camera: Camera2,
   filter?: SnapFilter,
 ): ReadonlySet<string> | null {
-  if (!session || session.verb !== "profile") return null;
+  if (!session || session.verb !== "region") return null;
   if (!needCarrier(session)) return null;
   const from = session.vertices[session.vertices.length - 1];
   if (!from) return null;
   return namedStrokesThrough(trace, from.at, camera, undefined, filter);
 }
 
-export const profile: Tool<ProfileSession> = {
+export const region: Tool<RegionSession> = {
   spec: {
-    id: "profile",
-    title: "Profile",
+    id: "region",
+    title: "Region",
     hint: "Named points or crossings, then existing strokes until the start. Circles need a direction.",
-    prefix: "pr",
-    aliases: ["face", "region", "loop", "fill"],
+    prefix: "rg",
+    aliases: ["face", "loop", "fill"],
   },
-  start: () => ({ verb: "profile", focus: "cycle", vertices: [], carriers: [], name: "" }),
+  start: () => ({ verb: "region", focus: "cycle", vertices: [], carriers: [], name: "" }),
   fields,
   focus: (s) => s.focus,
   setFocus: (s, id) => ({ ...s, focus: id === "name" ? "name" : "cycle" }),
@@ -212,7 +212,7 @@ export const profile: Tool<ProfileSession> = {
     }
     if (canClose(session)) {
       const start = session.vertices[0]!;
-      const max = PROFILE_CLOSE_PX / Math.max(8, ctx.camera.scale);
+      const max = REGION_CLOSE_PX / Math.max(8, ctx.camera.scale);
       if (dist(hit.world, start.at) <= max) {
         const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
         const point = placeFromVertex(start, ctx.trace, filter);
@@ -289,10 +289,10 @@ export const profile: Tool<ProfileSession> = {
       return { kind: "point", at: session.vertices[0].at };
     }
     if (edges.length === 0 && !hover) return null;
-    return { kind: "profile", edges, hover, arrow };
+    return { kind: "region", edges, hover, arrow };
   },
   preview(session, place, scope): Preview {
-    const spec = profile.spec;
+    const spec = region.spec;
     const bind = previewName(session, spec.prefix);
     const name = inSlot(session.focus === "name", bind);
     const extra: Expr[] = [];

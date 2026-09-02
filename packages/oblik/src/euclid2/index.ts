@@ -17,7 +17,16 @@ export {
   type ToolId,
   type ToolSession,
 } from "./tool";
-export { snapBoundPoint, hitsNear, hitTest, traceKey, isFiniteTrace, movedPastClick, PICK_CLICK_PX, type SnapPoint } from "./pick";
+export {
+  snapBoundPoint,
+  hitsNear,
+  hitTest,
+  traceKey,
+  isFiniteTrace,
+  movedPastClick,
+  PICK_CLICK_PX,
+  type SnapPoint,
+} from "./pick";
 export {
   resolvePlacePoint,
   placeAllowsGliders,

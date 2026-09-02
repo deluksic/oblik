@@ -1,24 +1,31 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, test } from "vitest";
 
 import { normalizeSceneRelPath } from "./scene-path";
 import { resolveSceneFileAbs } from "./scene-path.server";
-import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
 
 describe("normalizeSceneRelPath", () => {
   test("maps app-relative vite paths onto catalog module path", () => {
-    expect(
-      normalizeSceneRelPath("src/scenes/shelf.ts", "apps/demo/src/scenes/shelf.ts"),
-    ).toBe("apps/demo/src/scenes/shelf.ts");
+    expect(normalizeSceneRelPath("src/scenes/shelf.ts", "apps/demo/src/scenes/shelf.ts")).toBe(
+      "apps/demo/src/scenes/shelf.ts",
+    );
   });
 
   test("does not confuse a helper with a scene that shares the basename", () => {
     expect(
-      normalizeSceneRelPath("src/layout/mounting-plate.ts", "apps/demo/src/scenes/mounting-plate.ts"),
+      normalizeSceneRelPath(
+        "src/layout/mounting-plate.ts",
+        "apps/demo/src/scenes/mounting-plate.ts",
+      ),
     ).toBe("src/layout/mounting-plate.ts");
     expect(
-      normalizeSceneRelPath("src/layout/mounting-plate.ts", "apps/demo/src/layout/mounting-plate.ts"),
+      normalizeSceneRelPath(
+        "src/layout/mounting-plate.ts",
+        "apps/demo/src/layout/mounting-plate.ts",
+      ),
     ).toBe("apps/demo/src/layout/mounting-plate.ts");
   });
 });

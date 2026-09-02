@@ -1,21 +1,28 @@
 import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 
-import { tryEvaluate } from "../eval/evaluate";
+import { traceKey } from "../euclid2/pick";
+import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../euclid2/tool";
 import type { TraceNode } from "../eval/context";
+import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import { sourceFileKey } from "../eval/stack";
-import type { FigureScene } from "../eval/scene";
-import type { Annotation } from "../source/analyze";
-import type { MentionFile } from "../source/mention";
 import { isPaint, type PaintValue } from "../eval/paint";
-import { SelectionInspector, SelectionSidebar, SidebarIdentity, SidebarSection } from "../host/SelectionSidebar";
+import type { FigureScene } from "../eval/scene";
+import { sourceFileKey } from "../eval/stack";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
   type ScopePick,
 } from "../host/selection-detail";
-import { traceKey } from "../euclid2/pick";
-import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../euclid2/tool";
+import {
+  SelectionInspector,
+  SelectionSidebar,
+  SidebarIdentity,
+  SidebarSection,
+} from "../host/SelectionSidebar";
+import { useRequestModal } from "../modal/ModalContext";
+import type { Annotation } from "../source/analyze";
+import type { MentionFile } from "../source/mention";
+import { BrushDock } from "./BrushDock";
 import {
   DEFAULT_BRUSH,
   figureStyleFromBrush,
@@ -23,16 +30,14 @@ import {
   lookFromBrush,
   type BrushSettings,
 } from "./chips";
-import { useRequestModal } from "../modal/ModalContext";
-import { BrushDock } from "./BrushDock";
-import { ExportModal } from "./ExportModal";
-import { FigurePalette } from "./Palette";
-import { FigureView } from "./View";
-import { FrameEditor, type FrameXywh } from "./FrameEditor";
 import { figureToSvg } from "./export";
+import { ExportModal } from "./ExportModal";
 import { frameRect } from "./frame";
+import { FrameEditor, type FrameXywh } from "./FrameEditor";
+import { FigurePalette } from "./Palette";
 import { isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
+import { FigureView } from "./View";
 
 import styles from "./Pane.module.css";
 
@@ -53,7 +58,10 @@ function parentFocus(
   trace: readonly TraceNode[],
   mentions: readonly MentionFile[],
 ): ScopeFocus {
-  if (sourceFileKey(focus.file) === sourceFileKey(entry.file) && (focus.name ?? "build") === (entry.name ?? "build")) {
+  if (
+    sourceFileKey(focus.file) === sourceFileKey(entry.file) &&
+    (focus.name ?? "build") === (entry.name ?? "build")
+  ) {
     return entry;
   }
   const n = trace.find((node) => node.inv && invMatches(node, focus));
@@ -62,11 +70,18 @@ function parentFocus(
   const key = sourceFileKey(inv.callerFile);
   const fn = mentions
     .flatMap((m) => m.functions)
-    .find((f) => sourceFileKey(f.file) === key && inv.callerLine >= f.startLine && inv.callerLine <= f.endLine);
+    .find(
+      (f) =>
+        sourceFileKey(f.file) === key &&
+        inv.callerLine >= f.startLine &&
+        inv.callerLine <= f.endLine,
+    );
   if (!fn) return entry;
   const parentNode = trace.find(
     (node) =>
-      node.inv?.name === fn.name && node.inv && sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
+      node.inv?.name === fn.name &&
+      node.inv &&
+      sourceFileKey(node.inv.file) === sourceFileKey(fn.file),
   );
   return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
 }
@@ -328,14 +343,17 @@ export function FigurePane(props: FigurePaneProps) {
         ? "Brush — hover previews, click construction to add ink. Ink fades while construction is up. Escape leaves the brush."
         : "Brush — click ink to replace. Hold Shift to see construction and add. Escape leaves the brush.";
     }
-    if (t === "eraser") return "Eraser — click ink to remove it. Construction stays. Escape leaves the eraser.";
+    if (t === "eraser")
+      return "Eraser — click ink to remove it. Construction stays. Escape leaves the eraser.";
     return "Click ink to inspect. Hold Shift for construction. Space for Brush, Eraser, or Export.";
   });
 
   return (
     <div class={styles.workspace}>
       <div class={styles.wrap}>
-        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
+        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>
+          {status()}
+        </p>
         <div class={styles.stage}>
           <FigureView
             trace={world().trace}

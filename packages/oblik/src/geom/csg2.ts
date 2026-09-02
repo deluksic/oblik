@@ -1,5 +1,5 @@
 import { signedDist } from "./ops";
-import { isFiniteRegion, signedDistToRegion, tessellateRegion } from "./profile";
+import { isFiniteRegion, signedDistToRegion, tessellateRegion } from "./region";
 import type {
   Circle,
   Csg2,

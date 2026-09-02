@@ -188,7 +188,7 @@ export function RegionTreeFill(props: {
   );
 }
 
-/** Overlay halo outside the CSG fill, same clip idea as `ChromeOutsideClip` on profiles. */
+/** Overlay halo outside the CSG fill, same clip idea as `ChromeOutsideClip` on regions. */
 export function RegionHalo(props: {
   paint: CsgPaint;
   id: string;

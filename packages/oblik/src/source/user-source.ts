@@ -34,7 +34,8 @@ function walkTs(dir: string, out: string[]): void {
       walkTs(abs, out);
       continue;
     }
-    if (name.endsWith(".ts") && !name.endsWith(".d.ts") && name !== "scene-loaders.ts") out.push(abs);
+    if (name.endsWith(".ts") && !name.endsWith(".d.ts") && name !== "scene-loaders.ts")
+      out.push(abs);
   }
 }
 

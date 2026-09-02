@@ -2,6 +2,7 @@ import { For } from "solid-js";
 
 import type { OblikSceneEntry } from "../source/catalog";
 import { navItems } from "./routing";
+
 import styles from "./Nav.module.css";
 
 export type NavProps = {

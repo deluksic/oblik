@@ -1,7 +1,18 @@
 import { printExpr } from "@/source/expr";
-import type { InsertJob, Field, FieldKind, Draft, Scope, Tool, ToolKey, ToolSession, ToolStep } from "./types";
+
 import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";
+import type {
+  InsertJob,
+  Field,
+  FieldKind,
+  Draft,
+  Scope,
+  Tool,
+  ToolKey,
+  ToolSession,
+  ToolStep,
+} from "./types";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
@@ -54,14 +65,19 @@ export function lengthError(raw: string, scope: Scope): string | null {
       return null;
     }
     if (field === "distance") {
-      if (scope.carriers[object]?.geom.kind !== "parallelLine") return `No parallel line named ${object}.`;
+      if (scope.carriers[object]?.geom.kind !== "parallelLine")
+        return `No parallel line named ${object}.`;
       return null;
     }
   }
   return refError(raw, Object.keys(scope.lengths), "slider");
 }
 
-export function fieldError<S extends ToolSession>(field: Field<S>, session: S, scope: Scope): string | null {
+export function fieldError<S extends ToolSession>(
+  field: Field<S>,
+  session: S,
+  scope: Scope,
+): string | null {
   const raw = field.get(session);
   if (field.kind === "length") return lengthError(raw, scope);
   if (field.kind === "number") return numError(raw);
@@ -69,14 +85,18 @@ export function fieldError<S extends ToolSession>(field: Field<S>, session: S, s
   const names =
     field.looks === "carrier"
       ? Object.keys(scope.carriers)
-      : field.looks === "profile"
-        ? Object.keys(scope.profiles)
+      : field.looks === "region"
+        ? Object.keys(scope.regions)
         : Object.keys(scope.points);
-  const label = field.looks === "carrier" ? "line" : field.looks === "profile" ? "profile" : "point";
+  const label = field.looks === "carrier" ? "line" : field.looks === "region" ? "region" : "point";
   return refError(raw, names, label);
 }
 
-export function firstInvalid<S extends ToolSession>(tool: Tool<S>, session: S, scope: Scope): Field<S> | null {
+export function firstInvalid<S extends ToolSession>(
+  tool: Tool<S>,
+  session: S,
+  scope: Scope,
+): Field<S> | null {
   return openFields(tool, session).find((f) => fieldError(f, session, scope) != null) ?? null;
 }
 
@@ -90,7 +110,11 @@ export function withBind(session: { name?: string }, job: InsertJob): InsertJob 
   return bind ? { ...job, bind } : job;
 }
 
-export function resolvePoint(ref: string, placed: import("./types").Placed | undefined, scope: Scope) {
+export function resolvePoint(
+  ref: string,
+  placed: import("./types").Placed | undefined,
+  scope: Scope,
+) {
   const t = ref.trim();
   if (!t) return placed;
   if (scope.points[t]) return scope.points[t];
@@ -108,14 +132,14 @@ export function resolveCarrier(
   if (placed && printExpr(placed.expr) === t) return placed;
 }
 
-export function resolveProfile(
+export function resolveRegion(
   ref: string,
-  placed: Scope["profiles"][string] | undefined,
+  placed: Scope["regions"][string] | undefined,
   scope: Scope,
 ) {
   const t = ref.trim();
   if (!t) return placed;
-  if (scope.profiles[t]) return scope.profiles[t];
+  if (scope.regions[t]) return scope.regions[t];
   if (placed && printExpr(placed.expr) === t) return placed;
 }
 
@@ -136,7 +160,9 @@ export function nameField<S extends ToolSession & { name: string }>(
   };
 }
 
-export function typedField<S extends ToolSession & { typed: string }>(open: (session: S) => boolean): Field<S> {
+export function typedField<S extends ToolSession & { typed: string }>(
+  open: (session: S) => boolean,
+): Field<S> {
   return {
     id: "typed",
     kind: "number",
@@ -164,7 +190,7 @@ export { numberField } from "./length";
 export function refField<S extends ToolSession>(
   id: string,
   placeholder: string,
-  looks: "point" | "carrier" | "profile",
+  looks: "point" | "carrier" | "region",
   get: (session: S) => string,
   set: (session: S, raw: string) => S,
 ): Field<S> {
@@ -197,7 +223,11 @@ export function focusedField<S extends ToolSession>(tool: Tool<S>, session: S): 
   return open.find((f) => f.id === id) ?? open[0]!;
 }
 
-export function focusedDraft<S extends ToolSession>(tool: Tool<S>, session: S, scope: Scope): Draft | null {
+export function focusedDraft<S extends ToolSession>(
+  tool: Tool<S>,
+  session: S,
+  scope: Scope,
+): Draft | null {
   const field = focusedField(tool, session);
   if (!field) return null;
   const value = field.get(session);

@@ -1,6 +1,7 @@
 import type { TraceNode } from "@/eval/context";
 import type { Circle, ParallelLine } from "@/geom";
 import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "@/source/expr";
+
 import { hitsNear, nodeByPrint, nodeByTraceAttr } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
@@ -106,7 +107,11 @@ export function parseLengthTyped(raw: string, scope: Scope, opts?: { min?: numbe
   return null;
 }
 
-export function resolveLengthExpr(session: LengthDraft, scope: Scope, opts?: { min?: number }): Expr | null {
+export function resolveLengthExpr(
+  session: LengthDraft,
+  scope: Scope,
+  opts?: { min?: number },
+): Expr | null {
   if (session.lengthPick) return session.lengthPick;
   return parseLengthTyped(session.typed, scope, opts);
 }
@@ -210,7 +215,10 @@ function isDomElement(t: EventTarget | null | undefined): t is Element {
 
 export function attachLengthHit(
   hit: PlaceHit,
-  ctx: Pick<PlaceCtx, "trace" | "camera" | "size" | "screen" | "target" | "keys" | "print" | "scope">,
+  ctx: Pick<
+    PlaceCtx,
+    "trace" | "camera" | "size" | "screen" | "target" | "keys" | "print" | "scope"
+  >,
   draft: LengthDraft,
   accept: readonly LengthPickField[] = [],
 ): PlaceHit {
@@ -241,7 +249,15 @@ export function attachLengthHit(
     if (picked) return { ...hit, length: picked };
   }
   if (accept.length > 0) {
-    const picked = nearestLengthPick(ctx.trace, hit.world, ctx.camera, ctx.size, accept, ctx.print, ctx.keys);
+    const picked = nearestLengthPick(
+      ctx.trace,
+      hit.world,
+      ctx.camera,
+      ctx.size,
+      accept,
+      ctx.print,
+      ctx.keys,
+    );
     if (picked) {
       const expr = wrapLengthNeg(picked.expr, pending);
       const value = evalLengthExpr(expr, scope) ?? (pending ? -picked.value : picked.value);
@@ -256,11 +272,15 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   const e = hit.length.expr;
   if (e.kind === "member") {
     const name = rootRef(e);
-    return name ? nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? null : null;
+    return name
+      ? (nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? null)
+      : null;
   }
   if (e.kind === "neg" && e.expr.kind === "member") {
     const name = rootRef(e.expr);
-    return name ? nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? null : null;
+    return name
+      ? (nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? null)
+      : null;
   }
   if (e.kind === "ref") {
     return nodeByPrint(trace, e.name)?.id ?? null;

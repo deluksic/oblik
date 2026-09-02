@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export function resolveSceneFileAbs(
-  workspaceRoot: string,
-  sceneDir: string,
-  rel: string,
-): string {
+export function resolveSceneFileAbs(workspaceRoot: string, sceneDir: string, rel: string): string {
   const key = rel.replace(/^\/+/, "").replace(/\?.*$/, "");
   const appRoot = path.resolve(sceneDir, "..", "..");
   const candidates = [safeResolveUnder(workspaceRoot, key), safeResolveUnder(appRoot, key)];

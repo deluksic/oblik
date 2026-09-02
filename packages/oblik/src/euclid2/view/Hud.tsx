@@ -1,11 +1,12 @@
 import { For, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import { gliderAt, isGlider } from "@/geom/gliders";
 import type { Point } from "@/geom";
+import { gliderAt, isGlider } from "@/geom/gliders";
+
 import { worldToScreen, type Camera2, type PaneSize } from "../camera";
-import { isCrossing, type PlacePoint } from "../place";
 import { traceKey } from "../pick";
+import { isCrossing, type PlacePoint } from "../place";
 import { POINT_STROKE_PX, chromeLayers, layerStrokeWidth } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
 import { HANDLE_R, SNAP_R, pointMarkRadius } from "./pointMark";
@@ -27,13 +28,17 @@ export function PointMark(props: {
     return worldToScreen(at, props.camera, props.size);
   });
   const layers = createMemo(() =>
-    chromeLayers(POINT_STROKE_PX, {
-      selected: props.selected,
-      hover: props.hot && !props.selected,
-      overlay: props.overlay === true,
-      screenSpace: true,
-      point: true,
-    }, readChromeMetrics()),
+    chromeLayers(
+      POINT_STROKE_PX,
+      {
+        selected: props.selected,
+        hover: props.hot && !props.selected,
+        overlay: props.overlay === true,
+        screenSpace: true,
+        point: true,
+      },
+      readChromeMetrics(),
+    ),
   );
   return (
     <>

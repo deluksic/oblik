@@ -11,7 +11,11 @@ export type FrameXywh = { x: number; y: number; width: number; height: number };
 export const FRAME_MIN_SIZE = 0.25;
 
 /** Drag the frame by a world-space delta. */
-export function frameMoved(start: FrameXywh, from: { x: number; y: number }, to: { x: number; y: number }): FrameXywh {
+export function frameMoved(
+  start: FrameXywh,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): FrameXywh {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   return { ...start, x: start.x + dx, y: start.y + dy };

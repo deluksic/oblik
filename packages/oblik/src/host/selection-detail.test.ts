@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { analyzeMentions } from "../source/mention";
 import type { TraceNode } from "../eval/context";
+import { analyzeMentions } from "../source/mention";
 import {
   buildFunctionSourceLines,
   buildOriginFrameLines,
@@ -43,9 +43,7 @@ describe("stackForNode", () => {
 
   test("uses annotation site when runtime stack is empty", () => {
     const stack = stackForNode({ ...node, stack: [] });
-    expect(stack).toEqual([
-      { file: "apps/demo/src/scenes/shelf.ts", line: 10, column: 4 },
-    ]);
+    expect(stack).toEqual([{ file: "apps/demo/src/scenes/shelf.ts", line: 10, column: 4 }]);
   });
 
   test("rewrites app-relative stack paths to the module path", () => {
@@ -100,7 +98,9 @@ describe("pinConstructorSite", () => {
 
 describe("originFileLabel", () => {
   test("keeps src/… so a helper is distinct from a same-named scene", () => {
-    expect(originFileLabel("apps/demo/src/layout/mounting-plate.ts")).toBe("src/layout/mounting-plate.ts");
+    expect(originFileLabel("apps/demo/src/layout/mounting-plate.ts")).toBe(
+      "src/layout/mounting-plate.ts",
+    );
     expect(originFileLabel("src/scenes/mounting-plate.ts")).toBe("src/scenes/mounting-plate.ts");
   });
 });
@@ -171,11 +171,11 @@ describe("dedentOriginLines", () => {
   test("leaves a column-0 helper alone", () => {
     const lines = dedentOriginLines([
       { kind: "header", line: 1, text: "export function mountingPlateLayout() {", current: true },
-      { kind: "code", line: 2, text: "  const origin = point(0.13, 0.25, \"o_origin\");" },
+      { kind: "code", line: 2, text: '  const origin = point(0.13, 0.25, "o_origin");' },
       { kind: "code", line: 3, text: "}" },
     ]);
     expect(lines[0]).toMatchObject({ text: "export function mountingPlateLayout() {" });
-    expect(lines[1]).toMatchObject({ text: "  const origin = point(0.13, 0.25, \"o_origin\");" });
+    expect(lines[1]).toMatchObject({ text: '  const origin = point(0.13, 0.25, "o_origin");' });
   });
 
   test("rewrites mixed tabs and spaces to 2-space indent", () => {
@@ -205,7 +205,9 @@ describe("dedentOriginLines", () => {
 
 describe("functionSourceSpan", () => {
   test("resolves the header even when mention start/end are present", () => {
-    expect(functionSourceSpan(plateFn, { startLine: 1, endLine: 7, name: "mountingPlateLayout" })).toEqual({
+    expect(
+      functionSourceSpan(plateFn, { startLine: 1, endLine: 7, name: "mountingPlateLayout" }),
+    ).toEqual({
       startLine: 1,
       endLine: 7,
     });
@@ -219,7 +221,9 @@ describe("functionSourceSpan", () => {
   });
 
   test("does not treat a closing-brace-only mention span as the function", () => {
-    expect(functionSourceSpan(plateFn, { startLine: 7, endLine: 7, name: "mountingPlateLayout" })).toEqual({
+    expect(
+      functionSourceSpan(plateFn, { startLine: 7, endLine: 7, name: "mountingPlateLayout" }),
+    ).toEqual({
       startLine: 1,
       endLine: 7,
     });
@@ -245,11 +249,14 @@ describe("buildOriginFrameLines", () => {
 
   test("keeps the pin on a real constructor site", () => {
     const lines = buildOriginFrameLines(plateFn, 2, "mountingPlateLayout");
-    expect(lines[0]).toMatchObject({ kind: "header", text: "export function mountingPlateLayout() {" });
+    expect(lines[0]).toMatchObject({
+      kind: "header",
+      text: "export function mountingPlateLayout() {",
+    });
     expect(lines[0]).not.toMatchObject({ current: true });
-    expect(lines.some((row) => row.kind === "code" && row.current && row.text.includes("origin"))).toBe(
-      true,
-    );
+    expect(
+      lines.some((row) => row.kind === "code" && row.current && row.text.includes("origin")),
+    ).toBe(true);
   });
 
   test("does not quote scene fields that sit above build()", () => {
@@ -277,7 +284,7 @@ describe("buildOriginFrameLines", () => {
 describe("findFunctionHeaderRow", () => {
   test("matches defineScene method shorthand build() {", () => {
     const rows = [
-      "import { defineScene } from \"oblik\";",
+      'import { defineScene } from "oblik";',
       "export default defineScene({",
       "  build() {",
       "    const plate = mountingPlateLayout();",
@@ -321,11 +328,7 @@ export default defineScene({
       expect(detail.origin.frames).toHaveLength(1);
       const texts = detail.origin.frames[0]!.lines.map((row) => ("text" in row ? row.text : "..."));
       expect(texts.some((t) => t.includes("ellipsis") || t === "...")).toBe(false);
-      expect(texts).toEqual([
-        "build() {",
-        "  const plate = mountingPlateLayout();",
-        "},",
-      ]);
+      expect(texts).toEqual(["build() {", "  const plate = mountingPlateLayout();", "},"]);
       expect(detail.origin.frames[0]!.lines[0]).toEqual({
         kind: "header",
         line: 7,
@@ -356,7 +359,10 @@ export default defineScene({
   },
 });
 `;
-    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const mentions = [
+      analyzeMentions(helperSrc, helperFile),
+      analyzeMentions(parentSrc, parentFile),
+    ];
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -388,7 +394,9 @@ export default defineScene({
         current: false,
         pick: expect.objectContaining({ name: "build", file: parentFile }),
       });
-      const parentTexts = detail.origin.frames[1]!.lines.map((row) => ("text" in row ? row.text : "..."));
+      const parentTexts = detail.origin.frames[1]!.lines.map((row) =>
+        "text" in row ? row.text : "...",
+      );
       expect(parentTexts.some((t) => t.includes("mountingPlateLayout()"))).toBe(true);
     } finally {
       globalThis.fetch = orig;
@@ -415,7 +423,10 @@ export default defineScene({
   },
 });
 `;
-    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const mentions = [
+      analyzeMentions(helperSrc, helperFile),
+      analyzeMentions(parentSrc, parentFile),
+    ];
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -440,7 +451,9 @@ export default defineScene({
       expect(detail.origin.kind).toBe("origin");
       if (detail.origin.kind !== "origin") throw new Error("expected origin");
       expect(detail.origin.frames).toHaveLength(2);
-      const parentTexts = detail.origin.frames[1]!.lines.map((row) => ("text" in row ? row.text : "..."));
+      const parentTexts = detail.origin.frames[1]!.lines.map((row) =>
+        "text" in row ? row.text : "...",
+      );
       expect(parentTexts.some((t) => t.includes("camera"))).toBe(false);
       expect(parentTexts.some((t) => t.includes("mountingPlateLayout("))).toBe(true);
       expect(
@@ -466,7 +479,12 @@ export default defineScene({
       id: "o_inl",
       occ: 0,
       kind: "line",
-      value: { kind: "parallelLine", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 }, distance: 0.2 },
+      value: {
+        kind: "parallelLine",
+        origin: { x: 0, y: 0 },
+        direction: { x: 1, y: 0 },
+        distance: 0.2,
+      },
       bind: "hLeft",
       editable: false,
       at: { line: 3, column: 4 },
@@ -477,7 +495,8 @@ export default defineScene({
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
-      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
+      if (url.includes("__map-stack"))
+        return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
       return new Response("no", { status: 404 });
     }) as typeof fetch;
     try {
@@ -509,7 +528,12 @@ export default defineScene({
       id: "o_inl",
       occ: 0,
       kind: "line",
-      value: { kind: "parallelLine", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 }, distance: 0.2 },
+      value: {
+        kind: "parallelLine",
+        origin: { x: 0, y: 0 },
+        direction: { x: 1, y: 0 },
+        distance: 0.2,
+      },
       bind: "hLeft",
       editable: false,
       at: { line: 3, column: 4 },
@@ -520,7 +544,8 @@ export default defineScene({
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("__peek")) return new Response(helperSrc, { status: 200 });
-      if (url.includes("__map-stack")) return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
+      if (url.includes("__map-stack"))
+        return new Response(JSON.stringify({ frames: traceNode.stack }), { status: 200 });
       return new Response("no", { status: 404 });
     }) as typeof fetch;
     try {
@@ -548,7 +573,9 @@ describe("scopeCallerChain", () => {
   },
 });
 `;
-    expect(scopeCallerChain({ file, name: "build", serial: 0 }, [analyzeMentions(src, file)])).toEqual([]);
+    expect(
+      scopeCallerChain({ file, name: "build", serial: 0 }, [analyzeMentions(src, file)]),
+    ).toEqual([]);
   });
 
   test("helper walks to the build() call without a selected node", () => {

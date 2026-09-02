@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
-import MagicString from "magic-string";
 import type { EncodedSourceMap } from "@jridgewell/trace-mapping";
+import MagicString from "magic-string";
+import { expect, test } from "vitest";
 
 import { originalFromMap, sourceMapFromCode, viteUrlForRepoFile } from "./map-stack";
 

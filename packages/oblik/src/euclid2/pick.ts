@@ -217,8 +217,8 @@ export function snapLineCarrier(
   return best ? { bind: best.bind, geom: best.geom } : null;
 }
 
-/** Nearest named profile under the pointer (ignores points and strokes). Inside a fill always wins. */
-export function snapProfile(
+/** Nearest named region under the pointer (ignores points and strokes). Inside a fill always wins. */
+export function snapRegion(
   trace: readonly TraceNode[],
   world: Vec2,
   camera: Camera2,

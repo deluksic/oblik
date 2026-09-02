@@ -2,17 +2,17 @@ import { render } from "@solidjs/web";
 import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanup } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import { FigurePane } from "../figure/Pane";
 import type { FigureScene, Scene } from "../eval/scene";
+import { FigurePane } from "../figure/Pane";
+import { Modal } from "../modal/Modal";
 import type { Annotation } from "../source/analyze";
-import type { MentionFile } from "../source/mention";
 import {
   sceneLoaderKey,
   mergeAnnotationBundle,
   type DuplicateId,
   type OblikSceneEntry,
 } from "../source/catalog";
-import { Modal } from "../modal/Modal";
+import type { MentionFile } from "../source/mention";
 import { Nav } from "./Nav";
 import { currentSceneId, openScene } from "./routing";
 import { registerSceneHot } from "./scene-hot";

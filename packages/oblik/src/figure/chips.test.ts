@@ -9,7 +9,7 @@ describe("figureStyleFromBrush", () => {
     expect(look.fill).toBeUndefined();
   });
 
-  test("profiles and circles take fill as well as the line look", () => {
+  test("regions and circles take fill as well as the line look", () => {
     expect(takesFill("region")).toBe(true);
     expect(takesFill("csg2")).toBe(true);
     expect(takesFill("pick")).toBe(true);
@@ -29,7 +29,7 @@ describe("figureStyleFromBrush", () => {
     expect(thick.width).toBe(5.6);
   });
 
-  test("preview look matches paint: fill only on profiles and circles", () => {
+  test("preview look matches paint: fill only on regions and circles", () => {
     const washed = { ...DEFAULT_BRUSH, fill: "#f3c5bc" };
     expect(lookFromBrush(washed, "point").fill).toBeUndefined();
     expect(lookFromBrush(washed, "segment").fill).toBeUndefined();

@@ -23,12 +23,12 @@ import {
   type Scope,
   type ToolSession,
 } from "../tool";
-import { profileEligibleCarriers } from "../tools/profile";
+import { regionEligibleCarriers } from "../tools/region";
 import { createDragHandler, type DragSession } from "./createDragHandler";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
-import { ProfileFill, ProfileGhost, ProfileOutline, Stroke } from "./Ink";
+import { RegionFill, RegionGhost, RegionOutline, Stroke } from "./Ink";
 import {
   isGrabbable,
   isHot,
@@ -257,7 +257,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
   const eligibleCarriers = createMemo(() =>
     props.placing
-      ? profileEligibleCarriers(
+      ? regionEligibleCarriers(
           props.toolSession,
           props.trace,
           camera(),
@@ -312,7 +312,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
-          <ProfileChrome
+          <RegionChrome
             band={fillBand()}
             hoverId={props.hoverId}
             selectedKey={props.selectedKey}
@@ -332,8 +332,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             size={size()}
             halos={drag.phase() !== "dragging"}
           />
-          {props.ghost?.kind === "profile" ? (
-            <ProfileGhost ghost={props.ghost} camera={camera()} />
+          {props.ghost?.kind === "region" ? (
+            <RegionGhost ghost={props.ghost} camera={camera()} />
           ) : null}
         </g>
       </svg>
@@ -374,7 +374,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         {props.placing && !chrome().hideSnap && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
         ) : null}
-        {props.ghost && props.ghost.kind !== "profile" ? (
+        {props.ghost && props.ghost.kind !== "region" ? (
           <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
         ) : null}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
@@ -383,7 +383,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
   );
 }
 
-function ProfileChrome(props: {
+function RegionChrome(props: {
   band: ChromeSplit<TraceNode>;
   hoverId?: string | null;
   selectedKey?: string | null;
@@ -395,14 +395,14 @@ function ProfileChrome(props: {
         <For each={pass.items}>
           {(n) =>
             pass.overlay ? (
-              <ProfileOutline
+              <RegionOutline
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}
                 overlay
               />
             ) : (
-              <ProfileFill
+              <RegionFill
                 node={n}
                 hot={isHot(n, props.hoverId, props.selectedKey)}
                 selected={isSelected(n, props.selectedKey)}

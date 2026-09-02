@@ -5,7 +5,7 @@ import type { Circle, Csg2, Pick, Region, Segment } from "@/geom";
 import { fillPaint } from "@/geom/csg-draw";
 import { isOffsetCsg, isCsg2, isPick } from "@/geom/csg2";
 import { infiniteLineAxis } from "@/geom/ops";
-import { edgesSvgPath, regionSvgPath, walkSvgPath } from "@/geom/profile";
+import { edgesSvgPath, regionSvgPath, walkSvgPath } from "@/geom/region";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
@@ -255,15 +255,15 @@ function isCsgNode(v: { kind: string }): v is Csg2 | Pick {
   return isCsg2(v) || isPick(v);
 }
 
-export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+export function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   return (
-    <Show when={isCsgNode(props.node.value)} fallback={<ProfileFillPath {...props} />}>
-      <RegionFill node={props.node} hot={props.hot} selected={props.selected} />
+    <Show when={isCsgNode(props.node.value)} fallback={<RegionFillPath {...props} />}>
+      <CsgFill node={props.node} hot={props.hot} selected={props.selected} />
     </Show>
   );
 }
 
-function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function RegionFillPath(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const d = createMemo(() => fillPath(props.node.value as Region | Csg2 | Pick));
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
   return (
@@ -287,7 +287,7 @@ function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boole
   );
 }
 
-function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+function CsgFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const paint = createMemo(() => fillPaint(props.node.value as Region | Csg2 | Pick));
   const id = () => regionMaskId(`e2-${traceKey(props.node)}`);
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
@@ -339,15 +339,15 @@ function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean })
   );
 }
 
-export function ProfileOutline(props: {
+export function RegionOutline(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
   overlay?: boolean;
 }) {
   return (
-    <Show when={isCsgNode(props.node.value)} fallback={<ProfileOutlinePath {...props} />}>
-      <RegionOutline
+    <Show when={isCsgNode(props.node.value)} fallback={<RegionOutlinePath {...props} />}>
+      <CsgOutline
         node={props.node}
         hot={props.hot}
         selected={props.selected}
@@ -357,7 +357,7 @@ export function ProfileOutline(props: {
   );
 }
 
-function ProfileOutlinePath(props: {
+function RegionOutlinePath(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
@@ -386,7 +386,7 @@ function ProfileOutlinePath(props: {
   );
 }
 
-function RegionOutline(props: {
+function CsgOutline(props: {
   node: TraceNode;
   hot: boolean;
   selected: boolean;
@@ -409,10 +409,7 @@ function RegionOutline(props: {
   );
 }
 
-export function ProfileGhost(props: {
-  ghost: Extract<Ghost, { kind: "profile" }>;
-  camera: Camera2;
-}) {
+export function RegionGhost(props: { ghost: Extract<Ghost, { kind: "region" }>; camera: Camera2 }) {
   const chain = createMemo(() => {
     const g = props.ghost;
     if (g.loops && g.loops.length > 0) {

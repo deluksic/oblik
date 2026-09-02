@@ -58,7 +58,7 @@ export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureS
   });
 }
 
-/** Same look paint writes — fill only for profiles and circles. Points and lines are stroke. */
+/** Same look paint writes — fill only for regions and circles. Points and lines are stroke. */
 export function lookFromBrush(b: BrushSettings, kind: string): FigureStyle {
   return figureStyleFromBrush(b, takesFill(kind));
 }

@@ -48,7 +48,10 @@ function numericValue(expr: ts.Expression): number | undefined {
   return undefined;
 }
 
-export function trailingId(call: ts.CallExpression): { id: string; args: readonly ts.Expression[] } {
+export function trailingId(call: ts.CallExpression): {
+  id: string;
+  args: readonly ts.Expression[];
+} {
   if (call.arguments.length === 0) return { id: "", args: call.arguments };
   const last = call.arguments[call.arguments.length - 1];
   if (last && ts.isStringLiteral(last)) {

@@ -30,7 +30,8 @@ function paintCallWithId(sf: ts.SourceFile, id: string): ts.CallExpression | und
 function statementOf(node: ts.Node): ts.Statement | undefined {
   let n: ts.Node | undefined = node;
   while (n && !ts.isSourceFile(n)) {
-    if (ts.isStatement(n) && n.parent && (ts.isBlock(n.parent) || ts.isSourceFile(n.parent))) return n;
+    if (ts.isStatement(n) && n.parent && (ts.isBlock(n.parent) || ts.isSourceFile(n.parent)))
+      return n;
     n = n.parent;
   }
   return undefined;
@@ -54,7 +55,9 @@ export function patchPaintStyle(source: string, id: string, look: Expr): string 
   const { args } = trailingId(call);
   const lookArg = args[1];
   if (!lookArg) throw new Error(`paint("${id}") has no look argument`);
-  return withImport.slice(0, lookArg.getStart(sf)) + printExpr(look) + withImport.slice(lookArg.getEnd());
+  return (
+    withImport.slice(0, lookArg.getStart(sf)) + printExpr(look) + withImport.slice(lookArg.getEnd())
+  );
 }
 
 /** Remove the statement that owns `paint(..., id)`. Geom stays. */
@@ -66,7 +69,11 @@ export function removePaintCall(source: string, id: string): string {
   if (!stmt) throw new Error(`paint("${id}") is not a statement`);
   let start = stmt.getFullStart();
   const end = stmt.getEnd();
-  if (start > 0 && source[start] !== "\n" && source.slice(start, stmt.getStart(sf)).includes("\n")) {
+  if (
+    start > 0 &&
+    source[start] !== "\n" &&
+    source.slice(start, stmt.getStart(sf)).includes("\n")
+  ) {
     // keep getFullStart — leading trivia already includes the newline after the previous stmt
   }
   let next = source.slice(0, start) + source.slice(end);

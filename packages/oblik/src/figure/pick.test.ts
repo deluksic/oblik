@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../eval/context";
 import { EMPTY_SCOPE } from "../euclid2/tools/scope";
+import type { TraceNode } from "../eval/context";
 import { brushAddHits } from "./pick";
 
 function node(id: string): TraceNode {

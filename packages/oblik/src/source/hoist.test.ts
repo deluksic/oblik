@@ -108,7 +108,10 @@ describe("hoistIntersections", () => {
         { kind: "num", value: 2.2 },
       ],
     };
-    const { exprs, hoists } = hoistIntersections([glider, { kind: "ref", name: "A" }], new Set(["A", "ground"]));
+    const { exprs, hoists } = hoistIntersections(
+      [glider, { kind: "ref", name: "A" }],
+      new Set(["A", "ground"]),
+    );
     expect(hoists).toEqual([{ bind: "g", from: "pointOnLine", args: glider.args }]);
     expect(exprs).toEqual([
       { kind: "ref", name: "g" },

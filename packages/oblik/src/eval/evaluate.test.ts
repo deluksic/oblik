@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { isCsg2, offsetOfCsg } from "../geom/csg2";
-import { walkEdges } from "../geom/profile";
+import { walkEdges } from "../geom/region";
 import { analyze } from "../source/analyze";
 import {
   along,
@@ -189,7 +189,7 @@ describe("evaluate", () => {
     expect(trace[0]?.module).toBe("apps/demo/src/layout/plate.ts");
   });
 
-  test("profile is traced; along is not", () => {
+  test("region is traced; along is not", () => {
     const scene = defineScene({
       kind: "euclid2",
       title: "t",
@@ -218,7 +218,7 @@ describe("evaluate", () => {
     );
   });
 
-  test("profile holes are walks, not tape nodes", () => {
+  test("region holes are walks, not tape nodes", () => {
     const scene = defineScene({
       kind: "euclid2",
       title: "t",

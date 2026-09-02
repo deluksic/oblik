@@ -26,7 +26,10 @@ export function printExpr(expr: Expr): string {
   if (expr.kind === "str") return JSON.stringify(expr.value);
   if (expr.kind === "ref") return expr.name;
   if (expr.kind === "member") {
-    const inner = expr.object.kind === "ref" || expr.object.kind === "member" ? printExpr(expr.object) : `(${printExpr(expr.object)})`;
+    const inner =
+      expr.object.kind === "ref" || expr.object.kind === "member"
+        ? printExpr(expr.object)
+        : `(${printExpr(expr.object)})`;
     return `${inner}.${expr.field}`;
   }
   if (expr.kind === "neg") return `-${printExprNegChild(expr.expr)}`;
@@ -48,7 +51,12 @@ export function parsePath(name: string): Expr {
   const parts = name.split(".").filter(Boolean);
   if (parts.length === 0) return { kind: "ref", name };
   const root = parts[0]!;
-  return parts.slice(1).reduce<Expr>((obj, field) => ({ kind: "member", object: obj, field }), { kind: "ref", name: root });
+  return parts
+    .slice(1)
+    .reduce<Expr>((obj, field) => ({ kind: "member", object: obj, field }), {
+      kind: "ref",
+      name: root,
+    });
 }
 
 export function rootRef(expr: Expr): string | null {

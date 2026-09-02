@@ -39,7 +39,9 @@ export function viteUrlForRepoFile(
 }
 
 export function sourceMapFromCode(code: string): EncodedSourceMap | null {
-  const m = code.match(/[#@] sourceMappingURL=data:application\/json(?:;charset=utf-8)?;base64,(\S+)/);
+  const m = code.match(
+    /[#@] sourceMappingURL=data:application\/json(?:;charset=utf-8)?;base64,(\S+)/,
+  );
   if (!m?.[1]) return null;
   try {
     return JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as EncodedSourceMap;
@@ -85,7 +87,11 @@ export function parseStackLocs(frames: unknown): StackLoc[] {
   for (const f of frames) {
     if (!f || typeof f !== "object") continue;
     const rec = f as Record<string, unknown>;
-    if (typeof rec.file !== "string" || typeof rec.line !== "number" || typeof rec.column !== "number") {
+    if (
+      typeof rec.file !== "string" ||
+      typeof rec.line !== "number" ||
+      typeof rec.column !== "number"
+    ) {
       continue;
     }
     locs.push({

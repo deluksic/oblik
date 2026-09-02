@@ -1,4 +1,5 @@
 import type { TraceNode } from "@/eval/context";
+
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
 const MARGIN = 12;
@@ -70,7 +71,11 @@ export function hitSlider(
   return null;
 }
 
-export function sliderValueFromPointer(node: TraceNode, screenX: number, nodes: readonly TraceNode[]): number {
+export function sliderValueFromPointer(
+  node: TraceNode,
+  screenX: number,
+  nodes: readonly TraceNode[],
+): number {
   const g = node.value;
   if (g.kind !== "slider") return 0;
   const L = layoutSliders(nodes).find((s) => s.node.id === node.id);

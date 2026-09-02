@@ -14,7 +14,7 @@ export type ToolId =
   | "parallelLine"
   | "perpendicularLine"
   | "slider"
-  | "profile"
+  | "region"
   | "roundOffset"
   | "fillet";
 
@@ -33,8 +33,8 @@ export type Field<S extends ToolSession = ToolSession> = {
   id: string;
   kind: FieldKind;
   placeholder: string;
-  /** For `ref`: existing point vs line/segment/parallel vs profile. For `length`: slider bind. */
-  looks?: "point" | "carrier" | "profile" | "length";
+  /** For `ref`: existing point vs line/segment/parallel vs region. For `length`: slider bind. */
+  looks?: "point" | "carrier" | "region" | "length";
   open: (session: S) => boolean;
   get: (session: S) => string;
   set: (session: S, raw: string) => S;
@@ -46,7 +46,7 @@ export type Scope = {
   points: Readonly<Record<string, Placed>>;
   carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
   circles: Readonly<Record<string, { expr: Expr; geom: Circle }>>;
-  profiles: Readonly<Record<string, { expr: Expr; geom: Region }>>;
+  regions: Readonly<Record<string, { expr: Expr; geom: Region }>>;
   /** Slider binds → live value (for length reuse). */
   lengths: Readonly<Record<string, number>>;
   /** Mentionable constructor id → expr in this focus. */
@@ -79,7 +79,7 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike | Circle };
-  profile?: { bind: string; geom: Region; id?: string };
+  region?: { bind: string; geom: Region; id?: string };
   corner?: { index: number; at: Vec2 };
   length?: { expr: Expr; value: number };
 };
@@ -154,7 +154,7 @@ export type ToolSession =
       name: string;
     }
   | {
-      verb: "profile";
+      verb: "region";
       focus: "cycle" | "name";
       vertices: Placed[];
       carriers: Array<{ expr: Expr; geom: LineLike | Circle; k?: Branch }>;
@@ -189,7 +189,7 @@ export type Ghost =
   | { kind: "line" | "segment"; a: Vec2; b: Vec2 }
   | { kind: "parallelLine"; geom: LineLike; distance: number }
   | {
-      kind: "profile";
+      kind: "region";
       edges: LoopEdge[];
       /** Disjoint closed walks; when set, fill/stroke do not chain islands. */
       loops?: Loop[];

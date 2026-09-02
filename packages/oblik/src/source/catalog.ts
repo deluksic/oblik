@@ -44,7 +44,11 @@ function parseDefineScene(source: string, file: string): { title?: string; kind?
   return { title, kind };
 }
 
-export function parseOblikSceneSource(absPath: string, source: string, relPath: string): OblikSceneEntry {
+export function parseOblikSceneSource(
+  absPath: string,
+  source: string,
+  relPath: string,
+): OblikSceneEntry {
   const file = path.basename(absPath);
   const id = path.basename(absPath, ".ts");
   const { title, kind } = parseDefineScene(source, file);
@@ -90,7 +94,9 @@ export function listSceneFiles(sceneDir: string): string[] {
 }
 
 export function listCatalogFiles(sceneDir: string): string[] {
-  return listSceneFiles(sceneDir).filter((abs) => fs.readFileSync(abs, "utf8").includes("defineScene"));
+  return listSceneFiles(sceneDir).filter((abs) =>
+    fs.readFileSync(abs, "utf8").includes("defineScene"),
+  );
 }
 
 export function scanOblikCatalog(sceneDir: string, workspaceRoot: string): OblikSceneEntry[] {
@@ -136,7 +142,9 @@ ${sceneLoadersAcceptTail(keys)}
 `;
 }
 
-export function mergeAnnotationBundle<T>(bundle: Record<string, Record<string, T>>): Record<string, T> {
+export function mergeAnnotationBundle<T>(
+  bundle: Record<string, Record<string, T>>,
+): Record<string, T> {
   const out: Record<string, T> = {};
   for (const file of Object.values(bundle)) Object.assign(out, file);
   return out;
