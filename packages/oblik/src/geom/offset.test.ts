@@ -28,6 +28,13 @@ function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
   return [bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)];
 }
 
+function twoArcCircle(center: Vec2, r: number, k: 1 | -1 = 1): unknown[] {
+  const P = { x: center.x + r, y: center.y };
+  const Q = { x: center.x - r, y: center.y };
+  const c: Circle = { kind: "circle", center, radius: r };
+  return [P, alongValue(c, k), Q, alongValue(c, k)];
+}
+
 function twoHoles(web: number): Profile {
   const a1 = 0.5;
   const a2 = 1.9;
@@ -391,6 +398,31 @@ describe("roundOffsetValue", () => {
     expect(profileContains(scene[0]!, { x: 8.4, y: 4.8 })).toBe(false);
     expect(profileContains(scene[0]!, { x: 10.3, y: 4.8 })).toBe(false);
     expect(profileContains(scene[0]!, { x: 9.35, y: 4.8 })).toBe(false);
+  });
+
+  test("two-arc circular hole stays a hole under inset and outset", () => {
+    const center = { x: 13.7, y: 4.8 };
+    const p = profileValue(rectCycle(12.2, 3.5, 15.2, 6.1), {
+      holes: [twoArcCircle(center, 0.52)],
+    });
+    expect(p.holes).toHaveLength(1);
+
+    for (const d of [-0.12, -0.01, 0.12] as const) {
+      const out = roundOffsetValue(p, d);
+      expect(out).toHaveLength(1);
+      expect(out[0]?.holes).toHaveLength(1);
+      expect(profileContains(out[0]!, { x: 12.4, y: 3.7 })).toBe(true);
+      expect(profileContains(out[0]!, center)).toBe(false);
+    }
+  });
+
+  test("two-arc circular disk insets to a smaller disk", () => {
+    const out = roundOffsetValue(profileValue(twoArcCircle({ x: 0, y: 0 }, 1)), -0.2);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.holes).toHaveLength(0);
+    expect(profileContains(out[0]!, { x: 0, y: 0 })).toBe(true);
+    expect(profileContains(out[0]!, { x: 0.9, y: 0 })).toBe(false);
+    expect(profileContains(out[0]!, { x: 0.7, y: 0 })).toBe(true);
   });
 });
 

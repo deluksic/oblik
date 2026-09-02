@@ -141,9 +141,14 @@ describe("migrated demo scenes", () => {
     expect(regionContains(holeInset.value, { x: 1.4, y: 4.8 })).toBe(false);
 
     const circInset = trace.find((n) => n.bind === "circInset");
-    if (!circInset || !isRegion(circInset.value)) throw new Error("missing circInset");
+    if (!circInset || !isRegion(circInset.value) || !isOffset(circInset.value.stock)) {
+      throw new Error("missing circInset");
+    }
     expect(regionContains(circInset.value, { x: 12.4, y: 3.7 })).toBe(true);
     expect(regionContains(circInset.value, { x: 13.7, y: 4.8 })).toBe(false);
+    const circIslands = compileOffsetBoundary(circInset.value.stock);
+    expect(circIslands).toHaveLength(1);
+    expect(circIslands[0]?.holes).toHaveLength(1);
 
     const boneInset = trace.find((n) => n.bind === "boneInset");
     if (!boneInset || !isRegion(boneInset.value)) throw new Error("missing boneInset");

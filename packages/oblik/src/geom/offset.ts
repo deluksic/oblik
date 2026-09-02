@@ -199,6 +199,14 @@ function lineMiter(
   return isFiniteVec(p) ? p : null;
 }
 
+function onOffsetCarrier(c: LineLike | Circle, p: Vec2): boolean {
+  if (!isFiniteVec(p)) return false;
+  if (c.kind === "circle") return Math.abs(dist(p, c.center) - Math.abs(c.radius)) <= 1e-6;
+  const { origin, dir } = lineBasis(c);
+  const n = norm(dir);
+  return isFiniteVec(n) && Math.abs(cross2(n, sub(p, origin))) <= 1e-6;
+}
+
 function miterJoin(
   prev: ProfileEdge,
   next: ProfileEdge,
@@ -212,7 +220,12 @@ function miterJoin(
     return lineMiter(prev, next, v, d, w);
   }
   const hint = miterHint(prev, next, v, d, w);
-  return closestHit(carrierHits(offPrev, offNext), hint);
+  const hit = closestHit(carrierHits(offPrev, offNext), hint);
+  if (hit) return hit;
+  // Two arcs of one circle (a circular hole) share an offset carrier, so
+  // pairwise hits are empty. The join is the offset of the shared vertex.
+  if (onOffsetCarrier(offPrev, hint) && onOffsetCarrier(offNext, hint)) return hint;
+  return null;
 }
 
 function len2(p: Vec2): number {
