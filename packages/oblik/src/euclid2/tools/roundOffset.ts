@@ -1,6 +1,6 @@
-import type { Profile } from "@/geom";
+import type { Region } from "@/geom";
 import { roundOffsetValue } from "@/geom/offset";
-import { signedDistToProfile, walkEdges } from "@/geom/profile";
+import { signedDistToRegion, walkEdges } from "@/geom/profile";
 import { printExpr } from "@/source/expr";
 
 import { snapProfile } from "../pick";
@@ -42,9 +42,9 @@ function faceOf(session: OffsetSession, scope: Scope) {
   return resolveProfile(session.faceRef, session.face, scope);
 }
 
-function distAt(hit: PlaceHit, geom: Profile): number {
+function distAt(hit: PlaceHit, geom: Region): number {
   const at = hit.point.kind === "free" ? hit.world : hit.point.at;
-  const d = signedDistToProfile(geom, at);
+  const d = signedDistToRegion(geom, at);
   return Number.isFinite(d) ? d : 0;
 }
 
@@ -63,7 +63,7 @@ function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null)
   return "profile";
 }
 
-function offsetGhost(face: Profile, d: number) {
+function offsetGhost(face: Region, d: number) {
   const islands = roundOffsetValue(face, d);
   const loops = islands.map((p) => p.outer);
   if (loops.length === 0) return null;

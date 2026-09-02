@@ -1,11 +1,11 @@
 import type { TraceNode } from "../eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "../eval/paint";
+import { csgTreeSvg, fillPaint, type DrawOp } from "../geom/csg-draw";
+import { fillAabb } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { isCircleWalk, profileSvgPath, walkEdges } from "../geom/profile";
-import { regionAabb } from "../geom/region";
-import { regionPaint, type DrawOp } from "../geom/region-draw";
-import type { Region } from "../geom/types";
+import { isCircleWalk, regionSvgPath, walkEdges } from "../geom/profile";
+import type { Csg2, Pick } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
@@ -97,7 +97,7 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
       const r = Math.abs(v.radius);
       inc(v.center.x - r, v.center.y - r);
       inc(v.center.x + r, v.center.y + r);
-    } else if (v.kind === "profile") {
+    } else if (v.kind === "region") {
       if (isCircleWalk(v.outer)) {
         const r = Math.abs(v.outer.radius);
         inc(v.outer.center.x - r, v.outer.center.y - r);
@@ -108,8 +108,8 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
           inc(e.b.x, e.b.y);
         }
       }
-    } else if (v.kind === "region") {
-      const box = regionAabb(v);
+    } else if (v.kind === "csg2" || v.kind === "pick") {
+      const box = fillAabb(v);
       if (box) {
         inc(box.minX, box.minY);
         inc(box.maxX, box.maxY);
@@ -155,23 +155,37 @@ function drawOpEl(op: DrawOp, attrs: string): string {
   return `<path d="${op.d}" fill-rule="evenodd" ${attrs}/>`;
 }
 
-function regionToSvg(r: Region, style: FigureStyle, id: string): string {
-  const p = regionPaint(r);
+function regionToSvg(r: Csg2 | Pick, style: FigureStyle, id: string): string {
+  const p = fillPaint(r);
   if (p.empty) return "";
   const key = id.replace(/[^a-zA-Z0-9_-]/g, "-");
   const box = p.box;
   const w = box.maxX - box.minX;
   const h = box.maxY - box.minY;
-  const holes = p.holes.map((op) => drawOpEl(op, 'fill="#000" stroke="none"')).join("");
-  const mask =
-    `<mask id="rm-${key}" maskUnits="userSpaceOnUse" x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}">` +
-    `<rect x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}" fill="#000"/>` +
-    drawOpEl(p.stock, 'fill="#fff" stroke="none"') +
-    holes +
-    `</mask>`;
+  const frame = `x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}"`;
   const clips: string[] = [];
   if (p.keepClip) clips.push(`<clipPath id="rk-${key}"><path d="${p.keepClip}"/></clipPath>`);
   if (p.islandClip) clips.push(`<clipPath id="ri-${key}"><path d="${p.islandClip}"/></clipPath>`);
+  if (p.tree) {
+    const tree = csgTreeSvg(p.tree, `rt-${key}`, box);
+    const mask =
+      `<mask id="rm-${key}" maskUnits="userSpaceOnUse" ${frame}>` +
+      `<rect ${frame} fill="#000"/>` +
+      tree.body +
+      `</mask>`;
+    const fillAttrs = `${styleAttrs(style, true)} mask="url(#rm-${key})"`;
+    let wrapped = `<rect ${frame} ${fillAttrs}/>`;
+    if (p.islandClip) wrapped = `<g clip-path="url(#ri-${key})">${wrapped}</g>`;
+    if (p.keepClip) wrapped = `<g clip-path="url(#rk-${key})">${wrapped}</g>`;
+    return `<defs>${tree.defs}${mask}${clips.join("")}</defs>${wrapped}`;
+  }
+  const holes = p.holes.map((op) => drawOpEl(op, 'fill="#000" stroke="none"')).join("");
+  const mask =
+    `<mask id="rm-${key}" maskUnits="userSpaceOnUse" ${frame}>` +
+    `<rect ${frame} fill="#000"/>` +
+    drawOpEl(p.stock, 'fill="#fff" stroke="none"') +
+    holes +
+    `</mask>`;
   const fillAttrs = `${styleAttrs(style, true)} mask="url(#rm-${key})"`;
   const strokeAttrs = `${styleAttrs({ ...style, fill: "none" }, false)} mask="url(#rm-${key})"`;
   let body = drawOpEl(p.stock, fillAttrs);
@@ -198,12 +212,12 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
   if (v.kind === "circle") {
     return `<circle cx="${num(v.center.x)}" cy="${num(v.center.y)}" r="${num(Math.abs(v.radius))}" ${styleAttrs(s.style, true)}/>`;
   }
-  if (v.kind === "profile") {
-    const d = profileSvgPath(v);
+  if (v.kind === "region") {
+    const d = regionSvgPath(v);
     if (!d) return "";
     return `<path d="${d}" fill-rule="evenodd" ${styleAttrs(s.style, true)}/>`;
   }
-  if (v.kind === "region") {
+  if (v.kind === "csg2" || v.kind === "pick") {
     return regionToSvg(v, s.style, `${s.geom.id}-${s.geom.occ}`);
   }
   const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : null;

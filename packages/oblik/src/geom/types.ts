@@ -13,7 +13,7 @@ export type LineLike = Segment | Line | ParallelLine;
 export type Along = { kind: "along"; carrier: Circle; k: Branch };
 /** Unmarked vertex witness. `at` is the sharp corner; `r` is the join radius. */
 export type Fillet = { kind: "fillet"; at: Vec2; r: number };
-export type ProfileEdge = {
+export type LoopEdge = {
   a: Vec2;
   b: Vec2;
   carrier: LineLike | Circle;
@@ -21,11 +21,12 @@ export type ProfileEdge = {
 };
 /**
  * Closed cycle: piecewise spans, or a full circle (zero vertices). Outer and
- * each hole of a profile are this. Not a tape node. A `Circle` here is a
- * boundary, not a region-operand disk — membership is still the walk interior.
+ * each hole of a region are this. Not a tape node. A `Circle` here is a
+ * boundary, not a CSG disk — membership is still the walk interior.
  */
-export type ClosedWalk = ProfileEdge[] | Circle;
-export type Profile = { kind: "profile"; outer: ClosedWalk; holes: ClosedWalk[] };
+export type Loop = LoopEdge[] | Circle;
+/** Declared cheese: one outer loop, holes inside, connected meat. */
+export type Region = { kind: "region"; outer: Loop; holes: Loop[] };
 
 /**
  * Unmarked half-space, like `along` / `fillet`. Side `1` is left of the directed
@@ -35,19 +36,25 @@ export type HalfPlane = { kind: "halfPlane"; line: LineLike; side: 1 | -1 };
 
 /**
  * Minkowski offset of an operand by a disk of radius `|d|`. Positive `d`
- * grows (outward). Membership is `sdf(of) − d`. Compiled walks are ephemeral.
+ * grows (outward). Membership is `sdf(of) − d`. Envelope walks are paint-only.
  */
-export type Offset = { kind: "offset"; of: RegionOperand; d: number };
+export type Offset = { kind: "offset"; of: CsgOperand; d: number };
 
-export type RegionOperand = Profile | Circle | Region | HalfPlane | Offset;
+export type CsgOp = "union" | "diff" | "intersect";
 
-/** Named CSG formula. Compiled outlines are ephemeral. */
-export type Region = {
-  kind: "region";
-  stock: RegionOperand;
-  subtract: readonly RegionOperand[];
-  keep: readonly RegionOperand[];
-  contains?: Vec2;
+/** Planar boolean tree. Leaves are region, disk, half-plane, offset, or pick. */
+export type Csg2 = {
+  kind: "csg2";
+  op: CsgOp;
+  of: readonly CsgOperand[];
 };
 
-export type Geom = Point | Segment | Line | Circle | ParallelLine | Glider | Profile | Region;
+/**
+ * Island clip of a CSG field at `at`. Compile to a `Region` is later; until
+ * then this is a tape node painted with the operand mask plus occupancy clip.
+ */
+export type Pick = { kind: "pick"; of: CsgOperand; at: Vec2 };
+
+export type CsgOperand = Region | Circle | HalfPlane | Offset | Csg2 | Pick;
+
+export type Geom = Point | Segment | Line | Circle | ParallelLine | Glider | Region | Csg2 | Pick;

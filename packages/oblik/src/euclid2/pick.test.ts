@@ -190,10 +190,10 @@ describe("profile pick", () => {
   const FACE = {
     id: "o_pr",
     occ: 0,
-    kind: "profile",
+    kind: "region",
     bind: "face",
     value: {
-      kind: "profile",
+      kind: "region",
       outer: [
         { a: Pa, b: Pb, carrier: ab },
         { a: Pb, b: Pc, carrier: bc },
@@ -208,13 +208,13 @@ describe("profile pick", () => {
   test("fill is last behind a point and a stroke", () => {
     const hits = hitsNear([FACE, SEG, A], { x: 0.05, y: 0.04 }, camera, size);
     expect(hits[0]?.kind).toBe("point");
-    expect(hits[hits.length - 1]?.kind).toBe("profile");
+    expect(hits[hits.length - 1]?.kind).toBe("region");
   });
 
   test("fill is last behind a stroke in the interior-adjacent edge", () => {
     const hits = hitsNear([FACE, SEG], { x: 2, y: 0.04 }, camera, size);
     expect(hits[0]?.kind).toBe("segment");
-    expect(hits[hits.length - 1]?.kind).toBe("profile");
+    expect(hits[hits.length - 1]?.kind).toBe("region");
   });
 
   test("empty interior still picks the profile", () => {
@@ -264,13 +264,12 @@ describe("profile pick", () => {
     const FACE_REGION = {
       id: "o_face",
       occ: 0,
-      kind: "region",
+      kind: "csg2",
       bind: "face",
       value: {
-        kind: "region",
-        stock: FACE.value,
-        subtract: [],
-        keep: [],
+        kind: "csg2",
+        op: "union",
+        of: [FACE.value],
       },
       editable: false,
       stack: [{ file: "scene.ts", line: 40, column: 4 }],
@@ -285,7 +284,7 @@ describe("profile pick", () => {
       ...FACE,
       occ: 1,
       value: {
-        kind: "profile" as const,
+        kind: "region" as const,
         outer: [
           {
             a: { x: 10, y: 0 },

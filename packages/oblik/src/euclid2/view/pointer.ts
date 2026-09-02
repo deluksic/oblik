@@ -1,8 +1,8 @@
 import type { TraceNode } from "@/eval/context";
 import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "@/geom";
+import { isCsg2, isOffset, isOffsetCsg, offsetOfCsg, offsetSourceSdf } from "@/geom/csg2";
 import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "@/geom/gliders";
 import { lineBasis, signedDist } from "@/geom/ops";
-import { isOffset, isOffsetRegion, isRegion, offsetSourceSdf } from "@/geom/region";
 import { mul, perp, sub } from "@/geom/vec";
 
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
@@ -255,9 +255,9 @@ export function offsetDrag(
   w: { x: number; y: number },
   e: PointerEvent,
 ): Extract<Drag, { kind: "offset" }> | null {
-  if (!isRegion(node.value) || !isOffsetRegion(node.value)) return null;
-  const off = node.value.stock;
-  if (!isOffset(off)) return null;
+  if (!isCsg2(node.value) || !isOffsetCsg(node.value)) return null;
+  const off = offsetOfCsg(node.value);
+  if (!off || !isOffset(off)) return null;
   const grabSdf = offsetSourceSdf(off, w);
   if (!Number.isFinite(grabSdf)) return null;
   return {
@@ -284,7 +284,7 @@ export function editDragOf(
   if (isGlider(hit.value)) return gliderDrag(hit, w, e);
   if (hit.value.kind === "circle") return radiusDrag(hit, w, e);
   if (hit.value.kind === "parallelLine") return parallelDrag(hit, w, e);
-  if (isRegion(hit.value) && isOffsetRegion(hit.value)) return offsetDrag(hit, w, e);
+  if (isCsg2(hit.value) && isOffsetCsg(hit.value)) return offsetDrag(hit, w, e);
   return null;
 }
 
@@ -454,7 +454,7 @@ export function applyDrag(
     return { draft: { id: drag.id, values: [round(ux), round(uy)] } };
   }
   if (drag.kind === "offset") {
-    const stock = isRegion(drag.node.value) ? drag.node.value.stock : null;
+    const stock = isCsg2(drag.node.value) ? offsetOfCsg(drag.node.value) : null;
     if (!stock || !isOffset(stock)) return {};
     const sdf = offsetSourceSdf(stock, w);
     if (!Number.isFinite(sdf)) return {};

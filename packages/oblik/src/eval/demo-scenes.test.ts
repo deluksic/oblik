@@ -17,9 +17,9 @@ import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
+import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
 import { compileOffsetBoundary } from "../geom/offset";
 import { isCircleWalk, walkEdges } from "../geom/profile";
-import { compileRegion, isOffset, isRegion, regionContains } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
@@ -103,56 +103,56 @@ describe("migrated demo scenes", () => {
 
   test("round-offset playground traces numeric leftovers and holed plates", () => {
     const { trace } = run(roundOffsetScene, ["apps/demo/src/scenes/round-offset.ts"]);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(11);
     expect(trace.filter((n) => n.kind === "region")).toHaveLength(11);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(11);
     expect(trace.filter((n) => n.kind === "slider")).toHaveLength(1);
 
     const sqInset = trace.find((n) => n.bind === "sqInset");
-    expect(sqInset?.kind).toBe("region");
+    expect(sqInset?.kind).toBe("csg2");
     expect(sqInset?.editable).toBe(true);
-    const sqStock = sqInset?.value.kind === "region" ? sqInset.value.stock : null;
+    const sqStock = sqInset && isCsg2(sqInset.value) ? offsetOfCsg(sqInset.value) : null;
     expect(sqStock?.kind).toBe("offset");
     expect(sqStock?.kind === "offset" ? sqStock.d : 0).toBeCloseTo(-0.22);
 
     const shared = trace.find((n) => n.bind === "shared");
-    expect(shared?.kind).toBe("region");
+    expect(shared?.kind).toBe("csg2");
     expect(shared?.editable).toBe(false);
 
     const frameIn = trace.find((n) => n.bind === "frameIn");
-    expect(frameIn?.value.kind === "profile" ? frameIn.value.holes : []).toHaveLength(1);
+    expect(frameIn?.value.kind === "region" ? frameIn.value.holes : []).toHaveLength(1);
     const twoHoles = trace.find((n) => n.bind === "twoHoles");
-    expect(twoHoles?.value.kind === "profile" ? twoHoles.value.holes : []).toHaveLength(2);
+    expect(twoHoles?.value.kind === "region" ? twoHoles.value.holes : []).toHaveLength(2);
     const twoInset = trace.find((n) => n.bind === "twoInset");
-    if (!twoInset || !isRegion(twoInset.value) || !isOffset(twoInset.value.stock)) {
+    if (!twoInset || !isCsg2(twoInset.value) || !offsetOfCsg(twoInset.value)) {
       throw new Error("missing twoInset");
     }
-    const twoShallow = compileOffsetBoundary(twoInset.value.stock);
+    const twoShallow = compileOffsetBoundary(offsetOfCsg(twoInset.value)!);
     expect(twoShallow).toHaveLength(1);
     expect(twoShallow[0]?.holes).toHaveLength(2);
-    expect(regionContains(twoInset.value, { x: 7.45, y: 4.8 })).toBe(true);
-    expect(regionContains(twoInset.value, { x: 8.4, y: 4.8 })).toBe(false);
+    expect(csgContains(twoInset.value, { x: 7.45, y: 4.8 })).toBe(true);
+    expect(csgContains(twoInset.value, { x: 8.4, y: 4.8 })).toBe(false);
     const circHole = trace.find((n) => n.bind === "circHole");
     expect(
-      circHole?.value.kind === "profile" ? walkEdges(circHole.value.outer).length : 0,
+      circHole?.value.kind === "region" ? walkEdges(circHole.value.outer).length : 0,
     ).toBeGreaterThan(0);
-    expect(circHole?.value.kind === "profile" ? circHole.value.holes : []).toHaveLength(1);
-    expect(
-      circHole?.value.kind === "profile" ? isCircleWalk(circHole.value.holes[0]!) : false,
-    ).toBe(true);
+    expect(circHole?.value.kind === "region" ? circHole.value.holes : []).toHaveLength(1);
+    expect(circHole?.value.kind === "region" ? isCircleWalk(circHole.value.holes[0]!) : false).toBe(
+      true,
+    );
 
     const holeInset = trace.find((n) => n.bind === "holeInset");
     expect(holeInset?.editable).toBe(true);
-    if (!holeInset || !isRegion(holeInset.value)) throw new Error("missing holeInset");
-    expect(regionContains(holeInset.value, { x: 0.3, y: 3.8 })).toBe(true);
-    expect(regionContains(holeInset.value, { x: 1.4, y: 4.8 })).toBe(false);
+    if (!holeInset || !isCsg2(holeInset.value)) throw new Error("missing holeInset");
+    expect(csgContains(holeInset.value, { x: 0.3, y: 3.8 })).toBe(true);
+    expect(csgContains(holeInset.value, { x: 1.4, y: 4.8 })).toBe(false);
 
     const circInset = trace.find((n) => n.bind === "circInset");
-    if (!circInset || !isRegion(circInset.value) || !isOffset(circInset.value.stock)) {
+    if (!circInset || !isCsg2(circInset.value) || !offsetOfCsg(circInset.value)) {
       throw new Error("missing circInset");
     }
-    expect(regionContains(circInset.value, { x: 12.4, y: 3.7 })).toBe(true);
-    expect(regionContains(circInset.value, { x: 13.7, y: 4.8 })).toBe(false);
-    const circIslands = compileOffsetBoundary(circInset.value.stock);
+    expect(csgContains(circInset.value, { x: 12.4, y: 3.7 })).toBe(true);
+    expect(csgContains(circInset.value, { x: 13.7, y: 4.8 })).toBe(false);
+    const circIslands = compileOffsetBoundary(offsetOfCsg(circInset.value)!);
     expect(circIslands).toHaveLength(1);
     expect(circIslands[0]?.holes).toHaveLength(1);
     const circHoleWalk = circIslands[0]!.holes[0]!;
@@ -160,8 +160,8 @@ describe("migrated demo scenes", () => {
     expect(circHoleWalk.radius).toBeCloseTo(0.64);
 
     const boneInset = trace.find((n) => n.bind === "boneInset");
-    if (!boneInset || !isRegion(boneInset.value)) throw new Error("missing boneInset");
-    expect(compileRegion(boneInset.value)).toHaveLength(1);
+    if (!boneInset || !isCsg2(boneInset.value)) throw new Error("missing boneInset");
+    expect(compileOffsetBoundary(offsetOfCsg(boneInset.value)!)).toHaveLength(1);
 
     const drafted = run(
       roundOffsetScene,
@@ -173,35 +173,35 @@ describe("migrated demo scenes", () => {
       ]),
     );
     const pulled = drafted.trace.find((n) => n.id === "o_ro_sqi");
-    const pulledStock = pulled?.value.kind === "region" ? pulled.value.stock : null;
+    const pulledStock = pulled && isCsg2(pulled.value) ? offsetOfCsg(pulled.value) : null;
     expect(pulledStock?.kind === "offset" ? pulledStock.d : 0).toBeCloseTo(-0.4);
     const splitBone = drafted.trace.find((n) => n.id === "o_ro_bone");
-    if (!splitBone || !isRegion(splitBone.value)) throw new Error("missing split bone");
-    expect(compileRegion(splitBone.value)).toHaveLength(2);
+    if (!splitBone || !isCsg2(splitBone.value)) throw new Error("missing split bone");
+    expect(compileOffsetBoundary(offsetOfCsg(splitBone.value)!)).toHaveLength(2);
     const pinched = drafted.trace.find((n) => n.id === "o_ro_tw");
-    if (!pinched || !isRegion(pinched.value) || !isOffset(pinched.value.stock)) {
+    if (!pinched || !isCsg2(pinched.value) || !offsetOfCsg(pinched.value)) {
       throw new Error("missing twoInset");
     }
-    expect(regionContains(pinched.value, { x: 7.45, y: 4.8 })).toBe(true);
-    expect(regionContains(pinched.value, { x: 8.4, y: 4.8 })).toBe(false);
-    expect(regionContains(pinched.value, { x: 10.3, y: 4.8 })).toBe(false);
-    expect(regionContains(pinched.value, { x: 9.35, y: 4.8 })).toBe(false);
-    const pinchedIslands = compileOffsetBoundary(pinched.value.stock);
+    expect(csgContains(pinched.value, { x: 7.45, y: 4.8 })).toBe(true);
+    expect(csgContains(pinched.value, { x: 8.4, y: 4.8 })).toBe(false);
+    expect(csgContains(pinched.value, { x: 10.3, y: 4.8 })).toBe(false);
+    expect(csgContains(pinched.value, { x: 9.35, y: 4.8 })).toBe(false);
+    const pinchedIslands = compileOffsetBoundary(offsetOfCsg(pinched.value)!);
     expect(pinchedIslands).toHaveLength(1);
     expect(pinchedIslands[0]?.holes.length).toBeGreaterThan(0);
   });
 
   test("pie traces three roundOffset slices from one gap slider", () => {
     const { trace } = run(pie, ["apps/demo/src/scenes/pie.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(0);
-    expect(trace.filter((n) => n.kind === "region")).toHaveLength(3);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(0);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(3);
     expect(trace.filter((n) => n.kind === "segment")).toHaveLength(3);
     expect(trace.filter((n) => n.value.kind === "gliderCircle")).toHaveLength(3);
     expect(trace.some((n) => n.bind === "gap" && n.kind === "slider")).toBe(true);
     const one = trace.find((n) => n.bind === "one");
-    expect(one?.kind).toBe("region");
+    expect(one?.kind).toBe("csg2");
     expect(one?.editable).toBe(false);
-    const stock = one?.value.kind === "region" ? one.value.stock : null;
+    const stock = one && isCsg2(one.value) ? offsetOfCsg(one.value) : null;
     expect(stock?.kind).toBe("offset");
     expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
   });
@@ -223,54 +223,54 @@ describe("migrated demo scenes", () => {
 
   test("fillet scene traces the challenge cases from one radius slider", () => {
     const { trace } = run(fillet, ["apps/demo/src/scenes/fillet.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(8);
-    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(8);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(1);
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
     const flat = trace.find((n) => n.bind === "flat");
-    expect(flat?.kind).toBe("profile");
-    expect(flat?.value.kind === "profile" ? walkEdges(flat.value.outer) : []).toHaveLength(
-      flat?.value.kind === "profile" ? 3 : 0,
+    expect(flat?.kind).toBe("region");
+    expect(flat?.value.kind === "region" ? walkEdges(flat.value.outer) : []).toHaveLength(
+      flat?.value.kind === "region" ? 3 : 0,
     );
     expect(
-      flat?.value.kind === "profile"
+      flat?.value.kind === "region"
         ? walkEdges(flat.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
-    ).toHaveLength(flat?.value.kind === "profile" ? 1 : 0);
+    ).toHaveLength(flat?.value.kind === "region" ? 1 : 0);
     const mix = trace.find((n) => n.bind === "mix");
-    expect(mix?.kind).toBe("profile");
-    expect(mix?.value.kind === "profile" ? walkEdges(mix.value.outer) : []).toHaveLength(
-      mix?.value.kind === "profile" ? 6 : 0,
+    expect(mix?.kind).toBe("region");
+    expect(mix?.value.kind === "region" ? walkEdges(mix.value.outer) : []).toHaveLength(
+      mix?.value.kind === "region" ? 6 : 0,
     );
     expect(
-      mix?.value.kind === "profile"
+      mix?.value.kind === "region"
         ? walkEdges(mix.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
-    ).toHaveLength(mix?.value.kind === "profile" ? 2 : 0);
+    ).toHaveLength(mix?.value.kind === "region" ? 2 : 0);
     const ell = trace.find((n) => n.bind === "ell");
-    expect(ell?.value.kind === "profile" ? walkEdges(ell.value.outer) : []).toHaveLength(
-      ell?.value.kind === "profile" ? 7 : 0,
+    expect(ell?.value.kind === "region" ? walkEdges(ell.value.outer) : []).toHaveLength(
+      ell?.value.kind === "region" ? 7 : 0,
     );
     expect(
-      ell?.value.kind === "profile"
+      ell?.value.kind === "region"
         ? walkEdges(ell.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
-    ).toHaveLength(ell?.value.kind === "profile" ? 1 : 0);
+    ).toHaveLength(ell?.value.kind === "region" ? 1 : 0);
     const rim = trace.find((n) => n.bind === "rim");
-    expect(rim?.value.kind === "profile" ? walkEdges(rim.value.outer) : []).toHaveLength(
-      rim?.value.kind === "profile" ? 5 : 0,
+    expect(rim?.value.kind === "region" ? walkEdges(rim.value.outer) : []).toHaveLength(
+      rim?.value.kind === "region" ? 5 : 0,
     );
     const tip = trace.find((n) => n.bind === "tip");
-    expect(tip?.value.kind === "profile" ? walkEdges(tip.value.outer) : []).toHaveLength(
-      tip?.value.kind === "profile" ? 4 : 0,
+    expect(tip?.value.kind === "region" ? walkEdges(tip.value.outer) : []).toHaveLength(
+      tip?.value.kind === "region" ? 4 : 0,
     );
     const adj = trace.find((n) => n.bind === "adj");
-    expect(adj?.value.kind === "profile" ? walkEdges(adj.value.outer) : []).toHaveLength(
-      adj?.value.kind === "profile" ? 6 : 0,
+    expect(adj?.value.kind === "region" ? walkEdges(adj.value.outer) : []).toHaveLength(
+      adj?.value.kind === "region" ? 6 : 0,
     );
     const inset = trace.find((n) => n.bind === "inset");
-    expect(inset?.kind).toBe("region");
+    expect(inset?.kind).toBe("csg2");
     expect(inset?.editable).toBe(true);
-    const insetStock = inset?.value.kind === "region" ? inset.value.stock : null;
+    const insetStock = inset && isCsg2(inset.value) ? offsetOfCsg(inset.value) : null;
     expect(insetStock?.kind).toBe("offset");
     expect(insetStock?.kind === "offset" ? insetStock.d : 0).toBeCloseTo(-0.12);
   });
@@ -281,24 +281,25 @@ describe("migrated demo scenes", () => {
       "apps/demo/src/layout/stock-cutters.ts",
     ];
     const { trace } = run(stockCutters, files);
-    expect(trace.filter((n) => n.kind === "region")).toHaveLength(4);
-    expect(trace.some((n) => n.bind === "face" && n.kind === "region")).toBe(true);
-    expect(trace.some((n) => n.bind === "hold" && n.kind === "region")).toBe(true);
-    expect(trace.some((n) => n.bind === "left" && n.kind === "region")).toBe(true);
-    expect(trace.some((n) => n.bind === "right" && n.kind === "region")).toBe(true);
-    expect(trace.some((n) => n.bind === "stock" && n.kind === "profile")).toBe(true);
-    expect(trace.some((n) => n.bind === "slot" && n.kind === "profile")).toBe(true);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(3);
+    expect(trace.filter((n) => n.kind === "pick")).toHaveLength(1);
+    expect(trace.some((n) => n.bind === "face" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "hold" && n.kind === "pick")).toBe(true);
+    expect(trace.some((n) => n.bind === "left" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "right" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "stock" && n.kind === "region")).toBe(true);
+    expect(trace.some((n) => n.bind === "slot" && n.kind === "region")).toBe(true);
 
     const face = trace.find((n) => n.id === "o_sc_face");
-    expect(face?.value.kind).toBe("region");
-    if (!face || !isRegion(face.value)) throw new Error("missing face");
-    expect(regionContains(face.value, { x: 1.05, y: 1.6 })).toBe(true);
-    expect(regionContains(face.value, { x: 3.55, y: 1.6 })).toBe(false);
+    expect(face?.value.kind).toBe("csg2");
+    if (!face || !isCsg2(face.value)) throw new Error("missing face");
+    expect(csgContains(face.value, { x: 1.05, y: 1.6 })).toBe(true);
+    expect(csgContains(face.value, { x: 3.55, y: 1.6 })).toBe(false);
 
     const camera = { x: 2.25, y: 1.6, scale: 72 };
     const size = { w: 800, h: 600 };
     const hits = hitsNear(trace, { x: 1.2, y: 1.6 }, camera, size);
-    expect(hits.find((n) => n.kind === "region")?.id).toBe("o_sc_face");
+    expect(hits.find((n) => n.kind === "csg2")?.id).toBe("o_sc_face");
   });
 
   test("stock-cutters: drill off the plate drops that hole, not an XOR cap", () => {
@@ -308,10 +309,10 @@ describe("migrated demo scenes", () => {
     ];
     const { trace } = run(stockCutters, files, new Map([["o_sc_c0", [-1, -1]]]));
     const face = trace.find((n) => n.id === "o_sc_face");
-    expect(face?.kind).toBe("region");
-    if (!face || !isRegion(face.value)) throw new Error("missing face");
-    expect(regionContains(face.value, { x: 0.57, y: 0.62 })).toBe(true);
-    expect(regionContains(face.value, { x: -1, y: -1 })).toBe(false);
+    expect(face?.kind).toBe("csg2");
+    if (!face || !isCsg2(face.value)) throw new Error("missing face");
+    expect(csgContains(face.value, { x: 0.57, y: 0.62 })).toBe(true);
+    expect(csgContains(face.value, { x: -1, y: -1 })).toBe(false);
   });
 
   test("stock-cutters: a slot that severs stays one region; contains follows the probe", () => {
@@ -330,22 +331,24 @@ describe("migrated demo scenes", () => {
     );
     const face = trace.find((n) => n.id === "o_sc_face");
     const hold = trace.find((n) => n.id === "o_sc_hold");
-    expect(face?.kind).toBe("region");
-    expect(hold?.kind).toBe("region");
-    if (!face || !isRegion(face.value) || !hold || !isRegion(hold.value))
+    expect(face?.kind).toBe("csg2");
+    expect(hold?.kind).toBe("pick");
+    if (!face || !isCsg2(face.value) || !hold || !isPick(hold.value))
       throw new Error("missing regions");
-    expect(regionContains(face.value, { x: 1.05, y: 2.4 })).toBe(true);
-    expect(regionContains(face.value, { x: 1.05, y: 0.5 })).toBe(true);
-    expect(regionContains(face.value, { x: 2.25, y: 1.6 })).toBe(false);
-    expect(compileRegion(face.value).length).toBeGreaterThanOrEqual(2);
-    expect(regionContains(hold.value, { x: 1.05, y: 2.4 })).toBe(true);
-    expect(regionContains(hold.value, { x: 1.05, y: 0.5 })).toBe(false);
+    expect(csgContains(face.value, { x: 1.05, y: 2.4 })).toBe(true);
+    expect(csgContains(face.value, { x: 1.05, y: 0.5 })).toBe(true);
+    expect(csgContains(face.value, { x: 2.25, y: 1.6 })).toBe(false);
+    expect(
+      csgContains(face.value, { x: 1.05, y: 2.4 }) && csgContains(face.value, { x: 1.05, y: 0.5 }),
+    ).toBe(true);
+    expect(csgContains(hold.value, { x: 1.05, y: 2.4 })).toBe(true);
+    expect(csgContains(hold.value, { x: 1.05, y: 0.5 })).toBe(false);
 
     const empty = run(stockCutters, files, new Map([["o_sc_probe", [3.55, 1.6]]]));
     const holdEmpty = empty.trace.find((n) => n.id === "o_sc_hold");
     expect(empty.trace.some((n) => n.id === "o_sc_probe")).toBe(true);
-    if (!holdEmpty || !isRegion(holdEmpty.value)) throw new Error("missing hold");
-    expect(compileRegion(holdEmpty.value)).toHaveLength(0);
+    if (!holdEmpty || !isPick(holdEmpty.value)) throw new Error("missing hold");
+    expect(csgContains(holdEmpty.value, { x: 3.55, y: 1.6 })).toBe(false);
   });
 
   test("stock-cutters figure paints the face formula, not an island", () => {

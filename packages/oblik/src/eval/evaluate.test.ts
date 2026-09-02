@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { isCsg2, offsetOfCsg } from "../geom/csg2";
 import { walkEdges } from "../geom/profile";
 import { analyze } from "../source/analyze";
 import {
@@ -11,7 +12,7 @@ import {
   point,
   pointOnCircle,
   pointOnSegment,
-  profile,
+  intersect,
   region,
   roundOffset,
   segment,
@@ -198,7 +199,7 @@ describe("evaluate", () => {
         const A = pointOnCircle(c, 1, 0, "a");
         const B = pointOnCircle(c, 0, 1, "b");
         const ch = segment(A, B, "ch");
-        return profile([A, ch, B, along(c, -1)], "pr");
+        return region([A, ch, B, along(c, -1)], "pr");
       },
     });
     const { trace } = evaluate(scene);
@@ -208,12 +209,12 @@ describe("evaluate", () => {
       "gliderCircle",
       "gliderCircle",
       "segment",
-      "profile",
+      "region",
     ]);
     const p = trace.find((n) => n.id === "pr");
-    expect(p?.value.kind).toBe("profile");
-    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(
-      p?.value.kind === "profile" ? 2 : 0,
+    expect(p?.value.kind).toBe("region");
+    expect(p?.value.kind === "region" ? p.value.outer : []).toHaveLength(
+      p?.value.kind === "region" ? 2 : 0,
     );
   });
 
@@ -238,7 +239,7 @@ describe("evaluate", () => {
         const hbc = segment(h1, h2, "hbc");
         const hcd = segment(h2, h3, "hcd");
         const hda = segment(h3, h0, "hda");
-        return profile(
+        return region(
           [A, ab, B, bc, C, cd, D, da],
           { holes: [[h0, hab, h1, hbc, h2, hcd, h3, hda]] },
           "pr",
@@ -246,10 +247,10 @@ describe("evaluate", () => {
       },
     });
     const { trace } = evaluate(scene);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(1);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
     const p = trace.find((n) => n.id === "pr");
-    expect(p?.value.kind === "profile" ? p.value.holes : []).toHaveLength(1);
-    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(4);
+    expect(p?.value.kind === "region" ? p.value.holes : []).toHaveLength(1);
+    expect(p?.value.kind === "region" ? p.value.outer : []).toHaveLength(4);
   });
 
   test("fillet is not a tape node", () => {
@@ -263,7 +264,7 @@ describe("evaluate", () => {
         const ab = segment(A, B, "ab");
         const bc = segment(B, C, "bc");
         const ca = segment(C, A, "ca");
-        return profile([fillet(A, 0.3), ab, B, bc, C, ca], "pr");
+        return region([fillet(A, 0.3), ab, B, bc, C, ca], "pr");
       },
     });
     const { trace } = evaluate(scene);
@@ -274,18 +275,18 @@ describe("evaluate", () => {
       "segment",
       "segment",
       "segment",
-      "profile",
+      "region",
     ]);
     const p = trace.find((n) => n.id === "pr");
-    expect(p?.kind).toBe("profile");
-    expect(p?.value.kind === "profile" ? walkEdges(p.value.outer) : []).toHaveLength(
-      p?.value.kind === "profile" ? 4 : 0,
+    expect(p?.kind).toBe("region");
+    expect(p?.value.kind === "region" ? walkEdges(p.value.outer) : []).toHaveLength(
+      p?.value.kind === "region" ? 4 : 0,
     );
     expect(
-      p?.value.kind === "profile"
+      p?.value.kind === "region"
         ? walkEdges(p.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
-    ).toHaveLength(p?.value.kind === "profile" ? 1 : 0);
+    ).toHaveLength(p?.value.kind === "region" ? 1 : 0);
   });
 
   test("roundOffset is traced with dof on the distance", () => {
@@ -299,32 +300,29 @@ describe("evaluate", () => {
         const A = pointOnCircle(c, 1, 0, "a");
         const B = pointOnCircle(c, 0, 1, "b");
         const ch = segment(A, B, "ch");
-        const face = profile([A, ch, B, along(c, -1)], "pr");
+        const face = region([A, ch, B, along(c, -1)], "pr");
         return roundOffset(face, -0.12, "off");
       },
     });
     const { trace } = evaluate(scene, {
       annotations: analyze(
-        `const face = profile([A, ch, B, along(c, -1)], "pr");\nroundOffset(face, -0.12, "off");\n`,
+        `const face = region([A, ch, B, along(c, -1)], "pr");\nroundOffset(face, -0.12, "off");\n`,
       ),
     });
     const off = trace.find((n) => n.id === "off");
-    expect(off?.kind).toBe("region");
+    expect(off?.kind).toBe("csg2");
     expect(off?.editable).toBe(true);
-    const stock = off?.value.kind === "region" ? off.value.stock : null;
+    const stock = off && isCsg2(off.value) ? offsetOfCsg(off.value) : null;
     expect(stock?.kind).toBe("offset");
     expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
     const drafted = evaluate(scene, {
       annotations: analyze(`roundOffset(face, -0.12, "off");\n`),
       draft: new Map([["off", [-0.5]]]),
     }).trace.find((n) => n.id === "off");
-    expect(drafted?.kind).toBe("region");
-    expect(drafted?.value.kind === "region" ? drafted.value.stock.kind : null).toBe("offset");
-    expect(
-      drafted?.value.kind === "region" && drafted.value.stock.kind === "offset"
-        ? drafted.value.stock.d
-        : 0,
-    ).toBeCloseTo(-0.5);
+    expect(drafted?.kind).toBe("csg2");
+    const draftedStock = drafted && isCsg2(drafted.value) ? offsetOfCsg(drafted.value) : null;
+    expect(draftedStock?.kind).toBe("offset");
+    expect(draftedStock?.kind === "offset" ? draftedStock.d : 0).toBeCloseTo(-0.5);
   });
 
   test("region is traced; leftOf is not", () => {
@@ -340,16 +338,16 @@ describe("evaluate", () => {
         const bc = segment(B, C, "bc");
         const cd = segment(C, D, "cd");
         const da = segment(D, A, "da");
-        const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
+        const stock = region([A, ab, B, bc, C, cd, D, da], "pr");
         const split = segment(point(1, -1, "s0"), point(1, 3, "s1"), "sp");
-        const left = region(stock, { keep: [leftOf(split)] }, "reg");
+        const left = intersect(stock, leftOf(split), "reg");
         return { stock, left };
       },
     });
     const { trace } = evaluate(scene);
-    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
-    expect(trace.find((n) => n.id === "reg")?.kind).toBe("region");
-    expect(trace.find((n) => n.id === "pr")?.kind).toBe("profile");
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(1);
+    expect(trace.find((n) => n.id === "reg")?.kind).toBe("csg2");
+    expect(trace.find((n) => n.id === "pr")?.kind).toBe("region");
   });
 
   test("NaN keep operand drops the derived region from the tape", () => {
@@ -365,9 +363,9 @@ describe("evaluate", () => {
         const bc = segment(B, C, "bc");
         const cd = segment(C, D, "cd");
         const da = segment(D, A, "da");
-        const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
+        const stock = region([A, ab, B, bc, C, cd, D, da], "pr");
         const split = segment(point(Number.NaN, 0, "s0"), point(1, 3, "s1"), "sp");
-        region(stock, { keep: [leftOf(split)] }, "reg");
+        intersect(stock, leftOf(split), "reg");
         return stock;
       },
     });

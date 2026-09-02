@@ -5,7 +5,7 @@ import {
   fillet,
   point,
   pointOnCircle,
-  profile,
+  region,
   roundOffset,
   segment,
   slider,
@@ -22,7 +22,7 @@ export default defineScene({
     const Sb = point(2.2, 0, "o_ro_sb");
     const Sc = point(2.2, 2.2, "o_ro_sc");
     const Sd = point(0, 2.2, "o_ro_sd");
-    const sq = profile(
+    const sq = region(
       [
         Sa,
         segment(Sa, Sb, "o_ro_sab"),
@@ -42,7 +42,7 @@ export default defineScene({
     const Ob = point(5.7, 0, "o_ro_ob");
     const Oc = point(5.7, 2.2, "o_ro_oc");
     const Od = point(3.5, 2.2, "o_ro_od");
-    const sqOut = profile(
+    const sqOut = region(
       [
         Oa,
         segment(Oa, Ob, "o_ro_oab"),
@@ -62,7 +62,7 @@ export default defineScene({
     const Sreach = circle(So, 1.85, "o_ro_sr");
     const Sp = pointOnCircle(Sreach, 1, 0, "o_ro_sp");
     const Sq = pointOnCircle(Sreach, 0, 1, "o_ro_sqp");
-    const sector = profile(
+    const sector = region(
       [So, segment(So, Sp, "o_ro_soa"), Sp, along(Sreach, 1), Sq, segment(Sq, So, "o_ro_soq")],
       "o_ro_sec_p",
     );
@@ -77,7 +77,7 @@ export default defineScene({
     const Fh1 = point(13.3, 0.55, "o_ro_fh1");
     const Fh2 = point(13.3, 1.75, "o_ro_fh2");
     const Fh3 = point(11.9, 1.75, "o_ro_fh3");
-    const filHole = profile(
+    const filHole = region(
       [
         fillet(Fa, 0.28),
         segment(Fa, Fb, "o_ro_fab"),
@@ -115,7 +115,7 @@ export default defineScene({
     const Hh1 = point(2.1, 4.2, "o_ro_hh1");
     const Hh2 = point(2.1, 5.4, "o_ro_hh2");
     const Hh3 = point(0.7, 5.4, "o_ro_hh3");
-    const frameIn = profile(
+    const frameIn = region(
       [
         Ha,
         segment(Ha, Hb, "o_ro_hab"),
@@ -153,7 +153,7 @@ export default defineScene({
     const Gh1 = point(5.7, 4.2, "o_ro_gh1");
     const Gh2 = point(5.7, 5.4, "o_ro_gh2");
     const Gh3 = point(4.3, 5.4, "o_ro_gh3");
-    const frameOut = profile(
+    const frameOut = region(
       [
         Ga,
         segment(Ga, Gb, "o_ro_gab"),
@@ -195,7 +195,7 @@ export default defineScene({
     const U1 = point(11.0, 4.15, "o_ro_u1");
     const U2 = point(11.0, 5.45, "o_ro_u2");
     const U3 = point(9.55, 5.45, "o_ro_u3");
-    const twoHoles = profile(
+    const twoHoles = region(
       [
         Ta,
         segment(Ta, Tb, "o_ro_tab"),
@@ -241,7 +241,7 @@ export default defineScene({
     const Cd = point(12.2, 6.1, "o_ro_cd");
     const Co = point(13.7, 4.8, "o_ro_co");
     const Creach = circle(Co, 0.52, "o_ro_cr");
-    const circHole = profile(
+    const circHole = region(
       [
         Ca,
         segment(Ca, Cb, "o_ro_cab"),
@@ -270,7 +270,7 @@ export default defineScene({
     const B9 = point(1.6, 8.26, "o_ro_b9");
     const B10 = point(1.6, 8.9, "o_ro_b10");
     const B11 = point(0, 8.9, "o_ro_b11");
-    const bone = profile(
+    const bone = region(
       [
         B0,
         segment(B0, B1, "o_ro_b01"),
@@ -310,7 +310,7 @@ export default defineScene({
     const V5 = point(5.9, 8.1, "o_ro_v5");
     const V6 = point(5.9, 9.7, "o_ro_v6");
     const V7 = point(5.1, 9.7, "o_ro_v7");
-    const u = profile(
+    const u = region(
       [
         V0,
         segment(V0, V1, "o_ro_v01"),
@@ -343,7 +343,7 @@ export default defineScene({
     const Ph1 = point(11.3, 7.95, "o_ro_ph1");
     const Ph2 = point(11.3, 9.05, "o_ro_ph2");
     const Ph3 = point(9.3, 9.05, "o_ro_ph3");
-    const sharedPlate = profile(
+    const sharedPlate = region(
       [
         Pa,
         segment(Pa, Pb, "o_ro_pab"),

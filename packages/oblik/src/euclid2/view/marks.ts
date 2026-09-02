@@ -1,6 +1,6 @@
 import type { TraceNode } from "@/eval/context";
+import { isCsg2, isOffsetCsg } from "@/geom/csg2";
 import { isGlider } from "@/geom/gliders";
-import { isOffsetRegion, isRegion } from "@/geom/region";
 
 import { traceKey } from "../pick";
 
@@ -78,7 +78,7 @@ export function isGrabbable(node: TraceNode | null | undefined): boolean {
   ) {
     return true;
   }
-  return isRegion(node.value) && isOffsetRegion(node.value);
+  return isCsg2(node.value) && isOffsetCsg(node.value);
 }
 
 export function hoverNode(

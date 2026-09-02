@@ -1,5 +1,5 @@
 import type { TraceNode } from "@/eval/context";
-import type { Branch, Circle, ClosedWalk, LineLike, Profile, ProfileEdge } from "@/geom";
+import type { Branch, Circle, Loop, LineLike, Region, LoopEdge } from "@/geom";
 import type { Expr } from "@/source/expr";
 
 import type { Camera2, PaneSize } from "../camera";
@@ -46,7 +46,7 @@ export type Scope = {
   points: Readonly<Record<string, Placed>>;
   carriers: Readonly<Record<string, { expr: Expr; geom: LineLike }>>;
   circles: Readonly<Record<string, { expr: Expr; geom: Circle }>>;
-  profiles: Readonly<Record<string, { expr: Expr; geom: Profile }>>;
+  profiles: Readonly<Record<string, { expr: Expr; geom: Region }>>;
   /** Slider binds → live value (for length reuse). */
   lengths: Readonly<Record<string, number>>;
   /** Mentionable constructor id → expr in this focus. */
@@ -79,7 +79,7 @@ export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
   carrier?: { bind: string; geom: LineLike | Circle };
-  profile?: { bind: string; geom: Profile; id?: string };
+  profile?: { bind: string; geom: Region; id?: string };
   corner?: { index: number; at: Vec2 };
   length?: { expr: Expr; value: number };
 };
@@ -163,7 +163,7 @@ export type ToolSession =
   | {
       verb: "roundOffset";
       focus: "face" | "typed" | "name";
-      face?: { expr: Expr; geom: Profile };
+      face?: { expr: Expr; geom: Region };
       faceRef: string;
       typed: string;
       name: string;
@@ -174,7 +174,7 @@ export type ToolSession =
       focus: "corner" | "typed";
       faceId: string;
       faceBind: string;
-      geom?: Profile;
+      geom?: Region;
       vertex?: number;
       at?: Vec2;
       vertexExpr?: Expr;
@@ -190,16 +190,21 @@ export type Ghost =
   | { kind: "parallelLine"; geom: LineLike; distance: number }
   | {
       kind: "profile";
-      edges: ProfileEdge[];
+      edges: LoopEdge[];
       /** Disjoint closed walks; when set, fill/stroke do not chain islands. */
-      loops?: ClosedWalk[];
-      hover?: ProfileEdge;
+      loops?: Loop[];
+      hover?: LoopEdge;
       arrow?: { at: Vec2; tx: number; ty: number };
     };
 
 export type InsertJob = {
   from:
     | ToolId
+    | "region"
+    | "diff"
+    | "union"
+    | "intersect"
+    | "pick"
     | "lineIntersection"
     | "circleLineIntersection"
     | "circleCircleIntersection"

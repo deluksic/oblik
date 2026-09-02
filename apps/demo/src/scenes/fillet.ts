@@ -4,7 +4,7 @@ import {
   fillet,
   point,
   pointOnCircle,
-  profile,
+  region,
   roundOffset,
   segment,
   slider,
@@ -27,7 +27,7 @@ export default defineScene({
     const bc = segment(B, C, "o_fil_bc");
     const cd = segment(C, D, "o_fil_cd");
     const da = segment(D, A, "o_fil_da");
-    const mix = profile([fillet(A, r), ab, B, bc, fillet(C, r), cd, D, da], "o_fil_mix");
+    const mix = region([fillet(A, r), ab, B, bc, fillet(C, r), cd, D, da], "o_fil_mix");
 
     const Ra = point(4.4, 0, "o_fil_ra");
     const Rb = point(6.4, 0, "o_fil_rb");
@@ -37,7 +37,7 @@ export default defineScene({
     const rbc = segment(Rb, Rc, "o_fil_rbc");
     const rcd = segment(Rc, Rd, "o_fil_rcd");
     const rda = segment(Rd, Ra, "o_fil_rda");
-    const round = profile(
+    const round = region(
       [fillet(Ra, r), rab, fillet(Rb, r), rbc, fillet(Rc, r), rcd, fillet(Rd, r), rda],
       "o_fil_round",
     );
@@ -51,7 +51,7 @@ export default defineScene({
     const abc = segment(Ab, Ac, "o_fil_abc");
     const acd = segment(Ac, Ad, "o_fil_acd");
     const ada = segment(Ad, Aa, "o_fil_ada");
-    const adj = profile([fillet(Aa, r), aab, fillet(Ab, r), abc, Ac, acd, Ad, ada], "o_fil_adj");
+    const adj = region([fillet(Aa, r), aab, fillet(Ab, r), abc, Ac, acd, Ad, ada], "o_fil_adj");
 
     const E0 = point(0, 3.2, "o_fil_e0");
     const E1 = point(2, 3.2, "o_fil_e1");
@@ -65,7 +65,10 @@ export default defineScene({
     const e34 = segment(E3, E4, "o_fil_e34");
     const e45 = segment(E4, E5, "o_fil_e45");
     const e50 = segment(E5, E0, "o_fil_e50");
-    const ell = profile([E0, e01, E1, e12, E2, e23, fillet(E3, r), e34, E4, e45, E5, e50], "o_fil_ell");
+    const ell = region(
+      [E0, e01, E1, e12, E2, e23, fillet(E3, r), e34, E4, e45, E5, e50],
+      "o_fil_ell",
+    );
 
     const Ro = point(4.4, 3.4, "o_fil_ro");
     const Rreach = circle(Ro, 1.5, "o_fil_rr");
@@ -73,7 +76,7 @@ export default defineScene({
     const Rq = pointOnCircle(Rreach, 0, 1, "o_fil_rq");
     const roa = segment(Ro, Rp, "o_fil_roa");
     const rob = segment(Ro, Rq, "o_fil_rob");
-    const rim = profile([Ro, roa, fillet(Rp, r), along(Rreach, 1), fillet(Rq, r), rob], "o_fil_rim");
+    const rim = region([Ro, roa, fillet(Rp, r), along(Rreach, 1), fillet(Rq, r), rob], "o_fil_rim");
 
     const To = point(7.8, 3.4, "o_fil_to");
     const Treach = circle(To, 1.5, "o_fil_tr");
@@ -81,7 +84,7 @@ export default defineScene({
     const Tq = pointOnCircle(Treach, 0, 1, "o_fil_tq");
     const toa = segment(To, Tp, "o_fil_toa");
     const tob = segment(To, Tq, "o_fil_tob");
-    const tip = profile([fillet(To, r), toa, Tp, along(Treach, 1), Tq, tob], "o_fil_tip");
+    const tip = region([fillet(To, r), toa, Tp, along(Treach, 1), Tq, tob], "o_fil_tip");
 
     const Fo = point(11.4, 4.2, "o_fil_fo");
     const Freach = circle(Fo, 1.5, "o_fil_fr");
@@ -89,7 +92,7 @@ export default defineScene({
     const Fq = pointOnCircle(Freach, -1, 0, "o_fil_fq");
     const foa = segment(Fo, Fp, "o_fil_foa");
     const fob = segment(Fo, Fq, "o_fil_fob");
-    const flat = profile([fillet(Fo, r), foa, Fp, along(Freach, 1), Fq, fob], "o_fil_flat");
+    const flat = region([fillet(Fo, r), foa, Fp, along(Freach, 1), Fq, fob], "o_fil_flat");
 
     const Wa = point(10.2, 0, "o_fil_wa");
     const Wb = point(10.2, 1.2, "o_fil_wb");
@@ -99,7 +102,7 @@ export default defineScene({
     const wbc = segment(Wb, Wc, "o_fil_wbc");
     const wcd = segment(Wc, Wd, "o_fil_wcd");
     const wda = segment(Wd, Wa, "o_fil_wda");
-    const cw = profile([fillet(Wa, r), wab, Wb, wbc, Wc, wcd, Wd, wda], "o_fil_cw");
+    const cw = region([fillet(Wa, r), wab, Wb, wbc, Wc, wcd, Wd, wda], "o_fil_cw");
 
     return {
       r,

@@ -18,17 +18,18 @@ import {
   RegionHalo,
   RegionMaskDefs,
   RegionOp,
+  RegionTreeFill,
   regionMaskId,
   regionMaskUrl,
 } from "../euclid2/view/RegionInk";
 import type { TraceNode } from "../eval/context";
 import type { FigureStyle } from "../eval/paint";
+import { fillPaint } from "../geom/csg-draw";
+import { isCsg2, isPick } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { profileSvgPath } from "../geom/profile";
-import { isRegion } from "../geom/region";
-import { regionPaint } from "../geom/region-draw";
-import type { Region } from "../geom/types";
+import { regionSvgPath } from "../geom/profile";
+import type { Csg2, Pick } from "../geom/types";
 
 import styles from "./View.module.css";
 
@@ -156,7 +157,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
           layers={layers()}
         />
       </Show>
-      <Show when={kind() === "profile" || kind() === "region"}>
+      <Show when={kind() === "region" || kind() === "csg2" || kind() === "pick"}>
         <Face
           node={props.node}
           look={props.look}
@@ -355,7 +356,10 @@ function Face(props: {
   layers: ChromeLayer[];
 }) {
   return (
-    <Show when={isRegion(props.node.value)} fallback={<FaceProfile {...props} />}>
+    <Show
+      when={isCsg2(props.node.value) || isPick(props.node.value)}
+      fallback={<FaceProfile {...props} />}
+    >
       <FaceRegion {...props} />
     </Show>
   );
@@ -371,7 +375,7 @@ function FaceProfile(props: {
 }) {
   const d = createMemo(() => {
     const v = props.node?.value;
-    return v?.kind === "profile" ? profileSvgPath(v) : null;
+    return v?.kind === "region" ? regionSvgPath(v) : null;
   });
   const look = () => (props.onion ? ONION : props.look);
   const outsideId = () =>
@@ -423,7 +427,7 @@ function FaceRegion(props: {
   overlay: boolean;
   layers: ChromeLayer[];
 }) {
-  const paint = createMemo(() => regionPaint(props.node.value as Region));
+  const paint = createMemo(() => fillPaint(props.node.value as Csg2 | Pick));
   const id = () =>
     regionMaskId(
       `fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}${props.overlay ? "-ov" : ""}`,
@@ -447,41 +451,78 @@ function FaceRegion(props: {
         <>
           <RegionMaskDefs paint={paint()} id={id()} />
           <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
-            <RegionOp
-              op={paint().stock}
-              mask={regionMaskUrl(id())}
-              data-role="hit"
-              class={styles.hitFill}
-              data-ink={traceKey(props.node)}
-              fill="#fff"
-              stroke="none"
-            />
-            <For each={props.layers}>
-              {(layer) => (
-                <For each={ops()}>
-                  {(op) => (
-                    <RegionOp
-                      op={op}
-                      mask={regionMaskUrl(id())}
-                      data-role={
-                        layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
-                      }
-                      class={layerClass(layer.kind, props.muted, props.onion)}
-                      fill={
-                        op === paint().stock ? paintFill(look(), props.onion, layer, true) : "none"
-                      }
-                      stroke={paintStroke(look(), layer)}
-                      stroke-width={layerStrokeWidth(layer)}
-                      stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      vector-effect="non-scaling-stroke"
-                      opacity={layerOpacity(layer, props.onion, 0.35)}
-                    />
-                  )}
-                </For>
-              )}
-            </For>
+            <Show
+              when={paint().tree}
+              fallback={
+                <>
+                  <RegionOp
+                    op={paint().stock}
+                    mask={regionMaskUrl(id())}
+                    data-role="hit"
+                    class={styles.hitFill}
+                    data-ink={traceKey(props.node)}
+                    fill="#fff"
+                    stroke="none"
+                  />
+                  <For each={props.layers}>
+                    {(layer) => (
+                      <For each={ops()}>
+                        {(op) => (
+                          <RegionOp
+                            op={op}
+                            mask={regionMaskUrl(id())}
+                            data-role={
+                              layer.kind === "paint"
+                                ? props.onion
+                                  ? "onion"
+                                  : "paint"
+                                : layer.kind
+                            }
+                            class={layerClass(layer.kind, props.muted, props.onion)}
+                            fill={
+                              op === paint().stock
+                                ? paintFill(look(), props.onion, layer, true)
+                                : "none"
+                            }
+                            stroke={paintStroke(look(), layer)}
+                            stroke-width={layerStrokeWidth(layer)}
+                            stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            vector-effect="non-scaling-stroke"
+                            opacity={layerOpacity(layer, props.onion, 0.35)}
+                          />
+                        )}
+                      </For>
+                    )}
+                  </For>
+                </>
+              }
+            >
+              <RegionTreeFill
+                paint={paint()}
+                id={id()}
+                data-role="hit"
+                class={styles.hitFill}
+                data-ink={traceKey(props.node)}
+                fill="#fff"
+              />
+              <For each={props.layers}>
+                {(layer) => (
+                  <RegionTreeFill
+                    paint={paint()}
+                    id={id()}
+                    data-role={
+                      layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
+                    }
+                    class={layerClass(layer.kind, props.muted, props.onion)}
+                    fill={paintFill(look(), props.onion, layer, true)}
+                    stroke="none"
+                    opacity={layerOpacity(layer, props.onion, 0.35)}
+                  />
+                )}
+              </For>
+            </Show>
           </RegionClipped>
         </>
       )}

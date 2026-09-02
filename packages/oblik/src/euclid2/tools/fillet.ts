@@ -1,4 +1,4 @@
-import { filletAtVertex, isFiniteProfile, profileCorners, walkEdges, type Profile } from "@/geom";
+import { filletAtVertex, isFiniteRegion, regionCorners, walkEdges, type Region } from "@/geom";
 import { printExpr, type Expr } from "@/source/expr";
 
 import { snapProfile } from "../pick";
@@ -17,8 +17,8 @@ type FilletSession = Extract<ToolSession, { verb: "fillet" }>;
 
 const fields: Field<FilletSession>[] = [lengthField("<radius>")];
 
-function closestCorner(geom: Profile, world: { x: number; y: number }) {
-  const corners = profileCorners(geom);
+function closestCorner(geom: Region, world: { x: number; y: number }) {
+  const corners = regionCorners(geom);
   let best = corners[0];
   if (!best) return null;
   let bestD = dist(world, best.at);
@@ -32,13 +32,13 @@ function closestCorner(geom: Profile, world: { x: number; y: number }) {
   return best;
 }
 
-function cornerOf(hit: PlaceHit, geom: Profile) {
+function cornerOf(hit: PlaceHit, geom: Region) {
   if (hit.corner) return hit.corner;
   const c = closestCorner(geom, hit.world);
   return c ? { index: c.index, at: c.at } : null;
 }
 
-function faceGeom(session: FilletSession, scope: Scope): Profile | undefined {
+function faceGeom(session: FilletSession, scope: Scope): Region | undefined {
   if (session.faceBind && scope.profiles[session.faceBind])
     return scope.profiles[session.faceBind]!.geom;
   return session.geom;
@@ -210,7 +210,7 @@ export const fillet: Tool<FilletSession> = {
     if (!geom) return null;
     const r = radiusNumber(session, place, scope);
     const out = filletAtVertex(geom, vertex.index, r);
-    if (!isFiniteProfile(out)) return null;
+    if (!isFiniteRegion(out)) return null;
     return { kind: "profile", edges: walkEdges(out.outer) };
   },
   preview(session, place, scope): Preview {
@@ -221,14 +221,14 @@ export const fillet: Tool<FilletSession> = {
     if (!vertex) {
       const r = inSlot(session.focus === "typed", rLabel);
       return {
-        line: `profile([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …])`,
         hint: place?.corner ? `Click to fillet this corner. Tab for radius.` : spec.hint,
       };
     }
     if (place?.length && place.length.value >= 0 && resolveLengthExpr(session, scope) == null) {
       const r = printExpr(place.length.expr);
       return {
-        line: `profile([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …])`,
         hint: "Click to reuse that length.",
       };
     }
@@ -241,7 +241,7 @@ export const fillet: Tool<FilletSession> = {
     ) {
       const r = `dist(${printExpr(session.vertexExpr)}, ${printExpr(exprOfPlace(place.point))})`;
       return {
-        line: `profile([…, fillet(${vTok}, ${r}), …])`,
+        line: `region([…, fillet(${vTok}, ${r}), …])`,
         hint: "Click to pin the radius to that distance.",
       };
     }
@@ -255,12 +255,12 @@ export const fillet: Tool<FilletSession> = {
     const rTok = inSlot(session.focus === "typed", bound ? printExpr(bound) : shown);
     if (bound?.kind === "num" && bound.value === 0) {
       return {
-        line: `profile([…, ${vTok}, …])`,
+        line: `region([…, ${vTok}, …])`,
         hint: "Radius 0 leaves the corner sharp.",
       };
     }
     return {
-      line: `profile([…, fillet(${vTok}, ${rTok}), …])`,
+      line: `region([…, fillet(${vTok}, ${rTok}), …])`,
       hint: "Type a radius, slider, or field (reach.radius), click to reuse, or click to measure.",
     };
   },

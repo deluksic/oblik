@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "@/eval/context";
-import type { Profile, Segment } from "@/geom";
-import { profileValue } from "@/geom/profile";
-import { offsetValue, regionValue } from "@/geom/region";
+import type { Region, Segment } from "@/geom";
+import { wrapCsg, offsetValue } from "@/geom/csg2";
+import { regionValue } from "@/geom/profile";
 
 import { applyDrag, offsetDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 
@@ -32,7 +32,7 @@ const OFFSET = {
   stack: [],
 } as TraceNode;
 
-function squareProfile(): Profile {
+function squareProfile(): Region {
   const pts = [
     { x: 0, y: 0 },
     { x: 1, y: 0 },
@@ -45,14 +45,14 @@ function squareProfile(): Profile {
     const b = pts[(i + 1) % pts.length]!;
     cycle.push(a, { kind: "segment", a, b } satisfies Segment);
   }
-  return profileValue(cycle);
+  return regionValue(cycle);
 }
 
 const OFFSET_REGION = {
   id: "o_off",
   occ: 0,
-  kind: "region",
-  value: regionValue(offsetValue(squareProfile(), -0.2)),
+  kind: "csg2",
+  value: wrapCsg(offsetValue(squareProfile(), -0.2)),
   editable: true,
   stack: [],
 } as TraceNode;

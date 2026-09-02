@@ -32,9 +32,16 @@ describe("printExpr", () => {
       ],
     };
     expect(printExpr(e)).toBe("circle(A, 2.5)");
-    expect(printExpr({ kind: "call", name: "point", args: [{ kind: "num", value: 1.2 }, { kind: "num", value: -3 }] })).toBe(
-      "point(1.2, -3)",
-    );
+    expect(
+      printExpr({
+        kind: "call",
+        name: "point",
+        args: [
+          { kind: "num", value: 1.2 },
+          { kind: "num", value: -3 },
+        ],
+      }),
+    ).toBe("point(1.2, -3)");
     expect(
       printExpr({
         kind: "call",
@@ -55,9 +62,14 @@ describe("printExpr", () => {
   });
 
   test("prints member and neg expressions", () => {
-    expect(printExpr({ kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" })).toBe("reach.radius");
     expect(
-      printExpr({ kind: "neg", expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" } }),
+      printExpr({ kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }),
+    ).toBe("reach.radius");
+    expect(
+      printExpr({
+        kind: "neg",
+        expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+      }),
     ).toBe("-shelf.distance");
     expect(
       printExpr({
@@ -133,7 +145,10 @@ describe("insertCall", () => {
     const next = insertCall(withBinds("ground"), {
       from: "parallelLine",
       bind: "shelf",
-      args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 1.76 }],
+      args: [
+        { kind: "ref", name: "ground" },
+        { kind: "num", value: 1.76 },
+      ],
       id: "o_par",
     });
     expect(next).toContain('const shelf = parallelLine(ground, 1.76, "o_par");');
@@ -144,7 +159,10 @@ describe("insertCall", () => {
     const next = insertCall(withBinds("ground", "P"), {
       from: "perpendicularLine",
       bind: "normal",
-      args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "P" }],
+      args: [
+        { kind: "ref", name: "ground" },
+        { kind: "ref", name: "P" },
+      ],
       id: "o_perp",
     });
     expect(next).toContain('const normal = perpendicularLine(ground, P, "o_perp");');
@@ -155,7 +173,10 @@ describe("insertCall", () => {
     const next = insertCall(withBinds("span"), {
       from: "pointOnSegment",
       bind: "mid",
-      args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.5 }],
+      args: [
+        { kind: "ref", name: "span" },
+        { kind: "num", value: 0.5 },
+      ],
       id: "o_g",
     });
     expect(next).toContain('const mid = pointOnSegment(span, 0.5, "o_g");');
@@ -178,7 +199,7 @@ describe("insertCall", () => {
       ],
       id: "o_l",
     });
-    expect(next).toContain('const g = pointOnLine(ground, 2.2,');
+    expect(next).toContain("const g = pointOnLine(ground, 2.2,");
     expect(next).toContain('const l = line(g, A, "o_l");');
     expect(next).toMatch(/import \{ point, pointOnLine, line \} from "oblik"/);
   });
@@ -334,32 +355,29 @@ describe("insertCall", () => {
   });
 
   test("inserts a slider with options", () => {
-    const next = insertCall(
-      src,
-      {
-        from: "slider",
-        bind: "reach",
-        args: [
-          { kind: "num", value: 1.8 },
-          {
-            kind: "props",
-            props: {
-              min: { kind: "num", value: 0 },
-              max: { kind: "num", value: 4 },
-              step: { kind: "num", value: 0.05 },
-            },
+    const next = insertCall(src, {
+      from: "slider",
+      bind: "reach",
+      args: [
+        { kind: "num", value: 1.8 },
+        {
+          kind: "props",
+          props: {
+            min: { kind: "num", value: 0 },
+            max: { kind: "num", value: 4 },
+            step: { kind: "num", value: 0.05 },
           },
-        ],
-        id: "o_sl",
-      },
-    );
+        },
+      ],
+      id: "o_sl",
+    });
     expect(next).toContain('const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");');
     expect(next).toMatch(/import \{ point, slider \} from "oblik"/);
   });
 
-  test("inserts profile as profile([...], id) and imports along", () => {
+  test("inserts profile as region([...], id) and imports along", () => {
     const next = insertCall(withBinds("chord", "B", "c"), {
-      from: "profile",
+      from: "region",
       bind: "slice",
       args: [
         {
@@ -381,8 +399,8 @@ describe("insertCall", () => {
       ],
       id: "o_slice",
     });
-    expect(next).toContain('const slice = profile([A, chord, B, along(c, -1)], "o_slice");');
-    expect(next).toMatch(/import \{ point, profile, along \} from "oblik"/);
+    expect(next).toContain('const slice = region([A, chord, B, along(c, -1)], "o_slice");');
+    expect(next).toMatch(/import \{ point, region, along \} from "oblik"/);
   });
 
   test("refuses refs that only exist inside a helper", () => {
@@ -399,7 +417,7 @@ export default defineScene({
 `;
     expect(() =>
       insertCall(helperSrc, {
-        from: "profile",
+        from: "region",
         args: [
           {
             kind: "array",
@@ -506,7 +524,7 @@ export default defineScene({
   });
 
   test("patches fillet(A, r) into a profile array vertex", () => {
-    const faceSrc = `import { point, segment, profile } from "oblik";
+    const faceSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 
 export default defineScene({
@@ -519,7 +537,7 @@ export default defineScene({
     const ab = segment(A, B, "o_ab");
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
-    const mix = profile([A, ab, B, bc, C, ca], "o_mix");
+    const mix = region([A, ab, B, bc, C, ca], "o_mix");
     return { mix };
   },
 });
@@ -529,13 +547,13 @@ export default defineScene({
       args: [{ kind: "num", value: 0.35 }],
       patchVertex: { id: "o_mix", index: 1 },
     });
-    expect(next).toContain("profile([A, ab, fillet(B, 0.35), bc, C, ca], \"o_mix\")");
-    expect(next).toMatch(/import \{ point, segment, profile, fillet \} from "oblik"/);
+    expect(next).toContain('region([A, ab, fillet(B, 0.35), bc, C, ca], "o_mix")');
+    expect(next).toMatch(/import \{ point, segment, region, fillet \} from "oblik"/);
     expect(next).not.toContain("const fillet");
   });
 
   test("replaces an existing fillet radius and unwraps r === 0", () => {
-    const faceSrc = `import { point, segment, profile, fillet } from "oblik";
+    const faceSrc = `import { point, segment, region, fillet } from "oblik";
 import { defineScene } from "oblik";
 
 export default defineScene({
@@ -548,7 +566,7 @@ export default defineScene({
     const ab = segment(A, B, "o_ab");
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
-    const mix = profile([fillet(A, 0.2), ab, B, bc, C, ca], "o_mix");
+    const mix = region([fillet(A, 0.2), ab, B, bc, C, ca], "o_mix");
     return { mix };
   },
 });
@@ -558,18 +576,18 @@ export default defineScene({
       args: [{ kind: "ref", name: "r" }],
       patchVertex: { id: "o_mix", index: 0 },
     });
-    expect(replaced).toContain("profile([fillet(A, r), ab, B, bc, C, ca], \"o_mix\")");
+    expect(replaced).toContain('region([fillet(A, r), ab, B, bc, C, ca], "o_mix")');
     const unwrapped = insertCall(faceSrc, {
       from: "fillet",
       args: [{ kind: "num", value: 0 }],
       patchVertex: { id: "o_mix", index: 0 },
     });
-    expect(unwrapped).toContain("profile([A, ab, B, bc, C, ca], \"o_mix\")");
+    expect(unwrapped).toContain('region([A, ab, B, bc, C, ca], "o_mix")');
     expect(unwrapped).not.toContain("fillet(A");
   });
 
   test("wraps a crossing vertex as fillet(lineIntersection(...), r)", () => {
-    const faceSrc = `import { point, line, profile } from "oblik";
+    const faceSrc = `import { point, line, region } from "oblik";
 import { defineScene } from "oblik";
 
 export default defineScene({
@@ -579,7 +597,7 @@ export default defineScene({
     const ground = line({ x: 0, y: 0 }, { x: 1, y: 0 }, "o_g");
     const wall = line({ x: 1, y: 0 }, { x: 1, y: 1 }, "o_w");
     const A = point(0, 1, "o_a");
-    const mix = profile([lineIntersection(ground, wall), ground, A, wall], "o_mix");
+    const mix = region([lineIntersection(ground, wall), ground, A, wall], "o_mix");
     return { mix };
   },
 });
@@ -593,7 +611,7 @@ export default defineScene({
   });
 
   test("patches a helper-scope profile array by id", () => {
-    const helperSrc = `import { point, segment, profile } from "oblik";
+    const helperSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 
 function plate() {
@@ -603,7 +621,7 @@ function plate() {
   const ab = segment(A, B, "o_ab");
   const bc = segment(B, C, "o_bc");
   const ca = segment(C, A, "o_ca");
-  return profile([A, ab, B, bc, C, ca], "o_p");
+  return region([A, ab, B, bc, C, ca], "o_p");
 }
 
 export default defineScene({
@@ -619,11 +637,11 @@ export default defineScene({
       args: [{ kind: "num", value: 0.1 }],
       patchVertex: { id: "o_p", index: 0 },
     });
-    expect(next).toContain("profile([fillet(A, 0.1), ab, B, bc, C, ca], \"o_p\")");
+    expect(next).toContain('region([fillet(A, 0.1), ab, B, bc, C, ca], "o_p")');
   });
 
   test("refuses a profile cycle that is not an array literal", () => {
-    const varSrc = `import { point, segment, profile } from "oblik";
+    const varSrc = `import { point, segment, region } from "oblik";
 import { defineScene } from "oblik";
 
 export default defineScene({
@@ -637,7 +655,7 @@ export default defineScene({
     const bc = segment(B, C, "o_bc");
     const ca = segment(C, A, "o_ca");
     const cycle = [A, ab, B, bc, C, ca];
-    const mix = profile(cycle, "o_mix");
+    const mix = region(cycle, "o_mix");
     return { mix };
   },
 });
@@ -765,7 +783,10 @@ export default defineScene({
   test("adds a scene local to build()'s return bag", () => {
     const next = exposeReturnBag(src, "build", "A");
     expect(next).toBe(src);
-    const withExtra = src.replace("    const A = point(0, 0, \"o_a\");", '    const A = point(0, 0, "o_a");\n    const extra = A;');
+    const withExtra = src.replace(
+      '    const A = point(0, 0, "o_a");',
+      '    const A = point(0, 0, "o_a");\n    const extra = A;',
+    );
     const bag = exposeReturnBag(withExtra, "build", "extra");
     expect(bag).toContain("return { A, extra };");
   });

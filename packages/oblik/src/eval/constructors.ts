@@ -13,14 +13,18 @@ import {
   signedDist as signedDistValue,
   alongValue,
   filletValue,
-  isFiniteProfile,
+  isFiniteCsg2,
+  isFinitePick,
   isFiniteRegion,
-  isProfile,
+  isRegion,
   leftOfValue,
-  nanRegion,
-  profileValue,
-  offsetValue,
+  nanCsg2,
+  nanPick,
   regionValue,
+  csg2Value,
+  wrapCsg,
+  offsetValue,
+  pickValue,
   rightOfValue,
   type Along,
   type Branch,
@@ -32,10 +36,10 @@ import {
   type LineLike,
   type ParallelLine,
   type Point,
-  type Profile,
-  type ProfileOpts,
   type Region,
   type RegionOpts,
+  type Csg2,
+  type Pick,
   type Segment,
   type Vec2,
 } from "../geom";
@@ -107,10 +111,12 @@ function isFiniteValue(v: { kind: string }): boolean {
         isFiniteVec(o.line.origin) && isFiniteVec(o.line.direction) && Number.isFinite(o.distance)
       );
     }
-    case "profile":
-      return isFiniteProfile(v as Profile);
     case "region":
       return isFiniteRegion(v as Region);
+    case "csg2":
+      return isFiniteCsg2(v as Csg2);
+    case "pick":
+      return isFinitePick(v as Pick);
     default:
       if (isGlider(v)) return isFiniteVec(v);
       return false;
@@ -239,22 +245,22 @@ export function fillet(at: Vec2, r: number): Fillet {
   return filletValue(at, r);
 }
 
-export const profile = mark(
-  (cycle: Circle | readonly unknown[], optsOrId?: ProfileOpts | string, id?: string): Profile => {
-    if (typeof optsOrId === "string") return traced(profileValue(cycle), optsOrId);
-    return traced(profileValue(cycle, optsOrId), id);
+export const region = mark(
+  (cycle: Circle | readonly unknown[], optsOrId?: RegionOpts | string, id?: string): Region => {
+    if (typeof optsOrId === "string") return traced(regionValue(cycle), optsOrId);
+    return traced(regionValue(cycle, optsOrId), id);
   },
   { dof: [] },
 );
 
 export const roundOffset = mark(
-  (face: Profile, distance: number, id?: string): Region => {
+  (face: Region, distance: number, id?: string): Csg2 => {
     const d = draftAt(id, 0, distance);
-    if (!face || typeof face !== "object" || !isProfile(face) || !isFiniteProfile(face)) {
-      return nanRegion();
+    if (!face || typeof face !== "object" || !isRegion(face) || !isFiniteRegion(face)) {
+      return nanCsg2();
     }
-    if (!Number.isFinite(d)) return nanRegion();
-    return traced(regionValue(offsetValue(face, d)), id);
+    if (!Number.isFinite(d)) return nanCsg2();
+    return traced(wrapCsg(offsetValue(face, d)), id);
   },
   { dof: [1] },
 );
@@ -269,10 +275,45 @@ export function rightOf(geom: LineLike): HalfPlane {
   return rightOfValue(geom);
 }
 
-export const region = mark(
-  (stock: unknown, opts?: RegionOpts | string, id?: string): Region => {
-    if (typeof opts === "string") return traced(regionValue(stock), opts);
-    return traced(regionValue(stock, opts), id);
+function trailingId(args: unknown[]): { rest: unknown[]; id?: string } {
+  if (args.length > 0 && typeof args[args.length - 1] === "string") {
+    return { rest: args.slice(0, -1), id: args[args.length - 1] as string };
+  }
+  return { rest: args };
+}
+
+function tracedCsg(op: "union" | "diff" | "intersect", operands: unknown[], id?: string): Csg2 {
+  return traced(csg2Value(op, operands), id);
+}
+
+export const diff = mark(
+  (stock: unknown, ...args: unknown[]): Csg2 => {
+    const { rest, id } = trailingId(args);
+    return tracedCsg("diff", [stock, ...rest], id);
+  },
+  { dof: [] },
+);
+
+export const union = mark(
+  (...args: unknown[]): Csg2 => {
+    const { rest, id } = trailingId(args);
+    return tracedCsg("union", rest, id);
+  },
+  { dof: [] },
+);
+
+export const intersect = mark(
+  (...args: unknown[]): Csg2 => {
+    const { rest, id } = trailingId(args);
+    return tracedCsg("intersect", rest, id);
+  },
+  { dof: [] },
+);
+
+export const pick = mark(
+  (of: unknown, at: Vec2, id?: string): Pick => {
+    if (!at || typeof at !== "object") return traced(nanPick(), id);
+    return traced(pickValue(of, at), id);
   },
   { dof: [] },
 );
@@ -362,9 +403,12 @@ export const constructors = {
   circleLineIntersection,
   circleCircleIntersection,
   slider,
-  profile,
-  roundOffset,
   region,
+  roundOffset,
+  diff,
+  union,
+  intersect,
+  pick,
   style,
   paint,
 } as const;

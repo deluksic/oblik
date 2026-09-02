@@ -3,7 +3,7 @@ import {
   circle,
   point,
   pointOnCircle,
-  profileValue,
+  regionValue,
   roundOffset,
   segment,
   slider,
@@ -25,9 +25,9 @@ export default defineScene({
     const ob = segment(O, B, "o_pie_ob");
     const oc = segment(O, C, "o_pie_oc");
     const gap = slider(0.12, { min: 0, max: 0.4, step: 0.01 }, "o_pie_g");
-    const one = roundOffset(profileValue([O, oa, A, along(reach, 1), B, ob]), -gap, "o_pie_1");
-    const two = roundOffset(profileValue([O, ob, B, along(reach, 1), C, oc]), -gap, "o_pie_2");
-    const three = roundOffset(profileValue([O, oc, C, along(reach, 1), A, oa]), -gap, "o_pie_3");
+    const one = roundOffset(regionValue([O, oa, A, along(reach, 1), B, ob]), -gap, "o_pie_1");
+    const two = roundOffset(regionValue([O, ob, B, along(reach, 1), C, oc]), -gap, "o_pie_2");
+    const three = roundOffset(regionValue([O, oc, C, along(reach, 1), A, oa]), -gap, "o_pie_3");
     return { O, reach, A, B, C, oa, ob, oc, gap, one, two, three };
   },
 });

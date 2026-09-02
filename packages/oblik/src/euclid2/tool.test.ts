@@ -1,11 +1,23 @@
 import { describe, expect, test } from "vitest";
 
-import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, hoverTool, previewOf, startTool, tabTool, toolChrome, typeTool } from "./tool";
-import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
-import type { PlacePoint } from "./place";
 import type { TraceNode } from "../eval/context";
-import { roundOffsetValue } from "../geom/offset";
-import { regionValue } from "../geom/region";
+import { offsetValue, wrapCsg } from "../geom/csg2";
+import type { PlacePoint } from "./place";
+import {
+  clickTool,
+  commitTool,
+  enrichHit,
+  exprOfPlace,
+  filterTools,
+  ghostOf,
+  hoverTool,
+  previewOf,
+  startTool,
+  tabTool,
+  toolChrome,
+  typeTool,
+} from "./tool";
+import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -60,12 +72,28 @@ describe("enrichHit", () => {
       stack: [],
     } as TraceNode;
     const face = {
-      kind: "profile" as const,
+      kind: "region" as const,
       outer: [
-        { a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } },
-        { a: { x: 1, y: 0 }, b: { x: 1, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } } },
-        { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
-        { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
+        {
+          a: { x: 0, y: 0 },
+          b: { x: 1, y: 0 },
+          carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
+        },
+        {
+          a: { x: 1, y: 0 },
+          b: { x: 1, y: 1 },
+          carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } },
+        },
+        {
+          a: { x: 1, y: 1 },
+          b: { x: 0, y: 1 },
+          carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } },
+        },
+        {
+          a: { x: 0, y: 1 },
+          b: { x: 0, y: 0 },
+          carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } },
+        },
       ],
       holes: [],
     };
@@ -88,10 +116,22 @@ describe("enrichHit", () => {
       value: -0.12,
     });
     expect(hoverTool(session, next, [gap])).toBe("o_pie_g");
-    expect(clickTool(session, next, { used: ["one", "gap"], points: {}, carriers: {}, circles: {}, profiles: {}, lengths: { gap: 0.12 } })).toEqual({
+    expect(
+      clickTool(session, next, {
+        used: ["one", "gap"],
+        points: {},
+        carriers: {},
+        circles: {},
+        profiles: {},
+        lengths: { gap: 0.12 },
+      }),
+    ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "one" }, { kind: "neg", expr: { kind: "ref", name: "gap" } }],
+        args: [
+          { kind: "ref", name: "one" },
+          { kind: "neg", expr: { kind: "ref", name: "gap" } },
+        ],
       },
     });
   });
@@ -272,7 +312,10 @@ describe("clickTool", () => {
     expect(done).toEqual({
       insert: {
         from: "parallelLine",
-        args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 1.76 }],
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "num", value: 1.76 },
+        ],
       },
     });
   });
@@ -297,7 +340,14 @@ describe("clickTool", () => {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "call", name: "signedDist", args: [{ kind: "ref", name: "P" }, { kind: "ref", name: "ground" }] },
+          {
+            kind: "call",
+            name: "signedDist",
+            args: [
+              { kind: "ref", name: "P" },
+              { kind: "ref", name: "ground" },
+            ],
+          },
         ],
       },
     });
@@ -310,7 +360,10 @@ describe("clickTool", () => {
     expect(done).toMatchObject({
       insert: {
         from: "segment",
-        args: [{ kind: "ref", name: "A" }, { kind: "call", name: "point" }],
+        args: [
+          { kind: "ref", name: "A" },
+          { kind: "call", name: "point" },
+        ],
       },
     });
   });
@@ -331,15 +384,27 @@ describe("clickTool", () => {
       used: ["ground", "reach"],
       points: {},
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
-      circles: {}, profiles: {},
+      circles: {},
+      profiles: {},
       lengths: { reach: 1.25 },
     };
     expect(
-      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 1.25 } }, scope),
+      clickTool(
+        mid.session,
+        {
+          world: { x: 0, y: 0 },
+          point: free(0, 0),
+          length: { expr: { kind: "ref", name: "reach" }, value: 1.25 },
+        },
+        scope,
+      ),
     ).toEqual({
       insert: {
         from: "parallelLine",
-        args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "reach" }],
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "ref", name: "reach" },
+        ],
       },
     });
   });
@@ -351,11 +416,20 @@ describe("clickTool", () => {
       used: ["A", "reach"],
       points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       carriers: {},
-      circles: {}, profiles: {},
+      circles: {},
+      profiles: {},
       lengths: { reach: 2.5 },
     };
     expect(
-      clickTool(mid.session, { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 2.5 } }, scope),
+      clickTool(
+        mid.session,
+        {
+          world: { x: 0, y: 0 },
+          point: free(0, 0),
+          length: { expr: { kind: "ref", name: "reach" }, value: 2.5 },
+        },
+        scope,
+      ),
     ).toEqual({
       insert: {
         from: "circle",
@@ -374,7 +448,12 @@ describe("clickTool", () => {
       used: ["A", "reach"],
       points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
       carriers: {},
-      circles: { reach: { expr: { kind: "ref", name: "reach" }, geom: { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2.5 } } },
+      circles: {
+        reach: {
+          expr: { kind: "ref", name: "reach" },
+          geom: { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2.5 },
+        },
+      },
       lengths: {},
       byId: {},
     };
@@ -384,7 +463,10 @@ describe("clickTool", () => {
         {
           world: { x: 2.5, y: 0 },
           point: free(2.5, 0),
-          length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
+          length: {
+            expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
+            value: 2.5,
+          },
         },
         scope,
       ),
@@ -406,14 +488,24 @@ describe("clickTool", () => {
       clickTool(mid.session, {
         world: namedP.at,
         point: namedP,
-        length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
+        length: {
+          expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
+          value: 2.5,
+        },
       }),
     ).toEqual({
       insert: {
         from: "circle",
         args: [
           { kind: "ref", name: "A" },
-          { kind: "call", name: "dist", args: [{ kind: "ref", name: "A" }, { kind: "ref", name: "P" }] },
+          {
+            kind: "call",
+            name: "dist",
+            args: [
+              { kind: "ref", name: "A" },
+              { kind: "ref", name: "P" },
+            ],
+          },
         ],
       },
     });
@@ -426,7 +518,10 @@ describe("clickTool", () => {
       clickTool(mid.session, {
         world: ll.at,
         point: ll,
-        length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2.5 },
+        length: {
+          expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
+          value: 2.5,
+        },
       }),
     ).toMatchObject({
       insert: {
@@ -464,7 +559,8 @@ describe("clickTool", () => {
         ground: { expr: { kind: "ref", name: "ground" }, geom: ground },
         shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
       },
-      circles: {}, profiles: {},
+      circles: {},
+      profiles: {},
       lengths: {},
       byId: {},
     };
@@ -474,7 +570,10 @@ describe("clickTool", () => {
         {
           world: { x: 0, y: 1.76 },
           point: free(0, 1.76),
-          length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
+          length: {
+            expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+            value: 1.76,
+          },
         },
         scope,
       ),
@@ -507,14 +606,24 @@ describe("clickTool", () => {
       clickTool(session, {
         world: namedP.at,
         point: namedP,
-        length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
+        length: {
+          expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+          value: 1.76,
+        },
       }),
     ).toEqual({
       insert: {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "call", name: "signedDist", args: [{ kind: "ref", name: "P" }, { kind: "ref", name: "ground" }] },
+          {
+            kind: "call",
+            name: "signedDist",
+            args: [
+              { kind: "ref", name: "P" },
+              { kind: "ref", name: "ground" },
+            ],
+          },
         ],
       },
     });
@@ -539,7 +648,8 @@ describe("clickTool", () => {
         ground: { expr: { kind: "ref", name: "ground" }, geom: ground },
         shelf: { expr: { kind: "ref", name: "shelf" }, geom: shelf },
       },
-      circles: {}, profiles: {},
+      circles: {},
+      profiles: {},
       lengths: {},
       byId: {},
     };
@@ -555,36 +665,61 @@ describe("clickTool", () => {
         from: "parallelLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "neg", expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" } },
+          {
+            kind: "neg",
+            expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+          },
         ],
       },
     });
   });
 
   test("point on a line inserts pointOnLine", () => {
-    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const onGround: PlacePoint = {
+      kind: "pointOnLine",
+      bind: "ground",
+      s: 2.2,
+      at: { x: 2.2, y: 0 },
+    };
     const r = clickTool(startTool("point"), { world: onGround.at, point: onGround });
     expect(r).toEqual({
       insert: {
         from: "pointOnLine",
-        args: [{ kind: "ref", name: "ground" }, { kind: "num", value: 2.2 }],
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "num", value: 2.2 },
+        ],
       },
     });
   });
 
   test("point on a segment inserts pointOnSegment", () => {
-    const onSpan: PlacePoint = { kind: "pointOnSegment", bind: "span", t: 0.75, at: { x: 3, y: 0 } };
+    const onSpan: PlacePoint = {
+      kind: "pointOnSegment",
+      bind: "span",
+      t: 0.75,
+      at: { x: 3, y: 0 },
+    };
     const r = clickTool(startTool("point"), { world: onSpan.at, point: onSpan });
     expect(r).toEqual({
       insert: {
         from: "pointOnSegment",
-        args: [{ kind: "ref", name: "span" }, { kind: "num", value: 0.75 }],
+        args: [
+          { kind: "ref", name: "span" },
+          { kind: "num", value: 0.75 },
+        ],
       },
     });
   });
 
   test("point on a circle inserts pointOnCircle", () => {
-    const onReach: PlacePoint = { kind: "pointOnCircle", bind: "reach", ux: 0, uy: 1, at: { x: 0, y: 2 } };
+    const onReach: PlacePoint = {
+      kind: "pointOnCircle",
+      bind: "reach",
+      ux: 0,
+      uy: 1,
+      at: { x: 0, y: 2 },
+    };
     const r = clickTool(startTool("point"), { world: onReach.at, point: onReach });
     expect(r).toEqual({
       insert: {
@@ -599,13 +734,21 @@ describe("clickTool", () => {
   });
 
   test("line first click on ink stores a free point, not a glider", () => {
-    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const onGround: PlacePoint = {
+      kind: "pointOnLine",
+      bind: "ground",
+      s: 2.2,
+      at: { x: 2.2, y: 0 },
+    };
     const mid = clickTool(startTool("line"), { world: onGround.at, point: onGround });
     if (!("session" in mid) || mid.session.verb !== "line") throw new Error("expected session");
     expect(mid.session.a?.expr).toEqual({
       kind: "call",
       name: "point",
-      args: [{ kind: "num", value: 2.2 }, { kind: "num", value: 0 }],
+      args: [
+        { kind: "num", value: 2.2 },
+        { kind: "num", value: 0 },
+      ],
     });
     const done = clickTool(mid.session, { world: namedA.at, point: namedA });
     expect(done).toMatchObject({
@@ -639,7 +782,14 @@ describe("clickTool", () => {
         from: "perpendicularLine",
         args: [
           { kind: "ref", name: "ground" },
-          { kind: "call", name: "point", args: [{ kind: "num", value: 0 }, { kind: "num", value: 2 }] },
+          {
+            kind: "call",
+            name: "point",
+            args: [
+              { kind: "num", value: 0 },
+              { kind: "num", value: 2 },
+            ],
+          },
         ],
       },
     });
@@ -657,7 +807,12 @@ describe("clickTool", () => {
       carrier: { bind: "ground", geom: ground },
     });
     if (!("session" in mid)) throw new Error("expected session");
-    const onShelf: PlacePoint = { kind: "pointOnLine", bind: "shelf", s: 1.5, at: { x: 1.5, y: 1.8 } };
+    const onShelf: PlacePoint = {
+      kind: "pointOnLine",
+      bind: "shelf",
+      s: 1.5,
+      at: { x: 1.5, y: 1.8 },
+    };
     const done = clickTool(mid.session, { world: onShelf.at, point: onShelf });
     expect(done).toEqual({
       insert: {
@@ -667,7 +822,10 @@ describe("clickTool", () => {
           {
             kind: "call",
             name: "point",
-            args: [{ kind: "num", value: 1.5 }, { kind: "num", value: 1.8 }],
+            args: [
+              { kind: "num", value: 1.5 },
+              { kind: "num", value: 1.8 },
+            ],
           },
         ],
       },
@@ -692,7 +850,10 @@ describe("clickTool", () => {
     const done = clickTool(session, {
       world: onShelf.at,
       point: onShelf,
-      length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 1.76 },
+      length: {
+        expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+        value: 1.76,
+      },
     });
     expect(done).toEqual({
       insert: {
@@ -715,7 +876,8 @@ describe("clickTool", () => {
       used: ["ground", "P"],
       points: { P: { expr: { kind: "ref", name: "P" }, at: { x: 0, y: 2 } } },
       carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
-      circles: {}, profiles: {},
+      circles: {},
+      profiles: {},
       lengths: {},
       byId: {},
     };
@@ -729,7 +891,10 @@ describe("clickTool", () => {
     expect(commitTool(typed, null, scope)).toEqual({
       insert: {
         from: "perpendicularLine",
-        args: [{ kind: "ref", name: "ground" }, { kind: "ref", name: "P" }],
+        args: [
+          { kind: "ref", name: "ground" },
+          { kind: "ref", name: "P" },
+        ],
       },
     });
   });
@@ -737,15 +902,24 @@ describe("clickTool", () => {
 
 describe("ghostOf", () => {
   test("rubber-bands a free point under the cursor", () => {
-    expect(ghostOf(startTool("point"), { world: { x: 1.2, y: -3 }, point: free(1.2, -3) })).toEqual({
-      kind: "point",
-      at: { x: 1.2, y: -3 },
-    });
+    expect(ghostOf(startTool("point"), { world: { x: 1.2, y: -3 }, point: free(1.2, -3) })).toEqual(
+      {
+        kind: "point",
+        at: { x: 1.2, y: -3 },
+      },
+    );
   });
 
   test("rubber-bands a circle after the center", () => {
     const g = ghostOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      {
+        verb: "circle",
+        focus: "typed",
+        typed: "",
+        name: "",
+        centerRef: "",
+        center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } },
+      },
       { world: { x: 0, y: 2 }, point: free(0, 2) },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2 });
@@ -753,9 +927,27 @@ describe("ghostOf", () => {
 
   test("previews a slider radius after the center", () => {
     const g = ghostOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 2.5 } },
-      { used: ["A", "reach"], points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } }, carriers: {}, circles: {}, profiles: {}, lengths: { reach: 2.5 } },
+      {
+        verb: "circle",
+        focus: "typed",
+        typed: "",
+        name: "",
+        centerRef: "",
+        center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } },
+      },
+      {
+        world: { x: 0, y: 0 },
+        point: free(0, 0),
+        length: { expr: { kind: "ref", name: "reach" }, value: 2.5 },
+      },
+      {
+        used: ["A", "reach"],
+        points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+        carriers: {},
+        circles: {},
+        profiles: {},
+        lengths: { reach: 2.5 },
+      },
     );
     expect(g).toEqual({ kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 });
   });
@@ -767,7 +959,14 @@ describe("ghostOf", () => {
       direction: { x: 1, y: 0 },
     };
     const g = ghostOf(
-      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      {
+        verb: "parallelLine",
+        focus: "typed",
+        typed: "",
+        name: "",
+        carrierRef: "",
+        carrier: { expr: { kind: "ref", name: "ground" }, geom: ground },
+      },
       { world: { x: 0, y: 1.5 }, point: free(0, 1.5) },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.5 });
@@ -780,9 +979,27 @@ describe("ghostOf", () => {
       direction: { x: 1, y: 0 },
     };
     const g = ghostOf(
-      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "reach" }, value: 1.25 } },
-      { used: ["ground", "reach"], points: {}, carriers: {}, circles: {}, profiles: {}, lengths: { reach: 1.25 } },
+      {
+        verb: "parallelLine",
+        focus: "typed",
+        typed: "",
+        name: "",
+        carrierRef: "",
+        carrier: { expr: { kind: "ref", name: "ground" }, geom: ground },
+      },
+      {
+        world: { x: 0, y: 0 },
+        point: free(0, 0),
+        length: { expr: { kind: "ref", name: "reach" }, value: 1.25 },
+      },
+      {
+        used: ["ground", "reach"],
+        points: {},
+        carriers: {},
+        circles: {},
+        profiles: {},
+        lengths: { reach: 1.25 },
+      },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 1.25 });
   });
@@ -808,7 +1025,14 @@ describe("ghostOf", () => {
       direction: { x: 1, y: 0 },
     };
     const g = ghostOf(
-      { verb: "parallelLine", focus: "typed", typed: "", name: "", carrierRef: "", carrier: { expr: { kind: "ref", name: "ground" }, geom: ground } },
+      {
+        verb: "parallelLine",
+        focus: "typed",
+        typed: "",
+        name: "",
+        carrierRef: "",
+        carrier: { expr: { kind: "ref", name: "ground" }, geom: ground },
+      },
       { world: { x: 9, y: 0.2 }, point: namedP },
     );
     expect(g).toEqual({ kind: "parallelLine", geom: ground, distance: 0 });
@@ -845,14 +1069,26 @@ describe("previewOf", () => {
   });
 
   test("shows a glider constructor while hovering a line", () => {
-    const onGround: PlacePoint = { kind: "pointOnLine", bind: "ground", s: 2.2, at: { x: 2.2, y: 0 } };
+    const onGround: PlacePoint = {
+      kind: "pointOnLine",
+      bind: "ground",
+      s: 2.2,
+      at: { x: 2.2, y: 0 },
+    };
     const p = previewOf(startTool("point"), { world: onGround.at, point: onGround });
     expect(p.line).toBe("const g = pointOnLine(ground, 2.2)");
   });
 
   test("shows dist() when a circle radius hovers a point", () => {
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
+      {
+        verb: "circle",
+        focus: "typed",
+        typed: "",
+        name: "",
+        centerRef: "",
+        center: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } },
+      },
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const c = circle(A, dist(A, P))");
@@ -868,7 +1104,14 @@ describe("previewOf", () => {
       ],
     };
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: center, at: { x: 1, y: 2 } } },
+      {
+        verb: "circle",
+        focus: "typed",
+        typed: "",
+        name: "",
+        centerRef: "",
+        center: { expr: center, at: { x: 1, y: 2 } },
+      },
       { world: namedP.at, point: namedP },
     );
     expect(p.line).toBe("const p = point(1, 2)\nconst c = circle(p, dist(p, P))");
@@ -884,15 +1127,26 @@ describe("previewOf", () => {
       { verb: "circle", focus: "name", typed: "", name: "reach", centerRef: "" },
       { world: ll.at, point: ll },
     );
-    expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst reach = circle(x, radius)");
+    expect(p.line).toBe(
+      "const x = lineIntersection(ground, wall)\nconst reach = circle(x, radius)",
+    );
   });
 
   test("hoists a stored crossing center when pinning dist()", () => {
     const p = previewOf(
-      { verb: "circle", focus: "typed", typed: "", name: "", centerRef: "", center: { expr: exprOfPlace(ll), at: ll.at } },
+      {
+        verb: "circle",
+        focus: "typed",
+        typed: "",
+        name: "",
+        centerRef: "",
+        center: { expr: exprOfPlace(ll), at: ll.at },
+      },
       { world: namedP.at, point: namedP },
     );
-    expect(p.line).toBe("const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))");
+    expect(p.line).toBe(
+      "const x = lineIntersection(ground, wall)\nconst c = circle(x, dist(x, P))",
+    );
   });
   test("exposes the focused token so the prompt can caret into the source", () => {
     const x = previewOf(startTool("point"));
@@ -938,7 +1192,11 @@ describe("filterTools", () => {
   });
 
   test("title hits beat description hits", () => {
-    expect(filterTools("line").map((t) => t.id)).toEqual(["line", "parallelLine", "perpendicularLine"]);
+    expect(filterTools("line").map((t) => t.id)).toEqual([
+      "line",
+      "parallelLine",
+      "perpendicularLine",
+    ]);
   });
 
   test("falls back to aliases when the title does not match", () => {
@@ -958,7 +1216,10 @@ describe("slider tool", () => {
     expect(done).toEqual({
       insert: {
         from: "slider",
-        args: [{ kind: "num", value: 5 }, { kind: "props", props: {} }],
+        args: [
+          { kind: "num", value: 5 },
+          { kind: "props", props: {} },
+        ],
       },
     });
   });
@@ -970,7 +1231,10 @@ describe("slider tool", () => {
     expect(done).toEqual({
       insert: {
         from: "slider",
-        args: [{ kind: "num", value: 2.2 }, { kind: "props", props: {} }],
+        args: [
+          { kind: "num", value: 2.2 },
+          { kind: "props", props: {} },
+        ],
       },
     });
   });
@@ -1021,7 +1285,7 @@ describe("profile tool", () => {
     const done = clickTool(c2.session, { world: { x: 2, y: 0 }, point: namedA });
     expect(done).toEqual({
       insert: {
-        from: "profile",
+        from: "region",
         args: [
           {
             kind: "array",
@@ -1078,7 +1342,7 @@ describe("profile tool", () => {
     const done = clickTool(c2.session, { world: { x: 2, y: 0 }, point: ll });
     expect(done).toMatchObject({
       insert: {
-        from: "profile",
+        from: "region",
         args: [
           {
             kind: "array",
@@ -1104,10 +1368,16 @@ describe("profile tool", () => {
   test("point slot accepts circle-line and circle-circle crossings", () => {
     const clHit = clickTool(startTool("profile"), { world: cl.at, point: cl });
     if (!("session" in clHit) || clHit.session.verb !== "profile") throw new Error("expected cl");
-    expect(clHit.session.vertices[0]?.expr).toMatchObject({ kind: "call", name: "circleLineIntersection" });
+    expect(clHit.session.vertices[0]?.expr).toMatchObject({
+      kind: "call",
+      name: "circleLineIntersection",
+    });
     const ccHit = clickTool(startTool("profile"), { world: cc.at, point: cc });
     if (!("session" in ccHit) || ccHit.session.verb !== "profile") throw new Error("expected cc");
-    expect(ccHit.session.vertices[0]?.expr).toMatchObject({ kind: "call", name: "circleCircleIntersection" });
+    expect(ccHit.session.vertices[0]?.expr).toMatchObject({
+      kind: "call",
+      name: "circleCircleIntersection",
+    });
   });
 
   test("Tab flips along k on the last circle", () => {
@@ -1194,7 +1464,9 @@ describe("profile tool", () => {
     const a = clickTool(startTool("profile"), { world: namedC0.at, point: namedC0 });
     if (!("session" in a) || a.session.verb !== "profile") throw new Error("expected c0");
     expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera)!]).toEqual(["bottom"]);
-    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual(["bottom"]);
+    expect([...profileEligibleCarriers(a.session, ctx.trace, ctx.camera, filter)!]).toEqual([
+      "bottom",
+    ]);
     const miss = enrichHit(a.session, { world: { x: 2, y: 0.02 }, point: free(2, 0.02) }, ctx);
     expect(miss.carrier).toBeUndefined();
     const hit = enrichHit(a.session, { world: { x: 12, y: 0.02 }, point: free(12, 0.02) }, ctx);
@@ -1217,7 +1489,7 @@ describe("profile tool", () => {
       carrier: { bind: "axis", geom: xAxis },
     });
     expect(g).toMatchObject({
-      kind: "profile",
+      kind: "region",
       arrow: { at: { x: 0, y: 0 }, tx: 1, ty: 0 },
     });
   });
@@ -1225,12 +1497,28 @@ describe("profile tool", () => {
 
 describe("roundOffset tool", () => {
   const square = {
-    kind: "profile" as const,
+    kind: "region" as const,
     outer: [
-      { a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } },
-      { a: { x: 1, y: 0 }, b: { x: 1, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } } },
-      { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
-      { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
+      {
+        a: { x: 0, y: 0 },
+        b: { x: 1, y: 0 },
+        carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
+      },
+      {
+        a: { x: 1, y: 0 },
+        b: { x: 1, y: 1 },
+        carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } },
+      },
+      {
+        a: { x: 1, y: 1 },
+        b: { x: 0, y: 1 },
+        carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } },
+      },
+      {
+        a: { x: 0, y: 1 },
+        b: { x: 0, y: 0 },
+        carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } },
+      },
     ],
     holes: [],
   };
@@ -1254,13 +1542,20 @@ describe("roundOffset tool", () => {
     expect(
       clickTool(
         mid.session,
-        { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "n" }, value: 0.2 } },
+        {
+          world: { x: 0, y: 0 },
+          point: free(0, 0),
+          length: { expr: { kind: "ref", name: "n" }, value: 0.2 },
+        },
         scope,
       ),
     ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "ref", name: "n" }],
+        args: [
+          { kind: "ref", name: "slice" },
+          { kind: "ref", name: "n" },
+        ],
       },
     });
   });
@@ -1283,14 +1578,20 @@ describe("roundOffset tool", () => {
         {
           world: { x: 0, y: 0 },
           point: free(0, 0),
-          length: { expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }, value: 2 },
+          length: {
+            expr: { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
+            value: 2,
+          },
         },
         scope,
       ),
     ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" }],
+        args: [
+          { kind: "ref", name: "slice" },
+          { kind: "member", object: { kind: "ref", name: "reach" }, field: "radius" },
+        ],
       },
     });
     expect(
@@ -1299,14 +1600,20 @@ describe("roundOffset tool", () => {
         {
           world: { x: 0, y: 0 },
           point: free(0, 0),
-          length: { expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }, value: 0.2 },
+          length: {
+            expr: { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+            value: 0.2,
+          },
         },
         scope,
       ),
     ).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" }],
+        args: [
+          { kind: "ref", name: "slice" },
+          { kind: "member", object: { kind: "ref", name: "shelf" }, field: "distance" },
+        ],
       },
     });
   });
@@ -1317,7 +1624,10 @@ describe("roundOffset tool", () => {
     expect(commitTool(typeTool(mid.session, "0.2"))).toEqual({
       insert: {
         from: "roundOffset",
-        args: [{ kind: "ref", name: "slice" }, { kind: "num", value: 0.2 }],
+        args: [
+          { kind: "ref", name: "slice" },
+          { kind: "num", value: 0.2 },
+        ],
       },
     });
   });
@@ -1327,7 +1637,11 @@ describe("roundOffset tool", () => {
     if (!("session" in mid)) throw new Error("expected session");
     const g = ghostOf(
       mid.session,
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "n" }, value: 0.2 } },
+      {
+        world: { x: 0, y: 0 },
+        point: free(0, 0),
+        length: { expr: { kind: "ref", name: "n" }, value: 0.2 },
+      },
       {
         used: ["slice", "n"],
         points: {},
@@ -1344,12 +1658,28 @@ describe("roundOffset tool", () => {
 
 describe("fillet tool", () => {
   const square = {
-    kind: "profile" as const,
+    kind: "region" as const,
     outer: [
-      { a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } },
-      { a: { x: 1, y: 0 }, b: { x: 1, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } } },
-      { a: { x: 1, y: 1 }, b: { x: 0, y: 1 }, carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } } },
-      { a: { x: 0, y: 1 }, b: { x: 0, y: 0 }, carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } } },
+      {
+        a: { x: 0, y: 0 },
+        b: { x: 1, y: 0 },
+        carrier: { kind: "segment" as const, a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
+      },
+      {
+        a: { x: 1, y: 0 },
+        b: { x: 1, y: 1 },
+        carrier: { kind: "segment" as const, a: { x: 1, y: 0 }, b: { x: 1, y: 1 } },
+      },
+      {
+        a: { x: 1, y: 1 },
+        b: { x: 0, y: 1 },
+        carrier: { kind: "segment" as const, a: { x: 1, y: 1 }, b: { x: 0, y: 1 } },
+      },
+      {
+        a: { x: 0, y: 1 },
+        b: { x: 0, y: 0 },
+        carrier: { kind: "segment" as const, a: { x: 0, y: 1 }, b: { x: 0, y: 0 } },
+      },
     ],
     holes: [],
   };
@@ -1376,7 +1706,11 @@ describe("fillet tool", () => {
     expect(
       clickTool(
         mid.session,
-        { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "r" }, value: 0.35 } },
+        {
+          world: { x: 0, y: 0 },
+          point: free(0, 0),
+          length: { expr: { kind: "ref", name: "r" }, value: 0.35 },
+        },
         scope,
       ),
     ).toEqual({
@@ -1399,7 +1733,7 @@ describe("fillet tool", () => {
       },
     });
     const preview = previewOf(mid.session, null, scope);
-    expect(preview.line).toContain("profile([");
+    expect(preview.line).toContain("region([");
     expect(preview.line).toContain("fillet(");
     expect(preview.line).not.toMatch(/^const /);
   });
@@ -1410,7 +1744,7 @@ describe("fillet tool", () => {
         {
           id: "o_fil_mix",
           occ: 0,
-          kind: "profile",
+          kind: "region",
           bind: "mix",
           value: square,
           editable: false,
@@ -1421,7 +1755,11 @@ describe("fillet tool", () => {
       size: { w: 800, h: 600 },
       screen: { x: 10, y: 10 },
     };
-    const hit = enrichHit(startTool("fillet"), { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) }, ctx);
+    const hit = enrichHit(
+      startTool("fillet"),
+      { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) },
+      ctx,
+    );
     expect(hit.profile?.id).toBe("o_fil_mix");
     expect(hit.corner?.index).toBe(0);
     expect(hit.corner?.at.x).toBeCloseTo(0);
@@ -1430,19 +1768,35 @@ describe("fillet tool", () => {
 
   test("fillet profile pick follows the focused invocation, not occ 0", () => {
     const square1 = {
-      kind: "profile" as const,
+      kind: "region" as const,
       outer: [
-        { a: { x: 10, y: 0 }, b: { x: 11, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 11, y: 0 } } },
-        { a: { x: 11, y: 0 }, b: { x: 11, y: 1 }, carrier: { kind: "segment" as const, a: { x: 11, y: 0 }, b: { x: 11, y: 1 } } },
-        { a: { x: 11, y: 1 }, b: { x: 10, y: 1 }, carrier: { kind: "segment" as const, a: { x: 11, y: 1 }, b: { x: 10, y: 1 } } },
-        { a: { x: 10, y: 1 }, b: { x: 10, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 1 }, b: { x: 10, y: 0 } } },
+        {
+          a: { x: 10, y: 0 },
+          b: { x: 11, y: 0 },
+          carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 11, y: 0 } },
+        },
+        {
+          a: { x: 11, y: 0 },
+          b: { x: 11, y: 1 },
+          carrier: { kind: "segment" as const, a: { x: 11, y: 0 }, b: { x: 11, y: 1 } },
+        },
+        {
+          a: { x: 11, y: 1 },
+          b: { x: 10, y: 1 },
+          carrier: { kind: "segment" as const, a: { x: 11, y: 1 }, b: { x: 10, y: 1 } },
+        },
+        {
+          a: { x: 10, y: 1 },
+          b: { x: 10, y: 0 },
+          carrier: { kind: "segment" as const, a: { x: 10, y: 1 }, b: { x: 10, y: 0 } },
+        },
       ],
       holes: [],
     };
     const mix0 = {
       id: "o_pr",
       occ: 0,
-      kind: "profile",
+      kind: "region",
       bind: "mix",
       value: square,
       editable: false,
@@ -1456,10 +1810,18 @@ describe("fillet tool", () => {
       keys: new Set(["o_pr:1"]),
       print: (n: TraceNode) => n.bind,
     };
-    const miss = enrichHit(startTool("fillet"), { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) }, ctx);
+    const miss = enrichHit(
+      startTool("fillet"),
+      { world: { x: 0.02, y: 0.01 }, point: free(0.02, 0.01) },
+      ctx,
+    );
     expect(miss.profile).toBeUndefined();
     expect(miss.corner).toBeUndefined();
-    const hit = enrichHit(startTool("fillet"), { world: { x: 10.02, y: 0.01 }, point: free(10.02, 0.01) }, ctx);
+    const hit = enrichHit(
+      startTool("fillet"),
+      { world: { x: 10.02, y: 0.01 }, point: free(10.02, 0.01) },
+      ctx,
+    );
     expect(hit.profile?.id).toBe("o_pr");
     expect(hit.profile?.bind).toBe("mix");
     expect(hit.corner?.index).toBe(0);
@@ -1487,7 +1849,11 @@ describe("fillet tool", () => {
   });
 
   test("ghosts the closest corner, not the whole face", () => {
-    const g = ghostOf(startTool("fillet"), { ...faceHit, corner: { index: 2, at: { x: 1, y: 1 } } }, scope);
+    const g = ghostOf(
+      startTool("fillet"),
+      { ...faceHit, corner: { index: 2, at: { x: 1, y: 1 } } },
+      scope,
+    );
     expect(g).toEqual({ kind: "corner", at: { x: 1, y: 1 } });
   });
 
@@ -1496,7 +1862,11 @@ describe("fillet tool", () => {
     if (!("session" in mid)) throw new Error("expected session");
     const g = ghostOf(
       mid.session,
-      { world: { x: 0, y: 0 }, point: free(0, 0), length: { expr: { kind: "ref", name: "r" }, value: 0.2 } },
+      {
+        world: { x: 0, y: 0 },
+        point: free(0, 0),
+        length: { expr: { kind: "ref", name: "r" }, value: 0.2 },
+      },
       scope,
     );
     expect(g?.kind).toBe("profile");
@@ -1506,21 +1876,24 @@ describe("fillet tool", () => {
   });
 
   test("fillet does not pick a roundOffset region", () => {
-    const walks = roundOffsetValue(square, -0.2);
-    expect(walks[0]).toBeTruthy();
     const inset = {
       id: "o_fil_inset",
       occ: 0,
-      kind: "region",
+      kind: "csg2",
       bind: "inset",
-      value: regionValue(walks[0]),
+      value: wrapCsg(offsetValue(square, -0.2)),
       editable: false,
       stack: [],
     } as TraceNode;
     const hit = enrichHit(
       startTool("fillet"),
       { world: { x: 0.5, y: 0.5 }, point: free(0.5, 0.5) },
-      { trace: [inset], camera: { x: 0, y: 0, scale: 48 }, size: { w: 800, h: 600 }, screen: { x: 10, y: 10 } },
+      {
+        trace: [inset],
+        camera: { x: 0, y: 0, scale: 48 },
+        size: { w: 800, h: 600 },
+        screen: { x: 10, y: 10 },
+      },
     );
     expect(hit.profile).toBeUndefined();
     expect(hit.corner).toBeUndefined();

@@ -9,18 +9,18 @@ import {
 import {
   alongK,
   circleDelta,
-  distToProfileBoundary,
+  distToRegionBoundary,
   isCircleWalk,
-  isFiniteProfile,
-  nanProfile,
-  profileTopologyOk,
+  isFiniteRegion,
+  nanRegion,
+  regionTopologyOk,
   projectOnCircle,
   projectOnLine,
   tessellateWalk,
   walkContains,
   walkEdges,
 } from "./profile";
-import type { Branch, Circle, ClosedWalk, LineLike, Profile, ProfileEdge } from "./types";
+import type { Branch, Circle, LineLike, Loop, LoopEdge, Region } from "./types";
 import {
   add,
   cross2,
@@ -40,7 +40,7 @@ const EPS = 1e-9;
 /** World-space hair for ray inclusion; same order as the fillet radius compare. */
 const HAIR = 1e-6;
 
-function cloneEdge(e: ProfileEdge): ProfileEdge {
+function cloneEdge(e: LoopEdge): LoopEdge {
   return {
     a: { x: e.a.x, y: e.a.y },
     b: { x: e.b.x, y: e.b.y },
@@ -49,16 +49,16 @@ function cloneEdge(e: ProfileEdge): ProfileEdge {
   };
 }
 
-function cloneWalk(w: ClosedWalk): ClosedWalk {
+function cloneWalk(w: Loop): Loop {
   if (isCircleWalk(w)) {
     return { kind: "circle", center: { x: w.center.x, y: w.center.y }, radius: w.radius };
   }
   return w.map(cloneEdge);
 }
 
-function cloneProfile(p: Profile): Profile {
+function cloneRegion(p: Region): Region {
   return {
-    kind: "profile",
+    kind: "region",
     outer: cloneWalk(p.outer),
     holes: p.holes.map(cloneWalk),
   };
@@ -72,14 +72,14 @@ function polyArea(poly: readonly Vec2[]): number {
   return a / 2;
 }
 
-function windingOf(w: ClosedWalk): 1 | -1 | 0 {
+function windingOf(w: Loop): 1 | -1 | 0 {
   if (isCircleWalk(w)) return Math.abs(w.radius) > EPS ? 1 : 0;
   const area = polyArea(tessellateWalk(w));
   if (!Number.isFinite(area) || Math.abs(area) < EPS) return 0;
   return area > 0 ? 1 : -1;
 }
 
-function winding(p: Profile): 1 | -1 | 0 {
+function winding(p: Region): 1 | -1 | 0 {
   return windingOf(p.outer);
 }
 
@@ -88,7 +88,7 @@ function unitRadial(c: Circle, p: Vec2): Vec2 {
   return vec(u.ux, u.uy);
 }
 
-function edgeMid(e: ProfileEdge): Vec2 {
+function edgeMid(e: LoopEdge): Vec2 {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
     const c = e.carrier;
     const ua = unitRadial(c, e.a);
@@ -107,7 +107,7 @@ function edgeMid(e: ProfileEdge): Vec2 {
 }
 
 /** Unit walk tangent at `p` on `e`. */
-function walkTangentAt(e: ProfileEdge, p: Vec2): Vec2 {
+function walkTangentAt(e: LoopEdge, p: Vec2): Vec2 {
   if (e.carrier.kind === "circle") {
     const ccw = perp(unitRadial(e.carrier, p));
     return e.k === -1 ? mul(ccw, -1) : ccw;
@@ -115,11 +115,11 @@ function walkTangentAt(e: ProfileEdge, p: Vec2): Vec2 {
   return norm(sub(e.b, e.a));
 }
 
-function inwardNormal(e: ProfileEdge, p: Vec2, w: 1 | -1): Vec2 {
+function inwardNormal(e: LoopEdge, p: Vec2, w: 1 | -1): Vec2 {
   return mul(perp(walkTangentAt(e, p)), w);
 }
 
-function offsetCarrier(e: ProfileEdge, d: number, w: 1 | -1): LineLike | Circle | null {
+function offsetCarrier(e: LoopEdge, d: number, w: 1 | -1): LineLike | Circle | null {
   const mid = edgeMid(e);
   const n = inwardNormal(e, mid, w);
   if (e.carrier.kind === "circle") {
@@ -132,7 +132,7 @@ function offsetCarrier(e: ProfileEdge, d: number, w: 1 | -1): LineLike | Circle 
   return parallelLineValue(e.carrier, d * dot(n, perp(dir)));
 }
 
-function offsetPoint(e: ProfileEdge, p: Vec2, d: number, w: 1 | -1): Vec2 {
+function offsetPoint(e: LoopEdge, p: Vec2, d: number, w: 1 | -1): Vec2 {
   if (e.carrier.kind === "circle") {
     const u = unitRadial(e.carrier, p);
     const n = inwardNormal(e, p, w);
@@ -177,7 +177,7 @@ function closestHit(hits: readonly Vec2[], hint: Vec2): Vec2 | null {
   return best;
 }
 
-function miterHint(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 1 | -1): Vec2 {
+function miterHint(prev: LoopEdge, next: LoopEdge, v: Vec2, d: number, w: 1 | -1): Vec2 {
   const nIn = inwardNormal(prev, prev.b, w);
   const nOut = inwardNormal(next, next.a, w);
   const s = add(nIn, nOut);
@@ -190,13 +190,7 @@ function miterHint(prev: ProfileEdge, next: ProfileEdge, v: Vec2, d: number, w: 
  * When the vertex is flat (collinear radii, a 180° sector) the normals
  * agree and this is `v + n d` — intersecting the offset lines is singular.
  */
-function lineMiter(
-  prev: ProfileEdge,
-  next: ProfileEdge,
-  v: Vec2,
-  d: number,
-  w: 1 | -1,
-): Vec2 | null {
+function lineMiter(prev: LoopEdge, next: LoopEdge, v: Vec2, d: number, w: 1 | -1): Vec2 | null {
   const nIn = inwardNormal(prev, prev.b, w);
   const nOut = inwardNormal(next, next.a, w);
   const denom = 1 + dot(nIn, nOut);
@@ -214,8 +208,8 @@ function onOffsetCarrier(c: LineLike | Circle, p: Vec2): boolean {
 }
 
 function miterJoin(
-  prev: ProfileEdge,
-  next: ProfileEdge,
+  prev: LoopEdge,
+  next: LoopEdge,
   v: Vec2,
   d: number,
   w: 1 | -1,
@@ -238,7 +232,7 @@ function len2(p: Vec2): number {
   return p.x * p.x + p.y * p.y;
 }
 
-function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): ProfileEdge | null {
+function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): LoopEdge | null {
   const aa = projectOnCarrier(carrier, a);
   const bb = projectOnCarrier(carrier, b);
   if (!isFiniteVec(aa) || !isFiniteVec(bb) || dist(aa, bb) < EPS) return null;
@@ -282,7 +276,7 @@ function inWalkSector(c: Circle, a: Vec2, b: Vec2, p: Vec2, k: Branch): boolean 
 }
 
 /** True when `a→b` walks the same way as `e`, and both points sit on `e`. */
-function originalForward(e: ProfileEdge, a: Vec2, b: Vec2): boolean {
+function originalForward(e: LoopEdge, a: Vec2, b: Vec2): boolean {
   if (e.carrier.kind !== "circle") {
     return dot(sub(b, a), sub(e.b, e.a)) > EPS;
   }
@@ -299,8 +293,8 @@ type Join =
   | { kind: "arc"; start: Vec2; end: Vec2; carrier: Circle; k: Branch };
 
 function vertexJoin(
-  prev: ProfileEdge,
-  next: ProfileEdge,
+  prev: LoopEdge,
+  next: LoopEdge,
   v: Vec2,
   inward: number,
   w: 1 | -1,
@@ -340,11 +334,7 @@ function offsetCircleWalk(c: Circle, distance: number): Circle | null {
  * emitted (the envelope trim drops them). A missed join or fewer than two
  * surviving edges → `null`. `strict` aborts on reverse (the local remnant).
  */
-function rawOffsetWalk(
-  edges: ProfileEdge[],
-  distance: number,
-  strict: boolean,
-): ProfileEdge[] | null {
+function rawOffsetWalk(edges: LoopEdge[], distance: number, strict: boolean): LoopEdge[] | null {
   const inward = -distance;
   const w = windingOf(edges);
   if (w === 0) return null;
@@ -374,7 +364,7 @@ function rawOffsetWalk(
     if (!hit) return null;
     joins.push({ kind: "miter", p: hit });
   }
-  const out: ProfileEdge[] = [];
+  const out: LoopEdge[] = [];
   for (let ki = 0; ki < m; ki++) {
     const i = kept[ki]!;
     const j0 = joins[ki]!;
@@ -404,7 +394,7 @@ function rawOffsetWalk(
   return out.length >= 2 ? out : null;
 }
 
-function offsetWalk(w: ClosedWalk, distance: number, strict: boolean): ClosedWalk | null {
+function offsetWalk(w: Loop, distance: number, strict: boolean): Loop | null {
   if (isCircleWalk(w)) return offsetCircleWalk(w, distance);
   return rawOffsetWalk(w, distance, strict);
 }
@@ -413,12 +403,12 @@ function offsetWalk(w: ClosedWalk, distance: number, strict: boolean): ClosedWal
  * Raw offset cycles of outer (by `d`) and holes (by `-d`). May self-intersect.
  * The outer walk missing → `[]`. Vanished holes are omitted.
  */
-export function rawRoundOffset(p: Profile, d: number): ClosedWalk[] {
-  if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
+export function rawRoundOffset(p: Region, d: number): Loop[] {
+  if (!isFiniteRegion(p) || !Number.isFinite(d)) return [];
   if (Math.abs(d) < EPS) return [cloneWalk(p.outer), ...p.holes.map(cloneWalk)];
   const outer = offsetWalk(p.outer, d, false);
   if (!outer) return [];
-  const holes: ClosedWalk[] = [];
+  const holes: Loop[] = [];
   for (const h of p.holes) {
     const off = offsetWalk(h, -d, false);
     if (off) holes.push(off);
@@ -426,7 +416,7 @@ export function rawRoundOffset(p: Profile, d: number): ClosedWalk[] {
   return [outer, ...holes];
 }
 
-function onSpanInterior(e: ProfileEdge, p: Vec2): boolean {
+function onSpanInterior(e: LoopEdge, p: Vec2): boolean {
   if (!isFiniteVec(p)) return false;
   if (dist(p, e.a) < HAIR || dist(p, e.b) < HAIR) return false;
   if (e.carrier.kind === "circle") {
@@ -441,7 +431,7 @@ function onSpanInterior(e: ProfileEdge, p: Vec2): boolean {
 }
 
 /** `p` sits on `e`'s carrier and strictly inside the span (T-junction / overlap). */
-function onCarrierSpan(e: ProfileEdge, p: Vec2): boolean {
+function onCarrierSpan(e: LoopEdge, p: Vec2): boolean {
   if (!onSpanInterior(e, p)) return false;
   if (e.carrier.kind === "circle") {
     return Math.abs(dist(p, e.carrier.center) - Math.abs(e.carrier.radius)) <= 1e-6;
@@ -451,7 +441,7 @@ function onCarrierSpan(e: ProfileEdge, p: Vec2): boolean {
   return Math.abs(cross2(n, sub(p, origin))) <= 1e-6;
 }
 
-function hitParam(e: ProfileEdge, p: Vec2): number {
+function hitParam(e: LoopEdge, p: Vec2): number {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
     const full = Math.abs(circleDelta(e.carrier, e.a, e.b, e.k));
     if (full < EPS) return 0;
@@ -463,7 +453,7 @@ function hitParam(e: ProfileEdge, p: Vec2): number {
   return dot(sub(p, e.a), ab) / len;
 }
 
-function splitEdge(e: ProfileEdge, hits: readonly Vec2[]): ProfileEdge[] {
+function splitEdge(e: LoopEdge, hits: readonly Vec2[]): LoopEdge[] {
   const tagged: { t: number; p: Vec2 }[] = [];
   for (const p of hits) {
     if (!onSpanInterior(e, p)) continue;
@@ -477,7 +467,7 @@ function splitEdge(e: ProfileEdge, hits: readonly Vec2[]): ProfileEdge[] {
   }
   if (uniq.length === 0) return [e];
   const pts = [e.a, ...uniq.map((h) => h.p), e.b];
-  const out: ProfileEdge[] = [];
+  const out: LoopEdge[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const frag = edgeFrom(e.carrier, pts[i]!, pts[i + 1]!, e.k);
     if (frag) out.push(frag);
@@ -485,8 +475,8 @@ function splitEdge(e: ProfileEdge, hits: readonly Vec2[]): ProfileEdge[] {
   return out.length > 0 ? out : [e];
 }
 
-function splitWalks(walks: readonly ProfileEdge[][]): ProfileEdge[] {
-  const edges: ProfileEdge[] = [];
+function splitWalks(walks: readonly LoopEdge[][]): LoopEdge[] {
+  const edges: LoopEdge[] = [];
   for (const w of walks) edges.push(...w);
   const hits: Vec2[][] = edges.map(() => []);
   for (let i = 0; i < edges.length; i++) {
@@ -511,13 +501,13 @@ function splitWalks(walks: readonly ProfileEdge[][]): ProfileEdge[] {
       if (onCarrierSpan(e, o.b)) hits[i]!.push(o.b);
     }
   }
-  const out: ProfileEdge[] = [];
+  const out: LoopEdge[] = [];
   for (let i = 0; i < edges.length; i++) out.push(...splitEdge(edges[i]!, hits[i]!));
   return out;
 }
 
-function clearanceOk(m: Vec2, src: Profile, absD: number): boolean {
-  const d = distToProfileBoundary(src, m);
+function clearanceOk(m: Vec2, src: Region, absD: number): boolean {
+  const d = distToRegionBoundary(src, m);
   if (!Number.isFinite(d)) return false;
   const tol = Math.max(1e-5, 1e-3 * absD);
   return Math.abs(d - absD) <= tol;
@@ -533,7 +523,7 @@ function endsMatch(a: Vec2, b: Vec2): boolean {
   return vertKey(a) === vertKey(b);
 }
 
-function sameLineCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
+function sameLineCarrier(a: LoopEdge, b: LoopEdge): boolean {
   if (a.carrier.kind === "circle" || b.carrier.kind === "circle") return false;
   const la = lineBasis(a.carrier);
   const lb = lineBasis(b.carrier);
@@ -544,7 +534,7 @@ function sameLineCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
   );
 }
 
-function sameCircleCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
+function sameCircleCarrier(a: LoopEdge, b: LoopEdge): boolean {
   if (a.carrier.kind !== "circle" || b.carrier.kind !== "circle") return false;
   return (
     dist(a.carrier.center, b.carrier.center) <= 1e-6 &&
@@ -553,7 +543,7 @@ function sameCircleCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
 }
 
 /** Same geometric span, either direction — a collapsed slit, not leftover boundary. */
-function coincidentSpan(a: ProfileEdge, b: ProfileEdge): boolean {
+function coincidentSpan(a: LoopEdge, b: LoopEdge): boolean {
   const fwd = endsMatch(a.a, b.a) && endsMatch(a.b, b.b);
   const rev = endsMatch(a.a, b.b) && endsMatch(a.b, b.a);
   if (!fwd && !rev) return false;
@@ -563,7 +553,7 @@ function coincidentSpan(a: ProfileEdge, b: ProfileEdge): boolean {
   return a.k === 1 ? b.k === -1 : b.k === 1;
 }
 
-function cancelCoincidentSpans(frags: readonly ProfileEdge[]): ProfileEdge[] {
+function cancelCoincidentSpans(frags: readonly LoopEdge[]): LoopEdge[] {
   const n = frags.length;
   const drop = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
@@ -577,17 +567,17 @@ function cancelCoincidentSpans(frags: readonly ProfileEdge[]): ProfileEdge[] {
       }
     }
   }
-  const out: ProfileEdge[] = [];
+  const out: LoopEdge[] = [];
   for (let i = 0; i < n; i++) if (!drop[i]) out.push(frags[i]!);
   return out;
 }
 
-function leaveDir(e: ProfileEdge, atA: boolean): Vec2 {
+function leaveDir(e: LoopEdge, atA: boolean): Vec2 {
   const t = walkTangentAt(e, atA ? e.a : e.b);
   return atA ? t : mul(t, -1);
 }
 
-function arriveDir(e: ProfileEdge, atB: boolean): Vec2 {
+function arriveDir(e: LoopEdge, atB: boolean): Vec2 {
   const t = walkTangentAt(e, atB ? e.b : e.a);
   return atB ? t : mul(t, -1);
 }
@@ -603,7 +593,7 @@ function leftTurn(inToward: Vec2, outAway: Vec2): number {
 
 type Inc = { fi: number; atA: boolean };
 
-function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
+function walkFragments(frags: readonly LoopEdge[]): Loop[] {
   const at = new Map<string, Inc[]>();
   const addInc = (p: Vec2, fi: number, atA: boolean) => {
     const k = vertKey(p);
@@ -639,11 +629,11 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
     }
     return best;
   };
-  const loops: ClosedWalk[] = [];
+  const loops: Loop[] = [];
   for (let start = 0; start < frags.length; start++) {
     if (used[start] || tried[start]) continue;
     tried[start] = 1;
-    const cycle: ProfileEdge[] = [];
+    const cycle: LoopEdge[] = [];
     const consumed: number[] = [];
     let fi = start;
     let forward = true;
@@ -673,31 +663,31 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
   return loops;
 }
 
-function reverseEdge(e: ProfileEdge): ProfileEdge {
+function reverseEdge(e: LoopEdge): LoopEdge {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
     return { a: e.b, b: e.a, carrier: e.carrier, k: e.k === 1 ? -1 : 1 };
   }
   return { a: e.b, b: e.a, carrier: e.carrier };
 }
 
-function reverseWalk(w: ClosedWalk): ClosedWalk {
+function reverseWalk(w: Loop): Loop {
   if (isCircleWalk(w)) return w;
   return w.toReversed().map(reverseEdge);
 }
 
-function walkProbe(w: ClosedWalk): Vec2 {
+function walkProbe(w: Loop): Vec2 {
   if (isCircleWalk(w)) {
     return { x: w.center.x + Math.abs(w.radius), y: w.center.y };
   }
   return edgeMid(w[0]!);
 }
 
-function walkArea(w: ClosedWalk): number {
+function walkArea(w: Loop): number {
   if (isCircleWalk(w)) return Math.PI * w.radius * w.radius;
   return polyArea(tessellateWalk(w));
 }
 
-function classifyIslands(walks: ClosedWalk[]): Profile[] {
+function classifyIslands(walks: Loop[]): Region[] {
   if (walks.length === 0) return [];
   const mids = walks.map((w) => walkProbe(w));
   const areas = walks.map((w) => walkArea(w));
@@ -707,13 +697,13 @@ function classifyIslands(walks: ClosedWalk[]): Profile[] {
     for (let i = 0; i < walks.length; i++) if (inside(i, j)) n++;
     return n;
   });
-  const islands: Profile[] = [];
+  const islands: Region[] = [];
   for (let i = 0; i < walks.length; i++) {
     if (depth[i] !== 0) continue;
     if (Math.abs(areas[i] ?? 0) < 1e-6) continue;
     let outer = walks[i]!;
     if ((areas[i] ?? 0) < 0) outer = reverseWalk(outer);
-    const holes: ClosedWalk[] = [];
+    const holes: Loop[] = [];
     for (let j = 0; j < walks.length; j++) {
       if (depth[j] !== 1 || !inside(i, j)) continue;
       if (Math.abs(areas[j] ?? 0) < 1e-6) continue;
@@ -721,10 +711,10 @@ function classifyIslands(walks: ClosedWalk[]): Profile[] {
       if ((areas[j] ?? 0) > 0) hole = reverseWalk(hole);
       holes.push(hole);
     }
-    const p: Profile = { kind: "profile", outer, holes };
-    if (!isFiniteProfile(p)) continue;
-    if (holes.length > 0 && !profileTopologyOk(p)) {
-      islands.push({ kind: "profile", outer, holes: [] });
+    const p: Region = { kind: "region", outer, holes };
+    if (!isFiniteRegion(p)) continue;
+    if (holes.length > 0 && !regionTopologyOk(p)) {
+      islands.push({ kind: "region", outer, holes: [] });
       continue;
     }
     islands.push(p);
@@ -737,19 +727,19 @@ function classifyIslands(walks: ClosedWalk[]): Profile[] {
  * at distance `|d|` from the original boundary, walk left-face cycles, nest
  * into islands. Generic `d` only — coincidences may yield `[]`.
  */
-export function trimOffsetEnvelope(src: Profile, d: number, raw: ClosedWalk[]): Profile[] {
+export function trimOffsetEnvelope(src: Region, d: number, raw: Loop[]): Region[] {
   if (raw.length === 0 || !Number.isFinite(d)) return [];
   const absD = Math.abs(d);
-  if (absD < EPS) return [cloneProfile(src)];
+  if (absD < EPS) return [cloneRegion(src)];
   const circles: Circle[] = [];
-  const edgeWalks: ProfileEdge[][] = [];
+  const edgeWalks: LoopEdge[][] = [];
   for (const w of raw) {
     if (isCircleWalk(w)) circles.push(w);
     else edgeWalks.push(w);
   }
   if (edgeWalks.length === 0) return classifyIslands(circles);
   const split = splitWalks(edgeWalks);
-  const kept: ProfileEdge[] = [];
+  const kept: LoopEdge[] = [];
   for (const e of split) {
     if (dist(e.a, e.b) < HAIR) continue;
     const m = edgeMid(e);
@@ -762,15 +752,15 @@ export function trimOffsetEnvelope(src: Profile, d: number, raw: ClosedWalk[]): 
 }
 
 /** `(src, d) → islands`. Pass a different kernel to `roundOffsetValue`. */
-export type OffsetKernel = (src: Profile, d: number) => Profile[];
+export type OffsetKernel = (src: Region, d: number) => Region[];
 
 export function composeOffset(
-  raw: (src: Profile, d: number) => ClosedWalk[],
-  trim: (src: Profile, d: number, raw: ClosedWalk[]) => Profile[] = trimOffsetEnvelope,
+  raw: (src: Region, d: number) => Loop[],
+  trim: (src: Region, d: number, raw: Loop[]) => Region[] = trimOffsetEnvelope,
 ): OffsetKernel {
   return (src, d) => {
-    if (!isFiniteProfile(src) || !Number.isFinite(d)) return [];
-    if (Math.abs(d) < EPS) return [cloneProfile(src)];
+    if (!isFiniteRegion(src) || !Number.isFinite(d)) return [];
+    if (Math.abs(d) < EPS) return [cloneRegion(src)];
     return trim(src, d, raw(src, d));
   };
 }
@@ -779,14 +769,14 @@ export function composeOffset(
  * Join-only offset: reverse, a missed hit, or holes → `[]`. No split/merge.
  * Kept so a later kernel can be compared against the local remnant.
  */
-export function localOffset(p: Profile, d: number): Profile[] {
-  if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];
-  if (Math.abs(d) < EPS) return [cloneProfile(p)];
+export function localOffset(p: Region, d: number): Region[] {
+  if (!isFiniteRegion(p) || !Number.isFinite(d)) return [];
+  if (Math.abs(d) < EPS) return [cloneRegion(p)];
   if (p.holes.length > 0) return [];
   const outer = offsetWalk(p.outer, d, true);
   if (!outer) return [];
-  const out: Profile = { kind: "profile", outer, holes: [] };
-  return isFiniteProfile(out) ? [out] : [];
+  const out: Region = { kind: "region", outer, holes: [] };
+  return isFiniteRegion(out) ? [out] : [];
 }
 
 /** Disk envelope of the raw offset. Default `roundOffsetValue` kernel. */
@@ -799,15 +789,15 @@ export const envelopeOffset: OffsetKernel = composeOffset(rawRoundOffset);
  * and later swaps; production uses `envelopeOffset`.
  */
 export function roundOffsetValue(
-  p: Profile,
+  p: Region,
   d: number,
   kernel: OffsetKernel = envelopeOffset,
-): Profile[] {
+): Region[] {
   return kernel(p, d);
 }
 
 /** Flatten nested offsets to a profile source + net distance, then compile. */
-export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: number }): Profile[] {
+export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: number }): Region[] {
   let d = op.d;
   let node: unknown = op.of;
   while (node && typeof node === "object" && (node as { kind?: string }).kind === "offset") {
@@ -815,16 +805,15 @@ export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: numb
     d += inner.d;
     node = inner.of;
   }
-  if (!node || typeof node !== "object" || (node as { kind?: string }).kind !== "profile")
-    return [];
-  return roundOffsetValue(node as Profile, d);
+  if (!node || typeof node !== "object" || (node as { kind?: string }).kind !== "region") return [];
+  return roundOffsetValue(node as Region, d);
 }
 
 type FilletJoin = { t0: Vec2; t1: Vec2; carrier: Circle; k: Branch };
 
 function filletJoin(
-  prev: ProfileEdge,
-  next: ProfileEdge,
+  prev: LoopEdge,
+  next: LoopEdge,
   v: Vec2,
   r: number,
   w: 1 | -1,
@@ -853,18 +842,18 @@ function filletJoin(
  * `outer[i].a`. Zero / omitted / a flat (180°) vertex keeps the corner.
  * Too-large `r` → empty profile.
  */
-export function filletVertices(p: Profile, radii: readonly number[]): Profile {
-  if (!isFiniteProfile(p)) return nanProfile();
+export function filletVertices(p: Region, radii: readonly number[]): Region {
+  if (!isFiniteRegion(p)) return nanRegion();
   const srcWalk = walkEdges(p.outer);
   if (srcWalk.length === 0) {
     if (isCircleWalk(p.outer) && radii.every((r) => !(r > EPS))) return p;
-    return nanProfile();
+    return nanRegion();
   }
   const n = srcWalk.length;
-  if (radii.length !== n) return nanProfile();
+  if (radii.length !== n) return nanRegion();
   if (radii.every((r) => !(r > EPS))) return p;
   const w = winding(p);
-  if (w === 0) return nanProfile();
+  if (w === 0) return nanRegion();
   const joins: Array<FilletJoin | null> = [];
   for (let i = 0; i < n; i++) {
     const r = radii[i]!;
@@ -872,7 +861,7 @@ export function filletVertices(p: Profile, radii: readonly number[]): Profile {
       joins.push(null);
       continue;
     }
-    if (!Number.isFinite(r)) return nanProfile();
+    if (!Number.isFinite(r)) return nanRegion();
     const prev = srcWalk[(i + n - 1) % n]!;
     const next = srcWalk[i]!;
     const join = filletJoin(prev, next, next.a, r, w);
@@ -880,35 +869,35 @@ export function filletVertices(p: Profile, radii: readonly number[]): Profile {
       joins.push(null);
       continue;
     }
-    if (!join) return nanProfile();
+    if (!join) return nanRegion();
     joins.push(join);
   }
-  const outer: ProfileEdge[] = [];
+  const outer: LoopEdge[] = [];
   for (let i = 0; i < n; i++) {
     const src = srcWalk[i]!;
     const j0 = joins[i];
     const j1 = joins[(i + 1) % n];
     const start = j0 ? j0.t1 : src.a;
     const end = j1 ? j1.t0 : src.b;
-    if (!originalForward(src, start, end)) return nanProfile();
+    if (!originalForward(src, start, end)) return nanRegion();
     const k = src.carrier.kind === "circle" ? src.k : undefined;
     const e = edgeFrom(src.carrier, start, end, k);
-    if (!e) return nanProfile();
+    if (!e) return nanRegion();
     outer.push(e);
     if (j1) {
       const arc = edgeFrom(j1.carrier, j1.t0, j1.t1, j1.k);
-      if (!arc) return nanProfile();
+      if (!arc) return nanRegion();
       outer.push(arc);
     }
   }
-  const out: Profile = { kind: "profile", outer, holes: p.holes.map(cloneWalk) };
-  if (!isFiniteProfile(out)) return nanProfile();
-  if (out.holes.length > 0 && !profileTopologyOk(out)) return nanProfile();
+  const out: Region = { kind: "region", outer, holes: p.holes.map(cloneWalk) };
+  if (!isFiniteRegion(out)) return nanRegion();
+  if (out.holes.length > 0 && !regionTopologyOk(out)) return nanRegion();
   return out;
 }
 
 /** Join circle G1 with both neighbors, whose original carriers still meet near the center. */
-function isFilletJoin(edges: readonly ProfileEdge[], i: number): boolean {
+function isFilletJoin(edges: readonly LoopEdge[], i: number): boolean {
   const e = edges[i]!;
   if (e.carrier.kind !== "circle") return false;
   const n = edges.length;
@@ -924,13 +913,13 @@ function isFilletJoin(edges: readonly ProfileEdge[], i: number): boolean {
   return dist(meet, c) <= 16 * r + EPS;
 }
 
-function tangentsG1(a: ProfileEdge, b: ProfileEdge, at: Vec2): boolean {
+function tangentsG1(a: LoopEdge, b: LoopEdge, at: Vec2): boolean {
   const ta = walkTangentAt(a, at);
   const tb = walkTangentAt(b, at);
   return dot(ta, tb) > 0.999;
 }
 
-function originalEdgeIndices(p: Profile): number[] {
+function originalEdgeIndices(p: Region): number[] {
   const edges = walkEdges(p.outer);
   const out: number[] = [];
   for (let i = 0; i < edges.length; i++) {
@@ -939,20 +928,20 @@ function originalEdgeIndices(p: Profile): number[] {
   return out;
 }
 
-export type ProfileCorner = { at: Vec2; index: number; r: number };
+export type RegionCorner = { at: Vec2; index: number; r: number };
 
 /**
  * Logical vertices of a (possibly filleted) face. Join arcs are skipped so
  * indices match the source cycle; a stadium rim and a pie `along` stay.
  */
-export function profileCorners(p: Profile): ProfileCorner[] {
-  if (!isFiniteProfile(p)) return [];
+export function regionCorners(p: Region): RegionCorner[] {
+  if (!isFiniteRegion(p)) return [];
   const edges = walkEdges(p.outer);
   if (edges.length === 0) return [];
   const orig = originalEdgeIndices(p);
   const n = orig.length;
   if (n < 2) return [];
-  const corners: ProfileCorner[] = [];
+  const corners: RegionCorner[] = [];
   for (let i = 0; i < n; i++) {
     const iPrev = orig[(i + n - 1) % n]!;
     const iNext = orig[i]!;
@@ -980,25 +969,25 @@ export function profileCorners(p: Profile): ProfileCorner[] {
  * Rebuild the sharp cycle, then fillet `index` to `r` while keeping other
  * corners. `r === 0` leaves that vertex sharp. Too-large / negative `r` → empty.
  */
-export function filletAtVertex(p: Profile, index: number, r: number): Profile {
-  if (!Number.isFinite(r) || r < 0) return nanProfile();
-  const corners = profileCorners(p);
-  if (index < 0 || index >= corners.length) return nanProfile();
+export function filletAtVertex(p: Region, index: number, r: number): Region {
+  if (!Number.isFinite(r) || r < 0) return nanRegion();
+  const corners = regionCorners(p);
+  if (index < 0 || index >= corners.length) return nanRegion();
   const orig = originalEdgeIndices(p);
-  if (orig.length !== corners.length) return nanProfile();
+  if (orig.length !== corners.length) return nanRegion();
   const edges = walkEdges(p.outer);
-  const outer: ProfileEdge[] = [];
+  const outer: LoopEdge[] = [];
   for (let i = 0; i < orig.length; i++) {
     const src = edges[orig[i]!]!;
     const a = corners[i]!.at;
     const b = corners[(i + 1) % orig.length]!.at;
     const k = src.carrier.kind === "circle" ? src.k : undefined;
     const e = edgeFrom(src.carrier, a, b, k);
-    if (!e) return nanProfile();
+    if (!e) return nanRegion();
     outer.push(e);
   }
-  const sharp: Profile = { kind: "profile", outer, holes: p.holes.map(cloneWalk) };
-  if (!isFiniteProfile(sharp)) return nanProfile();
+  const sharp: Region = { kind: "region", outer, holes: p.holes.map(cloneWalk) };
+  if (!isFiniteRegion(sharp)) return nanRegion();
   const radii = corners.map((c, i) => (i === index ? r : c.r));
   return filletVertices(sharp, radii);
 }

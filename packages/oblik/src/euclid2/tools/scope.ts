@@ -1,10 +1,11 @@
 import type { TraceNode } from "@/eval/context";
 import { invMatches, type TraceInv } from "@/eval/inv";
 import { sourceFileKey } from "@/eval/stack";
-import type { Circle, LineLike, Profile } from "@/geom";
+import type { Circle, LineLike, Region } from "@/geom";
 import { gliderAt, isGlider } from "@/geom/gliders";
 import { member, printExpr, type Expr } from "@/source/expr";
 import { fnNamed, insertPointNames, type MentionFile, type MentionFn } from "@/source/mention";
+
 import { isFiniteTrace, traceKey, type SnapFilter } from "../pick";
 import type { Placed, Scope } from "./types";
 
@@ -129,7 +130,7 @@ function put(
     points: Record<string, Placed>;
     carriers: Record<string, { expr: Expr; geom: LineLike }>;
     circles: Record<string, { expr: Expr; geom: Circle }>;
-    profiles: Record<string, { expr: Expr; geom: Profile }>;
+    profiles: Record<string, { expr: Expr; geom: Region }>;
     lengths: Record<string, number>;
     byId: Record<string, Expr>;
     prints: Record<string, Expr>;
@@ -152,8 +153,8 @@ function put(
   if (n.value.kind === "circle") {
     scope.circles[key] = { expr, geom: n.value as Circle };
   }
-  if (n.value.kind === "profile") {
-    scope.profiles[key] = { expr, geom: n.value as Profile };
+  if (n.value.kind === "region") {
+    scope.profiles[key] = { expr, geom: n.value as Region };
   }
   if (n.value.kind === "slider") {
     if (expr.kind === "ref") scope.lengths[expr.name] = n.value.n;
@@ -168,7 +169,7 @@ export function scopeFromTrace(
   const points: Record<string, Placed> = {};
   const carriers: Record<string, Scope["carriers"][string]> = {};
   const circles: Record<string, { expr: Expr; geom: Circle }> = {};
-  const profilesRec: Record<string, { expr: Expr; geom: Profile }> = {};
+  const profilesRec: Record<string, { expr: Expr; geom: Region }> = {};
   const lengths: Record<string, number> = {};
   const byId: Record<string, Expr> = {};
   const prints: Record<string, Expr> = {};
@@ -215,7 +216,11 @@ export function scopeFromTrace(
 }
 
 export function mentionExpr(scope: Scope, n: TraceNode): Expr | undefined {
-  return scope.prints?.[traceKey(n)] ?? (n.inv ? scope.byId[`${n.id}@${n.inv.serial}`] : undefined) ?? scope.byId[n.id];
+  return (
+    scope.prints?.[traceKey(n)] ??
+    (n.inv ? scope.byId[`${n.id}@${n.inv.serial}`] : undefined) ??
+    scope.byId[n.id]
+  );
 }
 
 export function mentionPrint(scope: Scope, n: TraceNode): string | undefined {

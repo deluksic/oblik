@@ -24,9 +24,12 @@ export const BIND_PREFIX: Record<string, string> = {
   pointOnLine: "g",
   pointOnCircle: "g",
   slider: "n",
-  profile: "pr",
+  region: "rg",
   roundOffset: "off",
-  region: "reg",
+  diff: "df",
+  union: "un",
+  intersect: "ix",
+  pick: "pk",
   style: "sty",
 };
 

@@ -10,8 +10,9 @@ describe("figureStyleFromBrush", () => {
   });
 
   test("profiles and circles take fill as well as the line look", () => {
-    expect(takesFill("profile")).toBe(true);
     expect(takesFill("region")).toBe(true);
+    expect(takesFill("csg2")).toBe(true);
+    expect(takesFill("pick")).toBe(true);
     expect(takesFill("circle")).toBe(true);
     expect(takesFill("segment")).toBe(false);
     expect(takesFill("point")).toBe(false);
@@ -33,8 +34,8 @@ describe("figureStyleFromBrush", () => {
     expect(lookFromBrush(washed, "point").fill).toBeUndefined();
     expect(lookFromBrush(washed, "segment").fill).toBeUndefined();
     expect(lookFromBrush(washed, "line").fill).toBeUndefined();
-    expect(lookFromBrush(washed, "profile").fill).toBe("#f3c5bc");
     expect(lookFromBrush(washed, "region").fill).toBe("#f3c5bc");
+    expect(lookFromBrush(washed, "csg2").fill).toBe("#f3c5bc");
     expect(lookFromBrush(washed, "circle").fill).toBe("#f3c5bc");
     expect(lookFromBrush(washed, "point").stroke).toBe(DEFAULT_BRUSH.stroke);
   });

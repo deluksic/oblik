@@ -5,8 +5,8 @@ import IconScaling from "~icons/lucide/scaling";
 
 import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
+import { isFillGeom } from "@/geom/csg2";
 import { isGlider } from "@/geom/gliders";
-import { isFillGeom } from "@/geom/region";
 
 import {
   kWorldToNdc,

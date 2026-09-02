@@ -1,6 +1,6 @@
 import { For, Show, type ParentProps } from "solid-js";
 
-import { REGION_MASK, type DrawOp, type RegionPaint } from "@/geom/region-draw";
+import { csgTreeSvg, REGION_MASK, type CsgDraw, type CsgPaint, type DrawOp } from "@/geom/csg-draw";
 
 import { layerStrokeWidth, type ChromeLayer } from "./chrome";
 
@@ -30,7 +30,7 @@ export function regionOutsideUrl(id: string): string {
   return clipUrl(`${id}-o`);
 }
 
-export function RegionMaskDefs(props: { paint: RegionPaint; id: string }) {
+export function RegionMaskDefs(props: { paint: CsgPaint; id: string }) {
   const box = () => props.paint.box;
   const w = () => box().maxX - box().minX;
   const h = () => box().maxY - box().minY;
@@ -44,10 +44,19 @@ export function RegionMaskDefs(props: { paint: RegionPaint; id: string }) {
     <defs>
       <mask id={`${props.id}-m`} maskUnits="userSpaceOnUse" {...frame()}>
         <rect {...frame()} fill={REGION_MASK.fill.canvas} />
-        <RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />
-        <For each={props.paint.holes}>
-          {(op) => <RegionOp op={op} fill={REGION_MASK.fill.hole} stroke="none" />}
-        </For>
+        <Show
+          when={props.paint.tree}
+          fallback={
+            <>
+              <RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />
+              <For each={props.paint.holes}>
+                {(op) => <RegionOp op={op} fill={REGION_MASK.fill.hole} stroke="none" />}
+              </For>
+            </>
+          }
+        >
+          {(tree) => <CsgTreeInk node={tree()} uid={`${props.id}-t`} box={props.paint.box} />}
+        </Show>
       </mask>
       <mask id={`${props.id}-x`} maskUnits="userSpaceOnUse" {...frame()}>
         <rect {...frame()} fill={REGION_MASK.outsideStock.canvas} />
@@ -133,7 +142,7 @@ export function RegionOp(props: {
     <Show
       when={props.op.kind === "circle" ? props.op : undefined}
       fallback={
-        <path d={props.op.kind === "profile" ? props.op.d : ""} fill-rule="evenodd" {...rest()} />
+        <path d={props.op.kind === "path" ? props.op.d : ""} fill-rule="evenodd" {...rest()} />
       }
     >
       {(c) => <circle cx={c().cx} cy={c().cy} r={c().r} {...rest()} />}
@@ -141,9 +150,47 @@ export function RegionOp(props: {
   );
 }
 
+function CsgTreeInk(props: { node: CsgDraw; uid: string; box: CsgPaint["box"] }) {
+  const bits = () => csgTreeSvg(props.node, props.uid, props.box);
+  return (
+    <>
+      <g innerHTML={bits().defs} />
+      <g innerHTML={bits().body} />
+    </>
+  );
+}
+
+export function RegionTreeFill(props: {
+  paint: CsgPaint;
+  id: string;
+  class?: InkClass;
+  "data-ink"?: string;
+  "data-role"?: string;
+  fill?: string;
+  stroke?: string;
+  opacity?: number;
+}) {
+  const box = () => props.paint.box;
+  return (
+    <rect
+      x={box().minX}
+      y={box().minY}
+      width={box().maxX - box().minX}
+      height={box().maxY - box().minY}
+      mask={regionMaskUrl(props.id)}
+      class={props.class}
+      data-ink={props["data-ink"]}
+      data-role={props["data-role"]}
+      fill={props.fill}
+      stroke={props.stroke ?? "none"}
+      opacity={props.opacity}
+    />
+  );
+}
+
 /** Overlay halo outside the CSG fill, same clip idea as `ChromeOutsideClip` on profiles. */
 export function RegionHalo(props: {
-  paint: RegionPaint;
+  paint: CsgPaint;
   id: string;
   layers: ChromeLayer[];
   class: (layer: ChromeLayer) => InkClass;
@@ -161,7 +208,7 @@ export function RegionHalo(props: {
     "vector-effect": "non-scaling-stroke" as const,
   });
   return (
-    <>
+    <Show when={!props.paint.tree}>
       <RegionMaskDefs paint={props.paint} id={props.id} />
       <RegionClipped
         id={props.id}
@@ -187,6 +234,6 @@ export function RegionHalo(props: {
           )}
         </For>
       </RegionClipped>
-    </>
+    </Show>
   );
 }

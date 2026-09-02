@@ -28,18 +28,28 @@ function parse(source: string): ts.SourceFile {
 function isFnLike(
   n: ts.Node,
 ): n is ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration {
-  return ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n);
+  return (
+    ts.isFunctionDeclaration(n) ||
+    ts.isFunctionExpression(n) ||
+    ts.isArrowFunction(n) ||
+    ts.isMethodDeclaration(n)
+  );
 }
 
-function fnLabel(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): string | undefined {
-  if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name) return ident(node.name);
+function fnLabel(
+  node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+): string | undefined {
+  if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name)
+    return ident(node.name);
   const parent = node.parent;
   if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text;
   if (ts.isPropertyAssignment(parent)) return ident(parent.name);
   return undefined;
 }
 
-function fnBlock(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): ts.Block | null {
+function fnBlock(
+  node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+): ts.Block | null {
   if (node.body && ts.isBlock(node.body)) return node.body;
   return null;
 }
@@ -96,7 +106,11 @@ export function freshBind(source: string, from: string, requested?: string): str
   return takeBind(usedIdentifiers(parse(source)), from, requested);
 }
 
-export function ensureNamedImport(source: string, moduleName: string, names: readonly string[]): string {
+export function ensureNamedImport(
+  source: string,
+  moduleName: string,
+  names: readonly string[],
+): string {
   const sf = parse(source);
   let importDecl: ts.ImportDeclaration | undefined;
   for (const stmt of sf.statements) {
@@ -192,7 +206,11 @@ function isFilletCall(node: ts.Expression): node is ts.CallExpression {
 function findProfileCall(sf: ts.SourceFile, id: string): ts.CallExpression | undefined {
   let target: ts.CallExpression | undefined;
   const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "profile") {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "region"
+    ) {
       if (trailingId(node).id === id) target = node;
     }
     ts.forEachChild(node, visit);
@@ -214,11 +232,11 @@ function patchProfileVertex(source: string, job: Insert): string {
   let next = names.length > 0 ? ensureNamedImport(source, "oblik", names) : source;
   const sf = parse(next);
   const call = findProfileCall(sf, patch.id);
-  if (!call) throw new Error(`no profile with id ${patch.id}`);
+  if (!call) throw new Error(`no region with id ${patch.id}`);
   const { args } = trailingId(call);
   const arr = args[0];
   if (!arr || !ts.isArrayLiteralExpression(arr)) {
-    throw new Error("Fillet needs the profile cycle as an array literal.");
+    throw new Error("Fillet needs the region cycle as an array literal.");
   }
   const elemIndex = 2 * patch.index;
   const elem = arr.elements[elemIndex];
@@ -260,7 +278,12 @@ function objectHasField(obj: ts.ObjectLiteralExpression, bind: string): boolean 
   return false;
 }
 
-function insertObjectField(source: string, sf: ts.SourceFile, obj: ts.ObjectLiteralExpression, bind: string): string {
+function insertObjectField(
+  source: string,
+  sf: ts.SourceFile,
+  obj: ts.ObjectLiteralExpression,
+  bind: string,
+): string {
   const props = obj.properties;
   if (props.length === 0) {
     return source.slice(0, obj.getStart(sf)) + `{ ${bind} }` + source.slice(obj.getEnd());
@@ -322,7 +345,11 @@ export function exposeReturnBag(source: string, dest: string, bind: string): str
   return insertObjectField(source, sf, expr, bind);
 }
 
-export function insertCall(source: string, job: Insert, nextId: () => string = freshSiteId): string {
+export function insertCall(
+  source: string,
+  job: Insert,
+  nextId: () => string = freshSiteId,
+): string {
   if (job.patchVertex) return patchProfileVertex(source, job);
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
@@ -335,25 +362,34 @@ export function insertCall(source: string, job: Insert, nextId: () => string = f
   for (const h of hoists) {
     if (!specs.has(h.from)) throw new Error(`unknown constructor ${h.from}`);
   }
-  const statements: { bind?: string; from: string; args: Expr[]; id: string }[] = hoists.map((h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() }));
+  const statements: { bind?: string; from: string; args: Expr[]; id: string }[] = hoists.map(
+    (h) => ({ bind: h.bind, from: h.from, args: h.args, id: nextId() }),
+  );
   if (EFFECT_CTORS.has(job.from)) {
     statements.push({ from: job.from, args, id: job.id ?? nextId() });
   } else {
-    statements.push({ bind: takeBind(used, job.from, job.bind), from: job.from, args, id: job.id ?? nextId() });
+    statements.push({
+      bind: takeBind(used, job.from, job.bind),
+      from: job.from,
+      args,
+      id: job.id ?? nextId(),
+    });
   }
   const introduced = new Set(statements.flatMap((s) => (s.bind ? [s.bind] : [])));
   const scope = namesInFunctionScope(source, dest);
   const missing = [
-    ...new Set(statements.flatMap((s) => s.args.flatMap(exprRefs)).filter((n) => !scope.has(n) && !introduced.has(n))),
+    ...new Set(
+      statements
+        .flatMap((s) => s.args.flatMap(exprRefs))
+        .filter((n) => !scope.has(n) && !introduced.has(n)),
+    ),
   ];
   if (missing.length > 0) {
     const who = missing.join(", ");
     const verb = missing.length === 1 ? "is" : "are";
     throw new Error(`${who} ${verb} not in ${dest}() — this scope cannot refer to ${who}.`);
   }
-  const names = [
-    ...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)])),
-  ];
+  const names = [...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)]))];
   let next = ensureNamedImport(source, "oblik", names);
   const sf = parse(next);
   const body = findFnBody(sf, dest);

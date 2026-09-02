@@ -123,13 +123,13 @@ function plate(origin) {
   });
 
   test("does not record unmarked geom helpers as callee calls", () => {
-    const src = `import { point, segment, profile, fillet, along, dist } from "oblik";
+    const src = `import { point, segment, region, fillet, along, dist } from "oblik";
 function plate() {
   const A = point(0, 0, "o_a");
   const B = point(1, 0, "o_b");
   const ab = segment(A, B, "o_ab");
   const d = dist(A, B);
-  profile([fillet(A, 0.1), ab, B, along({ kind: "circle", center: A, radius: 1 }, 1)], "o_pr");
+  region([fillet(A, 0.1), ab, B, along({ kind: "circle", center: A, radius: 1 }, 1)], "o_pr");
 }
 `;
     const file = analyzeMentions(src, "g.ts");

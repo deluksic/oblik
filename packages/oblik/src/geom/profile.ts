@@ -1,16 +1,7 @@
 import { circleUnitAt } from "./gliders";
 import { filletVertices } from "./offset";
 import { lineBasis } from "./ops";
-import type {
-  Along,
-  Branch,
-  Circle,
-  ClosedWalk,
-  Fillet,
-  LineLike,
-  Profile,
-  ProfileEdge,
-} from "./types";
+import type { Along, Branch, Circle, Fillet, LineLike, Loop, LoopEdge, Region } from "./types";
 import {
   add,
   cross2,
@@ -34,8 +25,8 @@ export function isFillet(v: unknown): v is Fillet {
   return !!v && typeof v === "object" && (v as { kind?: string }).kind === "fillet";
 }
 
-export function isProfile(v: { kind: string }): v is Profile {
-  return v.kind === "profile";
+export function isRegion(v: { kind: string }): v is Region {
+  return v.kind === "region";
 }
 
 export function alongValue(carrier: Circle, k: number): Along {
@@ -46,20 +37,20 @@ export function filletValue(at: Vec2, r: number): Fillet {
   return { kind: "fillet", at: { x: at.x, y: at.y }, r };
 }
 
-export function nanProfile(): Profile {
-  return { kind: "profile", outer: [], holes: [] };
+export function nanRegion(): Region {
+  return { kind: "region", outer: [], holes: [] };
 }
 
-export function isCircleWalk(w: ClosedWalk): w is Circle {
+export function isCircleWalk(w: Loop): w is Circle {
   return !Array.isArray(w);
 }
 
 /** Piecewise spans, or `[]` for a full-circle walk. */
-export function walkEdges(w: ClosedWalk): ProfileEdge[] {
+export function walkEdges(w: Loop): LoopEdge[] {
   return Array.isArray(w) ? w : [];
 }
 
-export function isFiniteWalk(w: ClosedWalk): boolean {
+export function isFiniteWalk(w: Loop): boolean {
   if (isCircleWalk(w)) {
     return isFiniteVec(w.center) && Number.isFinite(w.radius) && Math.abs(w.radius) > EPS;
   }
@@ -67,12 +58,12 @@ export function isFiniteWalk(w: ClosedWalk): boolean {
   return w.every((e) => isFiniteEdge(e));
 }
 
-export function isFiniteProfile(p: Profile): boolean {
+export function isFiniteRegion(p: Region): boolean {
   if (!isFiniteWalk(p.outer)) return false;
   return p.holes.every((h) => isFiniteWalk(h));
 }
 
-function isFiniteEdge(e: ProfileEdge): boolean {
+function isFiniteEdge(e: LoopEdge): boolean {
   if (!isFiniteVec(e.a) || !isFiniteVec(e.b)) return false;
   if (e.carrier.kind === "circle") {
     const c = e.carrier;
@@ -155,7 +146,7 @@ function asVertex(v: unknown): { at: Vec2; r: number } | null {
 }
 
 export type WalkInput = Circle | readonly unknown[];
-export type ProfileOpts = { holes?: readonly WalkInput[] };
+export type RegionOpts = { holes?: readonly WalkInput[] };
 
 function asCircleWalk(v: unknown): Circle | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
@@ -171,14 +162,14 @@ function asCircleWalk(v: unknown): Circle | null {
   };
 }
 
-function asWalk(v: unknown): ClosedWalk | null {
+function asWalk(v: unknown): Loop | null {
   const circle = asCircleWalk(v);
   if (circle) return circle;
   if (Array.isArray(v)) return walkFromCycle(v);
   return null;
 }
 
-function parseWalk(cycle: readonly unknown[]): { edges: ProfileEdge[]; radii: number[] } | null {
+function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | null {
   if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return null;
   const n = cycle.length / 2;
   const points: Vec2[] = [];
@@ -202,7 +193,7 @@ function parseWalk(cycle: readonly unknown[]): { edges: ProfileEdge[]; radii: nu
     }
     return null;
   }
-  const edges: ProfileEdge[] = [];
+  const edges: LoopEdge[] = [];
   for (let i = 0; i < n; i++) {
     const a = points[i]!;
     const b = points[(i + 1) % n]!;
@@ -226,13 +217,13 @@ function parseWalk(cycle: readonly unknown[]): { edges: ProfileEdge[]; radii: nu
   return { edges, radii };
 }
 
-function walkFromCycle(cycle: readonly unknown[]): ProfileEdge[] | null {
+function walkFromCycle(cycle: readonly unknown[]): LoopEdge[] | null {
   const parsed = parseWalk(cycle);
   if (!parsed) return null;
-  const sharp: Profile = { kind: "profile", outer: parsed.edges, holes: [] };
-  if (!isFiniteProfile(sharp)) return null;
+  const sharp: Region = { kind: "region", outer: parsed.edges, holes: [] };
+  if (!isFiniteRegion(sharp)) return null;
   const filleted = filletVertices(sharp, parsed.radii);
-  if (!isFiniteProfile(filleted)) return null;
+  if (!isFiniteRegion(filleted)) return null;
   const edges = walkEdges(filleted.outer);
   return edges.length >= 2 ? edges : null;
 }
@@ -241,8 +232,8 @@ function walkFromCycle(cycle: readonly unknown[]): ProfileEdge[] | null {
  * Holes must sit strictly inside the outer walk, pairwise disjoint, and not
  * touch. Overlap, nesting, or a hole that exits the outer is invalid.
  */
-export function profileTopologyOk(p: Profile): boolean {
-  if (!isFiniteProfile(p)) return false;
+export function regionTopologyOk(p: Region): boolean {
+  if (!isFiniteRegion(p)) return false;
   if (p.holes.length === 0) return true;
   const outerPoly = tessellateWalk(p.outer);
   if (outerPoly.length < 3) return false;
@@ -264,21 +255,21 @@ export function profileTopologyOk(p: Profile): boolean {
   return true;
 }
 
-export function profileValue(cycle: WalkInput, opts?: ProfileOpts): Profile {
+export function regionValue(cycle: WalkInput, opts?: RegionOpts): Region {
   const outer = asWalk(cycle);
-  if (!outer) return nanProfile();
-  const holes: ClosedWalk[] = [];
+  if (!outer) return nanRegion();
+  const holes: Loop[] = [];
   for (const holeCycle of opts?.holes ?? []) {
     const hole = asWalk(holeCycle);
-    if (!hole) return nanProfile();
+    if (!hole) return nanRegion();
     holes.push(hole);
   }
-  const p: Profile = { kind: "profile", outer, holes };
-  if (!profileTopologyOk(p)) return nanProfile();
+  const p: Region = { kind: "region", outer, holes };
+  if (!regionTopologyOk(p)) return nanRegion();
   return p;
 }
 
-function sampleArc(e: ProfileEdge, steps = 24): Vec2[] {
+function sampleArc(e: LoopEdge, steps = 24): Vec2[] {
   if (e.carrier.kind !== "circle" || (e.k !== 1 && e.k !== -1)) return [e.a, e.b];
   const c = e.carrier;
   const delta = circleDelta(c, e.a, e.b, e.k);
@@ -294,10 +285,10 @@ function sampleArc(e: ProfileEdge, steps = 24): Vec2[] {
   return out;
 }
 
-const tessellatedWalks = new WeakMap<ClosedWalk, Vec2[]>();
-const tessellated = new WeakMap<Profile, Vec2[]>();
+const tessellatedWalks = new WeakMap<Loop, Vec2[]>();
+const tessellated = new WeakMap<Region, Vec2[]>();
 
-export function tessellateWalk(w: ClosedWalk): Vec2[] {
+export function tessellateWalk(w: Loop): Vec2[] {
   const hit = tessellatedWalks.get(w);
   if (hit) return hit;
   if (isCircleWalk(w)) {
@@ -321,7 +312,7 @@ export function tessellateWalk(w: ClosedWalk): Vec2[] {
 }
 
 /** Outer walk only — AABB, winding, and offset. Holes are separate walks. */
-export function tessellateProfile(p: Profile): Vec2[] {
+export function tessellateRegion(p: Region): Vec2[] {
   const hit = tessellated.get(p);
   if (hit) return hit;
   const poly = tessellateWalk(p.outer);
@@ -386,14 +377,14 @@ function polysInterfere(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   return false;
 }
 
-export function walkContains(w: ClosedWalk, q: Vec2): boolean {
+export function walkContains(w: Loop, q: Vec2): boolean {
   if (!isFiniteWalk(w) || !isFiniteVec(q)) return false;
   if (isCircleWalk(w)) return dist(q, w.center) < Math.abs(w.radius) - EPS;
   return polyContains(tessellateWalk(w), q);
 }
 
-export function profileContains(p: Profile, q: Vec2): boolean {
-  if (!isFiniteProfile(p) || !isFiniteVec(q)) return false;
+export function regionContains(p: Region, q: Vec2): boolean {
+  if (!isFiniteRegion(p) || !isFiniteVec(q)) return false;
   if (!walkContains(p.outer, q)) return false;
   for (const hole of p.holes) {
     if (walkContains(hole, q)) return false;
@@ -401,7 +392,7 @@ export function profileContains(p: Profile, q: Vec2): boolean {
   return true;
 }
 
-function distToArc(e: ProfileEdge, q: Vec2): number {
+function distToArc(e: LoopEdge, q: Vec2): number {
   if (e.carrier.kind !== "circle" || (e.k !== 1 && e.k !== -1)) return distToSegment(q, e.a, e.b);
   const c = e.carrier;
   const closest = projectOnCircle(c, q);
@@ -415,7 +406,7 @@ function distToArc(e: ProfileEdge, q: Vec2): number {
   return Math.min(dist(q, e.a), dist(q, e.b));
 }
 
-function distToWalkBoundary(w: ClosedWalk, q: Vec2): number {
+function distToWalkBoundary(w: Loop, q: Vec2): number {
   if (isCircleWalk(w)) return Math.abs(dist(q, w.center) - Math.abs(w.radius));
   let best = Infinity;
   for (const e of w) {
@@ -426,7 +417,7 @@ function distToWalkBoundary(w: ClosedWalk, q: Vec2): number {
 }
 
 /** Unsigned distance to outer and hole edges — not dist-to-set (0 inside). */
-export function distToProfileBoundary(p: Profile, q: Vec2): number {
+export function distToRegionBoundary(p: Region, q: Vec2): number {
   let best = distToWalkBoundary(p.outer, q);
   for (const hole of p.holes) {
     const d = distToWalkBoundary(hole, q);
@@ -435,22 +426,22 @@ export function distToProfileBoundary(p: Profile, q: Vec2): number {
   return best;
 }
 
-export function distToProfile(p: Profile, q: Vec2): number {
-  if (!isFiniteProfile(p)) return Infinity;
-  if (profileContains(p, q)) return 0;
-  return distToProfileBoundary(p, q);
+export function distToRegion(p: Region, q: Vec2): number {
+  if (!isFiniteRegion(p)) return Infinity;
+  if (regionContains(p, q)) return 0;
+  return distToRegionBoundary(p, q);
 }
 
 /** Positive is outside (grows a round offset); negative is inside. */
-export function signedDistToProfile(p: Profile, q: Vec2): number {
-  if (!isFiniteProfile(p) || !isFiniteVec(q)) return Number.NaN;
-  const d = distToProfileBoundary(p, q);
+export function signedDistToRegion(p: Region, q: Vec2): number {
+  if (!isFiniteRegion(p) || !isFiniteVec(q)) return Number.NaN;
+  const d = distToRegionBoundary(p, q);
   if (!Number.isFinite(d)) return Number.NaN;
-  return profileContains(p, q) ? -d : d;
+  return regionContains(p, q) ? -d : d;
 }
 
 /** SVG path in world (y-up) user space. Arc sweep 1 is CCW. */
-export function edgesSvgPath(edges: readonly ProfileEdge[], close = false): string {
+export function edgesSvgPath(edges: readonly LoopEdge[], close = false): string {
   if (edges.length === 0) return "";
   const start = edges[0]!.a;
   const parts = [`M ${start.x} ${start.y}`];
@@ -469,7 +460,7 @@ export function edgesSvgPath(edges: readonly ProfileEdge[], close = false): stri
   return parts.join(" ");
 }
 
-export function walkSvgPath(w: ClosedWalk, close = false): string {
+export function walkSvgPath(w: Loop, close = false): string {
   if (isCircleWalk(w)) {
     const r = Math.abs(w.radius);
     const { x, y } = w.center;
@@ -479,8 +470,8 @@ export function walkSvgPath(w: ClosedWalk, close = false): string {
   return edgesSvgPath(w, close);
 }
 
-export function profileSvgPath(p: Profile): string {
-  if (!isFiniteProfile(p)) return "";
+export function regionSvgPath(p: Region): string {
+  if (!isFiniteRegion(p)) return "";
   const parts = [walkSvgPath(p.outer, true)];
   for (const hole of p.holes) parts.push(walkSvgPath(hole, true));
   return parts.filter((d) => d.length > 0).join(" ");

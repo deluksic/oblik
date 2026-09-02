@@ -1,11 +1,11 @@
 import { For, Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Profile, Region, Segment } from "@/geom";
+import type { Circle, Csg2, Pick, Region, Segment } from "@/geom";
+import { fillPaint } from "@/geom/csg-draw";
+import { isOffsetCsg, isCsg2, isPick } from "@/geom/csg2";
 import { infiniteLineAxis } from "@/geom/ops";
-import { edgesSvgPath, profileSvgPath, walkSvgPath } from "@/geom/profile";
-import { isOffsetRegion, isRegion } from "@/geom/region";
-import { regionPaint } from "@/geom/region-draw";
+import { edgesSvgPath, regionSvgPath, walkSvgPath } from "@/geom/profile";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
@@ -26,6 +26,7 @@ import {
   RegionHalo,
   RegionMaskDefs,
   RegionOp,
+  RegionTreeFill,
   regionMaskId,
   regionMaskUrl,
 } from "./RegionInk";
@@ -246,20 +247,24 @@ function InfiniteStroke(props: {
   );
 }
 
-function fillPath(v: Profile | Region): string {
-  return isRegion(v) ? "" : profileSvgPath(v);
+function fillPath(v: Region | Csg2 | Pick): string {
+  return isCsg2(v) || isPick(v) ? "" : regionSvgPath(v);
+}
+
+function isCsgNode(v: { kind: string }): v is Csg2 | Pick {
+  return isCsg2(v) || isPick(v);
 }
 
 export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   return (
-    <Show when={isRegion(props.node.value)} fallback={<ProfileFillPath {...props} />}>
+    <Show when={isCsgNode(props.node.value)} fallback={<ProfileFillPath {...props} />}>
       <RegionFill node={props.node} hot={props.hot} selected={props.selected} />
     </Show>
   );
 }
 
 function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boolean }) {
-  const d = createMemo(() => fillPath(props.node.value as Profile | Region));
+  const d = createMemo(() => fillPath(props.node.value as Region | Csg2 | Pick));
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
   return (
     <For each={layers()}>
@@ -283,32 +288,44 @@ function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boole
 }
 
 function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
-  const paint = createMemo(() => regionPaint(props.node.value as Region));
+  const paint = createMemo(() => fillPaint(props.node.value as Region | Csg2 | Pick));
   const id = () => regionMaskId(`e2-${traceKey(props.node)}`);
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
-  const offset = createMemo(() => isRegion(props.node.value) && isOffsetRegion(props.node.value));
+  const offset = createMemo(() => isCsg2(props.node.value) && isOffsetCsg(props.node.value));
   const stock = createMemo(() => paint().stock);
   return (
     <Show when={!paint().empty}>
       <RegionMaskDefs paint={paint()} id={id()} />
       <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
-        <For each={layers()}>
-          {(layer) => (
-            <RegionOp
-              op={stock()}
-              mask={regionMaskUrl(id())}
-              class={
-                layer.kind === "paint"
-                  ? [styles.fill, { [styles.selected]: props.selected || props.hot }]
-                  : layerClass(layer.kind, false, false)
-              }
-              data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
-              fill={layer.kind === "paint" ? undefined : "none"}
-              stroke={layer.kind === "paint" ? "none" : undefined}
-              stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
-            />
-          )}
-        </For>
+        <Show
+          when={paint().tree}
+          fallback={
+            <For each={layers()}>
+              {(layer) => (
+                <RegionOp
+                  op={stock()}
+                  mask={regionMaskUrl(id())}
+                  class={
+                    layer.kind === "paint"
+                      ? [styles.fill, { [styles.selected]: props.selected || props.hot }]
+                      : layerClass(layer.kind, false, false)
+                  }
+                  data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
+                  fill={layer.kind === "paint" ? undefined : "none"}
+                  stroke={layer.kind === "paint" ? "none" : undefined}
+                  stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+                />
+              )}
+            </For>
+          }
+        >
+          <RegionTreeFill
+            paint={paint()}
+            id={id()}
+            class={[styles.fill, { [styles.selected]: props.selected || props.hot }]}
+            data-ink={traceKey(props.node)}
+          />
+        </Show>
       </RegionClipped>
       <Show when={offset()}>
         <RegionOp op={stock()} class={styles.hit} data-ink={traceKey(props.node)} fill="none" />
@@ -329,7 +346,7 @@ export function ProfileOutline(props: {
   overlay?: boolean;
 }) {
   return (
-    <Show when={isRegion(props.node.value)} fallback={<ProfileOutlinePath {...props} />}>
+    <Show when={isCsgNode(props.node.value)} fallback={<ProfileOutlinePath {...props} />}>
       <RegionOutline
         node={props.node}
         hot={props.hot}
@@ -346,7 +363,7 @@ function ProfileOutlinePath(props: {
   selected: boolean;
   overlay?: boolean;
 }) {
-  const d = createMemo(() => fillPath(props.node.value as Profile | Region));
+  const d = createMemo(() => fillPath(props.node.value as Region | Csg2 | Pick));
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
   return (
@@ -375,7 +392,7 @@ function RegionOutline(props: {
   selected: boolean;
   overlay?: boolean;
 }) {
-  const paint = createMemo(() => regionPaint(props.node.value as Region));
+  const paint = createMemo(() => fillPaint(props.node.value as Region | Csg2 | Pick));
   const id = () => regionMaskId(`e2o-${traceKey(props.node)}`);
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   return (

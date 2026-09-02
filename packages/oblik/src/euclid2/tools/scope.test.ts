@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { analyze } from "../../source/analyze";
-import { analyzeMentions } from "../../source/mention";
 import { point, circle, parallelLine, segment } from "../../eval/constructors";
-import { defineScene } from "../../eval/scene";
 import { evaluate } from "../../eval/evaluate";
 import { assignInv } from "../../eval/inv";
+import { defineScene } from "../../eval/scene";
+import { analyze } from "../../source/analyze";
 import { printExpr } from "../../source/expr";
+import { analyzeMentions } from "../../source/mention";
 import { mutedForScope, scopeFromTrace } from "./scope";
 
 const helper = `import { point, circle } from "oblik";
@@ -60,13 +60,19 @@ describe("scopeFromTrace mentions", () => {
     }
     assignInv(trace, mentions);
 
-    const build = scopeFromTrace(trace, { focus: { file: parentFile, name: "build", serial: 0 }, mentions });
+    const build = scopeFromTrace(trace, {
+      focus: { file: parentFile, name: "build", serial: 0 },
+      mentions,
+    });
     expect(printExpr(build.byId["o_drill"]!)).toBe("bag.drill");
     expect(printExpr(build.byId["o_origin"]!)).toBe("bag.origin");
     expect(build.byId["o_hid"]).toBeUndefined();
     expect(build.circles["bag.drill"]).toBeDefined();
 
-    const inner = scopeFromTrace(trace, { focus: { file: helperFile, name: "plate", serial: 0 }, mentions });
+    const inner = scopeFromTrace(trace, {
+      focus: { file: helperFile, name: "plate", serial: 0 },
+      mentions,
+    });
     expect(printExpr(inner.byId["o_drill"]!)).toBe("drill");
     expect(printExpr(inner.byId["o_hid"]!)).toBe("hidden");
     expect(inner.used).toEqual(expect.arrayContaining(["origin", "drill", "hidden"]));
@@ -102,7 +108,10 @@ export default defineScene({
 `;
     const helperFile = "apps/demo/src/layout/plate.ts";
     const parentFile = "apps/demo/src/scenes/t.ts";
-    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
+    const mentions = [
+      analyzeMentions(helperSrc, helperFile),
+      analyzeMentions(parentSrc, parentFile),
+    ];
     const call = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
     const scene = defineScene({
       kind: "euclid2",
@@ -130,7 +139,10 @@ export default defineScene({
     }
     assignInv(trace, mentions);
 
-    const build = scopeFromTrace(trace, { focus: { file: parentFile, name: "build", serial: 0 }, mentions });
+    const build = scopeFromTrace(trace, {
+      focus: { file: parentFile, name: "build", serial: 0 },
+      mentions,
+    });
     expect(build.prints?.["o_h1:0"]).toBeUndefined();
     expect(build.prints?.["o_drill:0"]).toBeDefined();
     expect(build.liveKeys?.has("o_h1:0")).toBe(true);
@@ -207,7 +219,10 @@ export default defineScene({
     expect(origins).toHaveLength(2);
     expect(holes).toHaveLength(2);
 
-    const build = scopeFromTrace(trace, { focus: { file: parentFile, name: "build", serial: 0 }, mentions });
+    const build = scopeFromTrace(trace, {
+      focus: { file: parentFile, name: "build", serial: 0 },
+      mentions,
+    });
     expect(mutedForScope(origins[0]!, build)).toBe(false);
     expect(mutedForScope(origins[1]!, build)).toBe(false);
     expect(mutedForScope(holes[0]!, build)).toBe(false);
@@ -233,7 +248,7 @@ export default defineScene({
   });
 
   test("a fillet in a helper does not unmute sibling invocations", () => {
-    const helperSrc = `import { point, circle, fillet, profile, segment } from "oblik";
+    const helperSrc = `import { point, circle, fillet, region, segment } from "oblik";
 export function plate() {
   const origin = point(0, 0, "o_origin");
   const drill = circle(origin, 0.2, "o_drill");
@@ -243,7 +258,7 @@ export function plate() {
   const ab = segment(origin, B, "o_ab");
   const bc = segment(B, C, "o_bc");
   const ca = segment(C, origin, "o_ca");
-  profile([fillet(origin, 0.1), ab, B, bc, C, ca], "o_mix");
+  region([fillet(origin, 0.1), ab, B, bc, C, ca], "o_mix");
   return { origin, drill };
 }
 `;
@@ -260,8 +275,13 @@ export default defineScene({
 `;
     const helperFile = "apps/demo/src/layout/plate.ts";
     const parentFile = "apps/demo/src/scenes/t.ts";
-    const mentions = [analyzeMentions(helperSrc, helperFile), analyzeMentions(parentSrc, parentFile)];
-    expect(mentions[0]!.functions.find((f) => f.name === "plate")!.calls.map((c) => c.callee)).toEqual([]);
+    const mentions = [
+      analyzeMentions(helperSrc, helperFile),
+      analyzeMentions(parentSrc, parentFile),
+    ];
+    expect(
+      mentions[0]!.functions.find((f) => f.name === "plate")!.calls.map((c) => c.callee),
+    ).toEqual([]);
     const callA = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
     const scene = defineScene({
       kind: "euclid2",
@@ -337,7 +357,10 @@ export default defineScene({
 `;
     const layoutFile = "apps/demo/src/layout/nested-circles.ts";
     const parentFile = "apps/demo/src/scenes/nested-circles.ts";
-    const mentions = [analyzeMentions(layoutSrc, layoutFile), analyzeMentions(parentSrc, parentFile)];
+    const mentions = [
+      analyzeMentions(layoutSrc, layoutFile),
+      analyzeMentions(parentSrc, parentFile),
+    ];
     const petalCall = mentions[0]!.functions.find((f) => f.name === "nestedCircles")!.calls[0]!;
     const nestCall = mentions[1]!.functions.find((f) => f.name === "build")!.calls[0]!;
     const scene = defineScene({
@@ -363,7 +386,12 @@ export default defineScene({
       n.stack = petalIds.has(n.id)
         ? [
             { file: layoutFile, line: n.at.line, column: 4, name: "petal" },
-            { file: layoutFile, line: petalCall.line, column: petalCall.column, name: "nestedCircles" },
+            {
+              file: layoutFile,
+              line: petalCall.line,
+              column: petalCall.column,
+              name: "nestedCircles",
+            },
             { file: parentFile, line: nestCall.line, column: nestCall.column, name: "build" },
           ]
         : [
@@ -378,7 +406,10 @@ export default defineScene({
     const hub = trace.find((n) => n.id === "o_nest_hub")!;
     const rim = trace.find((n) => n.id === "o_nest_rim")!;
 
-    const build = scopeFromTrace(trace, { focus: { file: parentFile, name: "build", serial: 0 }, mentions });
+    const build = scopeFromTrace(trace, {
+      focus: { file: parentFile, name: "build", serial: 0 },
+      mentions,
+    });
     expect(mutedForScope(bead, build)).toBe(false);
     expect(mutedForScope(halo, build)).toBe(false);
     expect(mutedForScope(hub, build)).toBe(false);

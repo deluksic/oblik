@@ -45,7 +45,7 @@ export function dashForLine(
 }
 
 export function takesFill(kind: string): boolean {
-  return kind === "profile" || kind === "region" || kind === "circle";
+  return kind === "region" || kind === "csg2" || kind === "pick" || kind === "circle";
 }
 
 export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureStyle {

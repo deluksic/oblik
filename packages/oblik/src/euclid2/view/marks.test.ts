@@ -56,12 +56,11 @@ const OFFSET = {
 const OFFSET_REGION = {
   id: "o_off",
   occ: 0,
-  kind: "region",
+  kind: "csg2",
   value: {
-    kind: "region",
-    stock: { kind: "offset", of: { kind: "profile", outer: [], holes: [] }, d: -0.2 },
-    subtract: [],
-    keep: [],
+    kind: "csg2",
+    op: "union",
+    of: [{ kind: "offset", of: { kind: "region", outer: [], holes: [] }, d: -0.2 }],
   },
   editable: true,
   stack: [],
