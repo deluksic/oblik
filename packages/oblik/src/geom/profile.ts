@@ -1,7 +1,7 @@
-import type { Along, Branch, Circle, Fillet, LineLike, Profile, ProfileEdge } from "./types";
+import { circleUnitAt } from "./gliders";
 import { filletVertices } from "./offset";
 import { lineBasis } from "./ops";
-import { circleUnitAt } from "./gliders";
+import type { Along, Branch, Circle, Fillet, LineLike, Profile, ProfileEdge } from "./types";
 import {
   add,
   cross2,
@@ -50,7 +50,8 @@ function isFiniteEdge(e: ProfileEdge): boolean {
   if (!isFiniteVec(e.a) || !isFiniteVec(e.b)) return false;
   if (e.carrier.kind === "circle") {
     const c = e.carrier;
-    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || Math.abs(c.radius) < EPS) return false;
+    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || Math.abs(c.radius) < EPS)
+      return false;
     if (e.k !== 1 && e.k !== -1) return false;
     return dist(e.a, e.b) > EPS;
   }
@@ -61,7 +62,14 @@ function isFiniteEdge(e: ProfileEdge): boolean {
 function asVec2(v: unknown): Vec2 | null {
   if (!v || typeof v !== "object") return null;
   const p = v as { x?: unknown; y?: unknown; kind?: string };
-  if (p.kind === "along" || p.kind === "fillet" || p.kind === "circle" || p.kind === "line" || p.kind === "segment" || p.kind === "parallelLine") {
+  if (
+    p.kind === "along" ||
+    p.kind === "fillet" ||
+    p.kind === "circle" ||
+    p.kind === "line" ||
+    p.kind === "segment" ||
+    p.kind === "parallelLine"
+  ) {
     return null;
   }
   if (typeof p.x === "number" && typeof p.y === "number") return { x: p.x, y: p.y };
@@ -186,12 +194,17 @@ function sampleArc(e: ProfileEdge, steps = 24): Vec2[] {
   return out;
 }
 
+const tessellated = new WeakMap<Profile, Vec2[]>();
+
 export function tessellateProfile(p: Profile): Vec2[] {
+  const hit = tessellated.get(p);
+  if (hit) return hit;
   const poly: Vec2[] = [];
   for (const e of p.outer) {
     poly.push(e.a);
     if (e.carrier.kind === "circle") poly.push(...sampleArc(e));
   }
+  tessellated.set(p, poly);
   return poly;
 }
 

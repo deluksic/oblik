@@ -1,15 +1,17 @@
 import { describe, expect, test } from "vitest";
 
-import { alongValue, profileContains, profileValue } from "./profile";
+import { alongValue, filletValue, profileContains, profileSvgPath, profileValue } from "./profile";
 import {
   compileRegion,
   distToRegion,
   formulaSdf,
   leftOfValue,
   regionContains,
+  regionSvgPath,
   regionValue,
   rightOfValue,
 } from "./region";
+import { regionPaint } from "./region-draw";
 import type { Circle, Line, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -113,6 +115,63 @@ describe("region CSG field", () => {
     expect(regionContains(face, { x: 3.5, y: 1 })).toBe(true);
   });
 
+  test("regionPaint keeps stadium arcs instead of marching-square polylines", () => {
+    const stock = rect(0, 0, 4, 2);
+    const slot = stadium(2, 1, 2, 0.8);
+    const face = regionValue(stock, { subtract: slot });
+    const paint = regionPaint(face);
+    expect(paint.empty).toBe(false);
+    expect(paint.stock).toEqual({ kind: "profile", d: profileSvgPath(stock) });
+    expect(paint.holes).toHaveLength(1);
+    const hole = paint.holes[0]!;
+    expect(hole.kind).toBe("profile");
+    if (hole.kind !== "profile") throw new Error("expected profile hole");
+    expect(hole.d).toBe(profileSvgPath(slot));
+    expect(hole.d).toContain("A ");
+    const jaggy = regionSvgPath(face);
+    expect(jaggy).not.toContain("A ");
+    expect(jaggy.split("L ").length).toBeGreaterThan(20);
+  });
+
+  test("filleted stock keeps arc commands in the mask stock path", () => {
+    const corners = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 2 },
+      { x: 0, y: 2 },
+    ];
+    const cycle: unknown[] = [];
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i]!;
+      const b = corners[(i + 1) % 4]!;
+      cycle.push(filletValue(a, 0.2), seg(a, b));
+    }
+    const stock = profileValue(cycle);
+    const paint = regionPaint(regionValue(stock, { subtract: disk(1, 1, 0.3) }));
+    expect(paint.stock.kind).toBe("profile");
+    if (paint.stock.kind !== "profile") throw new Error("expected profile stock");
+    expect(paint.stock.d).toContain("A ");
+    expect(paint.holes).toEqual([{ kind: "circle", cx: 1, cy: 1, r: 0.3 }]);
+  });
+
+  test("contains isolates one island with a clip rect, not a compiled outline", () => {
+    const face = regionValue(rect(0, 0, 4, 2), { subtract: stadium(2, 1, 5, 0.35) });
+    const top = regionValue(face, { contains: { x: 2, y: 1.7 } });
+    const paint = regionPaint(top);
+    expect(paint.empty).toBe(false);
+    expect(paint.islandClip).toMatch(/^M /);
+    expect(regionContains(top, { x: 2, y: 1.7 })).toBe(true);
+    expect(regionContains(top, { x: 2, y: 0.3 })).toBe(false);
+    expect(regionPaint(regionValue(face, { contains: { x: 2, y: 1 } })).empty).toBe(true);
+  });
+
+  test("half-plane keep is a clip polygon", () => {
+    const paint = regionPaint(regionValue(rect(0, 0, 4, 2), { keep: leftOfValue(split) }));
+    expect(paint.empty).toBe(false);
+    expect(paint.keepClip).toMatch(/^M /);
+    expect(paint.islandClip).toBeUndefined();
+  });
+
   test("NaN keep operand NaNs the derived region, not the stock", () => {
     const face = regionValue(rect(0, 0, 2, 2));
     const bad: Line = { kind: "line", origin: { x: Number.NaN, y: 0 }, direction: { x: 0, y: 1 } };
@@ -121,5 +180,29 @@ describe("region CSG field", () => {
     expect(face.stock.kind).toBe("profile");
     expect(regionContains(face, { x: 1, y: 1 })).toBe(true);
     expect(regionContains(left, { x: 1, y: 1 })).toBe(false);
+  });
+
+  test("mask paint and SDF pick stay cheaper than compiling four outlines", () => {
+    const cutters = () => [
+      disk(0.5, 0.5, 0.16),
+      disk(3.5, 0.5, 0.16),
+      disk(3.5, 1.5, 0.16),
+      disk(0.5, 1.5, 0.16),
+      stadium(3.55, 1, 1.7, 0.42),
+    ];
+    const makeFace = () => regionValue(rect(0, 0, 4, 2), { subtract: cutters() });
+    const tPaint = performance.now();
+    for (let i = 0; i < 4; i++) regionPaint(makeFace());
+    const paintMs = performance.now() - tPaint;
+    const face = makeFace();
+    const tSdf = performance.now();
+    for (let i = 0; i < 800; i++)
+      distToRegion(face, { x: (i % 40) * 0.1, y: ((i / 40) | 0) * 0.1 });
+    const sdfMs = performance.now() - tSdf;
+    const tCompile = performance.now();
+    for (let i = 0; i < 4; i++) compileRegion(makeFace());
+    const compileMs = performance.now() - tCompile;
+    expect(paintMs).toBeLessThan(compileMs);
+    expect(sdfMs).toBeLessThan(compileMs);
   });
 });

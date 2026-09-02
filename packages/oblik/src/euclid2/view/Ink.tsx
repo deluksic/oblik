@@ -4,7 +4,8 @@ import type { TraceNode } from "@/eval/context";
 import type { Circle, Profile, Region, Segment } from "@/geom";
 import { infiniteLineAxis } from "@/geom/ops";
 import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
-import { isRegion, regionSvgPath } from "@/geom/region";
+import { isRegion } from "@/geom/region";
+import { regionPaint } from "@/geom/region-draw";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
@@ -20,6 +21,7 @@ import {
 } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
 import { ChromeOutsideClip } from "./ChromeClip";
+import { RegionClipped, RegionMaskDefs, RegionOp, regionMaskId, regionMaskUrl } from "./RegionInk";
 
 import styles from "./View.module.css";
 
@@ -238,12 +240,19 @@ function InfiniteStroke(props: {
 }
 
 function fillPath(v: Profile | Region): string {
-  return isRegion(v) ? regionSvgPath(v) : profileSvgPath(v);
+  return isRegion(v) ? "" : profileSvgPath(v);
 }
 
 export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+  return (
+    <Show when={isRegion(props.node.value)} fallback={<ProfileFillPath {...props} />}>
+      <RegionFill node={props.node} hot={props.hot} selected={props.selected} />
+    </Show>
+  );
+}
+
+function ProfileFillPath(props: { node: TraceNode; hot: boolean; selected: boolean }) {
   const d = createMemo(() => fillPath(props.node.value as Profile | Region));
-  const evenodd = () => isRegion(props.node.value);
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
   return (
     <For each={layers()}>
@@ -257,12 +266,41 @@ export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: bo
           data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
           d={d()}
           fill={layer.kind === "paint" ? undefined : "none"}
-          fill-rule={evenodd() ? "evenodd" : undefined}
           stroke={layer.kind === "paint" ? "none" : undefined}
           stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
         />
       )}
     </For>
+  );
+}
+
+function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+  const paint = createMemo(() => regionPaint(props.node.value as Region));
+  const id = () => regionMaskId(`e2-${traceKey(props.node)}`);
+  const layers = createMemo(() => layersOf(props.hot, props.selected, false));
+  return (
+    <Show when={!paint().empty}>
+      <RegionMaskDefs paint={paint()} id={id()} />
+      <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
+        <For each={layers()}>
+          {(layer) => (
+            <RegionOp
+              op={paint().stock}
+              mask={regionMaskUrl(id())}
+              class={
+                layer.kind === "paint"
+                  ? [styles.fill, { [styles.selected]: props.selected || props.hot }]
+                  : layerClass(layer.kind, false, false)
+              }
+              data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
+              fill={layer.kind === "paint" ? undefined : "none"}
+              stroke={layer.kind === "paint" ? "none" : undefined}
+              stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+            />
+          )}
+        </For>
+      </RegionClipped>
+    </Show>
   );
 }
 
@@ -272,8 +310,25 @@ export function ProfileOutline(props: {
   selected: boolean;
   overlay?: boolean;
 }) {
+  return (
+    <Show when={isRegion(props.node.value)} fallback={<ProfileOutlinePath {...props} />}>
+      <RegionOutline
+        node={props.node}
+        hot={props.hot}
+        selected={props.selected}
+        overlay={props.overlay}
+      />
+    </Show>
+  );
+}
+
+function ProfileOutlinePath(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  overlay?: boolean;
+}) {
   const d = createMemo(() => fillPath(props.node.value as Profile | Region));
-  const evenodd = () => isRegion(props.node.value);
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
   return (
@@ -287,13 +342,50 @@ export function ProfileOutline(props: {
             opacity={layer.opacity}
             d={d()}
             fill={layer.kind === "paint" ? undefined : "none"}
-            fill-rule={evenodd() ? "evenodd" : undefined}
             stroke={layer.kind === "paint" ? "none" : undefined}
             stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
           />
         )}
       </For>
     </>
+  );
+}
+
+function RegionOutline(props: {
+  node: TraceNode;
+  hot: boolean;
+  selected: boolean;
+  overlay?: boolean;
+}) {
+  const paint = createMemo(() => regionPaint(props.node.value as Region));
+  const id = () => regionMaskId(`e2o-${traceKey(props.node)}`);
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
+  const ops = createMemo(() => [paint().stock, ...paint().holes]);
+  return (
+    <Show when={!paint().empty}>
+      <RegionMaskDefs paint={paint()} id={id()} />
+      <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
+        <For each={layers()}>
+          {(layer) => (
+            <For each={ops()}>
+              {(op) => (
+                <RegionOp
+                  op={op}
+                  mask={regionMaskUrl(id())}
+                  class={
+                    layer.kind === "paint" ? styles.fill : layerClass(layer.kind, false, false)
+                  }
+                  opacity={layer.opacity}
+                  fill={layer.kind === "paint" ? undefined : "none"}
+                  stroke={layer.kind === "paint" ? "none" : undefined}
+                  stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
+                />
+              )}
+            </For>
+          )}
+        </For>
+      </RegionClipped>
+    </Show>
   );
 }
 

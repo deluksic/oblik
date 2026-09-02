@@ -1,7 +1,7 @@
 import { signedDist } from "./ops";
 import { isFiniteProfile, signedDistToProfile, tessellateProfile } from "./profile";
 import type { Circle, HalfPlane, LineLike, Profile, Region, RegionOperand } from "./types";
-import { dist, distToSegment, isFiniteVec, type Vec2 } from "./vec";
+import { dist, isFiniteVec, type Vec2 } from "./vec";
 
 export type RegionOpts = {
   subtract?: RegionOperand | readonly RegionOperand[];
@@ -104,7 +104,11 @@ function operandSdf(op: RegionOperand, p: Vec2): number {
     const s = signedDist(p, op.line);
     return op.side === 1 ? -s : s;
   }
-  return signedDistToRegion(op, p);
+  const d = formulaSdf(op, p);
+  if (op.contains && isFiniteVec(op.contains) && !islandContains(op, p)) {
+    return Number.isFinite(d) ? Math.max(Math.abs(d), 1e-6) : Number.NaN;
+  }
+  return d;
 }
 
 /** CSG field of the formula, ignoring this region's `contains` filter. */
@@ -210,28 +214,6 @@ function ringContains(ring: readonly Vec2[], q: Vec2): boolean {
     }
   }
   return n % 2 === 1;
-}
-
-function evenOdd(rings: readonly (readonly Vec2[])[], q: Vec2): boolean {
-  let inside = false;
-  for (const ring of rings) {
-    if (ringContains(ring, q)) inside = !inside;
-  }
-  return inside;
-}
-
-function distToRings(rings: readonly (readonly Vec2[])[], q: Vec2): number {
-  let best = Infinity;
-  for (const ring of rings) {
-    if (ring.length < 2) continue;
-    for (let i = 0; i < ring.length; i++) {
-      const a = ring[i]!;
-      const b = ring[(i + 1) % ring.length]!;
-      const d = distToSegment(q, a, b);
-      if (d < best) best = d;
-    }
-  }
-  return best;
 }
 
 type Seg = { a: Vec2; b: Vec2 };
@@ -398,6 +380,7 @@ function compileUncached(r: Region): Vec2[][] {
   return filterIsland(rings, probe);
 }
 
+/** Marching-squares outline. Tests and optional compile only — views use `regionPaint`. */
 export function compileRegion(r: Region): Vec2[][] {
   if (!isFiniteRegion(r)) return [];
   let rings = compiled.get(r);
@@ -408,40 +391,117 @@ export function compileRegion(r: Region): Vec2[][] {
   return rings;
 }
 
-function occupied(r: Region, q: Vec2, rings: readonly (readonly Vec2[])[]): boolean {
-  if (r.contains && isFiniteVec(r.contains)) return rings.length > 0 && evenOdd(rings, q);
-  return formulaSdf(r, q) < 0;
+const ISLAND_GRID = 48;
+const islandBoxes = new WeakMap<Region, Aabb | null>();
+
+function inAabb(box: Aabb, q: Vec2, pad = 0): boolean {
+  return (
+    q.x >= box.minX - pad && q.x <= box.maxX + pad && q.y >= box.minY - pad && q.y <= box.maxY + pad
+  );
+}
+
+export function aabbPath(box: Aabb): string {
+  return `M ${box.minX} ${box.minY} H ${box.maxX} V ${box.maxY} H ${box.minX} Z`;
+}
+
+/** Bounding box of the material component that contains `r.contains`. */
+export function islandAabb(r: Region): Aabb | null {
+  if (!isFiniteRegion(r) || !r.contains || !isFiniteVec(r.contains)) return null;
+  if (islandBoxes.has(r)) return islandBoxes.get(r) ?? null;
+  const box = floodIslandAabb(r);
+  islandBoxes.set(r, box);
+  return box;
+}
+
+function floodIslandAabb(r: Region): Aabb | null {
+  const probe = r.contains;
+  if (!probe || !(formulaSdf(r, probe) < 0)) return null;
+  const bounds = regionAabb(r);
+  if (!bounds) return null;
+  const padX = Math.max((bounds.maxX - bounds.minX) * 0.04, 1e-3);
+  const padY = Math.max((bounds.maxY - bounds.minY) * 0.04, 1e-3);
+  const minX = bounds.minX - padX;
+  const minY = bounds.minY - padY;
+  const maxX = bounds.maxX + padX;
+  const maxY = bounds.maxY + padY;
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const nx = ISLAND_GRID;
+  const ny = Math.max(8, Math.round((ISLAND_GRID * h) / (w || 1)));
+  const cellX = w / (nx - 1);
+  const cellY = h / (ny - 1);
+  const gx = (x: number) => Math.min(nx - 1, Math.max(0, Math.round((x - minX) / cellX)));
+  const gy = (y: number) => Math.min(ny - 1, Math.max(0, Math.round((y - minY) / cellY)));
+  const at = (i: number, j: number) => formulaSdf(r, { x: minX + i * cellX, y: minY + j * cellY });
+  const seen = new Uint8Array(nx * ny);
+  const stack = [gx(probe.x) + gy(probe.y) * nx];
+  seen[stack[0]!] = 1;
+  let iMin = nx;
+  let iMax = -1;
+  let jMin = ny;
+  let jMax = -1;
+  while (stack.length) {
+    const k = stack.pop()!;
+    const i = k % nx;
+    const j = (k / nx) | 0;
+    if (!(at(i, j) < 0)) continue;
+    if (i < iMin) iMin = i;
+    if (i > iMax) iMax = i;
+    if (j < jMin) jMin = j;
+    if (j > jMax) jMax = j;
+    const push = (ii: number, jj: number) => {
+      if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) return;
+      const idx = ii + jj * nx;
+      if (seen[idx]) return;
+      seen[idx] = 1;
+      stack.push(idx);
+    };
+    push(i - 1, j);
+    push(i + 1, j);
+    push(i, j - 1);
+    push(i, j + 1);
+  }
+  if (iMax < iMin) return null;
+  return {
+    minX: minX + iMin * cellX - cellX,
+    minY: minY + jMin * cellY - cellY,
+    maxX: minX + iMax * cellX + cellX,
+    maxY: minY + jMax * cellY + cellY,
+  };
+}
+
+function islandContains(r: Region, q: Vec2): boolean {
+  if (!(formulaSdf(r, q) < 0)) return false;
+  const box = islandAabb(r);
+  return box != null && inAabb(box, q);
+}
+
+function occupied(r: Region, q: Vec2): boolean {
+  if (!(formulaSdf(r, q) < 0)) return false;
+  if (!r.contains || !isFiniteVec(r.contains)) return true;
+  return islandContains(r, q);
 }
 
 export function signedDistToRegion(r: Region, q: Vec2): number {
   if (!isFiniteRegion(r) || !isFiniteVec(q)) return Number.NaN;
-  const rings = compileRegion(r);
   const d = formulaSdf(r, q);
-  if (r.contains && isFiniteVec(r.contains)) {
-    if (rings.length === 0) return Number.isFinite(d) ? Math.abs(d) || Infinity : Infinity;
-    if (evenOdd(rings, q)) return Number.isFinite(d) ? Math.min(d, 0) : -distToRings(rings, q);
-    const outline = distToRings(rings, q);
-    return Number.isFinite(d) ? Math.max(d, outline) : outline;
-  }
+  if (!occupied(r, q)) return Number.isFinite(d) ? Math.max(d, 0) : Number.NaN;
   return d;
 }
 
 export function regionContains(r: Region, q: Vec2): boolean {
   if (!isFiniteRegion(r) || !isFiniteVec(q)) return false;
-  return occupied(r, q, compileRegion(r));
+  return occupied(r, q);
 }
 
 export function distToRegion(r: Region, q: Vec2): number {
   if (!isFiniteRegion(r) || !isFiniteVec(q)) return Infinity;
-  const rings = compileRegion(r);
-  if (occupied(r, q, rings)) return 0;
-  if (rings.length === 0) {
-    const d = formulaSdf(r, q);
-    return Number.isFinite(d) ? Math.max(0, d) : Infinity;
-  }
-  return distToRings(rings, q);
+  if (occupied(r, q)) return 0;
+  const d = formulaSdf(r, q);
+  return Number.isFinite(d) ? Math.max(0, d) : Infinity;
 }
 
+/** Polyline path of `compileRegion`. Not the view; prefer `regionPaint` for exact operands. */
 export function regionSvgPath(r: Region): string {
   const rings = compileRegion(r);
   if (rings.length === 0) return "";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { circle, line, paint, point, segment } from "../eval/constructors";
+import { circle, line, paint, point, profile, region, segment } from "../eval/constructors";
 import type { TraceNode } from "../eval/context";
 import { evaluate } from "../eval/evaluate";
 import { defineScene } from "../eval/scene";
@@ -108,6 +108,30 @@ describe("figureToSvg", () => {
     expect(out.svg).toContain('y2="0"');
     expect(out.svg).toContain('"-2"');
     expect(out.svg).toContain('"2"');
+  });
+
+  test("paints a region with a luminance mask and exact hole circles", () => {
+    const out = svgFor(() => {
+      const a = point(0, 0, "o_ra");
+      const b = point(4, 0, "o_rb");
+      const c = point(4, 3, "o_rc");
+      const d = point(0, 3, "o_rd");
+      const ab = segment(a, b, "o_rab");
+      const bc = segment(b, c, "o_rbc");
+      const cd = segment(c, d, "o_rcd");
+      const da = segment(d, a, "o_rda");
+      const stock = profile([a, ab, b, bc, c, cd, d, da], "o_rstock");
+      const holeAt = point(2, 1.5, "o_rhc");
+      const hole = circle(holeAt, 0.5, "o_rhole");
+      const face = region(stock, { subtract: hole }, "o_rface");
+      paint(face, { stroke: "#1c1917", fill: "#cfe8d4", width: 1.2 }, "o_rp");
+    });
+
+    expect(out.empty).toBe(false);
+    expect(out.svg).toContain("<mask");
+    expect(out.svg).toContain('maskUnits="userSpaceOnUse"');
+    expect(out.svg).toContain('fill="#cfe8d4"');
+    expect(out.svg).toMatch(/<circle[^>]*r="0.5"/);
   });
 
   test("emits stroke-dasharray for dashed styles", () => {

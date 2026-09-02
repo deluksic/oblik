@@ -15,6 +15,7 @@ import stockCuttersFigure from "../../../../apps/demo/src/scenes/stock-cutters-f
 import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
+import { figureToSvg } from "../figure/export";
 import { compileRegion, isRegion, regionContains } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
@@ -261,5 +262,17 @@ describe("migrated demo scenes", () => {
     expect(paints.has("o_sc_face:0")).toBe(true);
     expect(paints.has("o_sc_probe:0")).toBe(true);
     expect(paints.has("o_sc_split:0")).toBe(true);
+
+    const out = figureToSvg({
+      trace,
+      frame: stockCuttersFigure.frame,
+      camera: stockCuttersFigure.camera,
+      paper: stockCuttersFigure.paper,
+      title: stockCuttersFigure.title,
+    });
+    expect(out.svg).toContain("<mask");
+    expect(out.svg).toContain('maskUnits="userSpaceOnUse"');
+    expect(out.svg).toMatch(/\sA /);
+    expect(out.svg).toContain("<circle");
   });
 });

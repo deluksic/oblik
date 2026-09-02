@@ -3,7 +3,9 @@ import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "../ev
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
 import { profileSvgPath } from "../geom/profile";
-import { compileRegion, regionSvgPath } from "../geom/region";
+import { regionAabb } from "../geom/region";
+import { regionPaint, type DrawOp } from "../geom/region-draw";
+import type { Region } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
@@ -101,8 +103,10 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
         inc(e.b.x, e.b.y);
       }
     } else if (v.kind === "region") {
-      for (const ring of compileRegion(v)) {
-        for (const p of ring) inc(p.x, p.y);
+      const box = regionAabb(v);
+      if (box) {
+        inc(box.minX, box.minY);
+        inc(box.maxX, box.maxY);
       }
     } else if (isGlider(v)) inc(v.x, v.y);
   }
@@ -137,6 +141,41 @@ function styleAttrs(style: FigureStyle, filled: boolean): string {
   );
 }
 
+function drawOpEl(op: DrawOp, attrs: string): string {
+  if (op.kind === "circle") {
+    return `<circle cx="${num(op.cx)}" cy="${num(op.cy)}" r="${num(op.r)}" ${attrs}/>`;
+  }
+  if (!op.d) return "";
+  return `<path d="${op.d}" ${attrs}/>`;
+}
+
+function regionToSvg(r: Region, style: FigureStyle, id: string): string {
+  const p = regionPaint(r);
+  if (p.empty) return "";
+  const key = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const box = p.box;
+  const w = box.maxX - box.minX;
+  const h = box.maxY - box.minY;
+  const holes = p.holes.map((op) => drawOpEl(op, 'fill="#000" stroke="none"')).join("");
+  const mask =
+    `<mask id="rm-${key}" maskUnits="userSpaceOnUse" x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}">` +
+    `<rect x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}" fill="#000"/>` +
+    drawOpEl(p.stock, 'fill="#fff" stroke="none"') +
+    holes +
+    `</mask>`;
+  const clips: string[] = [];
+  if (p.keepClip) clips.push(`<clipPath id="rk-${key}"><path d="${p.keepClip}"/></clipPath>`);
+  if (p.islandClip) clips.push(`<clipPath id="ri-${key}"><path d="${p.islandClip}"/></clipPath>`);
+  const fillAttrs = `${styleAttrs(style, true)} mask="url(#rm-${key})"`;
+  const strokeAttrs = `${styleAttrs({ ...style, fill: "none" }, false)} mask="url(#rm-${key})"`;
+  let body = drawOpEl(p.stock, fillAttrs);
+  for (const hole of p.holes) body += drawOpEl(hole, strokeAttrs);
+  let wrapped = body;
+  if (p.islandClip) wrapped = `<g clip-path="url(#ri-${key})">${wrapped}</g>`;
+  if (p.keepClip) wrapped = `<g clip-path="url(#rk-${key})">${wrapped}</g>`;
+  return `<defs>${mask}${clips.join("")}</defs>${wrapped}`;
+}
+
 function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string {
   const v = s.geom.value;
   if (v.kind === "segment") {
@@ -159,9 +198,7 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
     return `<path d="${d}" ${styleAttrs(s.style, true)}/>`;
   }
   if (v.kind === "region") {
-    const d = regionSvgPath(v);
-    if (!d) return "";
-    return `<path d="${d}" fill-rule="evenodd" ${styleAttrs(s.style, true)}/>`;
+    return regionToSvg(v, s.style, `${s.geom.id}-${s.geom.occ}`);
   }
   const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : null;
   if (point) {
