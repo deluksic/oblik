@@ -677,7 +677,7 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
     }
     if (closed) {
       const area = polyArea(tessellateWalk(cycle));
-      if (cycle.length >= 3 && Math.abs(area) > 1e-6) loops.push(cycle);
+      if (Math.abs(area) > 1e-6) loops.push(cycle);
     } else {
       failed++;
       for (const i of consumed) used[i] = 0;
