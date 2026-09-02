@@ -100,14 +100,16 @@ describe("migrated demo scenes", () => {
 
   test("pie traces three roundOffset slices from one gap slider", () => {
     const { trace } = run(pie, ["apps/demo/src/scenes/pie.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(3);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(0);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(3);
     expect(trace.filter((n) => n.kind === "segment")).toHaveLength(3);
     expect(trace.filter((n) => n.value.kind === "gliderCircle")).toHaveLength(3);
     expect(trace.some((n) => n.bind === "gap" && n.kind === "slider")).toBe(true);
     const one = trace.find((n) => n.bind === "one");
-    expect(one?.kind).toBe("profile");
-    expect(one?.value.kind === "profile" ? one.value.outer : []).toHaveLength(
-      one?.value.kind === "profile" ? 3 : 0,
+    expect(one?.kind).toBe("region");
+    const stock = one?.value.kind === "region" ? one.value.stock : null;
+    expect(stock?.kind === "profile" ? stock.outer : []).toHaveLength(
+      stock?.kind === "profile" ? 3 : 0,
     );
   });
 
@@ -128,7 +130,8 @@ describe("migrated demo scenes", () => {
 
   test("fillet scene traces the challenge cases from one radius slider", () => {
     const { trace } = run(fillet, ["apps/demo/src/scenes/fillet.ts"]);
-    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(9);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(8);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
     const flat = trace.find((n) => n.bind === "flat");
     expect(flat?.kind).toBe("profile");
@@ -172,11 +175,13 @@ describe("migrated demo scenes", () => {
       adj?.value.kind === "profile" ? 6 : 0,
     );
     const inset = trace.find((n) => n.bind === "inset");
+    expect(inset?.kind).toBe("region");
+    const insetStock = inset?.value.kind === "region" ? inset.value.stock : null;
     expect(
-      inset?.value.kind === "profile"
-        ? inset.value.outer.filter((e) => e.carrier.kind === "circle")
+      insetStock?.kind === "profile"
+        ? insetStock.outer.filter((e) => e.carrier.kind === "circle")
         : [],
-    ).toHaveLength(inset?.value.kind === "profile" ? 4 : 0);
+    ).toHaveLength(insetStock?.kind === "profile" ? 4 : 0);
   });
 
   test("stock-cutters traces one face formula plus hold/left/right", () => {

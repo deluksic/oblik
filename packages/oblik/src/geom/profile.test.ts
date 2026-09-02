@@ -334,7 +334,7 @@ describe("profile holes", () => {
     expect(p.outer).toHaveLength(0);
   });
 
-  test("roundOffset of a holed profile is empty until offset is a region", () => {
+  test("roundOffset of a holed profile is empty at the walk kernel", () => {
     const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [rectCycle(0.3, 0.3, 0.7, 0.7)] });
     expect(roundOffsetValue(p, 0.1)).toEqual([]);
     expect(roundOffsetValue(p, 0)[0]?.holes).toHaveLength(1);

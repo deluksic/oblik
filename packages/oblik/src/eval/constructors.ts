@@ -17,7 +17,7 @@ import {
   isFiniteRegion,
   isProfile,
   leftOfValue,
-  nanProfile,
+  nanRegion,
   profileValue,
   regionValue,
   rightOfValue,
@@ -248,10 +248,12 @@ export const profile = mark(
 );
 
 export const roundOffset = mark(
-  (face: Profile, distance: number, id?: string): Profile => {
+  (face: Profile, distance: number, id?: string): Region => {
     const d = draftAt(id, 0, distance);
-    if (!face || typeof face !== "object" || !isProfile(face)) return nanProfile();
-    return traced(roundOffsetValue(face, d)[0] ?? nanProfile(), id);
+    if (!face || typeof face !== "object" || !isProfile(face)) return nanRegion();
+    const walks = roundOffsetValue(face, d);
+    if (walks.length !== 1) return nanRegion();
+    return traced(regionValue(walks[0]), id);
   },
   { dof: [1] },
 );

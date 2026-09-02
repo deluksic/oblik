@@ -306,10 +306,11 @@ describe("evaluate", () => {
       ),
     });
     const off = trace.find((n) => n.id === "off");
-    expect(off?.kind).toBe("profile");
+    expect(off?.kind).toBe("region");
     expect(off?.editable).toBe(true);
-    expect(off?.value.kind === "profile" ? off.value.outer : []).toHaveLength(
-      off?.value.kind === "profile" ? 2 : 0,
+    const stock = off?.value.kind === "region" ? off.value.stock : null;
+    expect(stock?.kind === "profile" ? stock.outer : []).toHaveLength(
+      stock?.kind === "profile" ? 2 : 0,
     );
     const drafted = evaluate(scene, {
       annotations: analyze(`roundOffset(face, -0.12, "off");\n`),

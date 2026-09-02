@@ -307,7 +307,8 @@ function vertexJoin(
  * past `r` is a sharp inner square). Reverse, a missed hit, or fewer than
  * two surviving edges → `[]`. A profile with holes also returns `[]` (offset
  * is a set operation; topology can change). Does not split islands or clip
- * non-adjacent swallows.
+ * non-adjacent swallows. The `roundOffset` constructor wraps a single walk as
+ * a region — never a filletable profile.
  */
 export function roundOffsetValue(p: Profile, d: number): Profile[] {
   if (!isFiniteProfile(p) || !Number.isFinite(d)) return [];

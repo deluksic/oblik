@@ -4,6 +4,8 @@ import { clickTool, commitTool, enrichHit, exprOfPlace, filterTools, ghostOf, ho
 import { profileEligibleCarriers, profileHidesExisting } from "./tools/profile";
 import type { PlacePoint } from "./place";
 import type { TraceNode } from "../eval/context";
+import { roundOffsetValue } from "../geom/offset";
+import { regionValue } from "../geom/region";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -1501,5 +1503,26 @@ describe("fillet tool", () => {
     const profileGhost = g as { kind: "profile"; edges: { carrier: { kind: string } }[] };
     expect(profileGhost.edges).toHaveLength(5);
     expect(profileGhost.edges.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+  });
+
+  test("fillet does not pick a roundOffset region", () => {
+    const walks = roundOffsetValue(square, -0.2);
+    expect(walks[0]).toBeTruthy();
+    const inset = {
+      id: "o_fil_inset",
+      occ: 0,
+      kind: "region",
+      bind: "inset",
+      value: regionValue(walks[0]),
+      editable: false,
+      stack: [],
+    } as TraceNode;
+    const hit = enrichHit(
+      startTool("fillet"),
+      { world: { x: 0.5, y: 0.5 }, point: free(0.5, 0.5) },
+      { trace: [inset], camera: { x: 0, y: 0, scale: 48 }, size: { w: 800, h: 600 }, screen: { x: 10, y: 10 } },
+    );
+    expect(hit.profile).toBeUndefined();
+    expect(hit.corner).toBeUndefined();
   });
 });
