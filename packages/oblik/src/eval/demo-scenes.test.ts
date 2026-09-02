@@ -9,6 +9,7 @@ import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-g
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import pie from "../../../../apps/demo/src/scenes/pie.ts";
 import plateFigure from "../../../../apps/demo/src/scenes/plate-figure.ts";
+import roundOffsetScene from "../../../../apps/demo/src/scenes/round-offset.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
 import stockCuttersFigure from "../../../../apps/demo/src/scenes/stock-cutters-figure.ts";
@@ -96,6 +97,62 @@ describe("migrated demo scenes", () => {
       .filter((n) => n.id === "o_origin" && n.value.kind === "point")
       .map((n) => (n.value.kind === "point" ? n.value.x : 0));
     expect(new Set(xs.map((x) => x.toFixed(2))).size).toBe(3);
+  });
+
+  test("round-offset playground traces numeric leftovers and holed plates", () => {
+    const { trace } = run(roundOffsetScene, ["apps/demo/src/scenes/round-offset.ts"]);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(11);
+    expect(trace.filter((n) => n.kind === "profile")).toHaveLength(11);
+    expect(trace.filter((n) => n.kind === "slider")).toHaveLength(1);
+
+    const sqInset = trace.find((n) => n.bind === "sqInset");
+    expect(sqInset?.kind).toBe("region");
+    expect(sqInset?.editable).toBe(true);
+    const sqStock = sqInset?.value.kind === "region" ? sqInset.value.stock : null;
+    expect(sqStock?.kind).toBe("offset");
+    expect(sqStock?.kind === "offset" ? sqStock.d : 0).toBeCloseTo(-0.22);
+
+    const shared = trace.find((n) => n.bind === "shared");
+    expect(shared?.kind).toBe("region");
+    expect(shared?.editable).toBe(false);
+
+    const frameIn = trace.find((n) => n.bind === "frameIn");
+    expect(frameIn?.value.kind === "profile" ? frameIn.value.holes : []).toHaveLength(1);
+    const twoHoles = trace.find((n) => n.bind === "twoHoles");
+    expect(twoHoles?.value.kind === "profile" ? twoHoles.value.holes : []).toHaveLength(2);
+    const circHole = trace.find((n) => n.bind === "circHole");
+    expect(circHole?.value.kind === "profile" ? circHole.value.outer.length : 0).toBeGreaterThan(0);
+    expect(circHole?.value.kind === "profile" ? circHole.value.holes : []).toHaveLength(1);
+
+    const holeInset = trace.find((n) => n.bind === "holeInset");
+    expect(holeInset?.editable).toBe(true);
+    if (!holeInset || !isRegion(holeInset.value)) throw new Error("missing holeInset");
+    expect(regionContains(holeInset.value, { x: 0.3, y: 3.8 })).toBe(true);
+    expect(regionContains(holeInset.value, { x: 1.4, y: 4.8 })).toBe(false);
+
+    const circInset = trace.find((n) => n.bind === "circInset");
+    if (!circInset || !isRegion(circInset.value)) throw new Error("missing circInset");
+    expect(regionContains(circInset.value, { x: 12.4, y: 3.7 })).toBe(true);
+    expect(regionContains(circInset.value, { x: 13.7, y: 4.8 })).toBe(false);
+
+    const boneInset = trace.find((n) => n.bind === "boneInset");
+    if (!boneInset || !isRegion(boneInset.value)) throw new Error("missing boneInset");
+    expect(compileRegion(boneInset.value)).toHaveLength(1);
+
+    const drafted = run(
+      roundOffsetScene,
+      ["apps/demo/src/scenes/round-offset.ts"],
+      new Map([
+        ["o_ro_sqi", [-0.4]],
+        ["o_ro_bone", [-0.22]],
+      ]),
+    );
+    const pulled = drafted.trace.find((n) => n.id === "o_ro_sqi");
+    const pulledStock = pulled?.value.kind === "region" ? pulled.value.stock : null;
+    expect(pulledStock?.kind === "offset" ? pulledStock.d : 0).toBeCloseTo(-0.4);
+    const splitBone = drafted.trace.find((n) => n.id === "o_ro_bone");
+    if (!splitBone || !isRegion(splitBone.value)) throw new Error("missing split bone");
+    expect(compileRegion(splitBone.value)).toHaveLength(2);
   });
 
   test("pie traces three roundOffset slices from one gap slider", () => {
