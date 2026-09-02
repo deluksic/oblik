@@ -34,7 +34,10 @@ function roundDash(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function dashForLine(line: LineStyleId, width = DEFAULT_BRUSH.width): readonly number[] | undefined {
+export function dashForLine(
+  line: LineStyleId,
+  width = DEFAULT_BRUSH.width,
+): readonly number[] | undefined {
   if (line === "solid") return undefined;
   const base = DASH_AT_THIN[line];
   const w = width > 0 ? width : 1;
@@ -42,7 +45,7 @@ export function dashForLine(line: LineStyleId, width = DEFAULT_BRUSH.width): rea
 }
 
 export function takesFill(kind: string): boolean {
-  return kind === "profile" || kind === "circle";
+  return kind === "profile" || kind === "region" || kind === "circle";
 }
 
 export function figureStyleFromBrush(b: BrushSettings, closed: boolean): FigureStyle {

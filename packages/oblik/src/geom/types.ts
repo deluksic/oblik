@@ -21,4 +21,21 @@ export type ProfileEdge = {
 };
 export type Profile = { kind: "profile"; outer: ProfileEdge[] };
 
-export type Geom = Point | Segment | Line | Circle | ParallelLine | Glider | Profile;
+/**
+ * Unmarked half-space, like `along` / `fillet`. Side `1` is left of the directed
+ * line (`signedDist >= 0`); `-1` is right.
+ */
+export type HalfPlane = { kind: "halfPlane"; line: LineLike; side: 1 | -1 };
+
+export type RegionOperand = Profile | Circle | Region | HalfPlane;
+
+/** Named CSG formula. Compiled outlines are ephemeral. */
+export type Region = {
+  kind: "region";
+  stock: RegionOperand;
+  subtract: readonly RegionOperand[];
+  keep: readonly RegionOperand[];
+  contains?: Vec2;
+};
+
+export type Geom = Point | Segment | Line | Circle | ParallelLine | Glider | Profile | Region;

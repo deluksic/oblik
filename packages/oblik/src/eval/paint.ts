@@ -1,5 +1,5 @@
-import { nodeOf, type TraceNode } from "./context";
 import type { Geom } from "../geom";
+import { nodeOf, type TraceNode } from "./context";
 
 export type FigurePointMark = "dot" | "open" | "none";
 
@@ -53,6 +53,7 @@ const GEOM_KINDS = new Set([
   "circle",
   "parallelLine",
   "profile",
+  "region",
   "gliderSegment",
   "gliderLine",
   "gliderCircle",

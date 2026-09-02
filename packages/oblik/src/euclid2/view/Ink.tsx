@@ -1,15 +1,25 @@
 import { For, Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Profile, Segment } from "@/geom";
+import type { Circle, Profile, Region, Segment } from "@/geom";
 import { infiniteLineAxis } from "@/geom/ops";
 import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
+import { isRegion, regionSvgPath } from "@/geom/region";
+
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";
 import type { Ghost } from "../tool";
-import { CONSTRUCTION_STROKE_PX, chromeClipUrl, chromeLayers, chromeOutsideClipId, layerStrokeWidth, type ChromeKind, type ChromeLayer } from "./chrome";
-import { ChromeOutsideClip } from "./ChromeClip";
+import {
+  CONSTRUCTION_STROKE_PX,
+  chromeClipUrl,
+  chromeLayers,
+  chromeOutsideClipId,
+  layerStrokeWidth,
+  type ChromeKind,
+  type ChromeLayer,
+} from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
+import { ChromeOutsideClip } from "./ChromeClip";
 
 import styles from "./View.module.css";
 
@@ -25,18 +35,28 @@ function inkClass(editable: boolean, muted = false, selected = false, hot = fals
   ];
 }
 
-function layerClass(kind: ChromeKind, editable: boolean, muted: boolean, selected = false, hot = false) {
+function layerClass(
+  kind: ChromeKind,
+  editable: boolean,
+  muted: boolean,
+  selected = false,
+  hot = false,
+) {
   if (kind === "knockout") return styles.knockout;
   if (kind === "outline") return styles.outline;
   return inkClass(editable, muted, selected, hot);
 }
 
 function layersOf(hot: boolean, selected: boolean, overlay: boolean): ChromeLayer[] {
-  return chromeLayers(CONSTRUCTION_STROKE_PX, {
-    selected,
-    hover: hot && !selected,
-    overlay,
-  }, readChromeMetrics());
+  return chromeLayers(
+    CONSTRUCTION_STROKE_PX,
+    {
+      selected,
+      hover: hot && !selected,
+      overlay,
+    },
+    readChromeMetrics(),
+  );
 }
 
 export function Stroke(props: {
@@ -88,12 +108,26 @@ export function Stroke(props: {
   );
 }
 
-function SegmentStroke(props: { node: TraceNode; muted?: boolean; hot: boolean; selected: boolean; overlay: boolean; layers: ChromeLayer[] }) {
+function SegmentStroke(props: {
+  node: TraceNode;
+  muted?: boolean;
+  hot: boolean;
+  selected: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
+}) {
   const s = () => props.node.value as Segment;
   return (
     <>
       {props.overlay ? null : (
-        <line class={styles.hit} data-ink={traceKey(props.node)} x1={s().a.x} y1={s().a.y} x2={s().b.x} y2={s().b.y} />
+        <line
+          class={styles.hit}
+          data-ink={traceKey(props.node)}
+          x1={s().a.x}
+          y1={s().a.y}
+          x2={s().b.x}
+          y2={s().b.y}
+        />
       )}
       <For each={props.layers}>
         {(layer) => (
@@ -112,17 +146,36 @@ function SegmentStroke(props: { node: TraceNode; muted?: boolean; hot: boolean; 
   );
 }
 
-function CircleStroke(props: { node: TraceNode; muted?: boolean; hot: boolean; selected: boolean; overlay: boolean; layers: ChromeLayer[] }) {
+function CircleStroke(props: {
+  node: TraceNode;
+  muted?: boolean;
+  hot: boolean;
+  selected: boolean;
+  overlay: boolean;
+  layers: ChromeLayer[];
+}) {
   const c = () => props.node.value as Circle;
   return (
     <>
       {props.overlay ? null : (
-        <circle class={styles.hit} data-ink={traceKey(props.node)} cx={c().center.x} cy={c().center.y} r={Math.abs(c().radius)} />
+        <circle
+          class={styles.hit}
+          data-ink={traceKey(props.node)}
+          cx={c().center.x}
+          cy={c().center.y}
+          r={Math.abs(c().radius)}
+        />
       )}
       <For each={props.layers}>
         {(layer) => (
           <circle
-            class={layerClass(layer.kind, props.node.editable, !!props.muted, props.selected, props.hot)}
+            class={layerClass(
+              layer.kind,
+              props.node.editable,
+              !!props.muted,
+              props.selected,
+              props.hot,
+            )}
             opacity={layer.opacity}
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
@@ -156,7 +209,14 @@ function InfiniteStroke(props: {
       {(e) => (
         <>
           {props.overlay ? null : (
-            <line class={styles.hit} data-ink={traceKey(props.node)} x1={e().a.x} y1={e().a.y} x2={e().b.x} y2={e().b.y} />
+            <line
+              class={styles.hit}
+              data-ink={traceKey(props.node)}
+              x1={e().a.x}
+              y1={e().a.y}
+              x2={e().b.x}
+              y2={e().b.y}
+            />
           )}
           <For each={props.layers}>
             {(layer) => (
@@ -177,21 +237,27 @@ function InfiniteStroke(props: {
   );
 }
 
-export function ProfileFill(props: {
-  node: TraceNode;
-  hot: boolean;
-  selected: boolean;
-}) {
-  const d = createMemo(() => profileSvgPath(props.node.value as Profile));
+function fillPath(v: Profile | Region): string {
+  return isRegion(v) ? regionSvgPath(v) : profileSvgPath(v);
+}
+
+export function ProfileFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
+  const d = createMemo(() => fillPath(props.node.value as Profile | Region));
+  const evenodd = () => isRegion(props.node.value);
   const layers = createMemo(() => layersOf(props.hot, props.selected, false));
   return (
     <For each={layers()}>
       {(layer) => (
         <path
-          class={layer.kind === "paint" ? [styles.fill, { [styles.selected]: props.selected || props.hot }] : layerClass(layer.kind, false, false)}
+          class={
+            layer.kind === "paint"
+              ? [styles.fill, { [styles.selected]: props.selected || props.hot }]
+              : layerClass(layer.kind, false, false)
+          }
           data-ink={layer.kind === "paint" ? traceKey(props.node) : undefined}
           d={d()}
           fill={layer.kind === "paint" ? undefined : "none"}
+          fill-rule={evenodd() ? "evenodd" : undefined}
           stroke={layer.kind === "paint" ? "none" : undefined}
           stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
         />
@@ -206,7 +272,8 @@ export function ProfileOutline(props: {
   selected: boolean;
   overlay?: boolean;
 }) {
-  const d = createMemo(() => profileSvgPath(props.node.value as Profile));
+  const d = createMemo(() => fillPath(props.node.value as Profile | Region));
+  const evenodd = () => isRegion(props.node.value);
   const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
   const outsideId = () => chromeOutsideClipId(`e2-${traceKey(props.node)}`);
   return (
@@ -220,6 +287,7 @@ export function ProfileOutline(props: {
             opacity={layer.opacity}
             d={d()}
             fill={layer.kind === "paint" ? undefined : "none"}
+            fill-rule={evenodd() ? "evenodd" : undefined}
             stroke={layer.kind === "paint" ? "none" : undefined}
             stroke-width={layer.kind === "paint" ? undefined : layerStrokeWidth(layer)}
           />
@@ -229,7 +297,10 @@ export function ProfileOutline(props: {
   );
 }
 
-export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>; camera: Camera2 }) {
+export function ProfileGhost(props: {
+  ghost: Extract<Ghost, { kind: "profile" }>;
+  camera: Camera2;
+}) {
   const chain = createMemo(() => {
     const g = props.ghost;
     const edges = g.hover ? [...g.edges, g.hover] : g.edges;
@@ -252,8 +323,14 @@ export function ProfileGhost(props: { ghost: Extract<Ghost, { kind: "profile" }>
     const head = 7 / scale;
     const tail = { x: a.at.x + ux * pad, y: a.at.y + uy * pad };
     const tip = { x: tail.x + ux * shaft, y: tail.y + uy * shaft };
-    const left = { x: tip.x - ux * head - uy * head * 0.62, y: tip.y - uy * head + ux * head * 0.62 };
-    const right = { x: tip.x - ux * head + uy * head * 0.62, y: tip.y - uy * head - ux * head * 0.62 };
+    const left = {
+      x: tip.x - ux * head - uy * head * 0.62,
+      y: tip.y - uy * head + ux * head * 0.62,
+    };
+    const right = {
+      x: tip.x - ux * head + uy * head * 0.62,
+      y: tip.y - uy * head - ux * head * 0.62,
+    };
     return { tail, tip, left, right };
   });
   return (

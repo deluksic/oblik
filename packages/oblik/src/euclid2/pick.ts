@@ -1,8 +1,9 @@
 import type { TraceNode } from "../eval/context";
-import { gliderAt, isGlider } from "../geom/gliders";
-import { distToProfile, isFiniteProfile, isProfile } from "../geom/profile";
-import { lineBasis } from "../geom/ops";
 import type { Circle, Line, LineLike, ParallelLine, Point, Profile, Segment } from "../geom";
+import { gliderAt, isGlider } from "../geom/gliders";
+import { lineBasis } from "../geom/ops";
+import { distToProfile, isFiniteProfile, isProfile } from "../geom/profile";
+import { distToRegion, isFillGeom, isFiniteRegion, isRegion } from "../geom/region";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
@@ -72,6 +73,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "line") return Number.isFinite(v.origin.x);
   if (v.kind === "parallelLine") return Number.isFinite(v.distance);
   if (isProfile(v)) return isFiniteProfile(v);
+  if (isRegion(v)) return isFiniteRegion(v);
   if (isGlider(v)) return Number.isFinite(v.x) && Number.isFinite(v.y);
   return false;
 }
@@ -97,6 +99,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     return Math.abs(dist(world, c.center) - Math.abs(c.radius));
   }
   if (isProfile(v)) return distToProfile(v, world);
+  if (isRegion(v)) return distToRegion(v, world);
   if (isGlider(v)) return dist(world, gliderAt(v));
   return Infinity;
 }
@@ -129,7 +132,8 @@ function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
 
 function pickRank(n: TraceNode): number {
   if (n.value.kind === "point" || isGlider(n.value)) return 0;
-  if (isProfile(n.value)) return 2;
+  if (isRegion(n.value)) return 2;
+  if (isProfile(n.value)) return 3;
   return 1;
 }
 
@@ -145,7 +149,7 @@ export function hitsNear(
   for (const n of trace) {
     if (!isFiniteTrace(n)) continue;
     const d = geomDistWorld(world, n);
-    const insideFill = isProfile(n.value) && d === 0;
+    const insideFill = isFillGeom(n.value) && d === 0;
     if (insideFill || d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
   }
   out.sort((a, b) => {
@@ -212,7 +216,14 @@ export function snapProfile(
   maxPx = GEOM_PX,
   filter?: SnapFilter,
 ): { bind: string; geom: Profile; id: string } | null {
-  let best: { bind: string; geom: Profile; id: string; inside: boolean; d: number; i: number } | null = null;
+  let best: {
+    bind: string;
+    geom: Profile;
+    id: string;
+    inside: boolean;
+    d: number;
+    i: number;
+  } | null = null;
   let i = 0;
   for (const n of trace) {
     const idx = i++;
@@ -277,7 +288,8 @@ export function snapStrokeCarrier(
     if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike | Circle, d };
+    if (!best || d < best.d)
+      best = { bind: snapPrint(n, filter), geom: n.value as LineLike | Circle, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : null;
 }

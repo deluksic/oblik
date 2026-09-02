@@ -1,31 +1,39 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, test } from "vitest";
 
-import { analyze, type Annotation } from "../source/analyze";
-import { mergeAnnotationBundle } from "../source/catalog";
-import { evaluate } from "./evaluate";
-import { paintsFromTrace } from "./paint";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import pie from "../../../../apps/demo/src/scenes/pie.ts";
+import plateFigure from "../../../../apps/demo/src/scenes/plate-figure.ts";
 import sharedLoop from "../../../../apps/demo/src/scenes/shared-loop.ts";
 import shelf from "../../../../apps/demo/src/scenes/shelf.ts";
+import stockCuttersFigure from "../../../../apps/demo/src/scenes/stock-cutters-figure.ts";
+import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
-import plateFigure from "../../../../apps/demo/src/scenes/plate-figure.ts";
+import { hitsNear } from "../euclid2/pick";
+import { compileRegion, isRegion, regionContains } from "../geom/region";
+import { analyze, type Annotation } from "../source/analyze";
+import { mergeAnnotationBundle } from "../source/catalog";
+import { evaluate } from "./evaluate";
+import { paintsFromTrace } from "./paint";
 import type { Scene } from "./scene";
 
-const demoSrc = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../apps/demo/src");
+const demoSrc = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../../apps/demo/src",
+);
 
-function run(mod: Scene, files: string[]) {
+function run(mod: Scene, files: string[], draft?: Map<string, number[]>) {
   const bundle: Record<string, Record<string, Annotation>> = {};
   for (const rel of files) {
     const src = readFileSync(path.join(demoSrc, rel.replace(/^apps\/demo\/src\//, "")), "utf8");
     bundle[rel] = Object.fromEntries(analyze(src, rel));
   }
-  return evaluate(mod, { annotations: mergeAnnotationBundle(bundle) });
+  return evaluate(mod, { annotations: mergeAnnotationBundle(bundle), draft });
 }
 
 describe("migrated demo scenes", () => {
@@ -67,7 +75,9 @@ describe("migrated demo scenes", () => {
     const insets = trace.filter((n) => n.kind === "parallelLine");
     expect(insets).toHaveLength(4);
     const d0 = insets[0]?.value.kind === "parallelLine" ? insets[0].value.distance : null;
-    expect(insets.every((n) => n.value.kind === "parallelLine" && n.value.distance === d0)).toBe(true);
+    expect(insets.every((n) => n.value.kind === "parallelLine" && n.value.distance === d0)).toBe(
+      true,
+    );
     expect(trace.filter((n) => n.kind === "circle")).toHaveLength(4);
     expect(trace.every((n) => n.module === "apps/demo/src/layout/mounting-plate.ts")).toBe(true);
     expect(trace.some((n) => n.bind === "drill" && n.editable)).toBe(true);
@@ -125,7 +135,9 @@ describe("migrated demo scenes", () => {
       flat?.value.kind === "profile" ? 3 : 0,
     );
     expect(
-      flat?.value.kind === "profile" ? flat.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+      flat?.value.kind === "profile"
+        ? flat.value.outer.filter((e) => e.carrier.kind === "circle")
+        : [],
     ).toHaveLength(flat?.value.kind === "profile" ? 1 : 0);
     const mix = trace.find((n) => n.bind === "mix");
     expect(mix?.kind).toBe("profile");
@@ -133,14 +145,18 @@ describe("migrated demo scenes", () => {
       mix?.value.kind === "profile" ? 6 : 0,
     );
     expect(
-      mix?.value.kind === "profile" ? mix.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+      mix?.value.kind === "profile"
+        ? mix.value.outer.filter((e) => e.carrier.kind === "circle")
+        : [],
     ).toHaveLength(mix?.value.kind === "profile" ? 2 : 0);
     const ell = trace.find((n) => n.bind === "ell");
     expect(ell?.value.kind === "profile" ? ell.value.outer : []).toHaveLength(
       ell?.value.kind === "profile" ? 7 : 0,
     );
     expect(
-      ell?.value.kind === "profile" ? ell.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+      ell?.value.kind === "profile"
+        ? ell.value.outer.filter((e) => e.carrier.kind === "circle")
+        : [],
     ).toHaveLength(ell?.value.kind === "profile" ? 1 : 0);
     const rim = trace.find((n) => n.bind === "rim");
     expect(rim?.value.kind === "profile" ? rim.value.outer : []).toHaveLength(
@@ -156,7 +172,94 @@ describe("migrated demo scenes", () => {
     );
     const inset = trace.find((n) => n.bind === "inset");
     expect(
-      inset?.value.kind === "profile" ? inset.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+      inset?.value.kind === "profile"
+        ? inset.value.outer.filter((e) => e.carrier.kind === "circle")
+        : [],
     ).toHaveLength(inset?.value.kind === "profile" ? 4 : 0);
+  });
+
+  test("stock-cutters traces one face formula plus hold/left/right", () => {
+    const files = [
+      "apps/demo/src/scenes/stock-cutters.ts",
+      "apps/demo/src/layout/stock-cutters.ts",
+    ];
+    const { trace } = run(stockCutters, files);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(4);
+    expect(trace.some((n) => n.bind === "face" && n.kind === "region")).toBe(true);
+    expect(trace.some((n) => n.bind === "hold" && n.kind === "region")).toBe(true);
+    expect(trace.some((n) => n.bind === "left" && n.kind === "region")).toBe(true);
+    expect(trace.some((n) => n.bind === "right" && n.kind === "region")).toBe(true);
+    expect(trace.some((n) => n.bind === "stock" && n.kind === "profile")).toBe(true);
+    expect(trace.some((n) => n.bind === "slot" && n.kind === "profile")).toBe(true);
+
+    const face = trace.find((n) => n.id === "o_sc_face");
+    expect(face?.value.kind).toBe("region");
+    if (!face || !isRegion(face.value)) throw new Error("missing face");
+    expect(regionContains(face.value, { x: 1.05, y: 1.6 })).toBe(true);
+    expect(regionContains(face.value, { x: 3.55, y: 1.6 })).toBe(false);
+
+    const camera = { x: 2.25, y: 1.6, scale: 72 };
+    const size = { w: 800, h: 600 };
+    const hits = hitsNear(trace, { x: 1.2, y: 1.6 }, camera, size);
+    expect(hits.find((n) => n.kind === "region")?.id).toBe("o_sc_face");
+  });
+
+  test("stock-cutters: drill off the plate drops that hole, not an XOR cap", () => {
+    const files = [
+      "apps/demo/src/scenes/stock-cutters.ts",
+      "apps/demo/src/layout/stock-cutters.ts",
+    ];
+    const { trace } = run(stockCutters, files, new Map([["o_sc_c0", [-1, -1]]]));
+    const face = trace.find((n) => n.id === "o_sc_face");
+    expect(face?.kind).toBe("region");
+    if (!face || !isRegion(face.value)) throw new Error("missing face");
+    expect(regionContains(face.value, { x: 0.57, y: 0.62 })).toBe(true);
+    expect(regionContains(face.value, { x: -1, y: -1 })).toBe(false);
+  });
+
+  test("stock-cutters: a slot that severs stays one region; contains follows the probe", () => {
+    const files = [
+      "apps/demo/src/scenes/stock-cutters.ts",
+      "apps/demo/src/layout/stock-cutters.ts",
+    ];
+    const { trace } = run(
+      stockCutters,
+      files,
+      new Map([
+        ["o_sc_slotX", [2.25]],
+        ["o_sc_slotL", [5]],
+        ["o_sc_probe", [1.05, 2.4]],
+      ]),
+    );
+    const face = trace.find((n) => n.id === "o_sc_face");
+    const hold = trace.find((n) => n.id === "o_sc_hold");
+    expect(face?.kind).toBe("region");
+    expect(hold?.kind).toBe("region");
+    if (!face || !isRegion(face.value) || !hold || !isRegion(hold.value))
+      throw new Error("missing regions");
+    expect(regionContains(face.value, { x: 1.05, y: 2.4 })).toBe(true);
+    expect(regionContains(face.value, { x: 1.05, y: 0.5 })).toBe(true);
+    expect(regionContains(face.value, { x: 2.25, y: 1.6 })).toBe(false);
+    expect(compileRegion(face.value).length).toBeGreaterThanOrEqual(2);
+    expect(regionContains(hold.value, { x: 1.05, y: 2.4 })).toBe(true);
+    expect(regionContains(hold.value, { x: 1.05, y: 0.5 })).toBe(false);
+
+    const empty = run(stockCutters, files, new Map([["o_sc_probe", [3.55, 1.6]]]));
+    const holdEmpty = empty.trace.find((n) => n.id === "o_sc_hold");
+    expect(empty.trace.some((n) => n.id === "o_sc_probe")).toBe(true);
+    if (!holdEmpty || !isRegion(holdEmpty.value)) throw new Error("missing hold");
+    expect(compileRegion(holdEmpty.value)).toHaveLength(0);
+  });
+
+  test("stock-cutters figure paints the face formula, not an island", () => {
+    const { trace } = run(stockCuttersFigure, [
+      "apps/demo/src/scenes/stock-cutters-figure.ts",
+      "apps/demo/src/layout/stock-cutters.ts",
+    ]);
+    expect(trace.filter((n) => n.kind === "paint")).toHaveLength(3);
+    const paints = paintsFromTrace(trace);
+    expect(paints.has("o_sc_face:0")).toBe(true);
+    expect(paints.has("o_sc_probe:0")).toBe(true);
+    expect(paints.has("o_sc_split:0")).toBe(true);
   });
 });

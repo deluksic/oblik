@@ -1,15 +1,24 @@
 import { For, Show, createMemo } from "solid-js";
 
-import type { TraceNode } from "../eval/context";
-import type { FigureStyle } from "../eval/paint";
-import { infiniteLineAxis } from "../geom/ops";
-import { isGlider } from "../geom/gliders";
-import { profileSvgPath } from "../geom/profile";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
-import { chromeClipUrl, chromeLayers, chromeOutsideClipId, layerStrokeWidth, POINT_STROKE_PX, type ChromeKind, type ChromeLayer } from "../euclid2/view/chrome";
-import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
+import {
+  chromeClipUrl,
+  chromeLayers,
+  chromeOutsideClipId,
+  layerStrokeWidth,
+  POINT_STROKE_PX,
+  type ChromeKind,
+  type ChromeLayer,
+} from "../euclid2/view/chrome";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
+import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
+import type { TraceNode } from "../eval/context";
+import type { FigureStyle } from "../eval/paint";
+import { isGlider } from "../geom/gliders";
+import { infiniteLineAxis } from "../geom/ops";
+import { profileSvgPath } from "../geom/profile";
+import { isRegion, regionSvgPath } from "../geom/region";
 
 import styles from "./View.module.css";
 
@@ -19,16 +28,30 @@ function dash(s: FigureStyle): string | undefined {
   return s.dash && s.dash.length > 0 ? s.dash.join(" ") : undefined;
 }
 
-function layersOf(opts: { look: FigureStyle; onion: boolean; hot: boolean; selected: boolean; overlay?: boolean }): ChromeLayer[] {
+function layersOf(opts: {
+  look: FigureStyle;
+  onion: boolean;
+  hot: boolean;
+  selected: boolean;
+  overlay?: boolean;
+}): ChromeLayer[] {
   const w = (opts.onion ? ONION.width : opts.look.width) ?? 1.35;
-  return chromeLayers(w, {
-    selected: opts.selected,
-    hover: opts.hot && !opts.selected,
-    overlay: opts.overlay === true,
-  }, readChromeMetrics());
+  return chromeLayers(
+    w,
+    {
+      selected: opts.selected,
+      hover: opts.hot && !opts.selected,
+      overlay: opts.overlay === true,
+    },
+    readChromeMetrics(),
+  );
 }
 
-function layerClass(kind: ChromeKind, muted: boolean, onion: boolean): string | Array<string | Record<string, boolean>> {
+function layerClass(
+  kind: ChromeKind,
+  muted: boolean,
+  onion: boolean,
+): string | Array<string | Record<string, boolean>> {
   if (kind === "knockout") return styles.knockout;
   if (kind === "outline") return styles.outline;
   return [styles.stroke, { [styles.muted]: muted && !onion }];
@@ -84,9 +107,22 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
     }),
   );
   return (
-    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true, [styles.erase]: props.erase === true }}>
+    <g
+      class={{
+        [styles.preview]: props.preview === true,
+        [styles.replaced]: props.replaced === true,
+        [styles.erase]: props.erase === true,
+      }}
+    >
       <Show when={kind() === "segment"}>
-        <Seg node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Seg
+          node={props.node}
+          look={props.look}
+          onion={props.onion}
+          muted={props.muted}
+          overlay={props.overlay === true}
+          layers={layers()}
+        />
       </Show>
       <Show when={kind() === "line" || kind() === "parallelLine"}>
         <Inf
@@ -101,10 +137,24 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
         />
       </Show>
       <Show when={kind() === "circle"}>
-        <Circ node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+        <Circ
+          node={props.node}
+          look={props.look}
+          onion={props.onion}
+          muted={props.muted}
+          overlay={props.overlay === true}
+          layers={layers()}
+        />
       </Show>
-      <Show when={kind() === "profile"}>
-        <Face node={props.node} look={props.look} onion={props.onion} muted={props.muted} overlay={props.overlay === true} layers={layers()} />
+      <Show when={kind() === "profile" || kind() === "region"}>
+        <Face
+          node={props.node}
+          look={props.look}
+          onion={props.onion}
+          muted={props.muted}
+          overlay={props.overlay === true}
+          layers={layers()}
+        />
       </Show>
     </g>
   );
@@ -296,16 +346,28 @@ function Face(props: {
 }) {
   const d = createMemo(() => {
     const v = props.node?.value;
-    return v?.kind === "profile" ? profileSvgPath(v) : null;
+    if (v?.kind === "profile") return profileSvgPath(v);
+    if (v?.kind === "region") return regionSvgPath(v);
+    return null;
   });
+  const evenodd = () => isRegion(props.node.value);
   const look = () => (props.onion ? ONION : props.look);
-  const outsideId = () => chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const outsideId = () =>
+    chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
   return (
     <Show when={d()}>
       {(path) => (
         <>
           {props.overlay ? <ChromeOutsideClip id={outsideId()} d={path()} /> : null}
-          {props.overlay ? null : <path data-role="hit" class={styles.hitFill} data-ink={traceKey(props.node)} d={path()} />}
+          {props.overlay ? null : (
+            <path
+              data-role="hit"
+              class={styles.hitFill}
+              data-ink={traceKey(props.node)}
+              d={path()}
+              fill-rule={evenodd() ? "evenodd" : undefined}
+            />
+          )}
           <For each={props.layers}>
             {(layer) => (
               <path
@@ -314,6 +376,7 @@ function Face(props: {
                 clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
                 d={path()}
                 fill={paintFill(look(), props.onion, layer, true)}
+                fill-rule={evenodd() ? "evenodd" : undefined}
                 stroke={paintStroke(look(), layer)}
                 stroke-width={layerStrokeWidth(layer)}
                 stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
@@ -375,22 +438,31 @@ function PointInk(props: { node: TraceNode } & PointProps) {
   });
   const mark = () => (props.onion ? "open" : (props.look?.point ?? "dot"));
   const r = () => 5 / Math.max(12, props.camera.scale);
-  const stroke = () =>
-    props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917");
+  const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
   const fill = () => {
     if (props.onion || mark() === "open") return "none";
     return stroke();
   };
   const layers = createMemo(() =>
-    chromeLayers(props.look?.width ?? POINT_STROKE_PX, {
-      selected: props.selected,
-      hover: props.hot && !props.selected,
-      overlay: props.overlay === true,
-      point: true,
-    }, readChromeMetrics()),
+    chromeLayers(
+      props.look?.width ?? POINT_STROKE_PX,
+      {
+        selected: props.selected,
+        hover: props.hot && !props.selected,
+        overlay: props.overlay === true,
+        point: true,
+      },
+      readChromeMetrics(),
+    ),
   );
   return (
-    <g class={{ [styles.preview]: props.preview === true, [styles.replaced]: props.replaced === true, [styles.erase]: props.erase === true }}>
+    <g
+      class={{
+        [styles.preview]: props.preview === true,
+        [styles.replaced]: props.replaced === true,
+        [styles.erase]: props.erase === true,
+      }}
+    >
       {mark() === "none" && !props.onion ? null : (
         <>
           {props.overlay ? null : (
@@ -407,7 +479,11 @@ function PointInk(props: { node: TraceNode } & PointProps) {
             {(layer) => (
               <circle
                 data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
-                class={layer.kind === "paint" ? [styles.point, { [styles.muted]: props.muted }] : layerClass(layer.kind, props.muted, props.onion)}
+                class={
+                  layer.kind === "paint"
+                    ? [styles.point, { [styles.muted]: props.muted }]
+                    : layerClass(layer.kind, props.muted, props.onion)
+                }
                 cx={at().x}
                 cy={at().y}
                 r={r()}

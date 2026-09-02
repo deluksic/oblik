@@ -1,5 +1,4 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
-
 import IconFrame from "~icons/lucide/frame";
 import IconMove from "~icons/lucide/move";
 import IconScaling from "~icons/lucide/scaling";
@@ -7,16 +6,33 @@ import IconScaling from "~icons/lucide/scaling";
 import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
 import { isGlider } from "@/geom/gliders";
-import { isProfile } from "@/geom/profile";
-import { kWorldToNdc, screenToWorld, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
+import { isFillGeom } from "@/geom/region";
+
+import {
+  kWorldToNdc,
+  screenToWorld,
+  viewBox,
+  wheelZoomFactor,
+  zoomAt,
+  type Camera2,
+  type PaneSize,
+} from "../euclid2/camera";
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
+import { createDragHandler } from "../euclid2/view/createDragHandler";
 import { chromePasses, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
-import { createDragHandler } from "../euclid2/view/createDragHandler";
 import { lookFromBrush, type BrushSettings } from "./chips";
+import {
+  frameRect,
+  frameMoved,
+  frameResized,
+  pageScreenRect,
+  type FigureFrame,
+  type FrameRect,
+  type FrameXywh,
+} from "./frame";
 import { FigurePoint, FigureStroke } from "./Ink";
-import { frameRect, frameMoved, frameResized, pageScreenRect, type FigureFrame, type FrameRect, type FrameXywh } from "./frame";
 import { brushAddHits, inkFromGeomHits, isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 
@@ -97,12 +113,12 @@ export function FigureView(props: FigureViewProps) {
   const geom = createMemo(() => props.trace.filter(isDrawnGeom));
   const strokes = createMemo(() => paintStrokesFromTrace(props.trace));
   const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)));
-  const onionProfiles = createMemo(() => onionInk().filter((n) => isProfile(n.value)));
-  const onionEdges = createMemo(() => onionInk().filter((n) => !isProfile(n.value)));
+  const onionProfiles = createMemo(() => onionInk().filter((n) => isFillGeom(n.value)));
+  const onionEdges = createMemo(() => onionInk().filter((n) => !isFillGeom(n.value)));
   const onionPts = createMemo(() => geom().filter(isPointish));
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
-  const inkProfiles = createMemo(() => inkStrokes().filter((s) => isProfile(s.geom.value)));
-  const inkEdges = createMemo(() => inkStrokes().filter((s) => !isProfile(s.geom.value)));
+  const inkProfiles = createMemo(() => inkStrokes().filter((s) => isFillGeom(s.geom.value)));
+  const inkEdges = createMemo(() => inkStrokes().filter((s) => !isFillGeom(s.geom.value)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
   const paintSelected = (s: PaintStroke) => traceKey(s.paint) === props.selectedKey;
   const geomSelected = (n: TraceNode) => traceKey(n) === props.selectedKey;
@@ -142,39 +158,45 @@ export function FigureView(props: FigureViewProps) {
     };
   });
 
-  const onFrameMove = drag.start((e) => {
-    const el = paneEl();
-    const start = frameXywh();
-    if (!el || !start) return;
-    const world0 = worldAt(e, el);
-    let last = start;
-    return {
-      onPointerMove(ev) {
-        last = frameMoved(start, world0, worldAt(ev, el));
-        props.onFrameDraft?.(last);
-      },
-      onDone() {
-        props.onFrameCommit?.(last);
-      },
-    };
-  }, { preventDefault: true });
+  const onFrameMove = drag.start(
+    (e) => {
+      const el = paneEl();
+      const start = frameXywh();
+      if (!el || !start) return;
+      const world0 = worldAt(e, el);
+      let last = start;
+      return {
+        onPointerMove(ev) {
+          last = frameMoved(start, world0, worldAt(ev, el));
+          props.onFrameDraft?.(last);
+        },
+        onDone() {
+          props.onFrameCommit?.(last);
+        },
+      };
+    },
+    { preventDefault: true },
+  );
 
-  const onFrameResize = drag.start((_e) => {
-    const el = paneEl();
-    const start = frameXywh();
-    if (!el || !start) return;
-    const anchor = { x: start.x, y: start.y };
-    let last = start;
-    return {
-      onPointerMove(ev) {
-        last = frameResized(anchor, worldAt(ev, el));
-        props.onFrameDraft?.(last);
-      },
-      onDone() {
-        props.onFrameCommit?.(last);
-      },
-    };
-  }, { preventDefault: true });
+  const onFrameResize = drag.start(
+    (_e) => {
+      const el = paneEl();
+      const start = frameXywh();
+      if (!el || !start) return;
+      const anchor = { x: start.x, y: start.y };
+      let last = start;
+      return {
+        onPointerMove(ev) {
+          last = frameResized(anchor, worldAt(ev, el));
+          props.onFrameDraft?.(last);
+        },
+        onDone() {
+          props.onFrameCommit?.(last);
+        },
+      };
+    },
+    { preventDefault: true },
+  );
 
   function onPointerDown(e: PointerEvent) {
     noteShift(e);
@@ -229,7 +251,9 @@ export function FigureView(props: FigureViewProps) {
     props.onHoverKey?.(hit ? traceKey(hit) : null);
     if (props.tool === "brush" && props.shift && hit && isDrawnGeom(hit)) setPreviewGeom(hit);
     else if (props.tool === "brush" && !props.shift && hit?.value.kind === "paint") {
-      const g = paintStrokesFromTrace(props.trace).find((s) => s.paint === hit || traceKey(s.paint) === traceKey(hit))?.geom;
+      const g = paintStrokesFromTrace(props.trace).find(
+        (s) => s.paint === hit || traceKey(s.paint) === traceKey(hit),
+      )?.geom;
       setPreviewGeom(g ?? null);
     } else setPreviewGeom(null);
   }
@@ -279,7 +303,10 @@ export function FigureView(props: FigureViewProps) {
           {(box) => (
             <button
               type="button"
-              class={[styles.frameTitle, { [styles.frameTitleSelected]: props.frameSelected === true }]}
+              class={[
+                styles.frameTitle,
+                { [styles.frameTitleSelected]: props.frameSelected === true },
+              ]}
               style={{
                 left: `${box().left}px`,
                 top: `${box().top}px`,

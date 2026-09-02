@@ -26,6 +26,7 @@ export const BIND_PREFIX: Record<string, string> = {
   slider: "n",
   profile: "pr",
   roundOffset: "off",
+  region: "reg",
   style: "sty",
 };
 

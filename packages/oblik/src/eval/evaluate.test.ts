@@ -1,11 +1,26 @@
 import { describe, expect, test } from "vitest";
 
-import { siteOf } from "./site";
-import { along, circle, fillet, paint, point, pointOnCircle, pointOnSegment, profile, roundOffset, segment, slider, style } from "./constructors";
+import { analyze } from "../source/analyze";
+import {
+  along,
+  circle,
+  fillet,
+  leftOf,
+  paint,
+  point,
+  pointOnCircle,
+  pointOnSegment,
+  profile,
+  region,
+  roundOffset,
+  segment,
+  slider,
+  style,
+} from "./constructors";
+import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
 import { defineScene } from "./scene";
-import { emit, evaluate, tryEvaluate } from "./evaluate";
-import { analyze } from "../source/analyze";
+import { siteOf } from "./site";
 
 function plate() {
   point(1, 2, "h");
@@ -126,9 +141,10 @@ describe("evaluate", () => {
     expect(rings).toHaveLength(5);
     expect(rings.map((n) => n.occ)).toEqual([0, 1, 2, 3, 4]);
     expect(rings.every((n) => n.editable)).toBe(true);
-    const drafted = evaluate(scene, { annotations, draft: new Map([["ring", [1.5]]]) }).trace.filter(
-      (n) => n.id === "ring",
-    );
+    const drafted = evaluate(scene, {
+      annotations,
+      draft: new Map([["ring", [1.5]]]),
+    }).trace.filter((n) => n.id === "ring");
     expect(drafted.every((n) => n.value.kind === "circle" && n.value.radius === 1.5)).toBe(true);
   });
 
@@ -141,7 +157,9 @@ describe("evaluate", () => {
         return reach;
       },
     });
-    const annotations = analyze(`const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");\n`);
+    const annotations = analyze(
+      `const reach = slider(1.8, { min: 0, max: 4, step: 0.05 }, "o_sl");\n`,
+    );
     const { trace, value } = evaluate(scene, { annotations });
     expect(value).toBe(1.8);
     expect(trace).toHaveLength(1);
@@ -183,10 +201,19 @@ describe("evaluate", () => {
       },
     });
     const { trace } = evaluate(scene);
-    expect(trace.map((n) => n.kind)).toEqual(["point", "circle", "gliderCircle", "gliderCircle", "segment", "profile"]);
+    expect(trace.map((n) => n.kind)).toEqual([
+      "point",
+      "circle",
+      "gliderCircle",
+      "gliderCircle",
+      "segment",
+      "profile",
+    ]);
     const p = trace.find((n) => n.id === "pr");
     expect(p?.value.kind).toBe("profile");
-    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(p?.value.kind === "profile" ? 2 : 0);
+    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(
+      p?.value.kind === "profile" ? 2 : 0,
+    );
   });
 
   test("fillet is not a tape node", () => {
@@ -204,10 +231,20 @@ describe("evaluate", () => {
       },
     });
     const { trace } = evaluate(scene);
-    expect(trace.map((n) => n.kind)).toEqual(["point", "point", "point", "segment", "segment", "segment", "profile"]);
+    expect(trace.map((n) => n.kind)).toEqual([
+      "point",
+      "point",
+      "point",
+      "segment",
+      "segment",
+      "segment",
+      "profile",
+    ]);
     const p = trace.find((n) => n.id === "pr");
     expect(p?.kind).toBe("profile");
-    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(p?.value.kind === "profile" ? 4 : 0);
+    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(
+      p?.value.kind === "profile" ? 4 : 0,
+    );
     expect(
       p?.value.kind === "profile" ? p.value.outer.filter((e) => e.carrier.kind === "circle") : [],
     ).toHaveLength(p?.value.kind === "profile" ? 1 : 0);
@@ -244,6 +281,55 @@ describe("evaluate", () => {
       draft: new Map([["off", [-0.5]]]),
     }).trace.find((n) => n.id === "off");
     expect(drafted).toBeUndefined();
+  });
+
+  test("region is traced; leftOf is not", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(2, 0, "b");
+        const C = point(2, 2, "c");
+        const D = point(0, 2, "d");
+        const ab = segment(A, B, "ab");
+        const bc = segment(B, C, "bc");
+        const cd = segment(C, D, "cd");
+        const da = segment(D, A, "da");
+        const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
+        const split = segment(point(1, -1, "s0"), point(1, 3, "s1"), "sp");
+        const left = region(stock, { keep: leftOf(split) }, "reg");
+        return { stock, left };
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
+    expect(trace.find((n) => n.id === "reg")?.kind).toBe("region");
+    expect(trace.find((n) => n.id === "pr")?.kind).toBe("profile");
+  });
+
+  test("NaN keep operand drops the derived region from the tape", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const A = point(0, 0, "a");
+        const B = point(2, 0, "b");
+        const C = point(2, 2, "c");
+        const D = point(0, 2, "d");
+        const ab = segment(A, B, "ab");
+        const bc = segment(B, C, "bc");
+        const cd = segment(C, D, "cd");
+        const da = segment(D, A, "da");
+        const stock = profile([A, ab, B, bc, C, cd, D, da], "pr");
+        const split = segment(point(Number.NaN, 0, "s0"), point(1, 3, "s1"), "sp");
+        region(stock, { keep: leftOf(split) }, "reg");
+        return stock;
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.some((n) => n.id === "pr")).toBe(true);
+    expect(trace.some((n) => n.id === "reg")).toBe(false);
   });
 });
 

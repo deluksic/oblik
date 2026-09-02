@@ -1,12 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  DEFAULT_BRUSH,
-  figureStyleFromBrush,
-  lookExpr,
-  lookFromBrush,
-  takesFill,
-} from "./chips";
+import { DEFAULT_BRUSH, figureStyleFromBrush, lookExpr, lookFromBrush, takesFill } from "./chips";
 
 describe("figureStyleFromBrush", () => {
   test("lines get stroke, width, and dash, not fill", () => {
@@ -17,6 +11,7 @@ describe("figureStyleFromBrush", () => {
 
   test("profiles and circles take fill as well as the line look", () => {
     expect(takesFill("profile")).toBe(true);
+    expect(takesFill("region")).toBe(true);
     expect(takesFill("circle")).toBe(true);
     expect(takesFill("segment")).toBe(false);
     expect(takesFill("point")).toBe(false);
@@ -39,6 +34,7 @@ describe("figureStyleFromBrush", () => {
     expect(lookFromBrush(washed, "segment").fill).toBeUndefined();
     expect(lookFromBrush(washed, "line").fill).toBeUndefined();
     expect(lookFromBrush(washed, "profile").fill).toBe("#f3c5bc");
+    expect(lookFromBrush(washed, "region").fill).toBe("#f3c5bc");
     expect(lookFromBrush(washed, "circle").fill).toBe("#f3c5bc");
     expect(lookFromBrush(washed, "point").stroke).toBe(DEFAULT_BRUSH.stroke);
   });
@@ -46,7 +42,9 @@ describe("figureStyleFromBrush", () => {
 
 describe("lookExpr", () => {
   test("prints a plain look object, not style({ … })", () => {
-    const expr = lookExpr(figureStyleFromBrush({ ...DEFAULT_BRUSH, fill: "none", line: "dash" }, true));
+    const expr = lookExpr(
+      figureStyleFromBrush({ ...DEFAULT_BRUSH, fill: "none", line: "dash" }, true),
+    );
     expect(expr).toEqual({
       kind: "props",
       props: {

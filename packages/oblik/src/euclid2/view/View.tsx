@@ -1,7 +1,17 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import { kWorldToNdc, viewBox, wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../camera";
+import { isGlider } from "@/geom/gliders";
+import { isFillGeom } from "@/geom/region";
+
+import {
+  kWorldToNdc,
+  viewBox,
+  wheelZoomFactor,
+  zoomAt,
+  type Camera2,
+  type PaneSize,
+} from "../camera";
 import { isFiniteTrace, PICK_CLICK_PX, traceKey } from "../pick";
 import {
   hoverTool,
@@ -14,15 +24,23 @@ import {
   type ToolSession,
 } from "../tool";
 import { profileEligibleCarriers } from "../tools/profile";
-import { isGlider } from "@/geom/gliders";
-import { isProfile } from "@/geom/profile";
+import { createDragHandler, type DragSession } from "./createDragHandler";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
-import { NumberSliders } from "./NumberSliders";
 import { ProfileFill, ProfileGhost, ProfileOutline, Stroke } from "./Ink";
-import { isGrabbable, isHot, isHover, isSelected, hoverNode, liftSelected, splitChrome, chromePasses, type ChromeSplit } from "./marks";
-import { hitSlider, sliderNodes } from "./sliderHud";
+import {
+  isGrabbable,
+  isHot,
+  isHover,
+  isSelected,
+  hoverNode,
+  liftSelected,
+  splitChrome,
+  chromePasses,
+  type ChromeSplit,
+} from "./marks";
+import { NumberSliders } from "./NumberSliders";
 import {
   applyDrag,
   editDragOf,
@@ -32,7 +50,7 @@ import {
   topHit,
   type EditDrag,
 } from "./pointer";
-import { createDragHandler, type DragSession } from "./createDragHandler";
+import { hitSlider, sliderNodes } from "./sliderHud";
 
 import styles from "./View.module.css";
 
@@ -97,9 +115,19 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function placeAt(e: PointerEvent, el: HTMLDivElement) {
     const filter = props.scope ? snapFilterOf(props.scope) : undefined;
-    const hit = placeFromEvent(e, el, camera(), size(), props.trace, props.toolSession, filter, props.scope);
+    const hit = placeFromEvent(
+      e,
+      el,
+      camera(),
+      size(),
+      props.trace,
+      props.toolSession,
+      filter,
+      props.scope,
+    );
     const nearest = topHit(e, el, camera(), size(), props.trace)[0];
-    if (nearest && filter?.keys && !filter.keys.has(traceKey(nearest)) && hit.point.kind === "free") return;
+    if (nearest && filter?.keys && !filter.keys.has(traceKey(nearest)) && hit.point.kind === "free")
+      return;
     props.onPlace?.(hit);
   }
 
@@ -195,20 +223,31 @@ export function Euclid2View(props: Euclid2ViewProps) {
   function onPointerMove(e: PointerEvent) {
     if (props.placing) {
       const filter = props.scope ? snapFilterOf(props.scope) : undefined;
-      const hit = placeFromEvent(e, paneEl(), camera(), size(), props.trace, props.toolSession, filter, props.scope);
+      const hit = placeFromEvent(
+        e,
+        paneEl(),
+        camera(),
+        size(),
+        props.trace,
+        props.toolSession,
+        filter,
+        props.scope,
+      );
       props.onCursor?.(hit);
       const session = props.toolSession;
       props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : null);
     } else noteHover(e);
   }
 
-  const strokes = createMemo(() => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"));
+  const strokes = createMemo(() =>
+    props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"),
+  );
   const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : null));
   const fills = createMemo(() =>
-    chrome().hideFills ? [] : strokes().filter((n) => isProfile(n.value)),
+    chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value)),
   );
   const ink = createMemo(() =>
-    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isProfile(n.value)),
+    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value)),
   );
   const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
   const handles = createMemo(() =>
@@ -227,15 +266,29 @@ export function Euclid2View(props: Euclid2ViewProps) {
       : null,
   );
   const fillBand = createMemo(() =>
-    splitChrome(fills(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
+    splitChrome(
+      fills(),
+      (n) => isSelected(n, props.selectedKey),
+      (n) => isHover(n, props.hoverId, props.selectedKey),
+    ),
   );
   const inkBand = createMemo(() =>
-    splitChrome(ink(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
+    splitChrome(
+      ink(),
+      (n) => isSelected(n, props.selectedKey),
+      (n) => isHover(n, props.hoverId, props.selectedKey),
+    ),
   );
   const pointBand = createMemo(() =>
-    splitChrome(points(), (n) => isSelected(n, props.selectedKey), (n) => isHover(n, props.hoverId, props.selectedKey)),
+    splitChrome(
+      points(),
+      (n) => isSelected(n, props.selectedKey),
+      (n) => isHover(n, props.hoverId, props.selectedKey),
+    ),
   );
-  const handleBand = createMemo(() => liftSelected(handles(), (n) => isSelected(n, props.selectedKey)));
+  const handleBand = createMemo(() =>
+    liftSelected(handles(), (n) => isSelected(n, props.selectedKey)),
+  );
 
   return (
     <div
@@ -271,7 +324,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             selectedKey={props.selectedKey}
             muted={(n) =>
               chrome().muteStrokes ||
-              (eligibleCarriers() != null && !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
+              (eligibleCarriers() != null &&
+                !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
               (!!props.scope && mutedForScope(n, props.scope))
             }
             camera={camera()}

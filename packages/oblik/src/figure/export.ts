@@ -3,6 +3,7 @@ import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "../ev
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
 import { profileSvgPath } from "../geom/profile";
+import { compileRegion, regionSvgPath } from "../geom/region";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
@@ -99,6 +100,10 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
         inc(e.a.x, e.a.y);
         inc(e.b.x, e.b.y);
       }
+    } else if (v.kind === "region") {
+      for (const ring of compileRegion(v)) {
+        for (const p of ring) inc(p.x, p.y);
+      }
     } else if (isGlider(v)) inc(v.x, v.y);
   }
   return has ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null;
@@ -152,6 +157,11 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
     const d = profileSvgPath(v);
     if (!d) return "";
     return `<path d="${d}" ${styleAttrs(s.style, true)}/>`;
+  }
+  if (v.kind === "region") {
+    const d = regionSvgPath(v);
+    if (!d) return "";
+    return `<path d="${d}" fill-rule="evenodd" ${styleAttrs(s.style, true)}/>`;
   }
   const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : null;
   if (point) {

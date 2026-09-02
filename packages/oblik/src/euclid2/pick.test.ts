@@ -1,7 +1,15 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "../eval/context";
-import { hitTest, hitsNear, namedStrokesThrough, snapBoundPoint, snapLineCarrier, snapProfile, snapStrokeCarrier } from "./pick";
+import {
+  hitTest,
+  hitsNear,
+  namedStrokesThrough,
+  snapBoundPoint,
+  snapLineCarrier,
+  snapProfile,
+  snapStrokeCarrier,
+} from "./pick";
 
 const A = {
   id: "o_a",
@@ -38,7 +46,12 @@ describe("snapBoundPoint", () => {
   });
 
   test("keys restrict snap and print the mention", () => {
-    const hidden: TraceNode = { ...A, id: "o_hid", bind: "hidden", value: { kind: "point", x: 0.05, y: 0 } };
+    const hidden: TraceNode = {
+      ...A,
+      id: "o_hid",
+      bind: "hidden",
+      value: { kind: "point", x: 0.05, y: 0 },
+    };
     const keys = new Set(["o_a:0"]);
     const s = snapBoundPoint([A, hidden], { x: 0, y: 0 }, 0.3, {
       keys,
@@ -131,7 +144,10 @@ describe("snapLineCarrier", () => {
       editable: true,
       stack: [],
     } as TraceNode;
-    expect(snapLineCarrier([shelf], { x: 2, y: 1.85 }, camera, size)).toEqual({ bind: "shelf", geom: shelf.value });
+    expect(snapLineCarrier([shelf], { x: 2, y: 1.85 }, camera, size)).toEqual({
+      bind: "shelf",
+      geom: shelf.value,
+    });
     const hit = snapLineCarrier([ground, shelf], { x: 2, y: 0.05 }, camera, size);
     expect(hit).toEqual({ bind: "ground", geom: ground.value });
   });
@@ -243,6 +259,26 @@ describe("profile pick", () => {
     expect(snapProfile([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });
 
+  test("region fill picks before the stock profile", () => {
+    const FACE_REGION = {
+      id: "o_face",
+      occ: 0,
+      kind: "region",
+      bind: "face",
+      value: {
+        kind: "region",
+        stock: FACE.value,
+        subtract: [],
+        keep: [],
+      },
+      editable: false,
+      stack: [{ file: "scene.ts", line: 40, column: 4 }],
+    } as TraceNode;
+    const hits = hitsNear([FACE, FACE_REGION], { x: 1, y: 1 }, camera, size);
+    expect(hits[0]?.id).toBe("o_face");
+    expect(hits.some((n) => n.id === "o_pr")).toBe(true);
+  });
+
   test("snapProfile with keys uses that invocation, not occ 0", () => {
     const face1 = {
       ...FACE,
@@ -250,9 +286,21 @@ describe("profile pick", () => {
       value: {
         kind: "profile" as const,
         outer: [
-          { a: { x: 10, y: 0 }, b: { x: 14, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 14, y: 0 } } },
-          { a: { x: 14, y: 0 }, b: { x: 10, y: 3 }, carrier: { kind: "segment" as const, a: { x: 14, y: 0 }, b: { x: 10, y: 3 } } },
-          { a: { x: 10, y: 3 }, b: { x: 10, y: 0 }, carrier: { kind: "segment" as const, a: { x: 10, y: 3 }, b: { x: 10, y: 0 } } },
+          {
+            a: { x: 10, y: 0 },
+            b: { x: 14, y: 0 },
+            carrier: { kind: "segment" as const, a: { x: 10, y: 0 }, b: { x: 14, y: 0 } },
+          },
+          {
+            a: { x: 14, y: 0 },
+            b: { x: 10, y: 3 },
+            carrier: { kind: "segment" as const, a: { x: 14, y: 0 }, b: { x: 10, y: 3 } },
+          },
+          {
+            a: { x: 10, y: 3 },
+            b: { x: 10, y: 0 },
+            carrier: { kind: "segment" as const, a: { x: 10, y: 3 }, b: { x: 10, y: 0 } },
+          },
         ],
       },
     };
