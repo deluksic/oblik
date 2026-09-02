@@ -240,7 +240,7 @@ export function fillet(at: Vec2, r: number): Fillet {
 }
 
 export const profile = mark(
-  (cycle: readonly unknown[], optsOrId?: ProfileOpts | string, id?: string): Profile => {
+  (cycle: Circle | readonly unknown[], optsOrId?: ProfileOpts | string, id?: string): Profile => {
     if (typeof optsOrId === "string") return traced(profileValue(cycle), optsOrId);
     return traced(profileValue(cycle, optsOrId), id);
   },

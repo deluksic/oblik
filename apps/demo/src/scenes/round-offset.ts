@@ -241,8 +241,6 @@ export default defineScene({
     const Cd = point(12.2, 6.1, "o_ro_cd");
     const Co = point(13.7, 4.8, "o_ro_co");
     const Creach = circle(Co, 0.52, "o_ro_cr");
-    const Cp = pointOnCircle(Creach, 1, 0, "o_ro_cp");
-    const Cq = pointOnCircle(Creach, -1, 0, "o_ro_cq");
     const circHole = profile(
       [
         Ca,
@@ -254,7 +252,7 @@ export default defineScene({
         Cd,
         segment(Cd, Ca, "o_ro_cda"),
       ],
-      { holes: [[Cp, along(Creach, 1), Cq, along(Creach, 1)]] },
+      { holes: [Creach] },
       "o_ro_ch_p",
     );
     const circInset = roundOffset(circHole, -0.12, "o_ro_ch");

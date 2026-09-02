@@ -2,7 +2,14 @@ import { describe, expect, test } from "vitest";
 
 import { pointOnCircleValue } from "./gliders";
 import { filletAtVertex, localOffset, profileCorners, roundOffsetValue } from "./offset";
-import { alongValue, filletValue, profileContains, profileValue } from "./profile";
+import {
+  alongValue,
+  filletValue,
+  isCircleWalk,
+  profileContains,
+  profileValue,
+  walkEdges,
+} from "./profile";
 import type { Circle, Profile, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -100,14 +107,14 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
-    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(walkEdges(p.outer).every((e) => e.carrier.kind !== "circle")).toBe(true);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 1, y: 1 })).toBe(false);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
-    expect(p.outer[0]?.a.x).toBeCloseTo(0.2);
-    expect(p.outer[0]?.a.y).toBeCloseTo(0.2);
-    expect(p.outer[0]?.b.x).toBeCloseTo(0.8);
-    expect(p.outer[0]?.b.y).toBeCloseTo(0.2);
+    expect(walkEdges(p.outer)[0]?.a.x).toBeCloseTo(0.2);
+    expect(walkEdges(p.outer)[0]?.a.y).toBeCloseTo(0.2);
+    expect(walkEdges(p.outer)[0]?.b.x).toBeCloseTo(0.8);
+    expect(walkEdges(p.outer)[0]?.b.y).toBeCloseTo(0.2);
   });
 
   test("CCW square outset is four offsets plus four quarter joins", () => {
@@ -115,8 +122,12 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(8);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle").every((e) => e.k === 1)).toBe(true);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
+    expect(
+      walkEdges(p.outer)
+        .filter((e) => e.carrier.kind === "circle")
+        .every((e) => e.k === 1),
+    ).toBe(true);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 1, y: 1 })).toBe(true);
     expect(profileContains(p, { x: 1.1, y: 0.5 })).toBe(true);
@@ -143,12 +154,12 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(3);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
     expect(profileContains(p, { x: 0, y: 1 })).toBe(true);
     expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
     expect(profileContains(p, { x: 0, y: 0.05 })).toBe(false);
-    expect(p.outer[0]?.a.y).toBeCloseTo(0.12);
-    expect(p.outer[0]?.b.y).toBeCloseTo(0.12);
+    expect(walkEdges(p.outer)[0]?.a.y).toBeCloseTo(0.12);
+    expect(walkEdges(p.outer)[0]?.b.y).toBeCloseTo(0.12);
   });
 
   test("sectors just under and over 180° still inset", () => {
@@ -161,7 +172,7 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(2);
     expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
     expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
   });
@@ -170,7 +181,9 @@ describe("roundOffsetValue", () => {
     const out = roundOffsetValue(slice, 0.15);
     expect(out).toHaveLength(1);
     expect(out[0]?.outer).toHaveLength(4);
-    expect(out[0]?.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+    expect(walkEdges(out[0]?.outer ?? []).filter((e) => e.carrier.kind === "circle")).toHaveLength(
+      3,
+    );
     expect(profileContains(out[0]!, { x: 1.4, y: 1.4 })).toBe(true);
   });
 
@@ -181,11 +194,11 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
-    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(walkEdges(p.outer).every((e) => e.carrier.kind !== "circle")).toBe(true);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
-    expect(p.outer[0]?.a.x).toBeCloseTo(0.12);
-    expect(p.outer[0]?.a.y).toBeCloseTo(0.12);
+    expect(walkEdges(p.outer)[0]?.a.x).toBeCloseTo(0.12);
+    expect(walkEdges(p.outer)[0]?.a.y).toBeCloseTo(0.12);
   });
 
   test("filleted square inset at d === r is the same sharp remnant", () => {
@@ -193,7 +206,7 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
-    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(walkEdges(p.outer).every((e) => e.carrier.kind !== "circle")).toBe(true);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
   });
@@ -217,7 +230,7 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(4);
-    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(walkEdges(p.outer).every((e) => e.carrier.kind !== "circle")).toBe(true);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
   });
@@ -227,7 +240,7 @@ describe("roundOffsetValue", () => {
     expect(out).toHaveLength(1);
     const p = out[0]!;
     expect(p.outer).toHaveLength(8);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.12, y: 0.12 })).toBe(false);
   });
@@ -243,7 +256,7 @@ describe("roundOffsetValue", () => {
     ]);
     const out = roundOffsetValue(ell, -0.15);
     expect(out).toHaveLength(1);
-    const arcs = out[0]!.outer.filter((e) => e.carrier.kind === "circle");
+    const arcs = walkEdges(out[0]!.outer).filter((e) => e.carrier.kind === "circle");
     expect(out[0]?.outer).toHaveLength(7);
     expect(arcs).toHaveLength(1);
     expect(arcs[0]?.carrier.kind === "circle" && arcs[0].carrier.center.x).toBeCloseTo(1);
@@ -268,11 +281,11 @@ describe("roundOffsetValue", () => {
       filletValue({ x: g2.x, y: g2.y }, 0.36),
       right,
     ]);
-    expect(face.outer.length).toBe(5);
+    expect(walkEdges(face.outer).length).toBe(5);
     const out = roundOffsetValue(face, 0.359);
     expect(out).toHaveLength(1);
     const p = out[0]!;
-    expect(p.outer.length).toBeGreaterThanOrEqual(4);
+    expect(walkEdges(p.outer).length).toBeGreaterThanOrEqual(4);
     expect(profileContains(p, O)).toBe(true);
     expect(profileContains(p, { x: 3.69, y: 8.61 })).toBe(true);
     expect(profileContains(p, { x: 3.69, y: 8.2 })).toBe(false);
@@ -288,7 +301,7 @@ describe("roundOffsetValue", () => {
     const b = roundOffsetValue(square, -0.2);
     expect(a).toHaveLength(1);
     expect(b).toHaveLength(1);
-    expect(a[0]?.outer).toHaveLength(b[0]!.outer.length);
+    expect(walkEdges(a[0]?.outer ?? [])).toHaveLength(walkEdges(b[0]!.outer).length);
     expect(profileContains(b[0]!, { x: 0.5, y: 0.5 })).toBe(true);
   });
 
@@ -416,6 +429,40 @@ describe("roundOffsetValue", () => {
     }
   });
 
+  test("circle hole stays a concentric circle under inset and outset", () => {
+    const center = { x: 13.7, y: 4.8 };
+    const hole: Circle = { kind: "circle", center, radius: 0.52 };
+    const p = profileValue(rectCycle(12.2, 3.5, 15.2, 6.1), { holes: [hole] });
+    expect(isCircleWalk(p.holes[0]!)).toBe(true);
+
+    for (const d of [-0.12, -0.01, 0.12] as const) {
+      const out = roundOffsetValue(p, d);
+      expect(out).toHaveLength(1);
+      expect(out[0]?.holes).toHaveLength(1);
+      const h = out[0]!.holes[0]!;
+      if (!isCircleWalk(h)) throw new Error("expected circle hole");
+      expect(h.radius).toBeCloseTo(0.52 - d);
+      expect(h.center.x).toBeCloseTo(center.x);
+      expect(h.center.y).toBeCloseTo(center.y);
+      expect(profileContains(out[0]!, { x: 12.4, y: 3.7 })).toBe(true);
+      expect(profileContains(out[0]!, center)).toBe(false);
+    }
+  });
+
+  test("circle outer insets to a concentric circle", () => {
+    const out = roundOffsetValue(
+      profileValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 }),
+      -0.2,
+    );
+    expect(out).toHaveLength(1);
+    const disk = out[0]!.outer;
+    if (!isCircleWalk(disk)) throw new Error("expected circle outer");
+    expect(disk.radius).toBeCloseTo(0.8);
+    expect(profileContains(out[0]!, { x: 0, y: 0 })).toBe(true);
+    expect(profileContains(out[0]!, { x: 0.9, y: 0 })).toBe(false);
+    expect(profileContains(out[0]!, { x: 0.7, y: 0 })).toBe(true);
+  });
+
   test("two-arc circular disk insets to a smaller disk", () => {
     const out = roundOffsetValue(profileValue(twoArcCircle({ x: 0, y: 0 }, 1)), -0.2);
     expect(out).toHaveLength(1);
@@ -423,6 +470,22 @@ describe("roundOffsetValue", () => {
     expect(profileContains(out[0]!, { x: 0, y: 0 })).toBe(true);
     expect(profileContains(out[0]!, { x: 0.9, y: 0 })).toBe(false);
     expect(profileContains(out[0]!, { x: 0.7, y: 0 })).toBe(true);
+  });
+
+  test("a washer offsets as two concentric circles", () => {
+    const p = profileValue(
+      { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
+      { holes: [{ kind: "circle", center: { x: 0, y: 0 }, radius: 0.8 }] },
+    );
+    expect(profileContains(p, { x: 1.2, y: 0 })).toBe(true);
+    expect(profileContains(p, { x: 0, y: 0 })).toBe(false);
+    const out = roundOffsetValue(p, -0.2);
+    expect(out).toHaveLength(1);
+    const outer = out[0]!.outer;
+    const inner = out[0]!.holes[0]!;
+    if (!isCircleWalk(outer) || !isCircleWalk(inner)) throw new Error("expected circle washer");
+    expect(outer.radius).toBeCloseTo(1.8);
+    expect(inner.radius).toBeCloseTo(1);
   });
 });
 
@@ -455,7 +518,7 @@ describe("profileCorners / filletAtVertex", () => {
   test("filletAtVertex rounds one sharp corner and leaves the rest", () => {
     const out = filletAtVertex(square, 0, 0.2);
     expect(out.outer).toHaveLength(5);
-    expect(out.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(walkEdges(out.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
     expect(profileContains(out, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(out, { x: 0.05, y: 0.05 })).toBe(false);
     expect(profileContains(out, { x: 0.95, y: 0.95 })).toBe(true);
@@ -464,7 +527,7 @@ describe("profileCorners / filletAtVertex", () => {
   test("filletAtVertex r === 0 on a filleted corner is sharp again", () => {
     const out = filletAtVertex(roundedSquare(0.2), 0, 0);
     expect(profileContains(out, { x: 0.05, y: 0.05 })).toBe(true);
-    expect(out.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+    expect(walkEdges(out.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
   });
 
   test("too-large filletAtVertex is empty", () => {

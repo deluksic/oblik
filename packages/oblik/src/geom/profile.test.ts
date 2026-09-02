@@ -4,10 +4,12 @@ import { roundOffsetValue } from "./offset";
 import {
   alongValue,
   filletValue,
+  isCircleWalk,
   profileContains,
   profileSvgPath,
   profileValue,
   signedDistToProfile,
+  walkEdges,
 } from "./profile";
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
@@ -56,10 +58,10 @@ describe("profileValue", () => {
       { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 0, y: 1 } },
     ]);
     expect(p.outer).toHaveLength(2);
-    expect(p.outer[0]?.a).toEqual({ x: 2, y: 0 });
-    expect(p.outer[0]?.b).toEqual({ x: 4, y: 0 });
-    expect(p.outer[1]?.a.x).toBeCloseTo(0);
-    expect(p.outer[1]?.b.x).toBeCloseTo(0);
+    expect(walkEdges(p.outer)[0]?.a).toEqual({ x: 2, y: 0 });
+    expect(walkEdges(p.outer)[0]?.b).toEqual({ x: 4, y: 0 });
+    expect(walkEdges(p.outer)[1]?.a.x).toBeCloseTo(0);
+    expect(walkEdges(p.outer)[1]?.b.x).toBeCloseTo(0);
   });
 
   test("circular segment with along(c, -1) is the minor cap", () => {
@@ -93,7 +95,7 @@ describe("profileValue", () => {
     }
     const p = profileValue(cycle);
     expect(p.outer).toHaveLength(5);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
     expect(profileContains(p, { x: 0.95, y: 0.95 })).toBe(true);
@@ -114,7 +116,7 @@ describe("profileValue", () => {
     }
     const p = profileValue(cycle);
     expect(p.outer).toHaveLength(8);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
   });
@@ -147,7 +149,7 @@ describe("profileValue", () => {
       { kind: "segment", a: cpt, b: a } satisfies Segment,
     ]);
     expect(p.outer).toHaveLength(3);
-    expect(p.outer.every((e) => e.carrier.kind !== "circle")).toBe(true);
+    expect(walkEdges(p.outer).every((e) => e.carrier.kind !== "circle")).toBe(true);
   });
 
   test("concave L-notch fillet adds material in the pocket", () => {
@@ -163,8 +165,8 @@ describe("profileValue", () => {
       [undefined, undefined, undefined, 0.2],
     );
     expect(p.outer).toHaveLength(7);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    const arc = p.outer.find((e) => e.carrier.kind === "circle");
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    const arc = walkEdges(p.outer).find((e) => e.carrier.kind === "circle");
     expect(arc?.carrier.kind === "circle" && arc.carrier.center.x).toBeCloseTo(1.2);
     expect(arc?.carrier.kind === "circle" && arc.carrier.center.y).toBeCloseTo(1.2);
     expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
@@ -190,7 +192,7 @@ describe("profileValue", () => {
       ob,
     ]);
     expect(p.outer).toHaveLength(5);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
     expect(profileContains(p, { x: 0.8, y: 0.8 })).toBe(true);
     expect(profileContains(p, { x: 1.95, y: 0.05 })).toBe(false);
     expect(profileContains(p, { x: 0.05, y: 1.95 })).toBe(false);
@@ -214,7 +216,7 @@ describe("profileValue", () => {
         seg(O, Q),
       ]);
       expect(p.outer).toHaveLength(5);
-      expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
+      expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(3);
       expect(profileContains(p, { x: 0.4, y: 0.4 })).toBe(true);
       expect(profileContains(p, { x: 1.95, y: 0.05 })).toBe(false);
     }
@@ -236,8 +238,8 @@ describe("profileValue", () => {
     const p = profileValue([filletValue(O, 0.2), ...cycle.slice(1)]);
     const sharp = profileValue(cycle);
     expect(p.outer).toHaveLength(3);
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
-    expect(p.outer).toHaveLength(sharp.outer.length);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(1);
+    expect(walkEdges(p.outer)).toHaveLength(walkEdges(sharp.outer).length);
     expect(profileContains(p, { x: 0, y: 1 })).toBe(true);
     expect(profileContains(p, { x: 0.1, y: 0.1 })).toBe(true);
   });
@@ -266,7 +268,7 @@ describe("profileValue", () => {
     const out = roundOffsetValue(face, -0.1);
     expect(out).toHaveLength(1);
     const p = out[0]!;
-    expect(p.outer.filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
+    expect(walkEdges(p.outer).filter((e) => e.carrier.kind === "circle")).toHaveLength(4);
     expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(true);
     expect(profileContains(p, { x: 0.12, y: 0.12 })).toBe(false);
     expect(profileContains(p, { x: 0.05, y: 0.05 })).toBe(false);
@@ -307,6 +309,25 @@ describe("profile holes", () => {
     expect(profileContains(p, { x: 0.5, y: 0.72 })).toBe(true);
     expect(profileSvgPath(p)).toMatch(/A /);
     expect(profileSvgPath(p).match(/Z/g)?.length).toBe(2);
+  });
+
+  test("a circle is a closed walk as a hole", () => {
+    const hole: Circle = { kind: "circle", center: { x: 0.5, y: 0.5 }, radius: 0.2 };
+    const p = profileValue(rectCycle(0, 0, 1, 1), { holes: [hole] });
+    expect(p.holes).toHaveLength(1);
+    expect(isCircleWalk(p.holes[0]!)).toBe(true);
+    expect(profileContains(p, { x: 0.08, y: 0.08 })).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0.5 })).toBe(false);
+    expect(profileSvgPath(p)).toMatch(/A /);
+    expect(profileSvgPath(p).match(/Z/g)?.length).toBe(2);
+  });
+
+  test("a circle is a closed walk as the outer", () => {
+    const p = profileValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 });
+    expect(isCircleWalk(p.outer)).toBe(true);
+    expect(profileContains(p, { x: 0, y: 0 })).toBe(true);
+    expect(profileContains(p, { x: 0.5, y: 0 })).toBe(true);
+    expect(profileContains(p, { x: 1.01, y: 0 })).toBe(false);
   });
 
   test("a hole outside the outer is an empty profile", () => {

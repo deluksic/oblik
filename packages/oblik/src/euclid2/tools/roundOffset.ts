@@ -1,6 +1,6 @@
 import type { Profile } from "@/geom";
 import { roundOffsetValue } from "@/geom/offset";
-import { signedDistToProfile } from "@/geom/profile";
+import { signedDistToProfile, walkEdges } from "@/geom/profile";
 import { printExpr } from "@/source/expr";
 
 import { snapProfile } from "../pick";
@@ -66,8 +66,8 @@ function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null)
 function offsetGhost(face: Profile, d: number) {
   const islands = roundOffsetValue(face, d);
   const loops = islands.map((p) => p.outer);
-  const edges = loops.flat();
-  if (edges.length < 2) return null;
+  if (loops.length === 0) return null;
+  const edges = loops.flatMap(walkEdges);
   return { kind: "profile" as const, edges, loops };
 }
 

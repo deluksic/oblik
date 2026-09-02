@@ -1,5 +1,5 @@
 import type { TraceNode } from "@/eval/context";
-import type { Branch, Circle, LineLike, Profile, ProfileEdge } from "@/geom";
+import type { Branch, Circle, ClosedWalk, LineLike, Profile, ProfileEdge } from "@/geom";
 import type { Expr } from "@/source/expr";
 
 import type { Camera2, PaneSize } from "../camera";
@@ -192,7 +192,7 @@ export type Ghost =
       kind: "profile";
       edges: ProfileEdge[];
       /** Disjoint closed walks; when set, fill/stroke do not chain islands. */
-      loops?: ProfileEdge[][];
+      loops?: ClosedWalk[];
       hover?: ProfileEdge;
       arrow?: { at: Vec2; tx: number; ty: number };
     };

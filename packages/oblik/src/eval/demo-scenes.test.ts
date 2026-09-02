@@ -18,6 +18,7 @@ import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
 import { compileOffsetBoundary } from "../geom/offset";
+import { isCircleWalk, walkEdges } from "../geom/profile";
 import { compileRegion, isOffset, isRegion, regionContains } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
@@ -131,8 +132,13 @@ describe("migrated demo scenes", () => {
     expect(regionContains(twoInset.value, { x: 7.45, y: 4.8 })).toBe(true);
     expect(regionContains(twoInset.value, { x: 8.4, y: 4.8 })).toBe(false);
     const circHole = trace.find((n) => n.bind === "circHole");
-    expect(circHole?.value.kind === "profile" ? circHole.value.outer.length : 0).toBeGreaterThan(0);
+    expect(
+      circHole?.value.kind === "profile" ? walkEdges(circHole.value.outer).length : 0,
+    ).toBeGreaterThan(0);
     expect(circHole?.value.kind === "profile" ? circHole.value.holes : []).toHaveLength(1);
+    expect(
+      circHole?.value.kind === "profile" ? isCircleWalk(circHole.value.holes[0]!) : false,
+    ).toBe(true);
 
     const holeInset = trace.find((n) => n.bind === "holeInset");
     expect(holeInset?.editable).toBe(true);
@@ -149,6 +155,9 @@ describe("migrated demo scenes", () => {
     const circIslands = compileOffsetBoundary(circInset.value.stock);
     expect(circIslands).toHaveLength(1);
     expect(circIslands[0]?.holes).toHaveLength(1);
+    const circHoleWalk = circIslands[0]!.holes[0]!;
+    if (!isCircleWalk(circHoleWalk)) throw new Error("circInset hole is not a circle");
+    expect(circHoleWalk.radius).toBeCloseTo(0.64);
 
     const boneInset = trace.find((n) => n.bind === "boneInset");
     if (!boneInset || !isRegion(boneInset.value)) throw new Error("missing boneInset");
@@ -219,43 +228,43 @@ describe("migrated demo scenes", () => {
     expect(trace.some((n) => n.bind === "r" && n.kind === "slider")).toBe(true);
     const flat = trace.find((n) => n.bind === "flat");
     expect(flat?.kind).toBe("profile");
-    expect(flat?.value.kind === "profile" ? flat.value.outer : []).toHaveLength(
+    expect(flat?.value.kind === "profile" ? walkEdges(flat.value.outer) : []).toHaveLength(
       flat?.value.kind === "profile" ? 3 : 0,
     );
     expect(
       flat?.value.kind === "profile"
-        ? flat.value.outer.filter((e) => e.carrier.kind === "circle")
+        ? walkEdges(flat.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
     ).toHaveLength(flat?.value.kind === "profile" ? 1 : 0);
     const mix = trace.find((n) => n.bind === "mix");
     expect(mix?.kind).toBe("profile");
-    expect(mix?.value.kind === "profile" ? mix.value.outer : []).toHaveLength(
+    expect(mix?.value.kind === "profile" ? walkEdges(mix.value.outer) : []).toHaveLength(
       mix?.value.kind === "profile" ? 6 : 0,
     );
     expect(
       mix?.value.kind === "profile"
-        ? mix.value.outer.filter((e) => e.carrier.kind === "circle")
+        ? walkEdges(mix.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
     ).toHaveLength(mix?.value.kind === "profile" ? 2 : 0);
     const ell = trace.find((n) => n.bind === "ell");
-    expect(ell?.value.kind === "profile" ? ell.value.outer : []).toHaveLength(
+    expect(ell?.value.kind === "profile" ? walkEdges(ell.value.outer) : []).toHaveLength(
       ell?.value.kind === "profile" ? 7 : 0,
     );
     expect(
       ell?.value.kind === "profile"
-        ? ell.value.outer.filter((e) => e.carrier.kind === "circle")
+        ? walkEdges(ell.value.outer).filter((e) => e.carrier.kind === "circle")
         : [],
     ).toHaveLength(ell?.value.kind === "profile" ? 1 : 0);
     const rim = trace.find((n) => n.bind === "rim");
-    expect(rim?.value.kind === "profile" ? rim.value.outer : []).toHaveLength(
+    expect(rim?.value.kind === "profile" ? walkEdges(rim.value.outer) : []).toHaveLength(
       rim?.value.kind === "profile" ? 5 : 0,
     );
     const tip = trace.find((n) => n.bind === "tip");
-    expect(tip?.value.kind === "profile" ? tip.value.outer : []).toHaveLength(
+    expect(tip?.value.kind === "profile" ? walkEdges(tip.value.outer) : []).toHaveLength(
       tip?.value.kind === "profile" ? 4 : 0,
     );
     const adj = trace.find((n) => n.bind === "adj");
-    expect(adj?.value.kind === "profile" ? adj.value.outer : []).toHaveLength(
+    expect(adj?.value.kind === "profile" ? walkEdges(adj.value.outer) : []).toHaveLength(
       adj?.value.kind === "profile" ? 6 : 0,
     );
     const inset = trace.find((n) => n.bind === "inset");

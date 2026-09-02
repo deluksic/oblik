@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { walkEdges } from "../geom/profile";
 import { analyze } from "../source/analyze";
 import {
   along,
@@ -277,11 +278,13 @@ describe("evaluate", () => {
     ]);
     const p = trace.find((n) => n.id === "pr");
     expect(p?.kind).toBe("profile");
-    expect(p?.value.kind === "profile" ? p.value.outer : []).toHaveLength(
+    expect(p?.value.kind === "profile" ? walkEdges(p.value.outer) : []).toHaveLength(
       p?.value.kind === "profile" ? 4 : 0,
     );
     expect(
-      p?.value.kind === "profile" ? p.value.outer.filter((e) => e.carrier.kind === "circle") : [],
+      p?.value.kind === "profile"
+        ? walkEdges(p.value.outer).filter((e) => e.carrier.kind === "circle")
+        : [],
     ).toHaveLength(p?.value.kind === "profile" ? 1 : 0);
   });
 

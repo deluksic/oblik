@@ -1,7 +1,9 @@
-import { filletAtVertex, isFiniteProfile, profileCorners, type Profile } from "@/geom";
+import { filletAtVertex, isFiniteProfile, profileCorners, walkEdges, type Profile } from "@/geom";
 import { printExpr, type Expr } from "@/source/expr";
+
 import { snapProfile } from "../pick";
 import { dist, exprOfPlace, hoverBind, isPinnedPoint, round, sameRef } from "./common";
+import { inSlot, lengthField } from "./draft";
 import {
   attachLengthHit,
   lengthHover,
@@ -9,7 +11,6 @@ import {
   lengthValue,
   resolveLengthExpr,
 } from "./length";
-import { inSlot, lengthField } from "./draft";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 type FilletSession = Extract<ToolSession, { verb: "fillet" }>;
@@ -38,7 +39,8 @@ function cornerOf(hit: PlaceHit, geom: Profile) {
 }
 
 function faceGeom(session: FilletSession, scope: Scope): Profile | undefined {
-  if (session.faceBind && scope.profiles[session.faceBind]) return scope.profiles[session.faceBind]!.geom;
+  if (session.faceBind && scope.profiles[session.faceBind])
+    return scope.profiles[session.faceBind]!.geom;
   return session.geom;
 }
 
@@ -96,7 +98,12 @@ function radiusNumber(session: FilletSession, place: PlaceHit | null, scope: Sco
   if (place?.length && place.length.value >= 0) {
     return Math.max(0, lengthValue(session, scope, place.length.value));
   }
-  if (place && isPinnedPoint(place.point) && session.vertexExpr && !sameRef(session.vertexExpr, place.point)) {
+  if (
+    place &&
+    isPinnedPoint(place.point) &&
+    session.vertexExpr &&
+    !sameRef(session.vertexExpr, place.point)
+  ) {
     return Math.max(0, dist(place.point.at, session.at ?? place.point.at));
   }
   if (!place || !session.at) return 0;
@@ -171,7 +178,12 @@ export const fillet: Tool<FilletSession> = {
       };
     }
     const expr = radiusExpr(session, hit, scope);
-    if (expr.kind === "num" && expr.value === 0 && !hit.length && !resolveLengthExpr(session, scope, { min: 0 })) {
+    if (
+      expr.kind === "num" &&
+      expr.value === 0 &&
+      !hit.length &&
+      !resolveLengthExpr(session, scope, { min: 0 })
+    ) {
       return { session };
     }
     return patchJob(session, expr);
@@ -190,14 +202,16 @@ export const fillet: Tool<FilletSession> = {
     const vertex = vertexOf(session);
     const geom = faceGeom(session, scope);
     if (!vertex) {
-      const at = place?.corner?.at ?? (place?.profile ? closestCorner(place.profile.geom, place.world)?.at : undefined);
+      const at =
+        place?.corner?.at ??
+        (place?.profile ? closestCorner(place.profile.geom, place.world)?.at : undefined);
       return at ? { kind: "corner" as const, at } : null;
     }
     if (!geom) return null;
     const r = radiusNumber(session, place, scope);
     const out = filletAtVertex(geom, vertex.index, r);
     if (!isFiniteProfile(out)) return null;
-    return { kind: "profile", edges: out.outer };
+    return { kind: "profile", edges: walkEdges(out.outer) };
   },
   preview(session, place, scope): Preview {
     const spec = fillet.spec;
@@ -208,9 +222,7 @@ export const fillet: Tool<FilletSession> = {
       const r = inSlot(session.focus === "typed", rLabel);
       return {
         line: `profile([…, fillet(${vTok}, ${r}), …])`,
-        hint: place?.corner
-          ? `Click to fillet this corner. Tab for radius.`
-          : spec.hint,
+        hint: place?.corner ? `Click to fillet this corner. Tab for radius.` : spec.hint,
       };
     }
     if (place?.length && place.length.value >= 0 && resolveLengthExpr(session, scope) == null) {
@@ -234,7 +246,12 @@ export const fillet: Tool<FilletSession> = {
       };
     }
     const bound = resolveLengthExpr(session, scope, { min: 0 });
-    const shown = rLabel !== "radius" ? rLabel : place ? String(round(radiusNumber(session, place, scope))) : "radius";
+    const shown =
+      rLabel !== "radius"
+        ? rLabel
+        : place
+          ? String(round(radiusNumber(session, place, scope)))
+          : "radius";
     const rTok = inSlot(session.focus === "typed", bound ? printExpr(bound) : shown);
     if (bound?.kind === "num" && bound.value === 0) {
       return {

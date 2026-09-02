@@ -19,8 +19,12 @@ export type ProfileEdge = {
   carrier: LineLike | Circle;
   k?: Branch;
 };
-/** Closed cycle of spans. Outer and each hole of a profile are this. Not a tape node. */
-export type ClosedWalk = ProfileEdge[];
+/**
+ * Closed cycle: piecewise spans, or a full circle (zero vertices). Outer and
+ * each hole of a profile are this. Not a tape node. A `Circle` here is a
+ * boundary, not a region-operand disk — membership is still the walk interior.
+ */
+export type ClosedWalk = ProfileEdge[] | Circle;
 export type Profile = { kind: "profile"; outer: ClosedWalk; holes: ClosedWalk[] };
 
 /**

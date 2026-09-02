@@ -2,7 +2,7 @@ import type { TraceNode } from "../eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "../eval/paint";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { profileSvgPath } from "../geom/profile";
+import { isCircleWalk, profileSvgPath, walkEdges } from "../geom/profile";
 import { regionAabb } from "../geom/region";
 import { regionPaint, type DrawOp } from "../geom/region-draw";
 import type { Region } from "../geom/types";
@@ -98,9 +98,15 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
       inc(v.center.x - r, v.center.y - r);
       inc(v.center.x + r, v.center.y + r);
     } else if (v.kind === "profile") {
-      for (const e of v.outer) {
-        inc(e.a.x, e.a.y);
-        inc(e.b.x, e.b.y);
+      if (isCircleWalk(v.outer)) {
+        const r = Math.abs(v.outer.radius);
+        inc(v.outer.center.x - r, v.outer.center.y - r);
+        inc(v.outer.center.x + r, v.outer.center.y + r);
+      } else {
+        for (const e of walkEdges(v.outer)) {
+          inc(e.a.x, e.a.y);
+          inc(e.b.x, e.b.y);
+        }
       }
     } else if (v.kind === "region") {
       const box = regionAabb(v);

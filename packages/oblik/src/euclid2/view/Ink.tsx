@@ -3,7 +3,7 @@ import { For, Show, createMemo } from "solid-js";
 import type { TraceNode } from "@/eval/context";
 import type { Circle, Profile, Region, Segment } from "@/geom";
 import { infiniteLineAxis } from "@/geom/ops";
-import { edgesSvgPath, profileSvgPath } from "@/geom/profile";
+import { edgesSvgPath, profileSvgPath, walkSvgPath } from "@/geom/profile";
 import { isOffsetRegion, isRegion } from "@/geom/region";
 import { regionPaint } from "@/geom/region-draw";
 
@@ -399,7 +399,7 @@ export function ProfileGhost(props: {
   const chain = createMemo(() => {
     const g = props.ghost;
     if (g.loops && g.loops.length > 0) {
-      return g.loops.map((w) => edgesSvgPath(w, false)).join(" ");
+      return g.loops.map((w) => walkSvgPath(w, false)).join(" ");
     }
     const edges = g.hover ? [...g.edges, g.hover] : g.edges;
     return edgesSvgPath(edges, false);
@@ -407,7 +407,7 @@ export function ProfileGhost(props: {
   const fill = createMemo(() => {
     const g = props.ghost;
     if (g.loops && g.loops.length > 0) {
-      return g.loops.map((w) => edgesSvgPath(w, true)).join(" ");
+      return g.loops.map((w) => walkSvgPath(w, true)).join(" ");
     }
     if (g.edges.length < 2) return "";
     return edgesSvgPath(g.edges, true);

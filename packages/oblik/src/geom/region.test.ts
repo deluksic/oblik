@@ -1,7 +1,14 @@
 import { describe, expect, test } from "vitest";
 
 import { roundOffsetValue } from "./offset";
-import { alongValue, filletValue, profileContains, profileSvgPath, profileValue } from "./profile";
+import {
+  alongValue,
+  filletValue,
+  profileContains,
+  profileSvgPath,
+  profileValue,
+  walkEdges,
+} from "./profile";
 import {
   compileRegion,
   distToRegion,
@@ -280,7 +287,9 @@ describe("offset operand", () => {
     expect(paint.stock.d).toMatch(/A /);
     expect(paint.stock.d.match(/Z/g)?.length).toBe(1);
     expect(
-      roundOffsetValue(stock, 0.2)[0]?.outer.filter((e) => e.carrier.kind === "circle"),
+      walkEdges(roundOffsetValue(stock, 0.2)[0]?.outer ?? []).filter(
+        (e) => e.carrier.kind === "circle",
+      ),
     ).toHaveLength(4);
   });
 
