@@ -391,29 +391,72 @@ export function compileRegion(r: Region): Vec2[][] {
   return rings;
 }
 
-const ISLAND_GRID = 48;
-const islandBoxes = new WeakMap<Region, Aabb | null>();
+const ISLAND_GRID = 64;
+const islands = new WeakMap<Region, Island | null>();
 
-function inAabb(box: Aabb, q: Vec2, pad = 0): boolean {
-  return (
-    q.x >= box.minX - pad && q.x <= box.maxX + pad && q.y >= box.minY - pad && q.y <= box.maxY + pad
-  );
-}
+type Island = {
+  box: Aabb;
+  nx: number;
+  ny: number;
+  minX: number;
+  minY: number;
+  cellX: number;
+  cellY: number;
+  occ: Uint8Array;
+};
 
-export function aabbPath(box: Aabb): string {
-  return `M ${box.minX} ${box.minY} H ${box.maxX} V ${box.maxY} H ${box.minX} Z`;
+function islandOf(r: Region): Island | null {
+  if (!isFiniteRegion(r) || !r.contains || !isFiniteVec(r.contains)) return null;
+  if (islands.has(r)) return islands.get(r) ?? null;
+  const found = floodIsland(r);
+  islands.set(r, found);
+  return found;
 }
 
 /** Bounding box of the material component that contains `r.contains`. */
 export function islandAabb(r: Region): Aabb | null {
-  if (!isFiniteRegion(r) || !r.contains || !isFiniteVec(r.contains)) return null;
-  if (islandBoxes.has(r)) return islandBoxes.get(r) ?? null;
-  const box = floodIslandAabb(r);
-  islandBoxes.set(r, box);
-  return box;
+  return islandOf(r)?.box ?? null;
 }
 
-function floodIslandAabb(r: Region): Aabb | null {
+/** Occupied-cell clip of that component. Mask still does the exact CSG edge. */
+export function islandClipPath(r: Region): string | null {
+  const m = islandOf(r);
+  if (!m) return null;
+  return occupancyPath(m, 1);
+}
+
+function occupancyPath(m: Island, dilate: number): string {
+  const { nx, ny, occ } = m;
+  const on = (i: number, j: number) => {
+    if (i < 0 || j < 0 || i >= nx || j >= ny) return false;
+    if (occ[i + j * nx]) return true;
+    if (dilate < 1) return false;
+    return (
+      (i > 0 && !!occ[i - 1 + j * nx]) ||
+      (i + 1 < nx && !!occ[i + 1 + j * nx]) ||
+      (j > 0 && !!occ[i + (j - 1) * nx]) ||
+      (j + 1 < ny && !!occ[i + (j + 1) * nx])
+    );
+  };
+  const parts: string[] = [];
+  for (let j = 0; j < ny; j++) {
+    let i = 0;
+    while (i < nx) {
+      while (i < nx && !on(i, j)) i++;
+      if (i >= nx) break;
+      const i0 = i;
+      while (i < nx && on(i, j)) i++;
+      const x0 = m.minX + (i0 - 0.5) * m.cellX;
+      const x1 = m.minX + (i - 0.5) * m.cellX;
+      const y0 = m.minY + (j - 0.5) * m.cellY;
+      const y1 = m.minY + (j + 0.5) * m.cellY;
+      parts.push(`M ${x0} ${y0} H ${x1} V ${y1} H ${x0} Z`);
+    }
+  }
+  return parts.join(" ");
+}
+
+function floodIsland(r: Region): Island | null {
   const probe = r.contains;
   if (!probe || !(formulaSdf(r, probe) < 0)) return null;
   const bounds = regionAabb(r);
@@ -434,6 +477,7 @@ function floodIslandAabb(r: Region): Aabb | null {
   const gy = (y: number) => Math.min(ny - 1, Math.max(0, Math.round((y - minY) / cellY)));
   const at = (i: number, j: number) => formulaSdf(r, { x: minX + i * cellX, y: minY + j * cellY });
   const seen = new Uint8Array(nx * ny);
+  const occ = new Uint8Array(nx * ny);
   const stack = [gx(probe.x) + gy(probe.y) * nx];
   seen[stack[0]!] = 1;
   let iMin = nx;
@@ -445,6 +489,7 @@ function floodIslandAabb(r: Region): Aabb | null {
     const i = k % nx;
     const j = (k / nx) | 0;
     if (!(at(i, j) < 0)) continue;
+    occ[k] = 1;
     if (i < iMin) iMin = i;
     if (i > iMax) iMax = i;
     if (j < jMin) jMin = j;
@@ -463,17 +508,37 @@ function floodIslandAabb(r: Region): Aabb | null {
   }
   if (iMax < iMin) return null;
   return {
-    minX: minX + iMin * cellX - cellX,
-    minY: minY + jMin * cellY - cellY,
-    maxX: minX + iMax * cellX + cellX,
-    maxY: minY + jMax * cellY + cellY,
+    box: {
+      minX: minX + iMin * cellX - cellX,
+      minY: minY + jMin * cellY - cellY,
+      maxX: minX + iMax * cellX + cellX,
+      maxY: minY + jMax * cellY + cellY,
+    },
+    nx,
+    ny,
+    minX,
+    minY,
+    cellX,
+    cellY,
+    occ,
   };
 }
 
 function islandContains(r: Region, q: Vec2): boolean {
   if (!(formulaSdf(r, q) < 0)) return false;
-  const box = islandAabb(r);
-  return box != null && inAabb(box, q);
+  const m = islandOf(r);
+  if (!m) return false;
+  const i = Math.min(m.nx - 1, Math.max(0, Math.round((q.x - m.minX) / m.cellX)));
+  const j = Math.min(m.ny - 1, Math.max(0, Math.round((q.y - m.minY) / m.cellY)));
+  for (let dj = -1; dj <= 1; dj++) {
+    for (let di = -1; di <= 1; di++) {
+      const ii = i + di;
+      const jj = j + dj;
+      if (ii < 0 || jj < 0 || ii >= m.nx || jj >= m.ny) continue;
+      if (m.occ[ii + jj * m.nx]) return true;
+    }
+  }
+  return false;
 }
 
 function occupied(r: Region, q: Vec2): boolean {

@@ -1,6 +1,6 @@
 import { signedDist } from "./ops";
 import { profileSvgPath } from "./profile";
-import { aabbPath, islandAabb, isFiniteRegion, regionAabb, type Aabb } from "./region";
+import { islandClipPath, isFiniteRegion, regionAabb, type Aabb } from "./region";
 import type { Circle, HalfPlane, Profile, Region, RegionOperand } from "./types";
 import { isFiniteVec, lerp, type Vec2 } from "./vec";
 
@@ -156,9 +156,9 @@ export function regionPaint(r: Region): RegionPaint {
   const padded = padAabb(box, span * 0.08);
   let islandClip: string | undefined;
   if (flat.contains && isFiniteVec(flat.contains)) {
-    const island = islandAabb(r);
-    if (!island) return emptyPaint();
-    islandClip = aabbPath(padAabb(island, Math.max(span * 0.05, 0.12)));
+    const clip = islandClipPath(r);
+    if (!clip) return emptyPaint();
+    islandClip = clip;
   }
   const keepClip = keepClipPath(flat.keep, padded);
   if (keepClip === "") return emptyPaint();

@@ -104,6 +104,24 @@ describe("region CSG field", () => {
     expect(compileRegion(miss)).toHaveLength(0);
   });
 
+  test("contains keeps a C-shape as one component through the spine", () => {
+    const face = regionValue(rect(0, 0, 4, 3), { subtract: rect(1, 1, 4.5, 2) });
+    const top = regionValue(face, { contains: { x: 3, y: 2.5 } });
+    expect(regionContains(top, { x: 3, y: 2.5 })).toBe(true);
+    expect(regionContains(top, { x: 3, y: 0.5 })).toBe(true);
+    expect(regionContains(top, { x: 0.4, y: 1.5 })).toBe(true);
+  });
+
+  test("contains clip is the occupied flood, not one island AABB", () => {
+    const top = regionValue(rect(0, 0, 4, 2), {
+      subtract: stadium(2, 1, 5, 0.35),
+      contains: { x: 2, y: 1.7 },
+    });
+    const clip = regionPaint(top).islandClip ?? "";
+    expect(clip.split("Z").length).toBeGreaterThan(3);
+    expect(regionContains(top, { x: 2, y: 0.3 })).toBe(false);
+  });
+
   test("half-plane keep splits without trimming stock", () => {
     const face = regionValue(rect(0, 0, 4, 2));
     const left = regionValue(face, { keep: leftOfValue(split) });

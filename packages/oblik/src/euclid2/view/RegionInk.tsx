@@ -95,7 +95,7 @@ export function RegionClipped(
     ) : (
       props.children
     );
-  return props.keepClip ? <g clip-path={clipUrl(`${props.id}-k`)}>{island()}</g> : island();
+  return <>{props.keepClip ? <g clip-path={clipUrl(`${props.id}-k`)}>{island()}</g> : island()}</>;
 }
 
 export function RegionOp(props: {
