@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 import { circleUnitAt } from "./gliders";
 import {
   circleCircleIntersectionValue,
@@ -37,6 +39,20 @@ import {
 const EPS = 1e-9;
 /** World-space hair for ray inclusion; same order as the fillet radius compare. */
 const HAIR = 1e-6;
+
+// #region agent log
+function dbg(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+): void {
+  appendFileSync(
+    "/opt/cursor/logs/debug.log",
+    JSON.stringify({ hypothesisId, location, message, data, timestamp: Date.now() }) + "\n",
+  );
+}
+// #endregion
 
 function cloneEdge(e: ProfileEdge): ProfileEdge {
   return {
@@ -401,6 +417,17 @@ function onSpanInterior(e: ProfileEdge, p: Vec2): boolean {
   return t > 1e-6 && t < 1 - 1e-6;
 }
 
+/** `p` sits on `e`'s carrier and strictly inside the span (T-junction / overlap). */
+function onCarrierSpan(e: ProfileEdge, p: Vec2): boolean {
+  if (!onSpanInterior(e, p)) return false;
+  if (e.carrier.kind === "circle") {
+    return Math.abs(dist(p, e.carrier.center) - Math.abs(e.carrier.radius)) <= 1e-6;
+  }
+  const { origin, dir } = lineBasis(e.carrier);
+  const n = norm(dir);
+  return Math.abs(cross2(n, sub(p, origin))) <= 1e-6;
+}
+
 function hitParam(e: ProfileEdge, p: Vec2): number {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
     const full = Math.abs(circleDelta(e.carrier, e.a, e.b, e.k));
@@ -413,33 +440,20 @@ function hitParam(e: ProfileEdge, p: Vec2): number {
   return dot(sub(p, e.a), ab) / len;
 }
 
-function atParam(e: ProfileEdge, t: number): Vec2 {
-  if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
-    const delta = circleDelta(e.carrier, e.a, e.b, e.k);
-    const ua = unitRadial(e.carrier, e.a);
-    const ang = Math.atan2(ua.y, ua.x) + delta * t;
-    return add(
-      e.carrier.center,
-      mul(vec(Math.cos(ang), Math.sin(ang)), Math.abs(e.carrier.radius)),
-    );
-  }
-  return lerp(e.a, e.b, t);
-}
-
 function splitEdge(e: ProfileEdge, hits: readonly Vec2[]): ProfileEdge[] {
-  const ts: number[] = [];
+  const tagged: { t: number; p: Vec2 }[] = [];
   for (const p of hits) {
     if (!onSpanInterior(e, p)) continue;
     const t = hitParam(e, p);
-    if (t > 1e-6 && t < 1 - 1e-6) ts.push(t);
+    if (t > 1e-6 && t < 1 - 1e-6) tagged.push({ t, p });
   }
-  ts.sort((a, b) => a - b);
-  const uniq: number[] = [];
-  for (const t of ts) {
-    if (uniq.length === 0 || Math.abs(t - uniq[uniq.length - 1]!) > 1e-6) uniq.push(t);
+  tagged.sort((a, b) => a.t - b.t);
+  const uniq: { t: number; p: Vec2 }[] = [];
+  for (const h of tagged) {
+    if (uniq.length === 0 || Math.abs(h.t - uniq[uniq.length - 1]!.t) > 1e-6) uniq.push(h);
   }
   if (uniq.length === 0) return [e];
-  const pts = [e.a, ...uniq.map((t) => atParam(e, t)), e.b];
+  const pts = [e.a, ...uniq.map((h) => h.p), e.b];
   const out: ProfileEdge[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const frag = edgeFrom(e.carrier, pts[i]!, pts[i + 1]!, e.k);
@@ -452,19 +466,64 @@ function splitWalks(walks: readonly ClosedWalk[]): ProfileEdge[] {
   const edges: ProfileEdge[] = [];
   for (const w of walks) edges.push(...w);
   const hits: Vec2[][] = edges.map(() => []);
+  let hitPairs = 0;
+  let coinc = 0;
   for (let i = 0; i < edges.length; i++) {
     for (let j = i + 1; j < edges.length; j++) {
-      for (const p of carrierHits(edges[i]!.carrier, edges[j]!.carrier)) {
+      const ei = edges[i]!;
+      const ej = edges[j]!;
+      // #region agent log
+      if (ei.carrier.kind !== "circle" && ej.carrier.kind !== "circle") {
+        const la = lineBasis(ei.carrier);
+        const lb = lineBasis(ej.carrier);
+        if (Math.abs(cross2(la.dir, lb.dir)) < 1e-8) {
+          const off = Math.abs(cross2(la.dir, sub(ej.a, ei.a)));
+          if (off < 1e-4) coinc++;
+        }
+      }
+      // #endregion
+      for (const p of carrierHits(ei.carrier, ej.carrier)) {
         if (!isFiniteVec(p)) continue;
-        if (onSpanInterior(edges[i]!, p) && onSpanInterior(edges[j]!, p)) {
+        if (onSpanInterior(ei, p) && onSpanInterior(ej, p)) {
           hits[i]!.push(p);
           hits[j]!.push(p);
+          hitPairs++;
         }
+      }
+    }
+  }
+  let tHits = 0;
+  for (let i = 0; i < edges.length; i++) {
+    for (let j = 0; j < edges.length; j++) {
+      if (i === j) continue;
+      const e = edges[i]!;
+      const o = edges[j]!;
+      if (onCarrierSpan(e, o.a)) {
+        hits[i]!.push(o.a);
+        tHits++;
+      }
+      if (onCarrierSpan(e, o.b)) {
+        hits[i]!.push(o.b);
+        tHits++;
       }
     }
   }
   const out: ProfileEdge[] = [];
   for (let i = 0; i < edges.length; i++) out.push(...splitEdge(edges[i]!, hits[i]!));
+  // #region agent log
+  dbg("B", "offset.ts:splitWalks", "split hits vs coincident parallels", {
+    nEdges: edges.length,
+    hitPairs,
+    coinc,
+    nOut: out.length,
+    nSplit: hits.filter((h) => h.length > 0).length,
+  });
+  dbg("F", "offset.ts:splitWalks", "T-junction endpoint splits", {
+    tHits,
+    nOut: out.length,
+    runId: "post-fix",
+  });
+  // #endregion
   return out;
 }
 
@@ -479,6 +538,57 @@ const VERT_SNAP = 1e6;
 
 function vertKey(p: Vec2): string {
   return `${Math.round(p.x * VERT_SNAP)}_${Math.round(p.y * VERT_SNAP)}`;
+}
+
+function endsMatch(a: Vec2, b: Vec2): boolean {
+  return vertKey(a) === vertKey(b);
+}
+
+function sameLineCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
+  if (a.carrier.kind === "circle" || b.carrier.kind === "circle") return false;
+  const la = lineBasis(a.carrier);
+  const lb = lineBasis(b.carrier);
+  const da = norm(la.dir);
+  const db = norm(lb.dir);
+  return Math.abs(cross2(da, db)) <= 1e-6 && Math.abs(cross2(da, sub(lb.origin, la.origin))) <= 1e-6;
+}
+
+function sameCircleCarrier(a: ProfileEdge, b: ProfileEdge): boolean {
+  if (a.carrier.kind !== "circle" || b.carrier.kind !== "circle") return false;
+  return (
+    dist(a.carrier.center, b.carrier.center) <= 1e-6 &&
+    Math.abs(Math.abs(a.carrier.radius) - Math.abs(b.carrier.radius)) <= 1e-6
+  );
+}
+
+/** Same geometric span, either direction — a collapsed slit, not leftover boundary. */
+function coincidentSpan(a: ProfileEdge, b: ProfileEdge): boolean {
+  const fwd = endsMatch(a.a, b.a) && endsMatch(a.b, b.b);
+  const rev = endsMatch(a.a, b.b) && endsMatch(a.b, b.a);
+  if (!fwd && !rev) return false;
+  if (sameLineCarrier(a, b)) return true;
+  if (!sameCircleCarrier(a, b)) return false;
+  if (fwd) return a.k === b.k;
+  return a.k === 1 ? b.k === -1 : b.k === 1;
+}
+
+function cancelCoincidentSpans(frags: readonly ProfileEdge[]): ProfileEdge[] {
+  const n = frags.length;
+  const drop = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (drop[i]) continue;
+    for (let j = i + 1; j < n; j++) {
+      if (drop[j]) continue;
+      if (coincidentSpan(frags[i]!, frags[j]!)) {
+        drop[i] = 1;
+        drop[j] = 1;
+        break;
+      }
+    }
+  }
+  const out: ProfileEdge[] = [];
+  for (let i = 0; i < n; i++) if (!drop[i]) out.push(frags[i]!);
+  return out;
 }
 
 function leaveDir(e: ProfileEdge, atA: boolean): Vec2 {
@@ -539,6 +649,9 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
     return best;
   };
   const loops: ClosedWalk[] = [];
+  let failed = 0;
+  let dangling = 0;
+  for (const list of at.values()) if (list.length < 2) dangling++;
   for (let start = 0; start < frags.length; start++) {
     if (used[start] || tried[start]) continue;
     tried[start] = 1;
@@ -562,9 +675,24 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
       fi = nxt.fi;
       forward = nxt.atA;
     }
-    if (closed) loops.push(cycle);
-    else for (const i of consumed) used[i] = 0;
+    if (closed) {
+      const area = polyArea(tessellateWalk(cycle));
+      if (cycle.length >= 3 && Math.abs(area) > 1e-6) loops.push(cycle);
+    } else {
+      failed++;
+      for (const i of consumed) used[i] = 0;
+    }
   }
+  // #region agent log
+  dbg("D", "offset.ts:walkFragments", "loops vs failed/dangling", {
+    nFrags: frags.length,
+    nLoops: loops.length,
+    loopLens: loops.map((w) => w.length),
+    failed,
+    dangling,
+    nVerts: at.size,
+  });
+  // #endregion
   return loops;
 }
 
@@ -592,23 +720,53 @@ function classifyIslands(walks: ClosedWalk[]): Profile[] {
   const islands: Profile[] = [];
   for (let i = 0; i < walks.length; i++) {
     if (depth[i] !== 0) continue;
+    if (Math.abs(areas[i] ?? 0) < 1e-6) continue;
     let outer = walks[i]!;
     if ((areas[i] ?? 0) < 0) outer = reverseWalk(outer);
     const holes: ClosedWalk[] = [];
     for (let j = 0; j < walks.length; j++) {
       if (depth[j] !== 1 || !inside(i, j)) continue;
+      if (Math.abs(areas[j] ?? 0) < 1e-6) continue;
       let hole = walks[j]!;
       if ((areas[j] ?? 0) > 0) hole = reverseWalk(hole);
       holes.push(hole);
     }
     const p: Profile = { kind: "profile", outer, holes };
     if (!isFiniteProfile(p)) continue;
-    if (holes.length > 0 && !profileTopologyOk(p)) {
+    const topo = holes.length === 0 || profileTopologyOk(p);
+    // #region agent log
+    dbg("A", "offset.ts:classifyIslands", "island candidate", {
+      outerI: i,
+      nHoles: holes.length,
+      topo,
+      area: areas[i],
+      holeAreas: holes.map((_, hi) => {
+        const j = walks.findIndex((w) => w === (hi === 0 ? holes[0] : holes[hi]));
+        return j >= 0 ? areas[j] : null;
+      }),
+    });
+    // #endregion
+    if (holes.length > 0 && !topo) {
       islands.push({ kind: "profile", outer, holes: [] });
       continue;
     }
     islands.push(p);
   }
+  // #region agent log
+  const qA = { x: 1.2, y: 1 };
+  const qWeb = { x: 2.1, y: 1 };
+  const qMeat = { x: 0.2, y: 1 };
+  dbg("E", "offset.ts:classifyIslands", "nesting depths", {
+    nWalks: walks.length,
+    depths: depth,
+    areas: areas.map((a) => Math.round(a * 1e4) / 1e4),
+    nIslands: islands.length,
+    holeCounts: islands.map((p) => p.holes.length),
+    containsA: walks.map((w) => walkContains(w, qA)),
+    containsWeb: walks.map((w) => walkContains(w, qWeb)),
+    containsMeat: walks.map((w) => walkContains(w, qMeat)),
+  });
+  // #endregion
   return islands;
 }
 
@@ -621,14 +779,65 @@ export function trimOffsetEnvelope(src: Profile, d: number, raw: ClosedWalk[]): 
   if (raw.length === 0 || !Number.isFinite(d)) return [];
   const absD = Math.abs(d);
   if (absD < EPS) return [cloneProfile(src)];
+  // #region agent log
+  dbg("C", "offset.ts:trimOffsetEnvelope:entry", "raw walks", {
+    d,
+    absD,
+    rawWalks: raw.length,
+    rawEdges: raw.map((w) => w.length),
+    srcHoles: src.holes.length,
+  });
+  // #endregion
   const split = splitWalks(raw);
   const kept: ProfileEdge[] = [];
+  let dropped = 0;
+  let webKept = 0;
+  let webDrop = 0;
   for (const e of split) {
     if (dist(e.a, e.b) < HAIR) continue;
-    if (clearanceOk(edgeMid(e), src, absD)) kept.push(e);
+    const m = edgeMid(e);
+    const ok = clearanceOk(m, src, absD);
+    const webish = m.x > 1.7 && m.x < 2.5 && m.y > 0.2 && m.y < 1.8;
+    if (ok) {
+      kept.push(e);
+      if (webish) webKept++;
+    } else {
+      dropped++;
+      if (webish) webDrop++;
+    }
   }
+  // #region agent log
+  dbg("C", "offset.ts:trimOffsetEnvelope:clearance", "kept vs dropped", {
+    d,
+    nSplit: split.length,
+    nKept: kept.length,
+    dropped,
+    webKept,
+    webDrop,
+  });
+  // #endregion
   if (kept.length < 2) return [];
-  return classifyIslands(walkFragments(kept));
+  const faces = cancelCoincidentSpans(kept);
+  // #region agent log
+  dbg("G", "offset.ts:trimOffsetEnvelope:cancel", "coincident spans dropped", {
+    nKept: kept.length,
+    nFaces: faces.length,
+    nCancel: kept.length - faces.length,
+    runId: "post-fix",
+  });
+  // #endregion
+  if (faces.length < 2) return [];
+  const loops = walkFragments(faces);
+  const out = classifyIslands(loops);
+  // #region agent log
+  dbg("A", "offset.ts:trimOffsetEnvelope:exit", "islands", {
+    d,
+    nLoops: loops.length,
+    nIslands: out.length,
+    holes: out.map((p) => p.holes.length),
+  });
+  // #endregion
+  return out;
 }
 
 /** `(src, d) → islands`. Pass a different kernel to `roundOffsetValue`. */

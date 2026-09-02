@@ -16,6 +16,25 @@ function poly(pts: readonly Vec2[]): Profile {
   return profileValue(cycle);
 }
 
+function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
+  const bl = { x: x0, y: y0 };
+  const br = { x: x1, y: y0 };
+  const tr = { x: x1, y: y1 };
+  const tl = { x: x0, y: y1 };
+  const s = (a: Vec2, b: Vec2): Segment => ({ kind: "segment", a, b });
+  return [bl, s(bl, br), br, s(br, tr), tr, s(tr, tl), tl, s(tl, bl)];
+}
+
+function twoHoles(web: number): Profile {
+  const a1 = 0.5;
+  const a2 = 1.9;
+  const b1 = a2 + web;
+  const b2 = b1 + 1.4;
+  return profileValue(rectCycle(0, 0, 4, 2), {
+    holes: [rectCycle(a1, 0.4, a2, 1.6), rectCycle(b1, 0.4, b2, 1.6)],
+  });
+}
+
 const square = poly([
   { x: 0, y: 0 },
   { x: 1, y: 0 },
@@ -319,6 +338,34 @@ describe("roundOffsetValue", () => {
     expect(profileContains(closed[0]!, { x: 1.5, y: 0.5 })).toBe(true);
     expect(profileContains(closed[0]!, { x: 1.5, y: 2 })).toBe(true);
     expect(profileContains(closed[0]!, { x: 1.5, y: 3.7 })).toBe(false);
+  });
+
+  test("two-hole inset keeps a void when the web pinches", () => {
+    const p = twoHoles(0.4);
+    expect(p.holes).toHaveLength(2);
+
+    const shallow = roundOffsetValue(p, -0.12);
+    expect(shallow).toHaveLength(1);
+    expect(shallow[0]?.holes).toHaveLength(2);
+    expect(profileContains(shallow[0]!, { x: 0.2, y: 1 })).toBe(true);
+    expect(profileContains(shallow[0]!, { x: 1.2, y: 1 })).toBe(false);
+    expect(profileContains(shallow[0]!, { x: 2.1, y: 1 })).toBe(true);
+
+    for (const d of [-0.2, -0.25] as const) {
+      const out = roundOffsetValue(p, d);
+      const meat =
+        d === -0.2
+          ? out.some((q) => profileContains(q, { x: 0.2, y: 1 }))
+          : out.some(
+              (q) =>
+                profileContains(q, { x: 0.26, y: 0.27 }) ||
+                profileContains(q, { x: 0.26, y: 1.73 }),
+            );
+      expect(meat).toBe(true);
+      expect(out.some((q) => profileContains(q, { x: 1.2, y: 1 }))).toBe(false);
+      expect(out.some((q) => profileContains(q, { x: 3, y: 1 }))).toBe(false);
+      expect(out.some((q) => profileContains(q, { x: 2.1, y: 1 }))).toBe(false);
+    }
   });
 });
 
