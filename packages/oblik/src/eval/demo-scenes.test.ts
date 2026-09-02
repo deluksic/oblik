@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
+import arcade from "../../../../apps/demo/src/scenes/arcade.ts";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
@@ -19,7 +20,7 @@ import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
 import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
 import { compileOffsetBoundary } from "../geom/offset";
-import { isCircleWalk, walkEdges } from "../geom/profile";
+import { isCircleWalk, isFiniteRegion, regionContains, walkEdges } from "../geom/profile";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
 import { evaluate } from "./evaluate";
@@ -83,8 +84,17 @@ describe("migrated demo scenes", () => {
       true,
     );
     expect(trace.filter((n) => n.kind === "circle")).toHaveLength(4);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(1);
     expect(trace.every((n) => n.module === "apps/demo/src/layout/mounting-plate.ts")).toBe(true);
     expect(trace.some((n) => n.bind === "drill" && n.editable)).toBe(true);
+    const face = trace.find((n) => n.bind === "face");
+    expect(face?.kind).toBe("region");
+    if (!face || face.value.kind !== "region") throw new Error("missing face");
+    expect(isFiniteRegion(face.value)).toBe(true);
+    expect(face.value.holes).toHaveLength(4);
+    expect(face.value.holes.every(isCircleWalk)).toBe(true);
+    expect(regionContains(face.value, { x: 2, y: 1.6 })).toBe(true);
+    expect(regionContains(face.value, { x: 0.62, y: 0.74 })).toBe(false);
   });
 
   test("plate grid evaluates six helper invocations from one looped call site", () => {
@@ -94,7 +104,9 @@ describe("migrated demo scenes", () => {
     ]);
     expect(trace.filter((n) => n.id === "o_origin")).toHaveLength(6);
     expect(trace.filter((n) => n.id === "o_drill")).toHaveLength(6);
+    expect(trace.filter((n) => n.id === "o_face")).toHaveLength(6);
     expect(trace.filter((n) => n.kind === "circle")).toHaveLength(24);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(6);
     const xs = trace
       .filter((n) => n.id === "o_origin" && n.value.kind === "point")
       .map((n) => (n.value.kind === "point" ? n.value.x : 0));
@@ -211,14 +223,52 @@ describe("migrated demo scenes", () => {
       "apps/demo/src/scenes/plate-figure.ts",
       "apps/demo/src/layout/mounting-plate.ts",
     ]);
-    expect(trace.filter((n) => n.kind === "paint")).toHaveLength(4);
+    expect(trace.filter((n) => n.kind === "paint")).toHaveLength(5);
     expect(trace.filter((n) => n.kind === "style")).toHaveLength(0);
     expect(trace.some((n) => n.bind === "drill" && n.kind === "circle")).toBe(true);
+    expect(trace.some((n) => n.bind === "face" && n.kind === "region")).toBe(true);
     const paints = paintsFromTrace(trace);
+    expect(paints.has("o_face:0")).toBe(true);
     expect(paints.has("o_drill:0")).toBe(true);
     expect(paints.has("o_origin:0")).toBe(true);
     expect(paints.has("o_in:0")).toBe(true);
     expect(paints.has("o_bot:0")).toBe(false);
+
+    const out = figureToSvg({
+      trace,
+      frame: plateFigure.frame,
+      camera: plateFigure.camera,
+      paper: plateFigure.paper,
+      title: plateFigure.title,
+    });
+    expect(out.svg).toMatch(/\sA /);
+    expect(out.svg).toContain('fill-rule="evenodd"');
+  });
+
+  test("arcade traces pac-man as disk minus wedge and a unioned ghost", () => {
+    const { trace } = run(arcade, ["apps/demo/src/scenes/arcade.ts"]);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(2);
+    const pac = trace.find((n) => n.bind === "pac");
+    const ghost = trace.find((n) => n.bind === "ghost");
+    expect(pac?.kind).toBe("csg2");
+    expect(ghost?.kind).toBe("csg2");
+    if (!pac || !isCsg2(pac.value) || !ghost || !isCsg2(ghost.value)) {
+      throw new Error("missing arcade faces");
+    }
+    expect(csgContains(pac.value, { x: 0.5, y: 1.6 })).toBe(true);
+    expect(csgContains(pac.value, { x: 2.4, y: 1.6 })).toBe(false);
+    expect(csgContains(ghost.value, { x: 6.55, y: 0.9 })).toBe(true);
+    expect(csgContains(ghost.value, { x: 6.17, y: 1.97 })).toBe(false);
+
+    const drafted = run(
+      arcade,
+      ["apps/demo/src/scenes/arcade.ts"],
+      new Map([["o_ar_el", [8.5, 3.2]]]),
+    );
+    const ghostOff = drafted.trace.find((n) => n.id === "o_ar_ghost");
+    if (!ghostOff || !isCsg2(ghostOff.value)) throw new Error("missing ghost");
+    expect(csgContains(ghostOff.value, { x: 6.17, y: 1.97 })).toBe(true);
+    expect(csgContains(ghostOff.value, { x: 8.5, y: 3.2 })).toBe(false);
   });
 
   test("fillet scene traces the challenge cases from one radius slider", () => {

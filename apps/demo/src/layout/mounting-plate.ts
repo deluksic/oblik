@@ -1,4 +1,4 @@
-import { circle, lineIntersection, parallelLine, point, segment } from "oblik";
+import { circle, lineIntersection, parallelLine, point, region, segment } from "oblik";
 
 /** Shared plate constructors — stamp/analyze this file, not only the scene. */
 export function mountingPlateLayout(ox = 0, oy = 0) {
@@ -25,8 +25,9 @@ export function mountingPlateLayout(ox = 0, oy = 0) {
   const c2 = lineIntersection(hTop, hRight, "o_c2");
   const c3 = lineIntersection(hTop, hLeft, "o_c3");
   const drill = circle(c0, 0.18, "o_drill");
-  circle(c1, drill.radius, "o_h1");
-  circle(c2, drill.radius, "o_h2");
-  circle(c3, drill.radius, "o_h3");
-  return { origin, opp, hBottom, drill, c0, c1, c2, c3 };
+  const h1 = circle(c1, drill.radius, "o_h1");
+  const h2 = circle(c2, drill.radius, "o_h2");
+  const h3 = circle(c3, drill.radius, "o_h3");
+  const face = region([bl, bottom, tr, right, br, top, tl, left], [drill, h1, h2, h3], "o_face");
+  return { origin, opp, hBottom, drill, c0, c1, c2, c3, face };
 }

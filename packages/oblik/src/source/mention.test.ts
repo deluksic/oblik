@@ -19,7 +19,7 @@ describe("analyzeMentions", () => {
     expect(plate).toBeDefined();
     expect(plate!.params).toEqual(["ox", "oy"]);
     expect(plate!.consts).toEqual(
-      expect.arrayContaining(["origin", "opp", "hBottom", "hLeft", "drill", "c0"]),
+      expect.arrayContaining(["origin", "opp", "hBottom", "hLeft", "drill", "c0", "face"]),
     );
     expect(plate!.return.kind).toBe("bag");
     if (plate!.return.kind !== "bag") throw new Error("expected bag");
@@ -27,6 +27,7 @@ describe("analyzeMentions", () => {
     expect(fields.origin).toBe("o_origin");
     expect(fields.hBottom).toBe("o_in");
     expect(fields.drill).toBe("o_drill");
+    expect(fields.face).toBe("o_face");
     expect(fields.c0).toBe("o_c0");
     expect(fields.hLeft).toBeUndefined();
     expect(plate!.onceIds).toEqual(expect.arrayContaining(["o_origin", "o_in", "o_drill", "o_h3"]));
