@@ -1,5 +1,3 @@
-import { appendFileSync } from "node:fs";
-
 import { circleUnitAt } from "./gliders";
 import {
   circleCircleIntersectionValue,
@@ -39,20 +37,6 @@ import {
 const EPS = 1e-9;
 /** World-space hair for ray inclusion; same order as the fillet radius compare. */
 const HAIR = 1e-6;
-
-// #region agent log
-function dbg(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-): void {
-  appendFileSync(
-    "/opt/cursor/logs/debug.log",
-    JSON.stringify({ hypothesisId, location, message, data, timestamp: Date.now() }) + "\n",
-  );
-}
-// #endregion
 
 function cloneEdge(e: ProfileEdge): ProfileEdge {
   return {
@@ -466,64 +450,30 @@ function splitWalks(walks: readonly ClosedWalk[]): ProfileEdge[] {
   const edges: ProfileEdge[] = [];
   for (const w of walks) edges.push(...w);
   const hits: Vec2[][] = edges.map(() => []);
-  let hitPairs = 0;
-  let coinc = 0;
   for (let i = 0; i < edges.length; i++) {
     for (let j = i + 1; j < edges.length; j++) {
       const ei = edges[i]!;
       const ej = edges[j]!;
-      // #region agent log
-      if (ei.carrier.kind !== "circle" && ej.carrier.kind !== "circle") {
-        const la = lineBasis(ei.carrier);
-        const lb = lineBasis(ej.carrier);
-        if (Math.abs(cross2(la.dir, lb.dir)) < 1e-8) {
-          const off = Math.abs(cross2(la.dir, sub(ej.a, ei.a)));
-          if (off < 1e-4) coinc++;
-        }
-      }
-      // #endregion
       for (const p of carrierHits(ei.carrier, ej.carrier)) {
         if (!isFiniteVec(p)) continue;
         if (onSpanInterior(ei, p) && onSpanInterior(ej, p)) {
           hits[i]!.push(p);
           hits[j]!.push(p);
-          hitPairs++;
         }
       }
     }
   }
-  let tHits = 0;
   for (let i = 0; i < edges.length; i++) {
     for (let j = 0; j < edges.length; j++) {
       if (i === j) continue;
       const e = edges[i]!;
       const o = edges[j]!;
-      if (onCarrierSpan(e, o.a)) {
-        hits[i]!.push(o.a);
-        tHits++;
-      }
-      if (onCarrierSpan(e, o.b)) {
-        hits[i]!.push(o.b);
-        tHits++;
-      }
+      if (onCarrierSpan(e, o.a)) hits[i]!.push(o.a);
+      if (onCarrierSpan(e, o.b)) hits[i]!.push(o.b);
     }
   }
   const out: ProfileEdge[] = [];
   for (let i = 0; i < edges.length; i++) out.push(...splitEdge(edges[i]!, hits[i]!));
-  // #region agent log
-  dbg("B", "offset.ts:splitWalks", "split hits vs coincident parallels", {
-    nEdges: edges.length,
-    hitPairs,
-    coinc,
-    nOut: out.length,
-    nSplit: hits.filter((h) => h.length > 0).length,
-  });
-  dbg("F", "offset.ts:splitWalks", "T-junction endpoint splits", {
-    tHits,
-    nOut: out.length,
-    runId: "post-fix",
-  });
-  // #endregion
   return out;
 }
 
@@ -649,9 +599,6 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
     return best;
   };
   const loops: ClosedWalk[] = [];
-  let failed = 0;
-  let dangling = 0;
-  for (const list of at.values()) if (list.length < 2) dangling++;
   for (let start = 0; start < frags.length; start++) {
     if (used[start] || tried[start]) continue;
     tried[start] = 1;
@@ -679,20 +626,9 @@ function walkFragments(frags: readonly ProfileEdge[]): ClosedWalk[] {
       const area = polyArea(tessellateWalk(cycle));
       if (Math.abs(area) > 1e-6) loops.push(cycle);
     } else {
-      failed++;
       for (const i of consumed) used[i] = 0;
     }
   }
-  // #region agent log
-  dbg("D", "offset.ts:walkFragments", "loops vs failed/dangling", {
-    nFrags: frags.length,
-    nLoops: loops.length,
-    loopLens: loops.map((w) => w.length),
-    failed,
-    dangling,
-    nVerts: at.size,
-  });
-  // #endregion
   return loops;
 }
 
@@ -733,40 +669,12 @@ function classifyIslands(walks: ClosedWalk[]): Profile[] {
     }
     const p: Profile = { kind: "profile", outer, holes };
     if (!isFiniteProfile(p)) continue;
-    const topo = holes.length === 0 || profileTopologyOk(p);
-    // #region agent log
-    dbg("A", "offset.ts:classifyIslands", "island candidate", {
-      outerI: i,
-      nHoles: holes.length,
-      topo,
-      area: areas[i],
-      holeAreas: holes.map((_, hi) => {
-        const j = walks.findIndex((w) => w === (hi === 0 ? holes[0] : holes[hi]));
-        return j >= 0 ? areas[j] : null;
-      }),
-    });
-    // #endregion
-    if (holes.length > 0 && !topo) {
+    if (holes.length > 0 && !profileTopologyOk(p)) {
       islands.push({ kind: "profile", outer, holes: [] });
       continue;
     }
     islands.push(p);
   }
-  // #region agent log
-  const qA = { x: 1.2, y: 1 };
-  const qWeb = { x: 2.1, y: 1 };
-  const qMeat = { x: 0.2, y: 1 };
-  dbg("E", "offset.ts:classifyIslands", "nesting depths", {
-    nWalks: walks.length,
-    depths: depth,
-    areas: areas.map((a) => Math.round(a * 1e4) / 1e4),
-    nIslands: islands.length,
-    holeCounts: islands.map((p) => p.holes.length),
-    containsA: walks.map((w) => walkContains(w, qA)),
-    containsWeb: walks.map((w) => walkContains(w, qWeb)),
-    containsMeat: walks.map((w) => walkContains(w, qMeat)),
-  });
-  // #endregion
   return islands;
 }
 
@@ -779,65 +687,18 @@ export function trimOffsetEnvelope(src: Profile, d: number, raw: ClosedWalk[]): 
   if (raw.length === 0 || !Number.isFinite(d)) return [];
   const absD = Math.abs(d);
   if (absD < EPS) return [cloneProfile(src)];
-  // #region agent log
-  dbg("C", "offset.ts:trimOffsetEnvelope:entry", "raw walks", {
-    d,
-    absD,
-    rawWalks: raw.length,
-    rawEdges: raw.map((w) => w.length),
-    srcHoles: src.holes.length,
-  });
-  // #endregion
   const split = splitWalks(raw);
   const kept: ProfileEdge[] = [];
-  let dropped = 0;
-  let webKept = 0;
-  let webDrop = 0;
   for (const e of split) {
     if (dist(e.a, e.b) < HAIR) continue;
     const m = edgeMid(e);
-    const ok = clearanceOk(m, src, absD);
-    const webish = m.x > 1.7 && m.x < 2.5 && m.y > 0.2 && m.y < 1.8;
-    if (ok) {
-      kept.push(e);
-      if (webish) webKept++;
-    } else {
-      dropped++;
-      if (webish) webDrop++;
-    }
+    if (clearanceOk(m, src, absD)) kept.push(e);
   }
-  // #region agent log
-  dbg("C", "offset.ts:trimOffsetEnvelope:clearance", "kept vs dropped", {
-    d,
-    nSplit: split.length,
-    nKept: kept.length,
-    dropped,
-    webKept,
-    webDrop,
-  });
-  // #endregion
   if (kept.length < 2) return [];
   const faces = cancelCoincidentSpans(kept);
-  // #region agent log
-  dbg("G", "offset.ts:trimOffsetEnvelope:cancel", "coincident spans dropped", {
-    nKept: kept.length,
-    nFaces: faces.length,
-    nCancel: kept.length - faces.length,
-    runId: "post-fix",
-  });
-  // #endregion
   if (faces.length < 2) return [];
   const loops = walkFragments(faces);
-  const out = classifyIslands(loops);
-  // #region agent log
-  dbg("A", "offset.ts:trimOffsetEnvelope:exit", "islands", {
-    d,
-    nLoops: loops.length,
-    nIslands: out.length,
-    holes: out.map((p) => p.holes.length),
-  });
-  // #endregion
-  return out;
+  return classifyIslands(loops);
 }
 
 /** `(src, d) → islands`. Pass a different kernel to `roundOffsetValue`. */
