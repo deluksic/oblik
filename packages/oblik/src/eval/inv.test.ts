@@ -4,7 +4,7 @@ import { analyze } from "../source/analyze";
 import { analyzeMentions } from "../source/mention";
 import { circle, point } from "./constructors";
 import { evaluate } from "./evaluate";
-import { assignInv } from "./inv";
+import { assignInv, mentionsNeedStackInv } from "./inv";
 import { defineScene } from "./scene";
 
 const src = `import { point, circle } from "oblik";
@@ -33,6 +33,35 @@ function bolts() {
 }
 
 describe("assignInv", () => {
+  test("flat scenes stamp inv from annotations without walking stacks", () => {
+    const srcFlat = `import { point } from "oblik";
+export default defineScene({
+  kind: "euclid2",
+  title: "flat",
+  build() {
+    const a = point(0, 0, "o_a");
+  },
+});
+`;
+    const file = "apps/demo/src/scenes/flat.ts";
+    const mentions = analyzeMentions(srcFlat, file);
+    expect(mentionsNeedStackInv([mentions])).toBe(false);
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "flat",
+      build() {
+        point(0, 0, "o_a");
+      },
+    });
+    const { trace } = evaluate(scene, { annotations: analyze(srcFlat, file), module: file });
+    assignInv(trace, [mentions]);
+    expect(trace[0]?.inv).toMatchObject({
+      file,
+      name: "build",
+      serial: 0,
+    });
+  });
+
   test("splits two plate() calls; holes follow the surrounding origin/drill", () => {
     const file = "apps/demo/src/scenes/t.ts";
     const mentions = analyzeMentions(src, file);
