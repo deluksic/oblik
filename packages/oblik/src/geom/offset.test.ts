@@ -447,6 +447,31 @@ describe("roundOffsetValue", () => {
     }
   });
 
+  test("circle hole that punches through splits into two leftover islands", () => {
+    const center = { x: 13.7, y: 4.8 };
+    const hole: Circle = { kind: "circle", center, radius: 0.52 };
+    const p = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), [hole]);
+
+    const nested = roundOffsetValue(p, -0.38);
+    expect(nested).toHaveLength(1);
+    expect(nested[0]?.holes).toHaveLength(1);
+    expect(regionContains(nested[0]!, { x: 12.69, y: 4.8 })).toBe(true);
+    expect(regionContains(nested[0]!, center)).toBe(false);
+
+    for (const d of [-0.39, -0.42, -0.45] as const) {
+      const out = roundOffsetValue(p, d);
+      expect(out).toHaveLength(2);
+      const left = out.find((q) => regionContains(q, { x: 12.69, y: 4.8 }));
+      const right = out.find((q) => regionContains(q, { x: 14.71, y: 4.8 }));
+      expect(left).toBeTruthy();
+      expect(right).toBeTruthy();
+      expect(left).not.toBe(right);
+      expect(out.some((q) => regionContains(q, center))).toBe(false);
+      expect(out.every((q) => !isCircleWalk(q.outer))).toBe(true);
+      expect(out.every((q) => q.holes.length === 0)).toBe(true);
+    }
+  });
+
   test("circle outer insets to a concentric circle", () => {
     const out = roundOffsetValue(
       regionValue({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 }, []),

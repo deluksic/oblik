@@ -399,6 +399,51 @@ function offsetWalk(w: Loop, distance: number, strict: boolean): Loop | null {
   return rawOffsetWalk(w, distance, strict);
 }
 
+/** Two semicircles so a full disk participates in splitWalks. */
+function circleAsEdges(c: Circle): LoopEdge[] {
+  const r = Math.abs(c.radius);
+  const e = { x: c.center.x + r, y: c.center.y };
+  const w = { x: c.center.x - r, y: c.center.y };
+  const carrier: Circle = { kind: "circle", center: { x: c.center.x, y: c.center.y }, radius: r };
+  return [
+    { a: e, b: w, carrier, k: 1 },
+    { a: w, b: e, carrier, k: 1 },
+  ];
+}
+
+function edgesOf(w: Loop): LoopEdge[] {
+  return isCircleWalk(w) ? circleAsEdges(w) : w;
+}
+
+function loopAsCircle(w: Loop): Circle | null {
+  if (isCircleWalk(w)) return w;
+  if (w.length < 2) return null;
+  const c0 = w[0]!.carrier;
+  if (c0.kind !== "circle") return null;
+  let span = 0;
+  for (const e of w) {
+    if (e.carrier.kind !== "circle") return null;
+    if (dist(e.carrier.center, c0.center) > 1e-6) return null;
+    if (Math.abs(Math.abs(e.carrier.radius) - Math.abs(c0.radius)) > 1e-6) return null;
+    if (e.k !== 1 && e.k !== -1) return null;
+    span += Math.abs(circleDelta(e.carrier, e.a, e.b, e.k));
+  }
+  if (Math.abs(span - 2 * Math.PI) > 1e-3) return null;
+  return {
+    kind: "circle",
+    center: { x: c0.center.x, y: c0.center.y },
+    radius: Math.abs(c0.radius),
+  };
+}
+
+function coalesceCircleLoops(p: Region): Region {
+  return {
+    kind: "region",
+    outer: loopAsCircle(p.outer) ?? p.outer,
+    holes: p.holes.map((h) => loopAsCircle(h) ?? h),
+  };
+}
+
 /**
  * Raw offset cycles of outer (by `d`) and holes (by `-d`). May self-intersect.
  * The outer walk missing → `[]`. Vanished holes are omitted.
@@ -731,13 +776,12 @@ export function trimOffsetEnvelope(src: Region, d: number, raw: Loop[]): Region[
   if (raw.length === 0 || !Number.isFinite(d)) return [];
   const absD = Math.abs(d);
   if (absD < EPS) return [cloneRegion(src)];
-  const circles: Circle[] = [];
   const edgeWalks: LoopEdge[][] = [];
   for (const w of raw) {
-    if (isCircleWalk(w)) circles.push(w);
-    else edgeWalks.push(w);
+    const edges = edgesOf(w);
+    if (edges.length >= 2) edgeWalks.push(edges);
   }
-  if (edgeWalks.length === 0) return classifyIslands(circles);
+  if (edgeWalks.length === 0) return [];
   const split = splitWalks(edgeWalks);
   const kept: LoopEdge[] = [];
   for (const e of split) {
@@ -748,7 +792,7 @@ export function trimOffsetEnvelope(src: Region, d: number, raw: Loop[]): Region[
   if (kept.length < 2) return [];
   const faces = cancelCoincidentSpans(kept);
   if (faces.length < 2) return [];
-  return classifyIslands([...walkFragments(faces), ...circles]);
+  return classifyIslands(walkFragments(faces)).map(coalesceCircleLoops);
 }
 
 /** `(src, d) → islands`. Pass a different kernel to `roundOffsetValue`. */

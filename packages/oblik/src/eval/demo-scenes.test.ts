@@ -194,6 +194,7 @@ describe("migrated demo scenes", () => {
         ["o_ro_sqi", [-0.4]],
         ["o_ro_bone", [-0.22]],
         ["o_ro_tw", [-0.2]],
+        ["o_ro_ch", [-0.42]],
       ]),
     );
     const pulled = drafted.trace.find((n) => n.id === "o_ro_sqi");
@@ -213,6 +214,15 @@ describe("migrated demo scenes", () => {
     const pinchedIslands = compileOffsetBoundary(offsetOfCsg(pinched.value)!);
     expect(pinchedIslands).toHaveLength(1);
     expect(pinchedIslands[0]?.holes.length).toBeGreaterThan(0);
+    const punched = drafted.trace.find((n) => n.id === "o_ro_ch");
+    if (!punched || !isCsg2(punched.value) || !offsetOfCsg(punched.value)) {
+      throw new Error("missing circInset");
+    }
+    const lenses = compileOffsetBoundary(offsetOfCsg(punched.value)!);
+    expect(lenses).toHaveLength(2);
+    expect(lenses.some((q) => regionContains(q, { x: 12.69, y: 4.8 }))).toBe(true);
+    expect(lenses.some((q) => regionContains(q, { x: 14.71, y: 4.8 }))).toBe(true);
+    expect(lenses.some((q) => regionContains(q, { x: 13.7, y: 4.8 }))).toBe(false);
   });
 
   test("pie traces three roundOffset slices from one gap slider", () => {
