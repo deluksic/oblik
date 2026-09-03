@@ -3,33 +3,20 @@ import { For, Show, createMemo } from "solid-js";
 import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
 import {
-  chromeClipUrl,
   chromeLayers,
-  chromeOutsideClipId,
   layerStrokeWidth,
   POINT_STROKE_PX,
   type ChromeKind,
   type ChromeLayer,
 } from "../euclid2/view/chrome";
 import { readChromeMetrics } from "../euclid2/view/chrome-metrics";
-import { ChromeOutsideClip } from "../euclid2/view/ChromeClip";
-import {
-  RegionClipped,
-  RegionHalo,
-  RegionMaskDefs,
-  RegionOp,
-  RegionTreeFill,
-  regionMaskId,
-  regionMaskUrl,
-} from "../euclid2/view/RegionInk";
+import { FillFace } from "../euclid2/view/FillFace";
 import type { TraceNode } from "../eval/context";
 import type { FigureStyle } from "../eval/paint";
-import { fillPaint } from "../geom/csg-draw";
 import { isCsg2, isPick } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
-import { regionSvgPath } from "../geom/region";
-import type { Csg2, Pick } from "../geom/types";
+import type { Csg2, Pick, Region } from "../geom/types";
 
 import styles from "./View.module.css";
 
@@ -355,178 +342,38 @@ function Face(props: {
   overlay: boolean;
   layers: ChromeLayer[];
 }) {
-  return (
-    <Show
-      when={isCsg2(props.node.value) || isPick(props.node.value)}
-      fallback={<FaceRegionPath {...props} />}
-    >
-      <FaceCsg {...props} />
-    </Show>
-  );
-}
-
-function FaceRegionPath(props: {
-  node: TraceNode;
-  look: FigureStyle;
-  onion: boolean;
-  muted: boolean;
-  overlay: boolean;
-  layers: ChromeLayer[];
-}) {
-  const d = createMemo(() => {
-    const v = props.node?.value;
-    return v?.kind === "region" ? regionSvgPath(v) : null;
-  });
   const look = () => (props.onion ? ONION : props.look);
-  const outsideId = () =>
-    chromeOutsideClipId(`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}`);
+  const csg = () => isCsg2(props.node.value) || isPick(props.node.value);
   return (
-    <Show when={d()}>
-      {(path) => (
-        <>
-          {props.overlay ? <ChromeOutsideClip id={outsideId()} d={path()} /> : null}
-          {props.overlay ? null : (
-            <path
-              data-role="hit"
-              class={styles.hitFill}
-              data-ink={traceKey(props.node)}
-              d={path()}
-              fill-rule="evenodd"
-            />
-          )}
-          <For each={props.layers}>
-            {(layer) => (
-              <path
-                data-role={layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind}
-                class={layerClass(layer.kind, props.muted, props.onion)}
-                clip-path={props.overlay ? chromeClipUrl(outsideId()) : undefined}
-                d={path()}
-                fill-rule="evenodd"
-                fill={paintFill(look(), props.onion, layer, true)}
-                stroke={paintStroke(look(), layer)}
-                stroke-width={layerStrokeWidth(layer)}
-                stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                vector-effect="non-scaling-stroke"
-                opacity={layerOpacity(layer, props.onion, 0.35)}
-              />
-            )}
-          </For>
-        </>
-      )}
-    </Show>
-  );
-}
-
-function FaceCsg(props: {
-  node: TraceNode;
-  look: FigureStyle;
-  onion: boolean;
-  muted: boolean;
-  overlay: boolean;
-  layers: ChromeLayer[];
-}) {
-  const paint = createMemo(() => fillPaint(props.node.value as Csg2 | Pick));
-  const id = () =>
-    regionMaskId(
-      `fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}${props.overlay ? "-ov" : ""}`,
-    );
-  const look = () => (props.onion ? ONION : props.look);
-  const ops = createMemo(() => [paint().stock, ...paint().holes]);
-  return (
-    <Show when={!paint().empty}>
-      {props.overlay ? (
-        <RegionHalo
-          paint={paint()}
-          id={id()}
-          layers={props.layers}
-          class={(layer) => layerClass(layer.kind, props.muted, props.onion)}
-          opacity={(layer) => layerOpacity(layer, props.onion, 0.35)}
-          layerRole={(layer) =>
-            layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
-          }
-        />
-      ) : (
-        <>
-          <RegionMaskDefs paint={paint()} id={id()} />
-          <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
-            <Show
-              when={paint().tree}
-              fallback={
-                <>
-                  <RegionOp
-                    op={paint().stock}
-                    mask={regionMaskUrl(id())}
-                    data-role="hit"
-                    class={styles.hitFill}
-                    data-ink={traceKey(props.node)}
-                    fill="#fff"
-                    stroke="none"
-                  />
-                  <For each={props.layers}>
-                    {(layer) => (
-                      <For each={ops()}>
-                        {(op) => (
-                          <RegionOp
-                            op={op}
-                            mask={regionMaskUrl(id())}
-                            data-role={
-                              layer.kind === "paint"
-                                ? props.onion
-                                  ? "onion"
-                                  : "paint"
-                                : layer.kind
-                            }
-                            class={layerClass(layer.kind, props.muted, props.onion)}
-                            fill={
-                              op === paint().stock
-                                ? paintFill(look(), props.onion, layer, true)
-                                : "none"
-                            }
-                            stroke={paintStroke(look(), layer)}
-                            stroke-width={layerStrokeWidth(layer)}
-                            stroke-dasharray={layer.kind === "paint" ? dash(look()) : undefined}
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            vector-effect="non-scaling-stroke"
-                            opacity={layerOpacity(layer, props.onion, 0.35)}
-                          />
-                        )}
-                      </For>
-                    )}
-                  </For>
-                </>
-              }
-            >
-              <RegionTreeFill
-                paint={paint()}
-                id={id()}
-                data-role="hit"
-                class={styles.hitFill}
-                data-ink={traceKey(props.node)}
-                fill="#fff"
-              />
-              <For each={props.layers}>
-                {(layer) => (
-                  <RegionTreeFill
-                    paint={paint()}
-                    id={id()}
-                    data-role={
-                      layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind
-                    }
-                    class={layerClass(layer.kind, props.muted, props.onion)}
-                    fill={paintFill(look(), props.onion, layer, true)}
-                    stroke="none"
-                    opacity={layerOpacity(layer, props.onion, 0.35)}
-                  />
-                )}
-              </For>
-            </Show>
-          </RegionClipped>
-        </>
-      )}
-    </Show>
+    <FillFace
+      value={props.node.value as Region | Csg2 | Pick}
+      overlay={props.overlay}
+      layers={props.layers}
+      uid={`fig-${traceKey(props.node)}${props.onion ? "-onion" : ""}${props.overlay ? "-ov" : ""}`}
+      strokeHoles
+      hit={
+        props.overlay
+          ? undefined
+          : {
+              "data-role": "hit",
+              class: styles.hitFill,
+              "data-ink": traceKey(props.node),
+              fill: csg() ? "#fff" : undefined,
+            }
+      }
+      layer={(layer) => ({
+        "data-role": layer.kind === "paint" ? (props.onion ? "onion" : "paint") : layer.kind,
+        class: layerClass(layer.kind, props.muted, props.onion),
+        fill: paintFill(look(), props.onion, layer, true),
+        stroke: paintStroke(look(), layer),
+        "stroke-width": layerStrokeWidth(layer),
+        "stroke-dasharray": layer.kind === "paint" ? dash(look()) : undefined,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "vector-effect": "non-scaling-stroke",
+        opacity: layerOpacity(layer, props.onion, 0.35),
+      })}
+    />
   );
 }
 

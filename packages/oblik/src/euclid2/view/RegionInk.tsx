@@ -4,7 +4,7 @@ import { csgTreeSvg, REGION_MASK, type CsgDraw, type CsgPaint, type DrawOp } fro
 
 import { layerStrokeWidth, type ChromeLayer } from "./chrome";
 
-type InkClass = string | Array<string | Record<string, boolean>> | Record<string, boolean>;
+export type InkClass = string | Array<string | Record<string, boolean>> | Record<string, boolean>;
 
 function clipUrl(id: string): string {
   return `url(#${id})`;
