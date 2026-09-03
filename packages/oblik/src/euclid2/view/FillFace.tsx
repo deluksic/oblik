@@ -2,6 +2,7 @@ import { For, Show, createMemo, type ParentProps } from "solid-js";
 
 import type { Csg2, Pick as GeomPick, Region } from "@/geom";
 import { fillPaint, type DrawOp } from "@/geom/csg-draw";
+import { isPick } from "@/geom/csg2";
 import { evaluateRegions } from "@/geom/evaluate-regions";
 import { regionSvgPath } from "@/geom/region";
 
@@ -44,8 +45,12 @@ export type FillFaceProps = {
 };
 
 function declaredFill(v: Region | Csg2 | GeomPick): Region | null {
-  const islands = evaluateRegions(v);
-  return islands.length === 1 ? islands[0]! : null;
+  if (v.kind === "region") return v;
+  if (isPick(v)) {
+    const islands = evaluateRegions(v);
+    return islands.length === 1 ? islands[0]! : null;
+  }
+  return null;
 }
 
 function attrs(ink: FaceInk) {
@@ -101,8 +106,8 @@ export function FillFace(props: ParentProps<FillFaceProps>) {
   );
 }
 
-function DeclaredFace(props: FillFaceProps) {
-  const d = () => (props.value.kind === "region" ? regionSvgPath(props.value) : "");
+function DeclaredFace(props: ParentProps<FillFaceProps & { value: Region }>) {
+  const d = () => regionSvgPath(props.value);
   const outsideId = () => chromeOutsideClipId(props.uid);
   return (
     <Show when={d()}>
@@ -122,6 +127,7 @@ function DeclaredFace(props: FillFaceProps) {
               />
             )}
           </For>
+          {props.overlay ? null : props.children}
         </>
       )}
     </Show>

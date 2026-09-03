@@ -10,7 +10,7 @@ import {
 import { evaluateRegions, islandsAabb, islandsSvgPath } from "./evaluate-regions";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
-import { regionSvgPath } from "./region";
+import { regionSvgPath, walkSvgPath } from "./region";
 import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
 import { lerp, type Vec2 } from "./vec";
 
@@ -227,7 +227,27 @@ function paintBox(op: CsgOperand): Aabb | null {
   return padAabb(box, span * 0.08);
 }
 
+function paintCompiledRegion(r: Region): CsgPaint {
+  const stockD = walkSvgPath(r.outer, true);
+  if (!stockD) return emptyPaint();
+  const box = fillAabb(r);
+  if (!box) return emptyPaint();
+  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  const holes: DrawOp[] = [];
+  for (const hole of r.holes) {
+    const d = walkSvgPath(hole, true);
+    if (d) holes.push({ kind: "path", d });
+  }
+  return {
+    empty: false,
+    box: padAabb(box, span * 0.08),
+    stock: { kind: "path", d: stockD },
+    holes,
+  };
+}
+
 function paintCompiledIslands(islands: readonly Region[]): CsgPaint {
+  if (islands.length === 1) return paintCompiledRegion(islands[0]!);
   const d = islandsSvgPath(islands);
   const box = islandsAabb(islands);
   if (!d || !box) return emptyPaint();
