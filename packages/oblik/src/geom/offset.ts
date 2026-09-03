@@ -88,7 +88,7 @@ function unitRadial(c: Circle, p: Vec2): Vec2 {
   return vec(u.ux, u.uy);
 }
 
-function edgeMid(e: LoopEdge): Vec2 {
+export function edgeMid(e: LoopEdge): Vec2 {
   if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
     const c = e.carrier;
     const ua = unitRadial(c, e.a);
@@ -107,7 +107,7 @@ function edgeMid(e: LoopEdge): Vec2 {
 }
 
 /** Unit walk tangent at `p` on `e`. */
-function walkTangentAt(e: LoopEdge, p: Vec2): Vec2 {
+export function walkTangentAt(e: LoopEdge, p: Vec2): Vec2 {
   if (e.carrier.kind === "circle") {
     const ccw = perp(unitRadial(e.carrier, p));
     return e.k === -1 ? mul(ccw, -1) : ccw;
@@ -475,7 +475,7 @@ function splitEdge(e: LoopEdge, hits: readonly Vec2[]): LoopEdge[] {
   return out.length > 0 ? out : [e];
 }
 
-function splitWalks(walks: readonly LoopEdge[][]): LoopEdge[] {
+export function splitWalks(walks: readonly LoopEdge[][]): LoopEdge[] {
   const edges: LoopEdge[] = [];
   for (const w of walks) edges.push(...w);
   const hits: Vec2[][] = edges.map(() => []);
@@ -593,7 +593,7 @@ function leftTurn(inToward: Vec2, outAway: Vec2): number {
 
 type Inc = { fi: number; atA: boolean };
 
-function walkFragments(frags: readonly LoopEdge[]): Loop[] {
+export function walkFragments(frags: readonly LoopEdge[]): Loop[] {
   const at = new Map<string, Inc[]>();
   const addInc = (p: Vec2, fi: number, atA: boolean) => {
     const k = vertKey(p);
@@ -687,7 +687,7 @@ function walkArea(w: Loop): number {
   return polyArea(tessellateWalk(w));
 }
 
-function classifyIslands(walks: Loop[]): Region[] {
+export function classifyIslands(walks: Loop[]): Region[] {
   if (walks.length === 0) return [];
   const mids = walks.map((w) => walkProbe(w));
   const areas = walks.map((w) => walkArea(w));
