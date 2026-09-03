@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { circle, line, paint, point, region, diff, union, segment } from "../eval/constructors";
+import { circle, line, paint, point, region, csg2, diff, union, segment } from "../eval/constructors";
 import type { TraceNode } from "../eval/context";
 import { evaluate } from "../eval/evaluate";
 import { defineScene } from "../eval/scene";
@@ -123,7 +123,7 @@ describe("figureToSvg", () => {
       const stock = region([a, ab, b, bc, c, cd, d, da], [], "o_rstock");
       const holeAt = point(2, 1.5, "o_rhc");
       const hole = circle(holeAt, 0.5, "o_rhole");
-      const face = diff(stock, [hole], "o_rface");
+      const face = csg2(diff(stock, [hole]), "o_rface");
       paint(face, { stroke: "#1c1917", fill: "#cfe8d4", width: 1.2 }, "o_rp");
     });
 
@@ -140,7 +140,7 @@ describe("figureToSvg", () => {
       const b = point(1.2, 0, "o_ub");
       const left = circle(a, 1, "o_ul");
       const right = circle(b, 1, "o_ur");
-      const face = union([left, right], "o_uface");
+      const face = csg2(union([left, right]), "o_uface");
       paint(face, { stroke: "#1c1917", fill: "#c5ddf5", width: 1.2 }, "o_up");
     });
 

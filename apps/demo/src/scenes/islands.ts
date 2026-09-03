@@ -1,6 +1,7 @@
 import {
   along,
   circle,
+  csg2,
   defineScene,
   diff,
   fillet,
@@ -25,7 +26,7 @@ export default defineScene({
     const cb = circle(B, ra, "o_is_cb");
     const pair = union([ca, cb]);
     const probePair = point(1.05, 1.55, "o_is_p0");
-    const holdPair = pick(pair, probePair, "o_is_pair");
+    const holdPair = csg2(pick(pair, probePair), "o_is_pair");
 
     const origin = point(4.45, 0.28, "o_is_origin");
     const opp = point(8.55, 2.82, "o_is_opp");
@@ -70,7 +71,7 @@ export default defineScene({
     );
     const probe = point(5.15, 2.35, "o_is_probe");
     const face = diff(stock, [d0, d1, slot]);
-    const hold = pick(face, probe, "o_is_hold");
+    const hold = csg2(pick(face, probe), "o_is_hold");
 
     const fr = slider(0.28, { min: 0, max: 0.7, step: 0.01 }, "o_is_fr");
     const Fa = point(9.85, 0.35, "o_is_fa");
@@ -89,7 +90,7 @@ export default defineScene({
     const hole = circle(holeC, 0.42, "o_is_hole");
     const cheese = diff(plate, [hole]);
     const probeFil = point(10.2, 1.5, "o_is_p1");
-    const holdFil = pick(cheese, probeFil, "o_is_fillet");
+    const holdFil = csg2(pick(cheese, probeFil), "o_is_fillet");
 
     return {
       A,

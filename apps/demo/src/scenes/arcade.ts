@@ -1,6 +1,7 @@
 import {
   along,
   circle,
+  csg2,
   diff,
   point,
   pointOnCircle,
@@ -23,7 +24,7 @@ export default defineScene({
     const oa = segment(O, A, "o_ar_oa");
     const ob = segment(O, B, "o_ar_ob");
     const mouth = region([O, oa, A, along(disk, -1), B, ob], []);
-    const pac = diff(disk, [mouth], "o_ar_pac");
+    const pac = csg2(diff(disk, [mouth]), "o_ar_pac");
 
     circle(point(3.28, 1.6, "o_ar_p0"), 0.11, "o_ar_d0");
     circle(point(3.78, 1.6, "o_ar_p1"), 0.11, "o_ar_d1");
@@ -50,7 +51,7 @@ export default defineScene({
     const s2 = circle(point(right - scallop, bot, "o_ar_s2"), scallop, "o_ar_c2");
     const eyeL = circle(point(G.x - 0.38, G.y + 0.12, "o_ar_el"), 0.24, "o_ar_eyeL");
     const eyeR = circle(point(G.x + 0.38, G.y + 0.12, "o_ar_er"), 0.24, "o_ar_eyeR");
-    const ghost = diff(union([head, tunic, s0, s1, s2]), [eyeL, eyeR], "o_ar_ghost");
+    const ghost = csg2(diff(union([head, tunic, s0, s1, s2]), [eyeL, eyeR]), "o_ar_ghost");
 
     return { O, disk, A, B, pac, G, head, eyeL, eyeR, ghost };
   },

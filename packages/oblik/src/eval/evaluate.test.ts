@@ -13,6 +13,8 @@ import {
   pointOnCircle,
   pointOnSegment,
   intersect,
+  csg2,
+  diff,
   region,
   roundOffset,
   segment,
@@ -321,7 +323,7 @@ describe("evaluate", () => {
     expect(draftedStock?.kind === "offset" ? draftedStock.d : 0).toBeCloseTo(-0.5);
   });
 
-  test("region is traced; leftOf is not", () => {
+  test("region is traced; leftOf and intersect are not", () => {
     const scene = defineScene({
       kind: "euclid2",
       title: "t",
@@ -336,7 +338,7 @@ describe("evaluate", () => {
         const da = segment(D, A, "da");
         const stock = region([A, ab, B, bc, C, cd, D, da], [], "pr");
         const split = segment(point(1, -1, "s0"), point(1, 3, "s1"), "sp");
-        const left = intersect([stock, leftOf(split)], "reg");
+        const left = csg2(intersect([stock, leftOf(split)]), "reg");
         return { stock, left };
       },
     });
@@ -344,6 +346,26 @@ describe("evaluate", () => {
     expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(1);
     expect(trace.find((n) => n.id === "reg")?.kind).toBe("csg2");
     expect(trace.find((n) => n.id === "pr")?.kind).toBe("region");
+  });
+
+  test("diff is not traced; csg2 is", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const a = point(0, 0, "a");
+        const b = point(2, 0, "b");
+        const c = point(2, 2, "c");
+        const d = point(0, 2, "d");
+        const stock = region([a, segment(a, b), b, segment(b, c), c, segment(c, d), d, segment(d, a)], [], "pr");
+        const hole = circle(point(1, 1, "h"), 0.3);
+        const face = csg2(diff(stock, [hole]), "face");
+        return { stock, face };
+      },
+    });
+    const { trace } = evaluate(scene);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(1);
+    expect(trace.find((n) => n.id === "face")?.kind).toBe("csg2");
   });
 
   test("NaN keep operand drops the derived region from the tape", () => {
@@ -361,7 +383,7 @@ describe("evaluate", () => {
         const da = segment(D, A, "da");
         const stock = region([A, ab, B, bc, C, cd, D, da], [], "pr");
         const split = segment(point(Number.NaN, 0, "s0"), point(1, 3, "s1"), "sp");
-        intersect([stock, leftOf(split)], "reg");
+        csg2(intersect([stock, leftOf(split)]), "reg");
         return stock;
       },
     });

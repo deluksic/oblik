@@ -1,6 +1,7 @@
 import {
   along,
   circle,
+  csg2,
   diff,
   intersect,
   leftOf,
@@ -71,7 +72,8 @@ export function csgTreeLayout() {
     [],
     "o_ct_earR",
   );
-  const frame = union([stock, earL, earR], "o_ct_frame");
+  const frameF = union([stock, earL, earR]);
+  const frame = csg2(frameF, "o_ct_frame");
 
   const drillR = slider(0.15, { min: 0.05, max: 0.42, step: 0.01 }, "o_ct_drillR");
   const inset = 0.55;
@@ -104,14 +106,15 @@ export function csgTreeLayout() {
     "o_ct_slot",
   );
 
-  const shell = diff(frame, [d0, d1, d2, d3, slot], "o_ct_shell");
+  const shellF = diff(frameF, [d0, d1, d2, d3, slot]);
+  const shell = csg2(shellF, "o_ct_shell");
 
   const midAt = point((minX + maxX) / 2, (minY + maxY) / 2, "o_ct_midAt");
   const midline = perpendicularLine(bot, midAt, "o_ct_midline");
   const probe = point(1.15, 1.75, "o_ct_probe");
-  const hold = pick(shell, probe, "o_ct_hold");
-  const west = intersect([shell, leftOf(midline)], "o_ct_west");
-  const east = intersect([shell, rightOf(midline)], "o_ct_east");
+  const hold = csg2(pick(shellF, probe), "o_ct_hold");
+  const west = csg2(intersect([shellF, leftOf(midline)]), "o_ct_west");
+  const east = csg2(intersect([shellF, rightOf(midline)]), "o_ct_east");
 
   return {
     origin,

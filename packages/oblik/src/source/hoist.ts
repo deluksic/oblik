@@ -26,10 +26,7 @@ export const BIND_PREFIX: Record<string, string> = {
   slider: "n",
   region: "rg",
   roundOffset: "off",
-  diff: "df",
-  union: "un",
-  intersect: "ix",
-  pick: "pk",
+  csg2: "csg",
   style: "sty",
 };
 

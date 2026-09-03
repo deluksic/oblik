@@ -1,6 +1,7 @@
 import {
   along,
   circle,
+  csg2,
   leftOf,
   perpendicularLine,
   point,
@@ -74,10 +75,11 @@ export function stockCuttersLayout() {
   const midline = perpendicularLine(bot, splitAt, "o_sc_split");
   const probe = point(1.05, 1.6, "o_sc_probe");
 
-  const face = diff(stock, [d0, d1, d2, d3, slot], "o_sc_face");
-  const hold = pick(face, probe, "o_sc_hold");
-  const left = intersect([face, leftOf(midline)], "o_sc_left");
-  const right = intersect([face, rightOf(midline)], "o_sc_right");
+  const faceF = diff(stock, [d0, d1, d2, d3, slot]);
+  const face = csg2(faceF, "o_sc_face");
+  const hold = csg2(pick(faceF, probe), "o_sc_hold");
+  const left = csg2(intersect([faceF, leftOf(midline)]), "o_sc_left");
+  const right = csg2(intersect([faceF, rightOf(midline)]), "o_sc_right");
 
   return {
     origin,

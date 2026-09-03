@@ -35,6 +35,7 @@ export {
   union,
   intersect,
   pick,
+  csg2,
   style,
   paint,
   constructors,

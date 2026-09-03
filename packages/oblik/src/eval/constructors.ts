@@ -276,34 +276,37 @@ export function rightOf(geom: LineLike): HalfPlane {
   return rightOfValue(geom);
 }
 
-export const diff = mark(
-  (stock: unknown, cutters: readonly unknown[], id?: string): Csg2 => {
-    if (!Array.isArray(cutters)) return traced(nanCsg2(), id);
-    return traced(csg2Value("diff", [stock, ...cutters]), id);
-  },
-  { dof: [] },
-);
+/** Unmarked CSG difference. Not a tape node — wrap with `csg2()` to inspect/fill. */
+export function diff(stock: unknown, cutters: readonly unknown[]): Csg2 {
+  if (!Array.isArray(cutters)) return nanCsg2();
+  return csg2Value("diff", [stock, ...cutters]);
+}
 
-export const union = mark(
-  (operands: readonly unknown[], id?: string): Csg2 => {
-    if (!Array.isArray(operands)) return traced(nanCsg2(), id);
-    return traced(csg2Value("union", operands), id);
-  },
-  { dof: [] },
-);
+/** Unmarked CSG union. Not a tape node — wrap with `csg2()` to inspect/fill. */
+export function union(operands: readonly unknown[]): Csg2 {
+  if (!Array.isArray(operands)) return nanCsg2();
+  return csg2Value("union", operands);
+}
 
-export const intersect = mark(
-  (operands: readonly unknown[], id?: string): Csg2 => {
-    if (!Array.isArray(operands)) return traced(nanCsg2(), id);
-    return traced(csg2Value("intersect", operands), id);
-  },
-  { dof: [] },
-);
+/** Unmarked CSG intersection. Not a tape node — wrap with `csg2()` to inspect/fill. */
+export function intersect(operands: readonly unknown[]): Csg2 {
+  if (!Array.isArray(operands)) return nanCsg2();
+  return csg2Value("intersect", operands);
+}
 
-export const pick = mark(
-  (of: unknown, at: Vec2, id?: string): Pick => {
-    if (!at || typeof at !== "object") return traced(nanPick(), id);
-    return traced(pickValue(of, at), id);
+/** Unmarked island pick. Not a tape node — wrap with `csg2()` to inspect/fill. */
+export function pick(of: unknown, at: Vec2): Pick {
+  if (!at || typeof at !== "object") return nanPick();
+  return pickValue(of, at);
+}
+
+/** Record a CSG field or pick on the tape for inspect/fill. */
+export const csg2 = mark(
+  (value: Csg2 | Pick, id?: string): Csg2 | Pick => {
+    if (!value || typeof value !== "object") return traced(nanCsg2(), id);
+    if (value.kind === "csg2" && isFiniteCsg2(value)) return traced(value, id);
+    if (value.kind === "pick" && isFinitePick(value)) return traced(value, id);
+    return traced(nanCsg2(), id);
   },
   { dof: [] },
 );
@@ -395,10 +398,7 @@ export const constructors = {
   slider,
   region,
   roundOffset,
-  diff,
-  union,
-  intersect,
-  pick,
+  csg2,
   style,
   paint,
 } as const;

@@ -317,7 +317,18 @@ function helperBinding(call: ts.CallExpression): HelperBinding {
 }
 
 /** Unmarked geom helpers (`$site`-less). Not user callees; recording them poisons nested live. */
-const GEOM_HELPERS = new Set(["fillet", "along", "dist", "signedDist"]);
+const GEOM_HELPERS = new Set([
+  "fillet",
+  "along",
+  "dist",
+  "signedDist",
+  "leftOf",
+  "rightOf",
+  "diff",
+  "union",
+  "intersect",
+  "pick",
+]);
 
 function callsInFn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
