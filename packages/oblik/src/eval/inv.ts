@@ -1,10 +1,10 @@
 import type { MentionFile, MentionFn } from "../source/mention";
 import type { TraceInv, TraceNode } from "./context";
 import {
-  isCaptureCandidate,
   normalizeCallSite,
   sourceFileKey,
   stackFileKey,
+  userStackFrames,
   type CallSite,
 } from "./stack";
 
@@ -41,12 +41,12 @@ function fnContaining(
 function fnForNode(n: TraceNode, files: readonly MentionFile[]): MentionFn | undefined {
   const fromAnno = fnContaining(files, n.module, n.at?.line);
   if (fromAnno) return fromAnno;
-  const leaf = n.stack.find((f) => isCaptureCandidate(f.file));
+  const leaf = userStackFrames(n.stack)[0];
   return fnContaining(files, leaf?.file, leaf?.line);
 }
 
 function callerOf(n: TraceNode, fn: MentionFn): CallSite {
-  const frames = n.stack.filter((f) => isCaptureCandidate(f.file));
+  const frames = userStackFrames(n.stack);
   const inSpan = (f: CallSite) =>
     sameStackFile(f.file, fn.file) && f.line >= fn.startLine && f.line <= fn.endLine;
   const anyInSpan = frames.some(inSpan);

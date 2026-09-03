@@ -2,10 +2,10 @@ import type { TraceNode } from "../eval/context";
 import { invMatches } from "../eval/inv";
 import type { CallSite } from "../eval/stack";
 import {
-  isCaptureCandidate,
   isUserSourcePath,
   normalizeStackFile,
   sourceFileKey,
+  userStackFrames,
 } from "../eval/stack";
 import type { MentionFile, MentionFn } from "../source/mention";
 import { normalizeSceneRelPath } from "../source/scene-path";
@@ -84,12 +84,10 @@ function frameWho(f: CallSite): string {
 
 /** Normalize raw capture-time stack frames for display and peek. */
 function presentStack(frames: readonly CallSite[], module?: string): CallSite[] {
-  return frames
-    .filter((f) => isCaptureCandidate(f.file))
-    .map((f) => ({
-      ...f,
-      file: normalizeSceneRelPath(normalizeStackFile(f.file), module),
-    }));
+  return userStackFrames(frames).map((f) => ({
+    ...f,
+    file: normalizeSceneRelPath(normalizeStackFile(f.file), module),
+  }));
 }
 
 export function stackLabel(frames: readonly CallSite[]): string {

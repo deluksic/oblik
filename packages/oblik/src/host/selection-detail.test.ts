@@ -103,6 +103,23 @@ describe("stackForNode", () => {
       column: 4,
     });
   });
+
+  test("drops oblik and vite frames from a raw capture stack at presentation", () => {
+    const stack = stackForNode({
+      ...node,
+      stack: [
+        { file: "packages/oblik/src/eval/constructors.ts", line: 82, column: 1, name: "traced" },
+        { file: "node_modules/.vite/deps/dev-DEjxqSxT.js", line: 99, column: 1 },
+        { file: "apps/demo/src/scenes/shelf.ts", line: 12, column: 6, name: "build" },
+      ],
+    });
+    expect(stack).toHaveLength(1);
+    expect(stack[0]).toMatchObject({
+      file: "apps/demo/src/scenes/shelf.ts",
+      line: 10,
+      column: 4,
+    });
+  });
 });
 
 describe("pinConstructorSite", () => {

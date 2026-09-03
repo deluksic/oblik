@@ -13,8 +13,6 @@ export type CallSite = {
   name?: string;
 };
 
-const SKIP_NAME = new Set(["", "eval", "anonymous", "<anonymous>", "Module", "evaluate", "traced"]);
-
 function slashForward(file: string): string {
   if (!file.includes("\\")) return file;
   return file.split("\\").join("/");
@@ -58,21 +56,6 @@ export function normalizeStackFile(file: string): string {
   return stripPortPrefix(f);
 }
 
-function hasTsExt(file: string): boolean {
-  const stem = stripQuery(file);
-  return stem.endsWith(".ts") || stem.endsWith(".tsx");
-}
-
-/** Cheap filter at capture time — raw V8 paths, no normalization. */
-export function isCaptureCandidate(file: string): boolean {
-  if (!file) return false;
-  if (file.includes("node_modules")) return false;
-  if (file.includes("/.vite/") || file.startsWith(".vite/")) return false;
-  if (file.includes("/oblik/") || file.includes("packages/oblik")) return false;
-  if (file.startsWith("node:")) return false;
-  return hasTsExt(file);
-}
-
 /** Scene / user source paths we can peek on disk — not Vite prebundles or oblik internals. */
 export function isUserSourcePath(file: string): boolean {
   const key = normalizeStackFile(file);
@@ -81,6 +64,11 @@ export function isUserSourcePath(file: string): boolean {
   if (key.startsWith("node:")) return false;
   if (key.includes("/oblik/")) return false;
   return key.endsWith(".ts") || key.endsWith(".tsx");
+}
+
+/** User-facing stack frames — filter and normalize at read time, not capture. */
+export function userStackFrames(frames: readonly CallSite[]): CallSite[] {
+  return frames.filter((f) => isUserSourcePath(f.file));
 }
 
 /** Repo-relative key for matching mention paths to raw stack filenames. */
@@ -109,13 +97,13 @@ function callSiteFromParts(
   column: number,
   name?: string | null,
 ): CallSite | null {
-  if (!isCaptureCandidate(file)) return null;
+  if (!file || line == null || column == null) return null;
   const who = name?.trim();
   return {
     file,
     line,
     column,
-    ...(who && !SKIP_NAME.has(who) ? { name: who } : {}),
+    ...(who ? { name: who } : {}),
   };
 }
 
@@ -148,10 +136,10 @@ function dedupe(frames: CallSite[]): CallSite[] {
 }
 
 /**
- * User frames at constructor time. V8 CallSites are generated positions (source
+ * Stack frames at constructor time. V8 CallSites are generated positions (source
  * maps are only applied when stringify-ing the stack), so `/__map-stack` can
  * remap them through Vite’s transform. Firefox falls back to the string stack.
- * Filenames stay raw until presentation or `assignInv` matching.
+ * Frames are stored verbatim; filtering and path cleanup happen at read time.
  */
 export function captureUserStack(): CallSite[] {
   const prev = ErrorWithStack.prepareStackTrace;

@@ -1,4 +1,5 @@
 import type { TraceNode } from "../eval/context";
+import { isUserSourcePath } from "../eval/stack";
 import type { Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
 import {
   distToCsg,
@@ -174,7 +175,7 @@ export function hitsNear(
 
 /** Tie-break equal distances using the innermost user frame. */
 function stackRank(n: TraceNode): number {
-  const leaf = n.stack[0];
+  const leaf = n.stack.find((f) => isUserSourcePath(f.file));
   if (!leaf) return 0;
   return leaf.line * 10_000 + leaf.column;
 }
