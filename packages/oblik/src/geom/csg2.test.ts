@@ -78,8 +78,18 @@ describe("region as CSG leaf", () => {
     const paint = csgPaint(face);
     const d = paint.stock.kind === "path" ? paint.stock.d : "";
     expect(paint.stock.kind).toBe("path");
-    expect(d.match(/Z/g)?.length).toBe(1);
-    expect(paint.holes).toHaveLength(1);
+    expect(d.match(/Z/g)?.length).toBe(2);
+    expect(paint.holes).toHaveLength(0);
+  });
+
+  test("compiled paint uses one even-odd path for stock and holes", () => {
+    const face = csg2Value("diff", [rect(0, 0, 2, 2), disk(1, 1, 0.4)]);
+    const paint = csgPaint(face);
+    expect(paint.holes).toHaveLength(0);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -157,14 +167,11 @@ describe("Csg2 field", () => {
     const paint = csgPaint(face);
     expect(paint.empty).toBe(false);
     expect(paint.tree).toBeUndefined();
-    expect(paint.holes).toHaveLength(1);
+    expect(paint.holes).toHaveLength(0);
     expect(paint.stock.kind).toBe("path");
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
-    const hole = paint.holes[0];
-    expect(hole?.kind).toBe("path");
-    if (hole?.kind !== "path") throw new Error("expected path hole");
-    expect(hole.d).toMatch(/A /);
-    expect(hole.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   test("filleted stock keeps arc commands in the mask stock path", () => {
@@ -185,11 +192,8 @@ describe("Csg2 field", () => {
     expect(paint.stock.kind).toBe("path");
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
     expect(paint.stock.d).toContain("A ");
-    expect(paint.holes.length).toBeGreaterThanOrEqual(1);
-    const hole = paint.holes[0];
-    expect(hole?.kind).toBe("path");
-    if (hole?.kind !== "path") throw new Error("expected path hole");
-    expect(hole.d).toMatch(/A |M /);
+    expect(paint.holes).toHaveLength(0);
+    expect(paint.stock.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   test("overlay halo masks invert the fill so the ring sits outside", () => {
@@ -225,11 +229,9 @@ describe("Csg2 field", () => {
     expect(paint.empty).toBe(false);
     expect(paint.stock.kind).toBe("path");
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
-    expect(paint.holes).toHaveLength(1);
-    const hole = paint.holes[0];
-    expect(hole?.kind).toBe("path");
-    if (hole?.kind !== "path") throw new Error("expected path hole");
-    expect(hole.d).toMatch(/A /);
+    expect(paint.holes).toHaveLength(0);
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(2);
     expect(csgContains(hold, { x: 0.15, y: 0.15 })).toBe(true);
     expect(csgContains(hold, { x: 1, y: 1 })).toBe(false);
   });

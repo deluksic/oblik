@@ -1,8 +1,9 @@
 import { For, Show, type ParentProps } from "solid-js";
 
-import { csgTreeSvg, REGION_MASK, type CsgDraw, type CsgPaint, type DrawOp } from "@/geom/csg-draw";
+import { csgTreeSvg, paintSvgPath, REGION_MASK, type CsgDraw, type CsgPaint, type DrawOp } from "@/geom/csg-draw";
 
-import { layerStrokeWidth, type ChromeLayer } from "./chrome";
+import { chromeClipUrl, layerStrokeWidth, type ChromeLayer } from "./chrome";
+import { ChromeOutsideClip } from "./ChromeClip";
 
 export type InkClass = string | Array<string | Record<string, boolean>> | Record<string, boolean>;
 
@@ -16,18 +17,6 @@ export function regionMaskId(id: string): string {
 
 export function regionMaskUrl(id: string): string {
   return clipUrl(`${id}-m`);
-}
-
-export function regionOutsideStockUrl(id: string): string {
-  return clipUrl(`${id}-x`);
-}
-
-export function regionStockUrl(id: string): string {
-  return clipUrl(`${id}-s`);
-}
-
-export function regionOutsideUrl(id: string): string {
-  return clipUrl(`${id}-o`);
 }
 
 export function RegionMaskDefs(props: { paint: CsgPaint; id: string }) {
@@ -47,31 +36,11 @@ export function RegionMaskDefs(props: { paint: CsgPaint; id: string }) {
         <Show
           when={props.paint.tree}
           fallback={
-            <>
-              <RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />
-              <For each={props.paint.holes}>
-                {(op) => <RegionOp op={op} fill={REGION_MASK.fill.hole} stroke="none" />}
-              </For>
-            </>
+            <RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />
           }
         >
           {(tree) => <CsgTreeInk node={tree()} uid={`${props.id}-t`} box={props.paint.box} />}
         </Show>
-      </mask>
-      <mask id={`${props.id}-x`} maskUnits="userSpaceOnUse" {...frame()}>
-        <rect {...frame()} fill={REGION_MASK.outsideStock.canvas} />
-        <RegionOp op={props.paint.stock} fill={REGION_MASK.outsideStock.stock} stroke="none" />
-      </mask>
-      <mask id={`${props.id}-s`} maskUnits="userSpaceOnUse" {...frame()}>
-        <rect {...frame()} fill={REGION_MASK.stock.canvas} />
-        <RegionOp op={props.paint.stock} fill={REGION_MASK.stock.stock} stroke="none" />
-      </mask>
-      <mask id={`${props.id}-o`} maskUnits="userSpaceOnUse" {...frame()}>
-        <rect {...frame()} fill={REGION_MASK.outside.canvas} />
-        <RegionOp op={props.paint.stock} fill={REGION_MASK.outside.stock} stroke="none" />
-        <For each={props.paint.holes}>
-          {(op) => <RegionOp op={op} fill={REGION_MASK.outside.hole} stroke="none" />}
-        </For>
       </mask>
       <Show when={props.paint.keepClip}>
         {(d) => (
@@ -182,7 +151,7 @@ export function RegionTreeFill(props: {
   );
 }
 
-/** Overlay halo outside the CSG fill, same clip idea as `ChromeOutsideClip` on regions. */
+/** Overlay halo outside the fill, including hole boundaries, via one even-odd path. */
 export function RegionHalo(props: {
   paint: CsgPaint;
   id: string;
@@ -191,6 +160,8 @@ export function RegionHalo(props: {
   opacity?: (layer: ChromeLayer) => number | undefined;
   layerRole?: (layer: ChromeLayer) => string | undefined;
 }) {
+  const d = () => paintSvgPath(props.paint);
+  const outsideId = () => `${props.id}-out`;
   const stroke = (layer: ChromeLayer) => ({
     class: props.class(layer),
     opacity: props.opacity?.(layer) ?? layer.opacity,
@@ -202,25 +173,17 @@ export function RegionHalo(props: {
     "vector-effect": "non-scaling-stroke" as const,
   });
   return (
-    <Show when={!props.paint.tree}>
-      <RegionMaskDefs paint={props.paint} id={props.id} />
+    <Show when={!props.paint.tree && d()}>
+      <ChromeOutsideClip id={outsideId()} d={d()} />
       <RegionClipped id={props.id} keepClip={props.paint.keepClip}>
         <For each={props.layers}>
           {(layer) => (
-            <>
-              <RegionOp
-                op={props.paint.stock}
-                mask={regionOutsideStockUrl(props.id)}
-                {...stroke(layer)}
-              />
-              <g mask={regionStockUrl(props.id)}>
-                <For each={props.paint.holes}>
-                  {(op) => (
-                    <RegionOp op={op} mask={regionOutsideUrl(props.id)} {...stroke(layer)} />
-                  )}
-                </For>
-              </g>
-            </>
+            <path
+              d={d()}
+              fill-rule="evenodd"
+              clip-path={chromeClipUrl(outsideId())}
+              {...stroke(layer)}
+            />
           )}
         </For>
       </RegionClipped>

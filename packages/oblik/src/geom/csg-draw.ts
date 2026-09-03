@@ -10,7 +10,7 @@ import {
 import { evaluateRegions, islandsAabb, islandsSvgPath } from "./evaluate-regions";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
-import { regionSvgPath, walkSvgPath } from "./region";
+import { regionSvgPath } from "./region";
 import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
 import { lerp, type Vec2 } from "./vec";
 
@@ -227,22 +227,41 @@ function paintBox(op: CsgOperand): Aabb | null {
   return padAabb(box, span * 0.08);
 }
 
+function drawOpPath(op: DrawOp): string {
+  if (op.kind === "path") return op.d;
+  if (op.kind === "circle") {
+    const r = Math.abs(op.r);
+    const x = op.cx;
+    const y = op.cy;
+    return `M ${x + r} ${y} A ${r} ${r} 0 1 1 ${x - r} ${y} A ${r} ${r} 0 1 1 ${x + r} ${y} Z`;
+  }
+  return "";
+}
+
+/** One even-odd path for fill, mask, and halo — outer plus holes as subpaths. */
+export function paintSvgPath(paint: CsgPaint): string {
+  if (paint.empty || paint.tree) return "";
+  return [drawOpPath(paint.stock), ...paint.holes.map(drawOpPath)].filter((d) => d.length > 0).join(" ");
+}
+
+function mergePaintHoles(paint: CsgPaint): CsgPaint {
+  if (paint.empty || paint.holes.length === 0 || paint.tree) return paint;
+  const d = paintSvgPath(paint);
+  if (!d) return paint;
+  return { ...paint, stock: { kind: "path", d }, holes: [] };
+}
+
 function paintCompiledRegion(r: Region): CsgPaint {
-  const stockD = walkSvgPath(r.outer, true);
-  if (!stockD) return emptyPaint();
+  const d = regionSvgPath(r);
+  if (!d) return emptyPaint();
   const box = fillAabb(r);
   if (!box) return emptyPaint();
   const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
-  const holes: DrawOp[] = [];
-  for (const hole of r.holes) {
-    const d = walkSvgPath(hole, true);
-    if (d) holes.push({ kind: "path", d });
-  }
   return {
     empty: false,
     box: padAabb(box, span * 0.08),
-    stock: { kind: "path", d: stockD },
-    holes,
+    stock: { kind: "path", d },
+    holes: [],
   };
 }
 
@@ -274,7 +293,7 @@ export function csgPaint(op: CsgOperand): CsgPaint {
   if (shop) {
     const keepClip = keepClipPath(shop.keep, box);
     if (keepClip === "") return emptyPaint();
-    return {
+    return mergePaintHoles({
       empty: false,
       box,
       stock: drawOp(shop.stock),
@@ -282,7 +301,7 @@ export function csgPaint(op: CsgOperand): CsgPaint {
         .map(drawOp)
         .filter((d) => (d.kind === "path" ? d.d.length > 0 : d.r > 0)),
       keepClip,
-    };
+    });
   }
   const tree = drawOf(op, box);
   if (!tree) return emptyPaint();
