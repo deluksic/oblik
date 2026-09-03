@@ -260,6 +260,51 @@ describe("region pick", () => {
     expect(snapRegion([A], { x: 1, y: 1 }, camera, size)).toBeNull();
   });
 
+  test("overlapping csg fills: last on the tape wins", () => {
+    const STOCK = {
+      ...FACE,
+      id: "o_stock",
+      bind: "stock",
+      stack: [{ file: "scene.ts", line: 10, column: 4 }],
+    };
+    const FACE_CSG = {
+      id: "o_face",
+      occ: 0,
+      kind: "csg2",
+      bind: "face",
+      value: {
+        kind: "csg2",
+        op: "diff",
+        of: [STOCK.value, { kind: "circle", center: { x: 2, y: 1.5 }, radius: 0.2 }],
+      },
+      editable: false,
+      stack: [{ file: "scene.ts", line: 20, column: 4 }],
+    } as TraceNode;
+    const SLICE = {
+      id: "o_left",
+      occ: 0,
+      kind: "csg2",
+      bind: "left",
+      value: {
+        kind: "csg2",
+        op: "intersect",
+        of: [
+          FACE_CSG.value,
+          {
+            kind: "halfPlane",
+            line: { kind: "line", origin: { x: 1, y: 0 }, direction: { x: 0, y: 1 } },
+            side: 1,
+          },
+        ],
+      },
+      editable: false,
+      stack: [{ file: "scene.ts", line: 30, column: 4 }],
+    } as TraceNode;
+    const hits = hitsNear([STOCK, FACE_CSG, SLICE], { x: 0.5, y: 1 }, camera, size);
+    expect(hits[0]?.id).toBe("o_left");
+    expect(hits.some((n) => n.id === "o_face")).toBe(true);
+  });
+
   test("region fill picks before the stock region", () => {
     const FACE_REGION = {
       id: "o_face",

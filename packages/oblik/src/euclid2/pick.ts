@@ -1,5 +1,4 @@
 import type { TraceNode } from "../eval/context";
-import { isUserSourcePath } from "../eval/stack";
 import type { Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
 import {
   distToCsg,
@@ -156,28 +155,22 @@ export function hitsNear(
   _size: PaneSize,
   maxPx = GEOM_PX,
 ): TraceNode[] {
-  const out: { node: TraceNode; d: number }[] = [];
-  for (const n of trace) {
+  const out: { node: TraceNode; d: number; tape: number }[] = [];
+  for (let tape = 0; tape < trace.length; tape++) {
+    const n = trace[tape]!;
     if (!isFiniteTrace(n)) continue;
     const d = geomDistWorld(world, n);
     const insideFill = isFillGeom(n.value) && d === 0;
-    if (insideFill || d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d });
+    if (insideFill || d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d, tape });
   }
   out.sort((a, b) => {
     const ra = pickRank(a.node);
     const rb = pickRank(b.node);
     if (ra !== rb) return ra - rb;
     if (a.d !== b.d) return a.d - b.d;
-    return stackRank(a.node) - stackRank(b.node);
+    return b.tape - a.tape;
   });
   return out.map((x) => x.node);
-}
-
-/** Tie-break equal distances using the innermost user frame. */
-function stackRank(n: TraceNode): number {
-  const leaf = n.stack.find((f) => isUserSourcePath(f.file));
-  if (!leaf) return 0;
-  return leaf.line * 10_000 + leaf.column;
 }
 
 /** Nearest pick target at `world`, if any. */

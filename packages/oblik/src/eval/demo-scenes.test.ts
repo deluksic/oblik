@@ -372,7 +372,7 @@ describe("migrated demo scenes", () => {
     const camera = { x: 2.25, y: 1.6, scale: 72 };
     const size = { w: 800, h: 600 };
     const hits = hitsNear(trace, { x: 1.2, y: 1.6 }, camera, size);
-    expect(hits.find((n) => n.kind === "csg2")?.id).toBe("o_sc_face");
+    expect(hits.find((n) => n.kind === "csg2")?.id).toBe("o_sc_left");
   });
 
   test("stock-cutters: drill off the plate drops that hole, not an XOR cap", () => {
