@@ -22,7 +22,7 @@ const r = circle(A, 2).radius;
 export const shape = ringProfile({ inner: r, seam: t, origin: A });
 ```
 
-**Identity, hover, and select are core.** The canvas must say what you pointed at (`profile/seg[2]`, created at `lib.ts:40`) so a scene can bind widgets to it. Jump to source. Do not synthesize new math. Do not chase arbitrary expressions to infer handles.
+**Identity, hover, and select are core.** The canvas must say what you pointed at (`face`, created at `layout.ts:31`) so a scene can bind widgets to it. Jump to source. Do not synthesize new math. Do not chase arbitrary expressions to infer handles.
 
 **Declared editors only.** `point`, `circle`, `offsetLine`, `slider`, `pointOnSegment`, `pointOnLine`, and later cousins. Degrees of freedom sit in the combinator. A plain `3` in a library is not a handle.
 
@@ -57,7 +57,7 @@ GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs t
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current runtime: [Prototype 6](./prototypes/6.md) (P5 paper app still runs). Current view experiment: [Prototype 9](./prototypes/9.md) (figure). P8 mention is shipped; P7 profiles are on the tape.
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current runtime: [Prototype 6](./prototypes/6.md) (P5 paper app still runs). Current view experiment: [Prototype 9](./prototypes/9.md) (figure). P8 mention is shipped; P7 Loop / Region / Csg2 are on the tape.
 
 Packages and rules: [layout.md](./layout.md). Catalog and palette: [scenes.md](./scenes.md).
 
