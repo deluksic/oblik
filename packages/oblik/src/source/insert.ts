@@ -203,7 +203,7 @@ function isFilletCall(node: ts.Expression): node is ts.CallExpression {
   );
 }
 
-function findProfileCall(sf: ts.SourceFile, id: string): ts.CallExpression | undefined {
+function findRegionCall(sf: ts.SourceFile, id: string): ts.CallExpression | undefined {
   let target: ts.CallExpression | undefined;
   const visit = (node: ts.Node) => {
     if (
@@ -223,7 +223,7 @@ function isZeroNum(expr: Expr): boolean {
   return expr.kind === "num" && expr.value === 0;
 }
 
-function patchProfileVertex(source: string, job: Insert): string {
+function patchRegionVertex(source: string, job: Insert): string {
   const patch = job.patchVertex;
   if (!patch) throw new Error("missing patchVertex");
   const radius = job.args[0];
@@ -231,7 +231,7 @@ function patchProfileVertex(source: string, job: Insert): string {
   const names = isZeroNum(radius) ? callees(radius) : ["fillet", ...callees(radius)];
   let next = names.length > 0 ? ensureNamedImport(source, "oblik", names) : source;
   const sf = parse(next);
-  const call = findProfileCall(sf, patch.id);
+  const call = findRegionCall(sf, patch.id);
   if (!call) throw new Error(`no region with id ${patch.id}`);
   const { args } = trailingId(call);
   const arr = args[0];
@@ -350,7 +350,7 @@ export function insertCall(
   job: Insert,
   nextId: () => string = freshSiteId,
 ): string {
-  if (job.patchVertex) return patchProfileVertex(source, job);
+  if (job.patchVertex) return patchRegionVertex(source, job);
   const specs = siteSpecs();
   if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
   const dest = job.dest?.trim() || "build";

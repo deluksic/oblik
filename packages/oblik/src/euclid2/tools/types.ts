@@ -200,7 +200,6 @@ export type Ghost =
 export type InsertJob = {
   from:
     | ToolId
-    | "region"
     | "diff"
     | "union"
     | "intersect"

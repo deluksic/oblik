@@ -161,11 +161,6 @@ function arrowAt(
   return { at, tx: dir.x * sign, ty: dir.y * sign };
 }
 
-/** True while Region is the live tool — existing fills stay out of the way. */
-export function regionHidesExisting(session: ToolSession | null | undefined): boolean {
-  return session?.verb === "region";
-}
-
 /** Named strokes through the current vertex, or `null` when not picking a carrier. */
 export function regionEligibleCarriers(
   session: ToolSession | null | undefined,

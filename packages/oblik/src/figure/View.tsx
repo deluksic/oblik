@@ -113,21 +113,21 @@ export function FigureView(props: FigureViewProps) {
   const geom = createMemo(() => props.trace.filter(isDrawnGeom));
   const strokes = createMemo(() => paintStrokesFromTrace(props.trace));
   const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)));
-  const onionProfiles = createMemo(() => onionInk().filter((n) => isFillGeom(n.value)));
+  const onionFills = createMemo(() => onionInk().filter((n) => isFillGeom(n.value)));
   const onionEdges = createMemo(() => onionInk().filter((n) => !isFillGeom(n.value)));
   const onionPts = createMemo(() => geom().filter(isPointish));
   const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
-  const inkProfiles = createMemo(() => inkStrokes().filter((s) => isFillGeom(s.geom.value)));
+  const inkFills = createMemo(() => inkStrokes().filter((s) => isFillGeom(s.geom.value)));
   const inkEdges = createMemo(() => inkStrokes().filter((s) => !isFillGeom(s.geom.value)));
   const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
   const paintSelected = (s: PaintStroke) => traceKey(s.paint) === props.selectedKey;
   const geomSelected = (n: TraceNode) => traceKey(n) === props.selectedKey;
   const paintHover = (s: PaintStroke) => traceKey(s.paint) === props.hoverKey && !paintSelected(s);
   const geomHover = (n: TraceNode) => traceKey(n) === props.hoverKey && !geomSelected(n);
-  const inkProfileBand = createMemo(() => splitChrome(inkProfiles(), paintSelected, paintHover));
+  const inkFillBand = createMemo(() => splitChrome(inkFills(), paintSelected, paintHover));
   const inkEdgeBand = createMemo(() => splitChrome(inkEdges(), paintSelected, paintHover));
   const inkPtBand = createMemo(() => splitChrome(inkPts(), paintSelected, paintHover));
-  const onionProfileBand = createMemo(() => splitChrome(onionProfiles(), geomSelected, geomHover));
+  const onionFillBand = createMemo(() => splitChrome(onionFills(), geomSelected, geomHover));
   const onionEdgeBand = createMemo(() => splitChrome(onionEdges(), geomSelected, geomHover));
   const onionPtBand = createMemo(() => splitChrome(onionPts(), geomSelected, geomHover));
   const frameXywh = createMemo<FrameXywh | null>(() => {
@@ -357,7 +357,7 @@ export function FigureView(props: FigureViewProps) {
               {(rect) => <FrameHandle rect={rect()} selected={props.frameSelected === true} />}
             </Show>
             <InkStrokeChrome
-              band={inkProfileBand()}
+              band={inkFillBand()}
               hoverKey={props.hoverKey}
               selectedKey={props.selectedKey}
               eraser={props.tool === "eraser"}
@@ -393,7 +393,7 @@ export function FigureView(props: FigureViewProps) {
             />
             <Show when={props.shift}>
               <OnionStrokeChrome
-                band={onionProfileBand()}
+                band={onionFillBand()}
                 hoverKey={props.hoverKey}
                 selectedKey={props.selectedKey}
                 scope={props.scope}

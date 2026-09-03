@@ -9,7 +9,7 @@ Each hot item is two passes:
 
 ## Draw order
 
-Bands stay **profiles, then edges, then points**. An item lifts only within its band:
+Bands stay **fills, then edges, then points**. An item lifts only within its band:
 
 1. Idle siblings (paint only)
 2. Hover overlay + hover paint
@@ -45,7 +45,7 @@ Points use a fixed wider halo instead of this growth: **14px outline / 9px selec
 
 ## Other
 
-- Overlay clip to the **outside of profiles** (not circles or points). Regions use the same idea: an inverted luminance mask so the halo sits outside the CSG fill.
+- Overlay clip to the **outside of fills** (not circles or points). Regions use the same idea: an inverted luminance mask so the halo sits outside the CSG fill.
 - Figure Shift-onion draws construction **on top** of faded ink.
 
 ## Tokens

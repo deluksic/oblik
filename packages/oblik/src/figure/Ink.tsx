@@ -358,14 +358,14 @@ function Face(props: {
   return (
     <Show
       when={isCsg2(props.node.value) || isPick(props.node.value)}
-      fallback={<FaceProfile {...props} />}
+      fallback={<FaceRegionPath {...props} />}
     >
-      <FaceRegion {...props} />
+      <FaceCsg {...props} />
     </Show>
   );
 }
 
-function FaceProfile(props: {
+function FaceRegionPath(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;
@@ -419,7 +419,7 @@ function FaceProfile(props: {
   );
 }
 
-function FaceRegion(props: {
+function FaceCsg(props: {
   node: TraceNode;
   look: FigureStyle;
   onion: boolean;

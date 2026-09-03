@@ -32,7 +32,7 @@ const OFFSET = {
   stack: [],
 } as TraceNode;
 
-function squareProfile(): Region {
+function squareRegion(): Region {
   const pts = [
     { x: 0, y: 0 },
     { x: 1, y: 0 },
@@ -52,7 +52,7 @@ const OFFSET_REGION = {
   id: "o_off",
   occ: 0,
   kind: "csg2",
-  value: wrapCsg(offsetValue(squareProfile(), -0.2)),
+  value: wrapCsg(offsetValue(squareRegion(), -0.2)),
   editable: true,
   stack: [],
 } as TraceNode;

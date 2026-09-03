@@ -17,7 +17,7 @@ import {
   toolChrome,
   typeTool,
 } from "./tool";
-import { regionEligibleCarriers, regionHidesExisting } from "./tools/region";
+import { regionEligibleCarriers } from "./tools/region";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -1475,10 +1475,10 @@ describe("region tool", () => {
     expect(hit.carrier?.bind).toBe("bottom");
   });
 
-  test("hides existing fills for the whole Profile session", () => {
-    expect(regionHidesExisting(startTool("region"))).toBe(true);
-    expect(regionHidesExisting(startTool("line"))).toBe(false);
-    expect(regionHidesExisting(null)).toBe(false);
+  test("hides existing fills for the whole region session", () => {
+    expect(toolChrome(startTool("region")).hideFills).toBe(true);
+    expect(toolChrome(startTool("line")).hideFills).toBe(false);
+    expect(toolChrome(null).hideFills).toBe(false);
   });
 
   test("ghost arrow sits on the carrier at the vertex, pointing along it", () => {
