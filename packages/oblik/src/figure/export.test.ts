@@ -110,7 +110,7 @@ describe("figureToSvg", () => {
     expect(out.svg).toContain('"2"');
   });
 
-  test("paints a region with a luminance mask and exact hole circles", () => {
+  test("paints a region diff as a compiled evenodd path", () => {
     const out = svgFor(() => {
       const a = point(0, 0, "o_ra");
       const b = point(4, 0, "o_rb");
@@ -128,13 +128,13 @@ describe("figureToSvg", () => {
     });
 
     expect(out.empty).toBe(false);
-    expect(out.svg).toContain("<mask");
-    expect(out.svg).toContain('maskUnits="userSpaceOnUse"');
     expect(out.svg).toContain('fill="#cfe8d4"');
-    expect(out.svg).toMatch(/<circle[^>]*r="0.5"/);
+    expect(out.svg).toContain('fill-rule="evenodd"');
+    expect(out.svg).toMatch(/A /);
+    expect(out.svg).not.toMatch(/<circle[^>]*r="0.5"/);
   });
 
-  test("paints a union as nested luminance, not shop stock", () => {
+  test("paints a union as compiled island arcs", () => {
     const out = svgFor(() => {
       const a = point(0, 0, "o_ua");
       const b = point(1.2, 0, "o_ub");
@@ -145,10 +145,9 @@ describe("figureToSvg", () => {
     });
 
     expect(out.empty).toBe(false);
-    expect(out.svg).toContain("<mask");
     expect(out.svg).toContain('fill="#c5ddf5"');
-    expect(out.svg).toMatch(/<circle[^>]*r="1"/);
-    expect(out.svg).toContain("<rect");
+    expect(out.svg).toContain('fill-rule="evenodd"');
+    expect(out.svg).toMatch(/A /);
   });
 
   test("emits stroke-dasharray for dashed styles", () => {

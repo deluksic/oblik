@@ -241,13 +241,13 @@ function paintCompiledIslands(islands: readonly Region[]): CsgPaint {
 }
 
 /**
- * Exact operand paths plus a luminance mask. Shop trees (diff of solids,
- * optional half-plane intersect) stay stock/holes. Pick paints compiled
- * loops. General trees carry a nested `tree` for SVG masks.
+ * Compiled islands when evaluateRegions produced cheese. Shop flatten and
+ * luminance trees are fallbacks for empty compile (unbounded clips).
  */
 export function csgPaint(op: CsgOperand): CsgPaint {
   if (!isFiniteOperand(op)) return emptyPaint();
-  if (op.kind === "pick") return paintCompiledIslands(evaluateRegions(op));
+  const islands = evaluateRegions(op);
+  if (islands.length > 0) return paintCompiledIslands(islands);
   const box = paintBox(op);
   if (!box) return emptyPaint();
   const shop = flattenCsg(op);

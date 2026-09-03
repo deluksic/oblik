@@ -15,7 +15,7 @@ import {
   wrapCsg,
 } from "./csg2";
 import { roundOffsetValue, compileOffsetBoundary } from "./offset";
-import { alongValue, filletValue, regionContains, regionSvgPath, regionValue } from "./region";
+import { alongValue, filletValue, regionContains, regionValue } from "./region";
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -99,8 +99,12 @@ describe("Csg2 field", () => {
     expect(csgContains(face, { x: 0.6, y: 0 })).toBe(true);
     expect(csgContains(face, { x: 3, y: 0 })).toBe(false);
     const paint = csgPaint(face);
-    expect(paint.tree?.kind).toBe("union");
-    expect(paint.stock).toEqual({ kind: "path", d: "" });
+    expect(paint.tree).toBeUndefined();
+    expect(paint.holes).toEqual([]);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBe(1);
   });
 
   test("escaping disk does not XOR a cap outside the stock", () => {
@@ -151,13 +155,12 @@ describe("Csg2 field", () => {
     const face = csg2Value("diff", [stock, slot]);
     const paint = csgPaint(face);
     expect(paint.empty).toBe(false);
-    expect(paint.stock).toEqual({ kind: "path", d: regionSvgPath(stock) });
-    expect(paint.holes).toHaveLength(1);
-    const hole = paint.holes[0]!;
-    expect(hole.kind).toBe("path");
-    if (hole.kind !== "path") throw new Error("expected path hole");
-    expect(hole.d).toBe(regionSvgPath(slot));
-    expect(hole.d).toContain("A ");
+    expect(paint.tree).toBeUndefined();
+    expect(paint.holes).toEqual([]);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/Z/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   test("filleted stock keeps arc commands in the mask stock path", () => {
@@ -178,7 +181,7 @@ describe("Csg2 field", () => {
     expect(paint.stock.kind).toBe("path");
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
     expect(paint.stock.d).toContain("A ");
-    expect(paint.holes).toEqual([{ kind: "circle", cx: 1, cy: 1, r: 0.3 }]);
+    expect(paint.holes).toEqual([]);
   });
 
   test("overlay halo masks invert the fill so the ring sits outside", () => {
@@ -229,10 +232,14 @@ describe("Csg2 field", () => {
     expect(paint.stock.d.match(/A /g)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  test("half-plane intersect is a clip polygon", () => {
+  test("half-plane intersect paints the clipped island", () => {
     const paint = csgPaint(csg2Value("intersect", [rect(0, 0, 4, 2), leftOfValue(split)]));
     expect(paint.empty).toBe(false);
-    expect(paint.keepClip).toMatch(/^M /);
+    expect(paint.tree).toBeUndefined();
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/^M /);
+    expect(paint.keepClip).toBeUndefined();
   });
 
   test("NaN intersect operand NaNs the derived CSG, not the stock", () => {
@@ -274,6 +281,22 @@ describe("offset operand", () => {
         ).length) ??
         0,
     ).toBe(4);
+  });
+
+  test("punched circular hole paints two leftover islands, not the grown disk", () => {
+    const center = { x: 13.7, y: 4.8 };
+    const hole: Circle = { kind: "circle", center, radius: 0.52 };
+    const plate = regionValue(rectCycle(12.2, 3.5, 15.2, 6.1), [hole]);
+    const face = wrapCsg(offsetValue(plate, -0.42));
+    const paint = csgPaint(face);
+    expect(paint.empty).toBe(false);
+    expect(paint.tree).toBeUndefined();
+    expect(paint.holes).toEqual([]);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d.match(/Z/g)?.length).toBe(2);
+    expect(paint.stock.d).toMatch(/A /);
+    expect(compileOffsetBoundary(offsetValue(plate, -0.42))).toHaveLength(2);
   });
 
   test("fillPaint and offset compile are identity-cached on the operand", () => {
