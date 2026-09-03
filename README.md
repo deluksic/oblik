@@ -11,24 +11,25 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`, `arcade`, `stock-cutters`, `stock-cutters-figure`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`, `arcade`, `stock-cutters`, `stock-cutters-figure`, `islands`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
 
 Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 
-| Scene               | What it exercises                                                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shelf               | `parallelLine`, `-shelf.distance` cellar, lamp glider, `dist` beam, `circleLineIntersection`                                                              |
-| Shared loop         | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle                                                                                         |
-| Truss               | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline)                                                                  |
+| Scene               | What it exercises                                                                                                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shelf               | `parallelLine`, `-shelf.distance` cellar, lamp glider, `dist` beam, `circleLineIntersection`                                                                                                         |
+| Shared loop         | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle                                                                                                                                    |
+| Truss               | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline)                                                                                                             |
 | Mounting plate      | Parent binds `const plate = mountingPlateLayout()`. Cheese `region(..., [drill, h1, h2, h3])`. Snap `plate.drill` from `build`; dive to insert in the layout file; Add to return for a private local |
-| Mounting plate grid | 3×2 `for` of the same helper. Dive one plate; siblings mute. Serial is once-id `occ`, not a second document                                               |
-| Nested circles      | Two-level helpers (`nestedCircles` → `petal`). Parent draws nested geometry; the inner bead is not referable there                                        |
-| Plate figure        | P9: same `mountingPlateLayout()`. Cream paper, page `frame`; Brush dock for stroke/fill/width/dash. Outline not returned stays onioned                    |
-| Pie                 | Three sectors on one circle; `roundOffset(region([...], []), -gap)` opens the cuts                                                                        |
-| Fillet              | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise                   |
-| Arcade              | Pac-Man `diff(disk, [mouth])`; ghost `diff(union([head, tunic, scallops]), [eyes])`                                                                        |
-| Stock-cutters       | CSG plate: `diff` / `intersect` / `pick` of stock, drills, stadium slot, half-planes                                                                      |
-| Triangle            | three free points                                                                                                                                         |
+| Mounting plate grid | 3×2 `for` of the same helper. Dive one plate; siblings mute. Serial is once-id `occ`, not a second document                                                                                          |
+| Nested circles      | Two-level helpers (`nestedCircles` → `petal`). Parent draws nested geometry; the inner bead is not referable there                                                                                   |
+| Plate figure        | P9: same `mountingPlateLayout()`. Cream paper, page `frame`; Brush dock for stroke/fill/width/dash. Outline not returned stays onioned                                                               |
+| Pie                 | Three sectors on one circle; `roundOffset(region([...], []), -gap)` opens the cuts                                                                                                                   |
+| Fillet              | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise                                                              |
+| Arcade              | Pac-Man `diff(disk, [mouth])`; ghost `diff(union([head, tunic, scallops]), [eyes])`                                                                                                                  |
+| Stock-cutters       | CSG plate: `diff` / `intersect` / `pick` of stock, drills, stadium slot, half-planes                                                                                                                 |
+| Islands             | Playground for compiled `pick`: unmarked CSG, probe jumps islands. Disks, severed plate, filleted cheese                                                                                             |
+| Triangle            | three free points                                                                                                                                                                                    |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), **slider labels**, sdf2 / 3D. P7 shipped regions / fillets / planar CSG; P9 figure is paint, not `{ style }` on constructors.
 

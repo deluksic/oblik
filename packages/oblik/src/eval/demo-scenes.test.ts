@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import arcade from "../../../../apps/demo/src/scenes/arcade.ts";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
+import islands from "../../../../apps/demo/src/scenes/islands.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
 import pie from "../../../../apps/demo/src/scenes/pie.ts";
@@ -18,7 +19,9 @@ import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
+import { csgPaint } from "../geom/csg-draw";
 import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
+import { evaluateRegions } from "../geom/evaluate-regions";
 import { compileOffsetBoundary } from "../geom/offset";
 import { isCircleWalk, isFiniteRegion, regionContains, walkEdges } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
@@ -423,5 +426,66 @@ describe("migrated demo scenes", () => {
     expect(out.svg).toContain('maskUnits="userSpaceOnUse"');
     expect(out.svg).toMatch(/\sA /);
     expect(out.svg).toContain("<circle");
+  });
+
+  test("islands scene fills compiled picks, not the unmarked CSG", () => {
+    const { trace } = run(islands, ["apps/demo/src/scenes/islands.ts"]);
+    expect(trace.filter((n) => n.kind === "pick")).toHaveLength(3);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(0);
+    expect(trace.some((n) => n.bind === "hold" && n.kind === "pick")).toBe(true);
+    expect(trace.some((n) => n.bind === "holdPair" && n.kind === "pick")).toBe(true);
+    expect(trace.some((n) => n.bind === "holdFil" && n.kind === "pick")).toBe(true);
+
+    const hold = trace.find((n) => n.id === "o_is_hold");
+    const pair = trace.find((n) => n.id === "o_is_pair");
+    const holdFil = trace.find((n) => n.id === "o_is_fillet");
+    if (
+      !hold ||
+      !isPick(hold.value) ||
+      !pair ||
+      !isPick(pair.value) ||
+      !holdFil ||
+      !isPick(holdFil.value)
+    ) {
+      throw new Error("missing picks");
+    }
+    expect(evaluateRegions(hold.value)).toHaveLength(1);
+    expect(csgContains(hold.value, { x: 5.15, y: 2.35 })).toBe(true);
+    expect(csgContains(hold.value, { x: 5.15, y: 0.7 })).toBe(false);
+    const holdPaint = csgPaint(hold.value);
+    expect(holdPaint.empty).toBe(false);
+    expect(holdPaint.stock.kind).toBe("path");
+    if (holdPaint.stock.kind !== "path") throw new Error("expected path");
+    expect(holdPaint.stock.d).toMatch(/^M /);
+    expect(holdPaint.stock.d).not.toMatch(/ H /);
+
+    expect(csgContains(pair.value, { x: 1.05, y: 1.55 })).toBe(true);
+    expect(csgContains(pair.value, { x: 2.9, y: 1.55 })).toBe(false);
+    const pairPaint = csgPaint(pair.value);
+    expect(pairPaint.empty).toBe(false);
+    if (pairPaint.stock.kind !== "path") throw new Error("expected path");
+    expect(pairPaint.stock.d).toMatch(/A /);
+
+    const filPaint = csgPaint(holdFil.value);
+    expect(filPaint.empty).toBe(false);
+    if (filPaint.stock.kind !== "path") throw new Error("expected path");
+    expect(filPaint.stock.d).toMatch(/A /);
+    expect(csgContains(holdFil.value, { x: 10.2, y: 1.5 })).toBe(true);
+    expect(csgContains(holdFil.value, { x: 11, y: 1.5 })).toBe(false);
+  });
+
+  test("islands: probe in the slot empties the pick; the other island stays off", () => {
+    const files = ["apps/demo/src/scenes/islands.ts"];
+    const empty = run(islands, files, new Map([["o_is_probe", [6.5, 1.55]]]));
+    const holdEmpty = empty.trace.find((n) => n.id === "o_is_hold");
+    if (!holdEmpty || !isPick(holdEmpty.value)) throw new Error("missing hold");
+    expect(evaluateRegions(holdEmpty.value)).toHaveLength(0);
+    expect(csgContains(holdEmpty.value, { x: 5.15, y: 2.35 })).toBe(false);
+
+    const swapped = run(islands, files, new Map([["o_is_probe", [5.15, 0.7]]]));
+    const holdBot = swapped.trace.find((n) => n.id === "o_is_hold");
+    if (!holdBot || !isPick(holdBot.value)) throw new Error("missing hold");
+    expect(csgContains(holdBot.value, { x: 5.15, y: 0.7 })).toBe(true);
+    expect(csgContains(holdBot.value, { x: 5.15, y: 2.35 })).toBe(false);
   });
 });

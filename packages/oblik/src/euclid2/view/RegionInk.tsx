@@ -80,13 +80,6 @@ export function RegionMaskDefs(props: { paint: CsgPaint; id: string }) {
           </clipPath>
         )}
       </Show>
-      <Show when={props.paint.islandClip}>
-        {(d) => (
-          <clipPath id={`${props.id}-i`} clipPathUnits="userSpaceOnUse">
-            <path d={d()} />
-          </clipPath>
-        )}
-      </Show>
     </defs>
   );
 }
@@ -95,16 +88,17 @@ export function RegionClipped(
   props: ParentProps<{
     id: string;
     keepClip?: string;
-    islandClip?: string;
   }>,
 ) {
-  const island = () =>
-    props.islandClip ? (
-      <g clip-path={clipUrl(`${props.id}-i`)}>{props.children}</g>
-    ) : (
-      props.children
-    );
-  return <>{props.keepClip ? <g clip-path={clipUrl(`${props.id}-k`)}>{island()}</g> : island()}</>;
+  return (
+    <>
+      {props.keepClip ? (
+        <g clip-path={clipUrl(`${props.id}-k`)}>{props.children}</g>
+      ) : (
+        props.children
+      )}
+    </>
+  );
 }
 
 export function RegionOp(props: {
@@ -210,11 +204,7 @@ export function RegionHalo(props: {
   return (
     <Show when={!props.paint.tree}>
       <RegionMaskDefs paint={props.paint} id={props.id} />
-      <RegionClipped
-        id={props.id}
-        keepClip={props.paint.keepClip}
-        islandClip={props.paint.islandClip}
-      >
+      <RegionClipped id={props.id} keepClip={props.paint.keepClip}>
         <For each={props.layers}>
           {(layer) => (
             <>

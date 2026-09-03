@@ -165,7 +165,6 @@ function regionToSvg(r: Csg2 | Pick, style: FigureStyle, id: string): string {
   const frame = `x="${num(box.minX)}" y="${num(box.minY)}" width="${num(w)}" height="${num(h)}"`;
   const clips: string[] = [];
   if (p.keepClip) clips.push(`<clipPath id="rk-${key}"><path d="${p.keepClip}"/></clipPath>`);
-  if (p.islandClip) clips.push(`<clipPath id="ri-${key}"><path d="${p.islandClip}"/></clipPath>`);
   if (p.tree) {
     const tree = csgTreeSvg(p.tree, `rt-${key}`, box);
     const mask =
@@ -175,7 +174,6 @@ function regionToSvg(r: Csg2 | Pick, style: FigureStyle, id: string): string {
       `</mask>`;
     const fillAttrs = `${styleAttrs(style, true)} mask="url(#rm-${key})"`;
     let wrapped = `<rect ${frame} ${fillAttrs}/>`;
-    if (p.islandClip) wrapped = `<g clip-path="url(#ri-${key})">${wrapped}</g>`;
     if (p.keepClip) wrapped = `<g clip-path="url(#rk-${key})">${wrapped}</g>`;
     return `<defs>${tree.defs}${mask}${clips.join("")}</defs>${wrapped}`;
   }
@@ -191,7 +189,6 @@ function regionToSvg(r: Csg2 | Pick, style: FigureStyle, id: string): string {
   let body = drawOpEl(p.stock, fillAttrs);
   for (const hole of p.holes) body += drawOpEl(hole, strokeAttrs);
   let wrapped = body;
-  if (p.islandClip) wrapped = `<g clip-path="url(#ri-${key})">${wrapped}</g>`;
   if (p.keepClip) wrapped = `<g clip-path="url(#rk-${key})">${wrapped}</g>`;
   return `<defs>${mask}${clips.join("")}</defs>${wrapped}`;
 }

@@ -2,7 +2,8 @@ import { For, Show, type ParentProps } from "solid-js";
 
 import type { Csg2, Pick as GeomPick, Region } from "@/geom";
 import { fillPaint } from "@/geom/csg-draw";
-import { isCsg2, isPick } from "@/geom/csg2";
+import { isPick } from "@/geom/csg2";
+import { evaluateRegions } from "@/geom/evaluate-regions";
 import { regionSvgPath } from "@/geom/region";
 
 import { chromeClipUrl, chromeOutsideClipId, type ChromeLayer } from "./chrome";
@@ -43,8 +44,13 @@ export type FillFaceProps = {
   strokeHoles?: boolean;
 };
 
-function isCsgNode(v: { kind: string }): v is Csg2 | GeomPick {
-  return isCsg2(v) || isPick(v);
+function declaredFill(v: Region | Csg2 | GeomPick): Region | null {
+  if (v.kind === "region") return v;
+  if (isPick(v)) {
+    const islands = evaluateRegions(v);
+    if (islands.length === 1) return islands[0]!;
+  }
+  return null;
 }
 
 function attrs(ink: FaceInk) {
@@ -69,9 +75,10 @@ function holeInk(ink: FaceInk): FaceInk {
 
 /** Shared region / CSG fill + overlay halo. Hosts pass layer class and paint. */
 export function FillFace(props: ParentProps<FillFaceProps>) {
+  const declared = () => declaredFill(props.value);
   return (
-    <Show when={isCsgNode(props.value)} fallback={<DeclaredFace {...props} />}>
-      <CsgFace {...props} />
+    <Show when={declared()} fallback={<CsgFace {...props} />}>
+      {(r) => <DeclaredFace {...props} value={r()} />}
     </Show>
   );
 }
@@ -121,7 +128,7 @@ function CsgFace(props: ParentProps<FillFaceProps>) {
       ) : (
         <>
           <RegionMaskDefs paint={paint()} id={id()} />
-          <RegionClipped id={id()} keepClip={paint().keepClip} islandClip={paint().islandClip}>
+          <RegionClipped id={id()} keepClip={paint().keepClip}>
             <Show
               when={paint().tree}
               fallback={

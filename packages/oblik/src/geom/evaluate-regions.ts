@@ -8,7 +8,13 @@ import {
   walkTangentAt,
 } from "./offset";
 import { lineBasis, lineIntersectionValue } from "./ops";
-import { isCircleWalk, isFiniteRegion, regionContains, signedDistToRegion } from "./region";
+import {
+  isCircleWalk,
+  isFiniteRegion,
+  regionContains,
+  regionSvgPath,
+  signedDistToRegion,
+} from "./region";
 import type { Circle, Csg2, CsgOp, CsgOperand, HalfPlane, Loop, LoopEdge, Region } from "./types";
 import { add, dist, isFiniteVec, mul, norm, perp, type Vec2 } from "./vec";
 
@@ -46,7 +52,7 @@ function loopsOf(r: Region): Loop[] {
   return [r.outer, ...r.holes];
 }
 
-function islandsSdf(islands: readonly Region[], p: Vec2): number {
+export function islandsSdf(islands: readonly Region[], p: Vec2): number {
   if (islands.length === 0) return Infinity;
   let d = signedDistToRegion(islands[0]!, p);
   if (!Number.isFinite(d)) return Number.NaN;
@@ -56,6 +62,30 @@ function islandsSdf(islands: readonly Region[], p: Vec2): number {
     d = Math.min(d, b);
   }
   return d;
+}
+
+export function islandsSvgPath(islands: readonly Region[]): string {
+  return islands
+    .map((r) => regionSvgPath(r))
+    .filter((d) => d.length > 0)
+    .join(" ");
+}
+
+export function islandsAabb(islands: readonly Region[]): Aabb | null {
+  let box: Aabb | null = null;
+  for (const r of islands) {
+    const b = operandAabb(r);
+    if (!b) continue;
+    box = box
+      ? {
+          minX: Math.min(box.minX, b.minX),
+          minY: Math.min(box.minY, b.minY),
+          maxX: Math.max(box.maxX, b.maxX),
+          maxY: Math.max(box.maxY, b.maxY),
+        }
+      : b;
+  }
+  return box;
 }
 
 function booleanSdf(op: CsgOp, groups: readonly (readonly Region[])[], p: Vec2): number {
@@ -301,11 +331,21 @@ function evaluateCsg(node: Csg2): Region[] {
   );
 }
 
+const compileCache = new WeakMap<CsgOperand, Region[]>();
+
 /**
  * Compile a CSG operand to declared cheese islands. Experimental: carriers
  * are split, cheap-filtered, then kept on a transverse SDF sign change.
  */
 export function evaluateRegions(op: CsgOperand): Region[] {
+  const hit = compileCache.get(op);
+  if (hit) return hit;
+  const out = compileOperand(op);
+  compileCache.set(op, out);
+  return out;
+}
+
+function compileOperand(op: CsgOperand): Region[] {
   if (!isFiniteOperand(op)) return [];
   if (op.kind === "region") return isFiniteRegion(op) ? [op] : [];
   if (op.kind === "circle") {

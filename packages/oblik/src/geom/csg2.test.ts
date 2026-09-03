@@ -191,22 +191,48 @@ describe("Csg2 field", () => {
     expect(REGION_MASK.outside.stock).toBe("#000");
   });
 
-  test("pick isolates one island with a clip, not a compiled outline", () => {
+  test("pick paints a compiled island outline, not an occupancy clip", () => {
     const face = csg2Value("diff", [rect(0, 0, 4, 2), stadium(2, 1, 5, 0.35)]);
     const top = pickValue(face, { x: 2, y: 1.7 });
     const paint = csgPaint(top);
     expect(paint.empty).toBe(false);
-    expect(paint.islandClip).toMatch(/^M /);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/^M /);
+    expect(paint.stock.d).toMatch(/ Z/);
+    expect(paint.stock.d).not.toMatch(/ H /);
+    expect(paint.stock.d).not.toMatch(/ V /);
     expect(csgContains(top, { x: 2, y: 1.7 })).toBe(true);
     expect(csgContains(top, { x: 2, y: 0.3 })).toBe(false);
     expect(csgPaint(pickValue(face, { x: 2, y: 1 })).empty).toBe(true);
+  });
+
+  test("pick of cheese with a round hole keeps arc commands", () => {
+    const face = csg2Value("diff", [rect(0, 0, 2, 2), disk(1, 1, 0.4)]);
+    const hold = pickValue(face, { x: 0.15, y: 0.15 });
+    const paint = csgPaint(hold);
+    expect(paint.empty).toBe(false);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(csgContains(hold, { x: 0.15, y: 0.15 })).toBe(true);
+    expect(csgContains(hold, { x: 1, y: 1 })).toBe(false);
+  });
+
+  test("pick of a disk paints the circle as arcs", () => {
+    const hold = pickValue(disk(0, 0, 1), { x: 0, y: 0 });
+    const paint = csgPaint(hold);
+    expect(paint.empty).toBe(false);
+    expect(paint.stock.kind).toBe("path");
+    if (paint.stock.kind !== "path") throw new Error("expected path stock");
+    expect(paint.stock.d).toMatch(/A /);
+    expect(paint.stock.d.match(/A /g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   test("half-plane intersect is a clip polygon", () => {
     const paint = csgPaint(csg2Value("intersect", [rect(0, 0, 4, 2), leftOfValue(split)]));
     expect(paint.empty).toBe(false);
     expect(paint.keepClip).toMatch(/^M /);
-    expect(paint.islandClip).toBeUndefined();
   });
 
   test("NaN intersect operand NaNs the derived CSG, not the stock", () => {

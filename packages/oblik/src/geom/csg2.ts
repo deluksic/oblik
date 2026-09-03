@@ -1,5 +1,6 @@
+import { evaluateRegions, islandsAabb, islandsSdf } from "./evaluate-regions";
 import { signedDist } from "./ops";
-import { isFiniteRegion, signedDistToRegion, tessellateRegion } from "./region";
+import { isFiniteRegion, regionContains, signedDistToRegion, tessellateRegion } from "./region";
 import type {
   Circle,
   Csg2,
@@ -146,13 +147,7 @@ export function operandSdf(op: CsgOperand, p: Vec2): number {
     return op.side === 1 ? -s : s;
   }
   if (op.kind === "offset") return operandSdf(op.of, p) - op.d;
-  if (op.kind === "pick") {
-    const d = operandSdf(op.of, p);
-    if (op.at && isFiniteVec(op.at) && !islandContains(op, p)) {
-      return Number.isFinite(d) ? Math.max(Math.abs(d), 1e-6) : Number.NaN;
-    }
-    return d;
-  }
+  if (op.kind === "pick") return islandsSdf(evaluateRegions(op), p);
   return csgSdf(op, p);
 }
 
@@ -253,7 +248,7 @@ export function operandAabb(op: CsgOperand): Aabb | null {
       maxY: inner.maxY + pad,
     };
   }
-  if (op.kind === "pick") return operandAabb(op.of);
+  if (op.kind === "pick") return islandsAabb(evaluateRegions(op));
   return csgAabb(op);
 }
 
@@ -283,160 +278,12 @@ export function fillAabb(v: Region | Csg2 | Pick): Aabb | null {
   return csgAabb(v);
 }
 
-const ISLAND_GRID = 64;
-const islands = new WeakMap<object, Island | null>();
-
-type Island = {
-  box: Aabb;
-  nx: number;
-  ny: number;
-  minX: number;
-  minY: number;
-  cellX: number;
-  cellY: number;
-  occ: Uint8Array;
-};
-
-function islandOf(p: Pick): Island | null {
-  if (!isFinitePick(p)) return null;
-  if (islands.has(p)) return islands.get(p) ?? null;
-  const found = floodIsland(p.of, p.at);
-  islands.set(p, found);
-  return found;
-}
-
 export function islandAabb(p: Pick): Aabb | null {
-  return islandOf(p)?.box ?? null;
-}
-
-export function islandClipPath(p: Pick): string | null {
-  const m = islandOf(p);
-  if (!m) return null;
-  return occupancyPath(m, 1);
-}
-
-function occupancyPath(m: Island, dilate: number): string {
-  const { nx, ny, occ } = m;
-  const on = (i: number, j: number) => {
-    if (i < 0 || j < 0 || i >= nx || j >= ny) return false;
-    if (occ[i + j * nx]) return true;
-    if (dilate < 1) return false;
-    return (
-      (i > 0 && !!occ[i - 1 + j * nx]) ||
-      (i + 1 < nx && !!occ[i + 1 + j * nx]) ||
-      (j > 0 && !!occ[i + (j - 1) * nx]) ||
-      (j + 1 < ny && !!occ[i + (j + 1) * nx])
-    );
-  };
-  const parts: string[] = [];
-  for (let j = 0; j < ny; j++) {
-    let i = 0;
-    while (i < nx) {
-      while (i < nx && !on(i, j)) i++;
-      if (i >= nx) break;
-      const i0 = i;
-      while (i < nx && on(i, j)) i++;
-      const x0 = m.minX + (i0 - 0.5) * m.cellX;
-      const x1 = m.minX + (i - 0.5) * m.cellX;
-      const y0 = m.minY + (j - 0.5) * m.cellY;
-      const y1 = m.minY + (j + 0.5) * m.cellY;
-      parts.push(`M ${x0} ${y0} H ${x1} V ${y1} H ${x0} Z`);
-    }
-  }
-  return parts.join(" ");
-}
-
-function fieldSdf(op: CsgOperand, q: Vec2): number {
-  if (op.kind === "pick") return operandSdf(op.of, q);
-  return operandSdf(op, q);
-}
-
-function floodIsland(op: CsgOperand, probe: Vec2): Island | null {
-  if (!(fieldSdf(op, probe) < 0)) return null;
-  const bounds = operandAabb(op);
-  if (!bounds) return null;
-  const padX = Math.max((bounds.maxX - bounds.minX) * 0.04, 1e-3);
-  const padY = Math.max((bounds.maxY - bounds.minY) * 0.04, 1e-3);
-  const minX = bounds.minX - padX;
-  const minY = bounds.minY - padY;
-  const maxX = bounds.maxX + padX;
-  const maxY = bounds.maxY + padY;
-  const w = maxX - minX;
-  const h = maxY - minY;
-  const nx = ISLAND_GRID;
-  const ny = Math.max(8, Math.round((ISLAND_GRID * h) / (w || 1)));
-  const cellX = w / (nx - 1);
-  const cellY = h / (ny - 1);
-  const gx = (x: number) => Math.min(nx - 1, Math.max(0, Math.round((x - minX) / cellX)));
-  const gy = (y: number) => Math.min(ny - 1, Math.max(0, Math.round((y - minY) / cellY)));
-  const at = (i: number, j: number) => fieldSdf(op, { x: minX + i * cellX, y: minY + j * cellY });
-  const seen = new Uint8Array(nx * ny);
-  const occ = new Uint8Array(nx * ny);
-  const stack = [gx(probe.x) + gy(probe.y) * nx];
-  seen[stack[0]!] = 1;
-  let iMin = nx;
-  let iMax = -1;
-  let jMin = ny;
-  let jMax = -1;
-  while (stack.length) {
-    const k = stack.pop()!;
-    const i = k % nx;
-    const j = (k / nx) | 0;
-    if (!(at(i, j) < 0)) continue;
-    occ[k] = 1;
-    if (i < iMin) iMin = i;
-    if (i > iMax) iMax = i;
-    if (j < jMin) jMin = j;
-    if (j > jMax) jMax = j;
-    const push = (ii: number, jj: number) => {
-      if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) return;
-      const idx = ii + jj * nx;
-      if (seen[idx]) return;
-      seen[idx] = 1;
-      stack.push(idx);
-    };
-    push(i - 1, j);
-    push(i + 1, j);
-    push(i, j - 1);
-    push(i, j + 1);
-  }
-  if (iMax < iMin) return null;
-  return {
-    box: {
-      minX: minX + iMin * cellX - cellX,
-      minY: minY + jMin * cellY - cellY,
-      maxX: minX + iMax * cellX + cellX,
-      maxY: minY + jMax * cellY + cellY,
-    },
-    nx,
-    ny,
-    minX,
-    minY,
-    cellX,
-    cellY,
-    occ,
-  };
-}
-
-function islandContains(p: Pick, q: Vec2): boolean {
-  if (!(fieldSdf(p.of, q) < 0)) return false;
-  const m = islandOf(p);
-  if (!m) return false;
-  const i = Math.min(m.nx - 1, Math.max(0, Math.round((q.x - m.minX) / m.cellX)));
-  const j = Math.min(m.ny - 1, Math.max(0, Math.round((q.y - m.minY) / m.cellY)));
-  for (let dj = -1; dj <= 1; dj++) {
-    for (let di = -1; di <= 1; di++) {
-      const ii = i + di;
-      const jj = j + dj;
-      if (ii < 0 || jj < 0 || ii >= m.nx || jj >= m.ny) continue;
-      if (m.occ[ii + jj * m.nx]) return true;
-    }
-  }
-  return false;
+  return islandsAabb(evaluateRegions(p));
 }
 
 function occupiedOperand(op: CsgOperand, q: Vec2): boolean {
-  if (op.kind === "pick") return islandContains(op, q);
+  if (op.kind === "pick") return evaluateRegions(op).some((r) => regionContains(r, q));
   return operandSdf(op, q) < 0;
 }
 

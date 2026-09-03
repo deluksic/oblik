@@ -50,8 +50,8 @@ export type Csg2 = {
 };
 
 /**
- * Island clip of a CSG field at `at`. Compile to a `Region` is later; until
- * then this is a tape node painted with the operand mask plus occupancy clip.
+ * Island of a CSG field at `at`. Paint and membership are the compiled
+ * `Region[]` from `evaluateRegions` that contain the probe.
  */
 export type Pick = { kind: "pick"; of: CsgOperand; at: Vec2 };
 

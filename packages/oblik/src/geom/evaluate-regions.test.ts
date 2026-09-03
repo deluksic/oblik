@@ -236,4 +236,61 @@ describe("evaluateRegions catalog", () => {
     const islands = evaluateRegions(face);
     expect(islands.length).toBeGreaterThanOrEqual(0);
   });
+
+  test("stock-cutters analog: drills plus a slot that severs", () => {
+    const stock = rect(0, 0, 4, 3);
+    const drills = [
+      disk(0.4, 0.4, 0.16),
+      disk(3.6, 0.4, 0.16),
+      disk(3.6, 2.6, 0.16),
+      disk(0.4, 2.6, 0.16),
+    ];
+    const face = csg2Value("diff", [stock, ...drills, stadium(2, 1.5, 5, 0.4)]);
+    const islands = evaluateRegions(face);
+    expect(islands).toHaveLength(2);
+    const top = pickValue(face, { x: 2, y: 2.5 });
+    expect(evaluateRegions(top)).toHaveLength(1);
+    expect(csgContains(top, { x: 2, y: 2.5 })).toBe(true);
+    expect(csgContains(top, { x: 2, y: 0.5 })).toBe(false);
+    expect(compileAgrees(face, grid(0, 0, 4, 3, 0.35))).toBe(true);
+  });
+
+  test("pac-man disk minus wedge stays one island", () => {
+    const o = { x: 0, y: 0 };
+    const body = disk(0, 0, 1);
+    const a = { x: 0.766, y: 0.643 };
+    const b = { x: 0.766, y: -0.643 };
+    const mouth = regionValue([o, seg(o, a), a, alongValue(body, -1), b, seg(b, o)], []);
+    const pac = csg2Value("diff", [body, mouth]);
+    const islands = evaluateRegions(pac);
+    expect(islands).toHaveLength(1);
+    expect(regionContains(islands[0]!, { x: -0.4, y: 0 })).toBe(true);
+    expect(regionContains(islands[0]!, { x: 0.5, y: 0 })).toBe(false);
+    expect(compileAgrees(pac, grid(-1.1, -1.1, 1.1, 1.1, 0.3))).toBe(true);
+  });
+
+  test("four-hole plate as CSG is one cheese", () => {
+    const face = csg2Value("diff", [
+      rect(0, 0, 4, 3),
+      disk(0.5, 0.5, 0.18),
+      disk(3.5, 0.5, 0.18),
+      disk(3.5, 2.5, 0.18),
+      disk(0.5, 2.5, 0.18),
+    ]);
+    const islands = evaluateRegions(face);
+    expect(islands).toHaveLength(1);
+    expect(islands[0]!.holes.length).toBeGreaterThanOrEqual(4);
+    expect(regionContains(islands[0]!, { x: 2, y: 1.5 })).toBe(true);
+    expect(regionContains(islands[0]!, { x: 0.5, y: 0.5 })).toBe(false);
+    expect(compileAgrees(face, grid(0, 0, 4, 3, 0.35))).toBe(true);
+  });
+
+  test("pick of two disjoint disks keeps one", () => {
+    const face = csg2Value("union", [disk(0, 0, 0.8), disk(3, 0, 0.8)]);
+    const left = pickValue(face, { x: 0, y: 0 });
+    expect(evaluateRegions(left)).toHaveLength(1);
+    expect(csgContains(left, { x: 0, y: 0 })).toBe(true);
+    expect(csgContains(left, { x: 3, y: 0 })).toBe(false);
+    expect(evaluateRegions(pickValue(face, { x: 1.5, y: 0 }))).toHaveLength(0);
+  });
 });

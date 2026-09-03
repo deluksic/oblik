@@ -1,13 +1,13 @@
 import {
   csgAabb,
   fillAabb,
-  islandClipPath,
   isFiniteCsg2,
   isFiniteOperand,
   isFinitePick,
   operandAabb,
   type Aabb,
 } from "./csg2";
+import { evaluateRegions, islandsAabb, islandsSvgPath } from "./evaluate-regions";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
 import { regionSvgPath } from "./region";
@@ -22,7 +22,6 @@ export type FlattenedCsg = {
   stock: Region | Circle;
   subtract: (Region | Circle)[];
   keep: HalfPlane[];
-  pick?: Pick;
 };
 
 export type CsgDraw =
@@ -38,7 +37,6 @@ export type CsgPaint = {
   stock: DrawOp;
   holes: DrawOp[];
   keepClip?: string;
-  islandClip?: string;
   tree?: CsgDraw;
 };
 
@@ -97,13 +95,8 @@ function unwrapUnary(op: CsgOperand): CsgOperand {
 }
 
 export function flattenCsg(op: CsgOperand): FlattenedCsg | null {
-  let pick: Pick | undefined;
   let node: CsgOperand = unwrapUnary(op);
   const keep: HalfPlane[] = [];
-  if (node.kind === "pick") {
-    pick = node;
-    node = unwrapUnary(node.of);
-  }
   while (node.kind === "csg2" && node.op === "intersect") {
     const rest: CsgOperand[] = [];
     for (const child of node.of) {
@@ -131,9 +124,7 @@ export function flattenCsg(op: CsgOperand): FlattenedCsg | null {
     node = compiled;
   }
   if (node.kind !== "region" && node.kind !== "circle") return null;
-  const out: FlattenedCsg = { stock: node, subtract, keep };
-  if (pick) out.pick = pick;
-  return out;
+  return { stock: node, subtract, keep };
 }
 
 function drawOp(op: Region | Circle): DrawOp {
@@ -212,10 +203,9 @@ function drawOf(op: CsgOperand, box: Aabb): CsgDraw | null {
     return { kind: "clip", d, kid: { kind: "solid", op: { kind: "path", d } } };
   }
   if (node.kind === "pick") {
-    const kid = drawOf(node.of, box);
-    const clip = islandClipPath(node);
-    if (!kid || !clip) return null;
-    return { kind: "clip", d: clip, kid };
+    const d = islandsSvgPath(evaluateRegions(node));
+    if (!d) return null;
+    return { kind: "solid", op: { kind: "path", d } };
   }
   if (node.kind !== "csg2") return null;
   const kids: CsgDraw[] = [];
@@ -237,23 +227,31 @@ function paintBox(op: CsgOperand): Aabb | null {
   return padAabb(box, span * 0.08);
 }
 
+function paintCompiledIslands(islands: readonly Region[]): CsgPaint {
+  const d = islandsSvgPath(islands);
+  const box = islandsAabb(islands);
+  if (!d || !box) return emptyPaint();
+  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  return {
+    empty: false,
+    box: padAabb(box, span * 0.08),
+    stock: { kind: "path", d },
+    holes: [],
+  };
+}
+
 /**
  * Exact operand paths plus a luminance mask. Shop trees (diff of solids,
- * optional half-plane intersect, optional pick) stay stock/holes. General
- * trees carry a nested `tree` for SVG masks. No marching squares.
+ * optional half-plane intersect) stay stock/holes. Pick paints compiled
+ * loops. General trees carry a nested `tree` for SVG masks.
  */
 export function csgPaint(op: CsgOperand): CsgPaint {
   if (!isFiniteOperand(op)) return emptyPaint();
+  if (op.kind === "pick") return paintCompiledIslands(evaluateRegions(op));
   const box = paintBox(op);
   if (!box) return emptyPaint();
   const shop = flattenCsg(op);
   if (shop) {
-    let islandClip: string | undefined;
-    if (shop.pick) {
-      const clip = islandClipPath(shop.pick);
-      if (!clip) return emptyPaint();
-      islandClip = clip;
-    }
     const keepClip = keepClipPath(shop.keep, box);
     if (keepClip === "") return emptyPaint();
     return {
@@ -264,7 +262,6 @@ export function csgPaint(op: CsgOperand): CsgPaint {
         .map(drawOp)
         .filter((d) => (d.kind === "path" ? d.d.length > 0 : d.r > 0)),
       keepClip,
-      islandClip,
     };
   }
   const tree = drawOf(op, box);
