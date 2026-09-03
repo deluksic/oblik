@@ -507,4 +507,29 @@ describe("migrated demo scenes", () => {
     expect(csgContains(holdBot.value, { x: 5.15, y: 0.7 })).toBe(true);
     expect(csgContains(holdBot.value, { x: 5.15, y: 2.35 })).toBe(false);
   });
+
+  test("islands: wide slot at SlotX knife-edge still fills the pick", () => {
+    const files = ["apps/demo/src/scenes/islands.ts"];
+    const top = { x: 5.15, y: 2.35 };
+    const bot = { x: 5.15, y: 0.7 };
+    for (const slotX of [6.24, 6.36, 6.64, 6.76]) {
+      const { trace } = run(
+        islands,
+        files,
+        new Map([
+          ["o_is_slotX", [slotX]],
+          ["o_is_slotW", [0.94]],
+        ]),
+      );
+      const hold = trace.find((n) => n.id === "o_is_hold");
+      if (!hold || !isPick(hold.value)) throw new Error("missing hold");
+      const kept = evaluateRegions(hold.value);
+      expect(kept).toHaveLength(1);
+      expect(csgContains(hold.value, top)).toBe(true);
+      const through = slotX >= 6.35 && slotX <= 6.65;
+      expect(csgContains(hold.value, bot)).toBe(!through);
+      const paint = csgPaint(hold.value);
+      expect(paint.empty).toBe(false);
+    }
+  });
 });

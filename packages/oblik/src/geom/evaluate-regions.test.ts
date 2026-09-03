@@ -149,6 +149,29 @@ describe("evaluateRegions expected pass", () => {
     expect(evaluateRegions(pickValue(face, { x: 2, y: 1 }))).toHaveLength(0);
   });
 
+  test("wide stadium against a plate keeps leftovers at cap/wall cuts", () => {
+    const stock = rect(4.45, 0.28, 8.55, 2.82);
+    const d0 = disk(4.83, 0.66, 0.16);
+    const d1 = disk(8.17, 2.44, 0.16);
+    const top = { x: 5.15, y: 2.35 };
+    const bot = { x: 5.15, y: 0.7 };
+    const probes = grid(4.45, 0.28, 8.55, 2.82, 0.35);
+    const xs: number[] = [];
+    for (let x = 6.2; x <= 6.8 + 1e-9; x += 0.02) xs.push(Number(x.toFixed(2)));
+    for (const slotX of xs) {
+      const face = csg2Value("diff", [stock, d0, d1, stadium(slotX, 1.55, 4.4, 0.94)]);
+      expect(compileAgrees(face, probes)).toBe(true);
+      const islands = evaluateRegions(face);
+      expect(islands.some((r) => regionContains(r, top))).toBe(true);
+      expect(islands.some((r) => regionContains(r, bot))).toBe(true);
+      const hold = evaluateRegions(pickValue(face, top));
+      expect(hold).toHaveLength(1);
+      expect(regionContains(hold[0]!, top)).toBe(true);
+      const through = slotX >= 6.35 && slotX <= 6.65;
+      expect(regionContains(hold[0]!, bot)).toBe(!through);
+    }
+  });
+
   test("half-plane intersect clips a rect", () => {
     const face = csg2Value("intersect", [rect(0, 0, 4, 2), leftOfValue(split)]);
     const islands = evaluateRegions(face);

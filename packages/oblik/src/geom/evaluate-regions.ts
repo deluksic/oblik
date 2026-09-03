@@ -132,17 +132,32 @@ function cheapMaybeBoundary(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
   return true;
 }
 
+function transverseHairs(e: LoopEdge): number[] {
+  const span = dist(e.a, e.b);
+  const base = Math.max(1e-5, Math.min(span * 0.05, 1e-3));
+  const hairs = [base];
+  if (e.carrier.kind !== "circle") return hairs;
+  const r = Math.abs(e.carrier.radius);
+  // `signedDistToRegion` signs from a tessellated walk. sampleArc(24) sagittas
+  // ~0.002 r, so a 1e-3 hair can land both samples outside the polygon even
+  // when the true circle is a result boundary. Clear that band.
+  const arc = Math.min(r * 0.02, span * 0.25, 5e-2);
+  if (arc > base * 1.05) hairs.push(Math.max(base, arc));
+  return hairs;
+}
+
 function transverseKeep(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
   const mid = edgeMid(e);
   const t = walkTangentAt(e, mid);
   const n = perp(norm(t));
   if (!isFiniteVec(n)) return false;
-  const span = dist(e.a, e.b);
-  const hair = Math.max(1e-5, Math.min(span * 0.05, 1e-3));
-  const left = sdf(add(mid, mul(n, hair)));
-  const right = sdf(add(mid, mul(n, -hair)));
-  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
-  return left * right < 0;
+  for (const hair of transverseHairs(e)) {
+    const left = sdf(add(mid, mul(n, hair)));
+    const right = sdf(add(mid, mul(n, -hair)));
+    if (!Number.isFinite(left) || !Number.isFinite(right)) continue;
+    if (left * right < 0) return true;
+  }
+  return false;
 }
 
 function keepBoundary(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
@@ -336,6 +351,8 @@ const compileCache = new WeakMap<CsgOperand, Region[]>();
 /**
  * Compile a CSG operand to declared cheese islands. Experimental: carriers
  * are split, cheap-filtered, then kept on a transverse SDF sign change.
+ * Circular spans retry a longer hair so tessellated region SDF sagittas
+ * do not drop true cap remnants.
  */
 export function evaluateRegions(op: CsgOperand): Region[] {
   const hit = compileCache.get(op);
