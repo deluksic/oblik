@@ -28,6 +28,18 @@ export type ChromeSplit<T> = { rest: T[]; hover: T[]; lifted: T[] };
 
 export type ChromePass<T> = { items: T[]; overlay?: true };
 
+function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** True when hover/select did not move any item between buckets. */
+export function chromeSplitEqual<T>(a: ChromeSplit<T>, b: ChromeSplit<T>): boolean {
+  return sameItems(a.rest, b.rest) && sameItems(a.hover, b.hover) && sameItems(a.lifted, b.lifted);
+}
+
 /** Idle, then hovered, then selected — hover/select paint draws after their overlay. */
 export function splitChrome<T>(
   items: readonly T[],
@@ -45,7 +57,11 @@ export function splitChrome<T>(
   return { rest, hover: hovered, lifted };
 }
 
-/** Draw order for a band. `halos` is false while dragging (paint still lifts). */
+/**
+ * Draw order for a band. `halos` is false while dragging (paint still lifts).
+ * Do not `<For>` over this — each call allocates new pass objects, which
+ * remounts every fill. Views paint through `ChromeBand` instead.
+ */
 export function chromePasses<T>(band: ChromeSplit<T>, halos = true): ChromePass<T>[] {
   if (!halos) {
     return [{ items: band.rest }, { items: band.hover }, { items: band.lifted }];

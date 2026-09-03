@@ -24,6 +24,7 @@ import {
   type ToolSession,
 } from "../tool";
 import { regionEligibleCarriers } from "../tools/region";
+import { ChromeBand } from "./ChromeBand";
 import { createDragHandler, type DragSession } from "./createDragHandler";
 import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
@@ -36,8 +37,8 @@ import {
   isSelected,
   hoverNode,
   liftSelected,
+  chromeSplitEqual,
   splitChrome,
-  chromePasses,
   type ChromeSplit,
 } from "./marks";
 import { NumberSliders } from "./NumberSliders";
@@ -265,26 +266,32 @@ export function Euclid2View(props: Euclid2ViewProps) {
         )
       : null,
   );
-  const fillBand = createMemo(() =>
-    splitChrome(
-      fills(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHover(n, props.hoverId, props.selectedKey),
-    ),
+  const fillBand = createMemo(
+    () =>
+      splitChrome(
+        fills(),
+        (n) => isSelected(n, props.selectedKey),
+        (n) => isHover(n, props.hoverId, props.selectedKey),
+      ),
+    { equals: chromeSplitEqual },
   );
-  const inkBand = createMemo(() =>
-    splitChrome(
-      ink(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHover(n, props.hoverId, props.selectedKey),
-    ),
+  const inkBand = createMemo(
+    () =>
+      splitChrome(
+        ink(),
+        (n) => isSelected(n, props.selectedKey),
+        (n) => isHover(n, props.hoverId, props.selectedKey),
+      ),
+    { equals: chromeSplitEqual },
   );
-  const pointBand = createMemo(() =>
-    splitChrome(
-      points(),
-      (n) => isSelected(n, props.selectedKey),
-      (n) => isHover(n, props.hoverId, props.selectedKey),
-    ),
+  const pointBand = createMemo(
+    () =>
+      splitChrome(
+        points(),
+        (n) => isSelected(n, props.selectedKey),
+        (n) => isHover(n, props.hoverId, props.selectedKey),
+      ),
+    { equals: chromeSplitEqual },
   );
   const handleBand = createMemo(() =>
     liftSelected(handles(), (n) => isSelected(n, props.selectedKey)),
@@ -390,28 +397,24 @@ function RegionChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(n) =>
-            pass.overlay ? (
-              <RegionOutline
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-                overlay
-              />
-            ) : (
-              <RegionFill
-                node={n}
-                hot={isHot(n, props.hoverId, props.selectedKey)}
-                selected={isSelected(n, props.selectedKey)}
-              />
-            )
-          }
-        </For>
-      )}
-    </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(n, overlay) =>
+        overlay ? (
+          <RegionOutline
+            node={n}
+            hot={isHot(n, props.hoverId, props.selectedKey)}
+            selected={isSelected(n, props.selectedKey)}
+            overlay
+          />
+        ) : (
+          <RegionFill
+            node={n}
+            hot={isHot(n, props.hoverId, props.selectedKey)}
+            selected={isSelected(n, props.selectedKey)}
+          />
+        )
+      }
+    </ChromeBand>
   );
 }
 
@@ -425,23 +428,19 @@ function StrokeChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(n) => (
-            <Stroke
-              node={n}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={props.muted(n)}
-              camera={props.camera}
-              size={props.size}
-              overlay={pass.overlay}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(n, overlay) => (
+        <Stroke
+          node={n}
+          hot={isHot(n, props.hoverId, props.selectedKey)}
+          selected={isSelected(n, props.selectedKey)}
+          muted={props.muted(n)}
+          camera={props.camera}
+          size={props.size}
+          overlay={overlay}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }
 
@@ -455,22 +454,18 @@ function PointChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(n) => (
-            <PointMark
-              node={n}
-              size={props.size}
-              camera={props.camera}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
-              muted={props.muted(n)}
-              overlay={pass.overlay}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(n, overlay) => (
+        <PointMark
+          node={n}
+          size={props.size}
+          camera={props.camera}
+          hot={isHot(n, props.hoverId, props.selectedKey)}
+          selected={isSelected(n, props.selectedKey)}
+          muted={props.muted(n)}
+          overlay={overlay}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }

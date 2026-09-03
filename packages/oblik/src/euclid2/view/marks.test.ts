@@ -4,6 +4,7 @@ import type { TraceNode } from "@/eval/context";
 
 import {
   chromePasses,
+  chromeSplitEqual,
   hoverNode,
   isGrabbable,
   isHot,
@@ -104,6 +105,36 @@ describe("splitChrome", () => {
       lifted: ["b"],
     });
   });
+
+  test("keeps item identity so For can reuse nodes across splits", () => {
+    const a = { id: "a" };
+    const b = { id: "b" };
+    const idle = splitChrome(
+      [a, b],
+      () => false,
+      () => false,
+    );
+    const hoverB = splitChrome(
+      [a, b],
+      () => false,
+      (x) => x.id === "b",
+    );
+    expect(idle.rest[0]).toBe(a);
+    expect(hoverB.rest[0]).toBe(a);
+    expect(hoverB.hover[0]).toBe(b);
+    expect(chromeSplitEqual(idle, idle)).toBe(true);
+    expect(
+      chromeSplitEqual(
+        idle,
+        splitChrome(
+          [a, b],
+          () => false,
+          () => false,
+        ),
+      ),
+    ).toBe(true);
+    expect(chromeSplitEqual(idle, hoverB)).toBe(false);
+  });
 });
 
 describe("chromePasses", () => {
@@ -133,6 +164,15 @@ describe("chromePasses", () => {
       { items: ["b"] },
       { items: ["c"] },
     ]);
+  });
+
+  test("allocates new pass objects each call", () => {
+    const band = splitChrome(
+      ["a"],
+      () => false,
+      () => false,
+    );
+    expect(chromePasses(band)[0]).not.toBe(chromePasses(band)[0]);
   });
 });
 

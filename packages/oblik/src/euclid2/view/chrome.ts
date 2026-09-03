@@ -92,6 +92,17 @@ export function chromeDprScale(): number {
   return window.devicePixelRatio || 1;
 }
 
+export function chromeLayersEqual(a: readonly ChromeLayer[], b: readonly ChromeLayer[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!;
+    const y = b[i]!;
+    if (x.kind !== y.kind || x.width !== y.width || x.opacity !== y.opacity) return false;
+  }
+  return true;
+}
+
 const CLIP_EXTENT = 1e6;
 
 /** Closed circle as a path, for even-odd outside clips. */

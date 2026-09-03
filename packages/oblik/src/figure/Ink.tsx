@@ -4,6 +4,7 @@ import { infiniteClip, type Camera2, type PaneSize } from "../euclid2/camera";
 import { traceKey } from "../euclid2/pick";
 import {
   chromeLayers,
+  chromeLayersEqual,
   layerStrokeWidth,
   POINT_STROKE_PX,
   type ChromeKind,
@@ -95,14 +96,16 @@ export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
 
 function StrokeInk(props: { node: TraceNode } & StrokeProps) {
   const kind = createMemo(() => props.node.value.kind);
-  const layers = createMemo(() =>
-    layersOf({
-      look: props.look,
-      onion: props.onion,
-      hot: props.hot,
-      selected: props.selected,
-      overlay: props.overlay,
-    }),
+  const layers = createMemo(
+    () =>
+      layersOf({
+        look: props.look,
+        onion: props.onion,
+        hot: props.hot,
+        selected: props.selected,
+        overlay: props.overlay,
+      }),
+    { equals: chromeLayersEqual },
   );
   return (
     <g
@@ -427,17 +430,19 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     if (props.onion || mark() === "open") return "none";
     return stroke();
   };
-  const layers = createMemo(() =>
-    chromeLayers(
-      props.look?.width ?? POINT_STROKE_PX,
-      {
-        selected: props.selected,
-        hover: props.hot && !props.selected,
-        overlay: props.overlay === true,
-        point: true,
-      },
-      readChromeMetrics(),
-    ),
+  const layers = createMemo(
+    () =>
+      chromeLayers(
+        props.look?.width ?? POINT_STROKE_PX,
+        {
+          selected: props.selected,
+          hover: props.hot && !props.selected,
+          overlay: props.overlay === true,
+          point: true,
+        },
+        readChromeMetrics(),
+      ),
+    { equals: chromeLayersEqual },
   );
   return (
     <g

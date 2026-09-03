@@ -276,6 +276,16 @@ export function csgPaint(op: CsgOperand): CsgPaint {
 }
 
 export function fillPaint(v: Region | Csg2 | Pick): CsgPaint {
+  const hit = fillPaintCache.get(v);
+  if (hit) return hit;
+  const out = fillPaintFresh(v);
+  fillPaintCache.set(v, out);
+  return out;
+}
+
+const fillPaintCache = new WeakMap<Region | Csg2 | Pick, CsgPaint>();
+
+function fillPaintFresh(v: Region | Csg2 | Pick): CsgPaint {
   if (v.kind === "region") {
     const d = regionSvgPath(v);
     if (!d) return emptyPaint();

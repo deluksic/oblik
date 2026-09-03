@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { Show, createEffect, createMemo, createSignal } from "solid-js";
 import IconFrame from "~icons/lucide/frame";
 import IconMove from "~icons/lucide/move";
 import IconScaling from "~icons/lucide/scaling";
@@ -19,8 +19,9 @@ import {
 } from "../euclid2/camera";
 import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
+import { ChromeBand } from "../euclid2/view/ChromeBand";
 import { createDragHandler } from "../euclid2/view/createDragHandler";
-import { chromePasses, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
+import { chromeSplitEqual, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import {
@@ -124,12 +125,24 @@ export function FigureView(props: FigureViewProps) {
   const geomSelected = (n: TraceNode) => traceKey(n) === props.selectedKey;
   const paintHover = (s: PaintStroke) => traceKey(s.paint) === props.hoverKey && !paintSelected(s);
   const geomHover = (n: TraceNode) => traceKey(n) === props.hoverKey && !geomSelected(n);
-  const inkFillBand = createMemo(() => splitChrome(inkFills(), paintSelected, paintHover));
-  const inkEdgeBand = createMemo(() => splitChrome(inkEdges(), paintSelected, paintHover));
-  const inkPtBand = createMemo(() => splitChrome(inkPts(), paintSelected, paintHover));
-  const onionFillBand = createMemo(() => splitChrome(onionFills(), geomSelected, geomHover));
-  const onionEdgeBand = createMemo(() => splitChrome(onionEdges(), geomSelected, geomHover));
-  const onionPtBand = createMemo(() => splitChrome(onionPts(), geomSelected, geomHover));
+  const inkFillBand = createMemo(() => splitChrome(inkFills(), paintSelected, paintHover), {
+    equals: chromeSplitEqual,
+  });
+  const inkEdgeBand = createMemo(() => splitChrome(inkEdges(), paintSelected, paintHover), {
+    equals: chromeSplitEqual,
+  });
+  const inkPtBand = createMemo(() => splitChrome(inkPts(), paintSelected, paintHover), {
+    equals: chromeSplitEqual,
+  });
+  const onionFillBand = createMemo(() => splitChrome(onionFills(), geomSelected, geomHover), {
+    equals: chromeSplitEqual,
+  });
+  const onionEdgeBand = createMemo(() => splitChrome(onionEdges(), geomSelected, geomHover), {
+    equals: chromeSplitEqual,
+  });
+  const onionPtBand = createMemo(() => splitChrome(onionPts(), geomSelected, geomHover), {
+    equals: chromeSplitEqual,
+  });
   const frameXywh = createMemo<FrameXywh | null>(() => {
     const r = page();
     if (!r) return null;
@@ -488,26 +501,22 @@ function InkStrokeChrome(props: {
   ghosting?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(s) => (
-            <InkStroke
-              s={s}
-              hoverKey={props.hoverKey}
-              selectedKey={props.selectedKey}
-              eraser={props.eraser}
-              replacePreview={props.replacePreview}
-              scope={props.scope}
-              camera={props.camera}
-              size={props.size}
-              overlay={pass.overlay}
-              ghosting={props.ghosting}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(s, overlay) => (
+        <InkStroke
+          s={s}
+          hoverKey={props.hoverKey}
+          selectedKey={props.selectedKey}
+          eraser={props.eraser}
+          replacePreview={props.replacePreview}
+          scope={props.scope}
+          camera={props.camera}
+          size={props.size}
+          overlay={overlay}
+          ghosting={props.ghosting}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }
 
@@ -523,25 +532,21 @@ function InkPointChrome(props: {
   ghosting?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(s) => (
-            <InkPoint
-              s={s}
-              hoverKey={props.hoverKey}
-              selectedKey={props.selectedKey}
-              eraser={props.eraser}
-              replacePreview={props.replacePreview}
-              scope={props.scope}
-              camera={props.camera}
-              overlay={pass.overlay}
-              ghosting={props.ghosting}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(s, overlay) => (
+        <InkPoint
+          s={s}
+          hoverKey={props.hoverKey}
+          selectedKey={props.selectedKey}
+          eraser={props.eraser}
+          replacePreview={props.replacePreview}
+          scope={props.scope}
+          camera={props.camera}
+          overlay={overlay}
+          ghosting={props.ghosting}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }
 
@@ -556,26 +561,22 @@ function OnionStrokeChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(n) => (
-            <FigureStroke
-              node={n}
-              look={ONION}
-              onion={true}
-              hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-              selected={traceKey(n) === props.selectedKey}
-              muted={!!props.scope && mutedForScope(n, props.scope)}
-              camera={props.camera}
-              size={props.size}
-              replaced={props.previewKey === traceKey(n)}
-              overlay={pass.overlay === true}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(n, overlay) => (
+        <FigureStroke
+          node={n}
+          look={ONION}
+          onion={true}
+          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+          selected={traceKey(n) === props.selectedKey}
+          muted={!!props.scope && mutedForScope(n, props.scope)}
+          camera={props.camera}
+          size={props.size}
+          replaced={props.previewKey === traceKey(n)}
+          overlay={overlay}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }
 
@@ -589,25 +590,21 @@ function OnionPointChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <For each={chromePasses(props.band, props.halos !== false)}>
-      {(pass) => (
-        <For each={pass.items}>
-          {(n) => (
-            <FigurePoint
-              node={n}
-              look={undefined}
-              onion={true}
-              hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-              selected={traceKey(n) === props.selectedKey}
-              muted={!!props.scope && mutedForScope(n, props.scope)}
-              camera={props.camera}
-              replaced={props.previewKey === traceKey(n)}
-              overlay={pass.overlay === true}
-            />
-          )}
-        </For>
+    <ChromeBand band={props.band} halos={props.halos}>
+      {(n, overlay) => (
+        <FigurePoint
+          node={n}
+          look={undefined}
+          onion={true}
+          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
+          selected={traceKey(n) === props.selectedKey}
+          muted={!!props.scope && mutedForScope(n, props.scope)}
+          camera={props.camera}
+          replaced={props.previewKey === traceKey(n)}
+          overlay={overlay}
+        />
       )}
-    </For>
+    </ChromeBand>
   );
 }
 

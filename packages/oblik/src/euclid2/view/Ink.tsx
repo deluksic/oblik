@@ -13,6 +13,7 @@ import type { Ghost } from "../tool";
 import {
   CONSTRUCTION_STROKE_PX,
   chromeLayers,
+  chromeLayersEqual,
   layerStrokeWidth,
   type ChromeKind,
   type ChromeLayer,
@@ -69,7 +70,9 @@ export function Stroke(props: {
   overlay?: boolean;
 }) {
   const kind = createMemo(() => props.node.value.kind);
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true), {
+    equals: chromeLayersEqual,
+  });
   return (
     <>
       {kind() === "segment" ? (
@@ -250,7 +253,9 @@ function constructionFaceLayer(layer: ChromeLayer): FaceInk {
 }
 
 export function RegionFill(props: { node: TraceNode; hot: boolean; selected: boolean }) {
-  const layers = createMemo(() => layersOf(props.hot, props.selected, false));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, false), {
+    equals: chromeLayersEqual,
+  });
   const value = () => props.node.value as Region | Csg2 | Pick;
   const offsetStock = createMemo(() => {
     const v = value();
@@ -297,7 +302,9 @@ export function RegionOutline(props: {
   selected: boolean;
   overlay?: boolean;
 }) {
-  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true));
+  const layers = createMemo(() => layersOf(props.hot, props.selected, props.overlay === true), {
+    equals: chromeLayersEqual,
+  });
   return (
     <FillFace
       value={props.node.value as Region | Csg2 | Pick}

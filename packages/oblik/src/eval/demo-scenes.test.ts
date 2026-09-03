@@ -19,7 +19,7 @@ import stockCutters from "../../../../apps/demo/src/scenes/stock-cutters.ts";
 import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
-import { csgPaint } from "../geom/csg-draw";
+import { csgPaint, fillPaint } from "../geom/csg-draw";
 import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
 import { evaluateRegions } from "../geom/evaluate-regions";
 import { compileOffsetBoundary } from "../geom/offset";
@@ -121,6 +121,15 @@ describe("migrated demo scenes", () => {
     expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(11);
     expect(trace.filter((n) => n.kind === "region")).toHaveLength(11);
     expect(trace.filter((n) => n.kind === "slider")).toHaveLength(1);
+
+    const painted = [];
+    for (const n of trace) {
+      if (!isCsg2(n.value)) continue;
+      const first = fillPaint(n.value);
+      painted.push(first);
+      expect(fillPaint(n.value)).toBe(first);
+    }
+    expect(painted).toHaveLength(11);
 
     const sqInset = trace.find((n) => n.bind === "sqInset");
     expect(sqInset?.kind).toBe("csg2");

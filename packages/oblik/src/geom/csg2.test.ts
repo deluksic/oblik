@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { csgPaint, REGION_MASK } from "./csg-draw";
+import { csgPaint, fillPaint, REGION_MASK } from "./csg-draw";
 import {
   csg2Value,
   csgContains,
@@ -14,7 +14,7 @@ import {
   rightOfValue,
   wrapCsg,
 } from "./csg2";
-import { roundOffsetValue } from "./offset";
+import { roundOffsetValue, compileOffsetBoundary } from "./offset";
 import { alongValue, filletValue, regionContains, regionSvgPath, regionValue } from "./region";
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
@@ -274,6 +274,17 @@ describe("offset operand", () => {
         ).length) ??
         0,
     ).toBe(4);
+  });
+
+  test("fillPaint and offset compile are identity-cached on the operand", () => {
+    const face = wrapCsg(offsetValue(rect(0, 0, 1, 1), 0.2));
+    const off = face.of[0]!;
+    expect(off.kind).toBe("offset");
+    const first = fillPaint(face);
+    const second = fillPaint(face);
+    expect(second).toBe(first);
+    if (off.kind !== "offset") throw new Error("expected offset");
+    expect(compileOffsetBoundary(off)).toBe(compileOffsetBoundary(off));
   });
 
   test("a split leftover is still one formula", () => {

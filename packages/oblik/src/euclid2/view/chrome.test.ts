@@ -5,6 +5,7 @@ import {
   DEFAULT_CHROME_METRICS,
   chromeClipUrl,
   chromeLayers,
+  chromeLayersEqual,
   circleClipD,
   layerStrokeWidth,
   outsideClipD,
@@ -93,6 +94,16 @@ describe("chromeLayers", () => {
 
   test("idle overlay draws nothing", () => {
     expect(chromeLayers(1.35, { selected: false, hover: false, overlay: true }, M)).toEqual([]);
+  });
+
+  test("chromeLayersEqual ignores array identity", () => {
+    const a = chromeLayers(1.5, { selected: false, hover: false, overlay: false }, M);
+    const b = chromeLayers(1.5, { selected: false, hover: false, overlay: false }, M);
+    expect(a).not.toBe(b);
+    expect(chromeLayersEqual(a, b)).toBe(true);
+    expect(
+      chromeLayersEqual(a, chromeLayers(1.5, { selected: false, hover: true, overlay: true }, M)),
+    ).toBe(false);
   });
 
   test("point hover overlay uses a wider band than strokes", () => {

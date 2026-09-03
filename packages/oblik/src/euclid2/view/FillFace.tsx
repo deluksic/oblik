@@ -98,7 +98,7 @@ function CsgLayerOps(props: {
 
 /** Shared region / CSG fill + overlay halo. Hosts pass layer class and paint. */
 export function FillFace(props: ParentProps<FillFaceProps>) {
-  const declared = () => declaredFill(props.value);
+  const declared = createMemo(() => declaredFill(props.value));
   return (
     <Show when={declared()} fallback={<CsgFace {...props} />}>
       {(r) => <DeclaredFace {...props} value={r()} />}
@@ -134,8 +134,8 @@ function DeclaredFace(props: FillFaceProps) {
 }
 
 function CsgFace(props: ParentProps<FillFaceProps>) {
-  const paint = () => fillPaint(props.value as Csg2 | GeomPick);
-  const id = () => regionMaskId(props.uid);
+  const paint = createMemo(() => fillPaint(props.value as Csg2 | GeomPick));
+  const id = createMemo(() => regionMaskId(props.uid));
   return (
     <Show when={!paint().empty}>
       {props.overlay ? (

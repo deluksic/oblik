@@ -798,6 +798,16 @@ export function roundOffsetValue(
 
 /** Flatten nested offsets to a region source + net distance, then compile. */
 export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: number }): Region[] {
+  const hit = offsetBoundaryCache.get(op);
+  if (hit) return hit;
+  const out = compileOffsetBoundaryFresh(op);
+  offsetBoundaryCache.set(op, out);
+  return out;
+}
+
+const offsetBoundaryCache = new WeakMap<object, Region[]>();
+
+function compileOffsetBoundaryFresh(op: { kind: "offset"; of: unknown; d: number }): Region[] {
   let d = op.d;
   let node: unknown = op.of;
   while (node && typeof node === "object" && (node as { kind?: string }).kind === "offset") {
