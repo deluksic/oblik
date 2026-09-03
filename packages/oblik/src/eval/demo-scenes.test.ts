@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 import arcade from "../../../../apps/demo/src/scenes/arcade.ts";
+import csgTree from "../../../../apps/demo/src/scenes/csg-tree.ts";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
 import islands from "../../../../apps/demo/src/scenes/islands.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
@@ -421,6 +422,61 @@ describe("migrated demo scenes", () => {
     expect(empty.trace.some((n) => n.id === "o_sc_probe")).toBe(true);
     if (!holdEmpty || !isPick(holdEmpty.value)) throw new Error("missing hold");
     expect(csgContains(holdEmpty.value, { x: 3.55, y: 1.6 })).toBe(false);
+  });
+
+  test("stock-cutters: midline is construction only; left and right are half-planes of face", () => {
+    const files = [
+      "apps/demo/src/scenes/stock-cutters.ts",
+      "apps/demo/src/layout/stock-cutters.ts",
+    ];
+    const { trace } = run(stockCutters, files);
+    expect(trace.some((n) => n.bind === "midline" && n.value.kind === "line")).toBe(true);
+    const left = trace.find((n) => n.id === "o_sc_left");
+    const right = trace.find((n) => n.id === "o_sc_right");
+    const face = trace.find((n) => n.id === "o_sc_face");
+    if (!left || !right || !face || !isCsg2(left.value) || !isCsg2(right.value) || !isCsg2(face.value)) {
+      throw new Error("missing half-plane slices");
+    }
+    expect(left.value.op).toBe("intersect");
+    expect(right.value.op).toBe("intersect");
+    expect(csgContains(face.value, { x: 1.05, y: 1.6 })).toBe(true);
+    expect(csgContains(face.value, { x: 3.55, y: 1.6 })).toBe(false);
+    expect(csgContains(left.value, { x: 1.05, y: 1.6 })).toBe(true);
+    expect(csgContains(left.value, { x: 2.7, y: 0.5 })).toBe(false);
+    expect(csgContains(right.value, { x: 2.7, y: 0.5 })).toBe(true);
+    expect(csgContains(right.value, { x: 1.05, y: 1.6 })).toBe(false);
+  });
+
+  test("csg-tree traces a nested union → diff → intersect formula tree", () => {
+    const files = ["apps/demo/src/scenes/csg-tree.ts", "apps/demo/src/layout/csg-tree.ts"];
+    const { trace } = run(csgTree, files);
+    expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(4);
+    expect(trace.filter((n) => n.kind === "pick")).toHaveLength(1);
+    expect(trace.some((n) => n.bind === "frame" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "shell" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "west" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "east" && n.kind === "csg2")).toBe(true);
+    expect(trace.some((n) => n.bind === "midline" && n.value.kind === "line")).toBe(true);
+
+    const shell = trace.find((n) => n.id === "o_ct_shell");
+    if (!shell || !isCsg2(shell.value)) throw new Error("missing shell");
+    expect(shell.value.op).toBe("diff");
+    const stockChild = shell.value.of[0];
+    expect(stockChild?.kind).toBe("csg2");
+    if (!stockChild || stockChild.kind !== "csg2") throw new Error("missing frame child");
+    expect(stockChild.op).toBe("union");
+    expect(stockChild.of).toHaveLength(3);
+
+    const west = trace.find((n) => n.id === "o_ct_west");
+    if (!west || !isCsg2(west.value)) throw new Error("missing west");
+    expect(west.value.op).toBe("intersect");
+    expect(csgContains(west.value, { x: 1.15, y: 1.75 })).toBe(true);
+    expect(csgContains(west.value, { x: 4.2, y: 1.75 })).toBe(false);
+
+    const paint = csgPaint(shell.value);
+    expect(paint.empty).toBe(false);
+    expect(paint.tree).toBeUndefined();
+    expect(evaluateRegions(shell.value).length).toBeGreaterThan(0);
   });
 
   test("stock-cutters figure paints the face formula, not an island", () => {

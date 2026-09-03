@@ -13,7 +13,13 @@ import {
   slider,
 } from "oblik";
 
-/** Stock rectangle, drills, stadium slot, split, and the CSG face. */
+/**
+ * Geometry layers:
+ *   stock, d0–d3, slot — declared regions/circles (construction + operands).
+ *   face = diff(stock, cutters) — the CSG field.
+ *   split — infinite midline through splitAt; only used to build left/right half-planes.
+ *   left / right = intersect(face, half-plane) — not separate stock or cutters.
+ */
 export function stockCuttersLayout() {
   const origin = point(0.15, 0.2, "o_sc_origin");
   const opp = point(4.35, 3.0, "o_sc_opp");
@@ -65,13 +71,27 @@ export function stockCuttersLayout() {
   );
 
   const splitAt = point((minX + maxX) / 2, (minY + maxY) / 2, "o_sc_splitAt");
-  const split = perpendicularLine(bot, splitAt, "o_sc_split");
+  const midline = perpendicularLine(bot, splitAt, "o_sc_split");
   const probe = point(1.05, 1.6, "o_sc_probe");
 
   const face = diff(stock, [d0, d1, d2, d3, slot], "o_sc_face");
   const hold = pick(face, probe, "o_sc_hold");
-  const left = intersect([face, leftOf(split)], "o_sc_left");
-  const right = intersect([face, rightOf(split)], "o_sc_right");
+  const left = intersect([face, leftOf(midline)], "o_sc_left");
+  const right = intersect([face, rightOf(midline)], "o_sc_right");
 
-  return { origin, opp, stock, drillR, slot, split, probe, face, hold, left, right, d0, splitAt };
+  return {
+    origin,
+    opp,
+    stock,
+    drillR,
+    slot,
+    midline,
+    splitAt,
+    probe,
+    face,
+    hold,
+    left,
+    right,
+    d0,
+  };
 }

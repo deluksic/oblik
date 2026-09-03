@@ -5,7 +5,7 @@ import { stockCuttersLayout } from "../layout/stock-cutters";
 export default defineScene({
   kind: "euclid2",
   title: "Stock and cutters",
-  hint: "o_sc_face is the formula, not a compiled loop. Drag a drill off the plate — that hole vanishes, no XOR cap. Lengthen the slot until it severs; o_sc_hold follows the probe. NaN the split and o_sc_left / o_sc_right drop, not the face.",
+  hint: "face = diff(stock, cutters). split (midline) is a construction divider for left/right — not stock, not a cutter. Select o_sc_left or o_sc_right to see the half-plane slices. Drag a drill off the plate and that hole vanishes.",
   camera: { x: 2.25, y: 1.6, scale: 72 },
   build() {
     return stockCuttersLayout();
