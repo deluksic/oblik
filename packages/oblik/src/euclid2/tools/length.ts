@@ -10,6 +10,8 @@ import { parseNum } from "./draft";
 import { toolScope } from "./scope";
 import type { Field, PlaceCtx, PlaceHit, Scope, ToolSession } from "./types";
 
+
+const { abs, max } = Math;
 export type LengthDraft = { typed: string; lengthPick?: Expr };
 
 export function lengthNegPending(raw: string | undefined): boolean {
@@ -49,7 +51,7 @@ function objectKey(expr: Expr): string | null {
 export function fieldValue(scope: Scope, object: string, field: string): number | null {
   if (field === "radius") {
     const c = scope.circles[object];
-    return c ? Math.abs(c.geom.radius) : null;
+    return c ? abs(c.geom.radius) : null;
   }
   const carrier = scope.carriers[object];
   if (field === "distance" && carrier?.geom.kind === "parallelLine") {
@@ -89,7 +91,7 @@ export function parseLengthTyped(raw: string, scope: Scope, opts?: { min?: numbe
   if (t === "" || t === "-") return null;
   const n = parseNum(t);
   if (n != null) {
-    const v = opts?.min != null ? Math.max(opts.min, n) : n;
+    const v = opts?.min != null ? max(opts.min, n) : n;
     return { kind: "num", value: round(v) };
   }
   let neg = false;
@@ -164,7 +166,7 @@ function lengthFromNode(
   if (!name) return null;
   if (field === "radius" && node.value.kind === "circle") {
     const c = node.value as Circle;
-    return { expr: memberExpr(name, "radius"), value: Math.abs(c.radius) };
+    return { expr: memberExpr(name, "radius"), value: abs(c.radius) };
   }
   if (field === "distance" && node.value.kind === "parallelLine") {
     const pl = node.value as ParallelLine;

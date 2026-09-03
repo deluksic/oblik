@@ -11,6 +11,8 @@ import {
 
 import styles from "./BrushDock.module.css";
 
+
+const { min } = Math;
 export type BrushDockProps = {
   settings: BrushSettings;
   onChange: (next: BrushSettings) => void;
@@ -164,7 +166,7 @@ function WidthBtn(props: { width: number; current: boolean; onPick: () => void }
           x2="25"
           y2="8"
           stroke="currentColor"
-          stroke-width={Math.min(props.width, 6)}
+          stroke-width={min(props.width, 6)}
           stroke-linecap="round"
         />
       </svg>

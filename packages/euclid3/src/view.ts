@@ -4,6 +4,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import type { Gizmo3 } from "./widgets";
 
+
+const { PI, abs, cos, max, min, sin } = Math;
 const COL = {
   bg: 0x12141c,
   geom: 0xd7d2c4,
@@ -51,7 +53,7 @@ export class SpaceView {
       alpha: false,
     });
     this.renderer.setClearColor(COL.bg, 1);
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(min(2, window.devicePixelRatio || 1));
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
@@ -77,7 +79,7 @@ export class SpaceView {
     this.scene.add(fill);
 
     const grid = new THREE.GridHelper(24, 24, 0x3a4156, 0x1d2230);
-    grid.rotation.x = Math.PI / 2;
+    grid.rotation.x = PI / 2;
     this.scene.add(grid);
 
     const axes = new THREE.AxesHelper(2.2);
@@ -105,8 +107,8 @@ export class SpaceView {
 
   resize(): void {
     const r = this.canvas.getBoundingClientRect();
-    const w = Math.max(1, r.width);
-    const h = Math.max(1, r.height);
+    const w = max(1, r.width);
+    const h = max(1, r.height);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
@@ -181,7 +183,7 @@ export class SpaceView {
     const plane = cameraPlane(this.camera, origin);
     const hit = this.intersectPlane(plane, clientX, clientY);
     if (!hit) return null;
-    return Math.max(0.05, dist3(origin, hit));
+    return max(0.05, dist3(origin, hit));
   }
 
   dragGlider(a: Vec3, b: Vec3, clientX: number, clientY: number): number | null {
@@ -193,7 +195,7 @@ export class SpaceView {
     const plane = cameraPlane(this.camera, mid);
     const hit = this.intersectPlane(plane, clientX, clientY);
     if (!hit) return null;
-    return Math.min(1, Math.max(0, projectT3(a, b, hit)));
+    return min(1, max(0, projectT3(a, b, hit)));
   }
 
   private intersectPlane(plane: THREE.Plane, clientX: number, clientY: number): Vec3 | null {
@@ -265,13 +267,13 @@ function meshFor(g: Geom3, color: number, highlight: boolean, rest?: RestInk): T
   };
 
   if (g.kind === "box3") {
-    const sx = Math.abs(g.max.x - g.min.x);
-    const sy = Math.abs(g.max.y - g.min.y);
-    const sz = Math.abs(g.max.z - g.min.z);
+    const sx = abs(g.max.x - g.min.x);
+    const sy = abs(g.max.y - g.min.y);
+    const sz = abs(g.max.z - g.min.z);
     const cx = (g.min.x + g.max.x) / 2;
     const cy = (g.min.y + g.max.y) / 2;
     const cz = (g.min.z + g.max.z) / 2;
-    const box = new THREE.BoxGeometry(Math.max(sx, 0.02), Math.max(sy, 0.02), Math.max(sz, 0.02));
+    const box = new THREE.BoxGeometry(max(sx, 0.02), max(sy, 0.02), max(sz, 0.02));
     const fill = new THREE.MeshLambertMaterial({
       color: COL.stock,
       transparent: true,
@@ -292,9 +294,9 @@ function meshFor(g: Geom3, color: number, highlight: boolean, rest?: RestInk): T
     );
     const h = axis.length();
     const cyl = new THREE.CylinderGeometry(
-      Math.abs(g.radius),
-      Math.abs(g.radius),
-      Math.max(h, 0.02),
+      abs(g.radius),
+      abs(g.radius),
+      max(h, 0.02),
       28,
       1,
       true,
@@ -325,16 +327,16 @@ function meshFor(g: Geom3, color: number, highlight: boolean, rest?: RestInk): T
     const pts: THREE.Vector3[] = [];
     const n = 48;
     const normal = new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z).normalize();
-    const tmp = Math.abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+    const tmp = abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const x = new THREE.Vector3().crossVectors(normal, tmp).normalize();
     const y = new THREE.Vector3().crossVectors(normal, x).normalize();
     for (let i = 0; i <= n; i++) {
-      const a = (i / n) * Math.PI * 2;
+      const a = (i / n) * PI * 2;
       pts.push(
         new THREE.Vector3(
-          g.center.x + (x.x * Math.cos(a) + y.x * Math.sin(a)) * g.radius,
-          g.center.y + (x.y * Math.cos(a) + y.y * Math.sin(a)) * g.radius,
-          g.center.z + (x.z * Math.cos(a) + y.z * Math.sin(a)) * g.radius,
+          g.center.x + (x.x * cos(a) + y.x * sin(a)) * g.radius,
+          g.center.y + (x.y * cos(a) + y.y * sin(a)) * g.radius,
+          g.center.z + (x.z * cos(a) + y.z * sin(a)) * g.radius,
         ),
       );
     }
@@ -411,7 +413,7 @@ function meshGizmo(g: Gizmo3, emphasis: "selected" | "hover" | null, rest?: Rest
       ),
     );
   } else {
-    const loops = unitCircles(g.origin, Math.abs(g.d), color);
+    const loops = unitCircles(g.origin, abs(g.d), color);
     group.add(...loops);
   }
   group.userData.gizmo = g;
@@ -441,12 +443,12 @@ function unitCircles(origin: Vec3, r: number, color: number): THREE.Object3D[] {
   return axes.map(([u, v]) => {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= 48; i++) {
-      const a = (i / 48) * Math.PI * 2;
+      const a = (i / 48) * PI * 2;
       pts.push(
         new THREE.Vector3(
-          origin.x + (u.x * Math.cos(a) + v.x * Math.sin(a)) * r,
-          origin.y + (u.y * Math.cos(a) + v.y * Math.sin(a)) * r,
-          origin.z + (u.z * Math.cos(a) + v.z * Math.sin(a)) * r,
+          origin.x + (u.x * cos(a) + v.x * sin(a)) * r,
+          origin.y + (u.y * cos(a) + v.y * sin(a)) * r,
+          origin.z + (u.z * cos(a) + v.z * sin(a)) * r,
         ),
       );
     }

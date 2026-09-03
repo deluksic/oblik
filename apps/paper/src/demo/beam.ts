@@ -13,6 +13,8 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 
+
+const { abs, floor } = Math;
 export type Ring = { post: Vec2; radius: number };
 
 function buildBeamParts(opts: {
@@ -25,7 +27,7 @@ function buildBeamParts(opts: {
   const b = opts.span.b;
   const dir = sub(b, a);
   const normal = norm(perp(dir));
-  const hub = opts.rings[Math.floor(opts.rings.length / 2)] ?? opts.rings[0];
+  const hub = opts.rings[floor(opts.rings.length / 2)] ?? opts.rings[0];
   const hubR = opts.hubRadius ?? hub?.radius ?? 1;
   const peak = hub ? add(hub.post, mul(normal, hubR)) : add(a, mul(normal, hubR));
 
@@ -33,7 +35,7 @@ function buildBeamParts(opts: {
 
   for (const ring of opts.rings) {
     parts.push(segment(ring.post, add(ring.post, mul(normal, ring.radius))));
-    parts.push(circle(ring.post, Math.abs(ring.radius)));
+    parts.push(circle(ring.post, abs(ring.radius)));
   }
 
   for (let i = 0; i < 4; i++) {

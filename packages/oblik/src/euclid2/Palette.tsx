@@ -4,6 +4,8 @@ import { filterTools, type Preview, type ToolId, type ToolSpec } from "./tool";
 
 import styles from "./Palette.module.css";
 
+
+const { max, min } = Math;
 export type PaletteProps = {
   picker: boolean;
   prompt: Preview | null;
@@ -58,7 +60,7 @@ function Prompt(props: {
     const d = props.preview.draft;
     const token = props.preview.token ?? d?.placeholder ?? "";
     const text = d?.value || token;
-    return `${Math.max(text.length, 1) + 1}ch`;
+    return `${max(text.length, 1) + 1}ch`;
   };
 
   return (
@@ -135,12 +137,12 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
         }
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setActive((i) => Math.min(items().length - 1, i + 1));
+          setActive((i) => min(items().length - 1, i + 1));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
-          setActive((i) => Math.max(0, i - 1));
+          setActive((i) => max(0, i - 1));
           return;
         }
         if (e.key === "Enter") {

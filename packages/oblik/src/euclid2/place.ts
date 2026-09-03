@@ -18,6 +18,8 @@ import {
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import { snapBoundPoint, snapEligible, snapPrint, type SnapFilter, type Vec2 } from "./pick";
 
+
+const { abs, max } = Math;
 export type GliderPlace =
   | { kind: "pointOnSegment"; bind: string; id?: string; t: number; at: Vec2 }
   | { kind: "pointOnLine"; bind: string; id?: string; s: number; at: Vec2 }
@@ -41,11 +43,11 @@ export const PLACE_SNAP_PX = 16;
 export const GLIDER_SNAP_PX = 28;
 
 export function placeSnapWorld(scale: number): number {
-  return PLACE_SNAP_PX / Math.max(8, scale);
+  return PLACE_SNAP_PX / max(8, scale);
 }
 
 export function gliderSnapWorld(scale: number): number {
-  return GLIDER_SNAP_PX / Math.max(8, scale);
+  return GLIDER_SNAP_PX / max(8, scale);
 }
 
 export function isCrossing(p: PlacePoint): p is Crossing {
@@ -159,7 +161,7 @@ function nearestGlider(
   for (const n of boundOf(trace, CIRCLE, filter)) {
     if (n.value.kind !== "circle") continue;
     const circle = n.value as Circle;
-    const d = Math.abs(dist(world, circle.center) - Math.abs(circle.radius));
+    const d = abs(dist(world, circle.center) - abs(circle.radius));
     if (d > maxDist) continue;
     const { ux, uy } = circleUnitAt(circle, world);
     const g = pointOnCircleValue(circle, ux, uy);

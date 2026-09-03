@@ -1,7 +1,9 @@
 import { enqueueLatest, writeSlot } from "./write-queue";
 
+
+const { max, min, round } = Math;
 export function quantize(n: number): number {
-  return Math.round(n * 100) / 100;
+  return round(n * 100) / 100;
 }
 
 /** World cursor for the pane status strip: always two decimals, tabular. */
@@ -16,8 +18,8 @@ export function escapeHtml(s: string): string {
 export function renderSnippet(text: string, line: number): string {
   const lines = text.split("\n");
   const i = line - 1;
-  const from = Math.max(0, i - 5);
-  const to = Math.min(lines.length, i + 6);
+  const from = max(0, i - 5);
+  const to = min(lines.length, i + 6);
   const chunks: string[] = [];
   for (let n = from; n < to; n++) {
     const current = n === i;
@@ -93,8 +95,8 @@ export function pinConstructorSite(
 function quoteLines(text: string, line: number): import("@design-scenes/shell").OriginCodeLine[] {
   const rows = text.split("\n");
   const i = line - 1;
-  const from = Math.max(0, i - 1);
-  const to = Math.min(rows.length, i + 2);
+  const from = max(0, i - 1);
+  const to = min(rows.length, i + 2);
   const out: import("@design-scenes/shell").OriginCodeLine[] = [];
   for (let n = from; n < to; n++) {
     out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === i });
@@ -135,8 +137,8 @@ export function buildOriginFrameLines(
   const rows = text.split("\n");
   const target = line - 1;
   const headerIdx = findFunctionHeaderRow(rows, line, name);
-  const from = Math.max(0, target - 1);
-  const to = Math.min(rows.length, target + 2);
+  const from = max(0, target - 1);
+  const to = min(rows.length, target + 2);
   const out: import("@design-scenes/shell").OriginDisplayLine[] = [];
 
   if (headerIdx != null) {

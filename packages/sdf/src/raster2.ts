@@ -1,6 +1,8 @@
 import type { Sdf2 } from "./tree2";
 import { evalSdf2 } from "./tree2";
 
+
+const { max, round } = Math;
 export type Cam2 = { x: number; y: number; scale: number };
 
 const BG = [18, 20, 28, 255] as const;
@@ -19,8 +21,8 @@ export function fillSdf2(
   sdf: Sdf2,
 ): void {
   const dpr = ctx.getTransform().a || 1;
-  const w = Math.max(1, Math.round(cssW * dpr));
-  const h = Math.max(1, Math.round(cssH * dpr));
+  const w = max(1, round(cssW * dpr));
+  const h = max(1, round(cssH * dpr));
   const img = ctx.createImageData(w, h);
   const data = img.data;
   const lip = 1.5 / cam.scale;

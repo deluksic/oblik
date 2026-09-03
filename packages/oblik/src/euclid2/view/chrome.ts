@@ -1,3 +1,4 @@
+const { abs, max } = Math;
 export const CONSTRUCTION_STROKE_PX = 1.5;
 export const POINT_STROKE_PX = 2;
 
@@ -82,8 +83,8 @@ export function overlayBands(
   // 7/4 was designed around a 1.5px stroke: 2.5px paper extra, 3px ring extra.
   const paper = metrics.knockoutPx - CONSTRUCTION_STROKE_PX;
   const ring = metrics.outlinePx - metrics.knockoutPx;
-  const knockout = Math.max(metrics.knockoutPx, paintWidth + paper);
-  return { outline: Math.max(metrics.outlinePx, knockout + ring), knockout };
+  const knockout = max(metrics.knockoutPx, paintWidth + paper);
+  return { outline: max(metrics.outlinePx, knockout + ring), knockout };
 }
 
 /** Scale CSS px to device px for world-space non-scaling strokes. */
@@ -107,7 +108,7 @@ const CLIP_EXTENT = 1e6;
 
 /** Closed circle as a path, for even-odd outside clips. */
 export function circleClipD(cx: number, cy: number, r: number): string {
-  const rr = Math.abs(r);
+  const rr = abs(r);
   if (!(rr > 0) || !Number.isFinite(cx) || !Number.isFinite(cy)) return "";
   return `M${cx - rr},${cy}a${rr},${rr} 0 1,0 ${2 * rr},0a${rr},${rr} 0 1,0 ${-2 * rr},0z`;
 }

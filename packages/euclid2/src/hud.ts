@@ -1,6 +1,8 @@
 import type { Gizmo, NumberGizmo } from "./widgets";
 import { snapEditNumber } from "./widgets";
 
+
+const { max, min } = Math;
 const MARGIN = 12;
 const PANEL_W = 200;
 const PANEL_H = 56;
@@ -28,8 +30,8 @@ export function layoutNumberSliders(
     const trackX = x + 14;
     const trackW = PANEL_W - 28;
     const trackY = y + 36;
-    const span = Math.max(1e-9, g.max - g.min);
-    const t = Math.min(1, Math.max(0, (g.n - g.min) / span));
+    const span = max(1e-9, g.max - g.min);
+    const t = min(1, max(0, (g.n - g.min) / span));
     return {
       gizmo: g,
       panel: { x, y, w: PANEL_W, h: PANEL_H },

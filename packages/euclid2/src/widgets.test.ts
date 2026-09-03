@@ -15,6 +15,8 @@ import {
 } from "./widgets";
 import { beginGeomFrame, circle, collectDrawables, line, offsetLine, point, withBind } from "@design-scenes/geom";
 
+
+const { PI } = Math;
 const F = "apps/paper/src/scenes/plate-layout.ts";
 const pt = { __annotations__: { file: F, at: [1, 1] as [number, number], editable: true } };
 const dist = { __annotations__: { file: F, at: [4, 5] as [number, number], editable: true } };
@@ -176,24 +178,24 @@ test("slider HUD uses label, min, max, step", () => {
 test("angle degrees are relative to from; return is world radians", () => {
   beginWidgetFrame("ang");
   const site = { __annotations__: { file: F, at: [11, 1] as [number, number], editable: true } };
-  const world = angle({ x: 0, y: 0 }, -59, { from: Math.PI / 2, radius: 1, ...site });
-  expect(world).toBeCloseTo((31 * Math.PI) / 180, 6);
+  const world = angle({ x: 0, y: 0 }, -59, { from: PI / 2, radius: 1, ...site });
+  expect(world).toBeCloseTo((31 * PI) / 180, 6);
   const g = getGizmos().find((x) => x.kind === "angle");
   expect(g?.kind).toBe("angle");
   if (g?.kind !== "angle") return;
   expect(g.deg).toBe(-59);
-  expect(g.from).toBeCloseTo(Math.PI / 2);
+  expect(g.from).toBeCloseTo(PI / 2);
 });
 
 test("angle mirror reflects world direction; same deg, opposite swing", () => {
   beginWidgetFrame("mir");
   const site = { __annotations__: { file: F, at: [12, 1] as [number, number], editable: true } };
-  const from = Math.PI / 2;
+  const from = PI / 2;
   const forward = angle({ x: 0, y: 0 }, 69, { from, radius: 1, ...site });
   const mirrored = angle({ x: 0, y: 0 }, 69, { from, radius: 1, mirror: true, ...site });
-  expect(forward).toBeCloseTo((159 * Math.PI) / 180, 6);
-  expect(mirrored).toBeCloseTo((21 * Math.PI) / 180, 6);
-  expect(forward + mirrored).toBeCloseTo(Math.PI, 6);
+  expect(forward).toBeCloseTo((159 * PI) / 180, 6);
+  expect(mirrored).toBeCloseTo((21 * PI) / 180, 6);
+  expect(forward + mirrored).toBeCloseTo(PI, 6);
 });
 
 test("offset mirror gizmo keeps stored literal, line on opposite side", () => {

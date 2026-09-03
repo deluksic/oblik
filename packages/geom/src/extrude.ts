@@ -2,6 +2,8 @@ import { mesh3, type Mesh3 } from "./geom3";
 import { dist, rotateAround, type Vec2 } from "./vec";
 import { vec3, type Vec3 } from "./vec3";
 
+
+const { PI, abs, ceil, cos, max, min, sin } = Math;
 export type ExtrudeOpts = {
   /** Total rotation about +Z from bottom to top, radians. */
   twist?: number;
@@ -41,14 +43,14 @@ function copyRing(positions: number[], from: number, n: number): number {
 export function extrude(points: readonly Vec2[], height: number, opts: ExtrudeOpts = {}): Mesh3 {
   const ring = stripClose(points);
   const n = ring.length;
-  const h = Math.max(1e-6, Math.abs(height));
+  const h = max(1e-6, abs(height));
   const twist = opts.twist ?? 0;
   const center = opts.center ?? { x: 0, y: 0 };
   const closed =
     opts.closed ?? (points.length >= 3 && dist(points[0]!, points[points.length - 1]!) < 1e-6);
-  const slices = Math.max(
+  const slices = max(
     1,
-    opts.slices ?? Math.max(8, Math.ceil(Math.abs(twist) / (Math.PI / 12))),
+    opts.slices ?? max(8, ceil(abs(twist) / (PI / 12))),
   );
 
   const positions: number[] = [];
@@ -118,7 +120,7 @@ export type WrapBandOpts = {
 
 function cyl(s: number, z: number, r: number, rMap: number): Vec3 {
   const theta = s / rMap;
-  return vec3(r * Math.cos(theta), r * Math.sin(theta), z);
+  return vec3(r * cos(theta), r * sin(theta), z);
 }
 
 function pushV(positions: number[], p: Vec3): void {
@@ -133,10 +135,10 @@ function pushV(positions: number[], p: Vec3): void {
  * The last sample is welded to the first (a closed ring).
  */
 export function wrapBand(bottom: readonly Vec2[], top: readonly Vec2[], opts: WrapBandOpts): Mesh3 {
-  const n = Math.min(bottom.length, top.length);
+  const n = min(bottom.length, top.length);
   if (n < 3) return mesh3([], []);
-  const rMap = Math.max(1e-3, Math.abs(opts.radius));
-  const thick = Math.abs(opts.thickness) < 1e-4 ? 0.05 : opts.thickness;
+  const rMap = max(1e-3, abs(opts.radius));
+  const thick = abs(opts.thickness) < 1e-4 ? 0.05 : opts.thickness;
   const r0 = rMap;
   const r1 = r0 + thick;
 

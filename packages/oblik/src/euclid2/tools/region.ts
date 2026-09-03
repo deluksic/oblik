@@ -10,6 +10,8 @@ import { dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, previewCall } fr
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
+
+const { max, sqrt } = Math;
 type RegionSession = Extract<ToolSession, { verb: "region" }>;
 type CycleCarrier = RegionSession["carriers"][number];
 
@@ -91,7 +93,7 @@ function carrierExpr(c: CycleCarrier): Expr {
 
 function cycleItems(s: RegionSession, extra: Expr[] = []): Expr[] {
   const items: Expr[] = [];
-  const n = Math.max(s.vertices.length, s.carriers.length);
+  const n = max(s.vertices.length, s.carriers.length);
   for (let i = 0; i < n; i++) {
     const v = s.vertices[i];
     if (v) items.push(v.expr);
@@ -146,7 +148,7 @@ function arrowAt(
   if (carrier.kind === "circle") {
     const at = projectOnCircle(carrier, from);
     const radial = { x: at.x - carrier.center.x, y: at.y - carrier.center.y };
-    const len = Math.hypot(radial.x, radial.y) || 1;
+    const len = sqrt((radial.x) * (radial.x) + (radial.y) * (radial.y)) || 1;
     const u = { x: radial.x / len, y: radial.y / len };
     const kk = k ?? hoverK(carrier, from, world);
     const tx = kk === 1 ? -u.y : u.y;
@@ -207,8 +209,8 @@ export const region: Tool<RegionSession> = {
     }
     if (canClose(session)) {
       const start = session.vertices[0]!;
-      const max = REGION_CLOSE_PX / Math.max(8, ctx.camera.scale);
-      if (dist(hit.world, start.at) <= max) {
+      const closeRadius = REGION_CLOSE_PX / max(8, ctx.camera.scale);
+      if (dist(hit.world, start.at) <= closeRadius) {
         const filter = ctx.keys ? { keys: ctx.keys, print: ctx.print } : undefined;
         const point = placeFromVertex(start, ctx.trace, filter);
         if (point) return { ...hit, point };

@@ -5,10 +5,12 @@ import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
+
+const { round: mathRound, sqrt } = Math;
 export { isConstructed, isGliderPlace, isPinnedPoint };
 
 export function round(n: number): number {
-  return Math.round(n * 100) / 100;
+  return mathRound(n * 100) / 100;
 }
 
 export function exprOfPlace(p: PlacePoint): Expr {
@@ -134,5 +136,5 @@ export function hoverBind(
 }
 
 export function dist(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+  return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }

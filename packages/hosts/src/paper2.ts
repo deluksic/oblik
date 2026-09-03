@@ -88,6 +88,8 @@ import {
   type Selection,
 } from "./pane";
 
+
+const { PI, atan2, max, min } = Math;
 type Sdf2SceneMod = {
   view: "sdf2";
   scene: () => Sdf2;
@@ -146,18 +148,18 @@ function applyDrag(
   if (g.kind === "point") {
     setWidgetOverride(g.site, [quantize(world.x), quantize(world.y)], sceneId);
   } else if (g.kind === "distance") {
-    setWidgetOverride(g.site, [quantize(Math.max(0.05, dist(world, g.origin)))], sceneId);
+    setWidgetOverride(g.site, [quantize(max(0.05, dist(world, g.origin)))], sceneId);
   } else if (g.kind === "glider") {
-    const t = Math.min(1, Math.max(0, projectT(g.a, g.b, world)));
+    const t = min(1, max(0, projectT(g.a, g.b, world)));
     setWidgetOverride(g.site, [quantize(t)], sceneId);
   } else if (g.kind === "lineGlider") {
     let s = (world.x - g.origin.x) * g.direction.x + (world.y - g.origin.y) * g.direction.y;
-    if (g.min != null) s = Math.max(g.min, s);
-    if (g.max != null) s = Math.min(g.max, s);
+    if (g.min != null) s = max(g.min, s);
+    if (g.max != null) s = min(g.max, s);
     setWidgetOverride(g.site, [quantize(s)], sceneId);
   } else if (g.kind === "angle") {
-    const worldDeg = (Math.atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / Math.PI;
-    const fromDeg = (g.from * 180) / Math.PI;
+    const worldDeg = (atan2(world.y - g.origin.y, world.x - g.origin.x) * 180) / PI;
+    const fromDeg = (g.from * 180) / PI;
     let rel = wrapAngleDeg(worldDeg - fromDeg);
     if (g.mirror) rel = wrapAngleDeg(-rel);
     setWidgetOverride(g.site, [rel], sceneId);

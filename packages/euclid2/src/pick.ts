@@ -12,6 +12,8 @@ import { worldToScreen } from "./camera";
 import { hitNumberSlider } from "./hud";
 import { angleDisplayRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
+
+const { abs, cos, min, sin, sqrt } = Math;
 const GIZMO_PX = 12;
 const GEOM_PX = 8;
 
@@ -20,7 +22,7 @@ export type Hit = { target: "gizmo"; gizmo: Gizmo } | { target: "geom"; drawable
 function geomDistWorld(world: Vec2, d: Drawable): number {
   const g = d.geom;
   if (g.kind === "point") {
-    return Math.hypot(g.x - world.x, g.y - world.y);
+    return sqrt((g.x - world.x) * (g.x - world.x) + (g.y - world.y) * (g.y - world.y));
   }
   if (g.kind === "segment") {
     return distToSegment(world, g.a, g.b);
@@ -29,19 +31,19 @@ function geomDistWorld(world: Vec2, d: Drawable): number {
     return distToLine(world, g.origin, g.direction);
   }
   if (g.kind === "circle") {
-    return Math.abs(dist(world, g.center) - Math.abs(g.radius));
+    return abs(dist(world, g.center) - abs(g.radius));
   }
   if (g.kind === "arc") {
     return distToArc(world, g.center, g.radius, g.a0, g.a1);
   }
-  let min = Infinity;
+  let best = Infinity;
   for (let i = 0; i < g.points.length - 1; i++) {
     const a = g.points[i];
     const b = g.points[i + 1];
     if (!a || !b) continue;
-    min = Math.min(min, distToSegment(world, a, b));
+    best = min(best, distToSegment(world, a, b));
   }
-  return min;
+  return best;
 }
 
 function pointLikeScreen(g: Gizmo, cam: Camera, width: number, height: number): Vec2 | null {
@@ -76,8 +78,8 @@ function pointLikeScreen(g: Gizmo, cam: Camera, width: number, height: number): 
     return worldToScreen(
       cam,
       {
-        x: g.origin.x + Math.cos(rad) * g.radius,
-        y: g.origin.y + Math.sin(rad) * g.radius,
+        x: g.origin.x + cos(rad) * g.radius,
+        y: g.origin.y + sin(rad) * g.radius,
       },
       width,
       height,
@@ -98,9 +100,9 @@ function hitExtendedGizmo(
     return distToLine(world, g.origin, g.direction) <= GEOM_PX / cam.scale;
   }
   if (g.kind === "distance") {
-    const radiusPx = Math.abs(g.d) * cam.scale;
+    const radiusPx = abs(g.d) * cam.scale;
     const c = worldToScreen(cam, g.origin, width, height);
-    return Math.abs(Math.hypot(c.x - screen.x, c.y - screen.y) - radiusPx) <= GIZMO_PX;
+    return abs(sqrt((c.x - screen.x) * (c.x - screen.x) + (c.y - screen.y) * (c.y - screen.y)) - radiusPx) <= GIZMO_PX;
   }
   return false;
 }
@@ -125,7 +127,7 @@ export function hitTest(
     const g = gizmos[i];
     if (!g || !gizmoIsPointLike(g)) continue;
     const s = pointLikeScreen(g, cam, width, height);
-    if (s && Math.hypot(s.x - screen.x, s.y - screen.y) <= GIZMO_PX) {
+    if (s && sqrt((s.x - screen.x) * (s.x - screen.x) + (s.y - screen.y) * (s.y - screen.y)) <= GIZMO_PX) {
       return { target: "gizmo", gizmo: g };
     }
   }

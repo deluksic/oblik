@@ -1,6 +1,8 @@
 import type { LineDash, LineStyle, ObjectStyle, PointStyle } from "@/types";
 import { DEFAULT_LINE_STYLE, DEFAULT_POINT_STYLE } from "@/types";
 
+
+const { abs, sqrt } = Math;
 export type ColorPresetId = "default" | "red" | "blue" | "green" | "orange" | "custom";
 export type SizePresetId = "small" | "normal" | "wide";
 
@@ -46,10 +48,10 @@ export function dashPattern(dash: LineDash | undefined, width = DEFAULT_LINE_STY
   const base = DASH_BASE[dash ?? "solid"];
   if (base.length === 0) return [];
   const ref = DEFAULT_LINE_STYLE.width ?? 1.5;
-  if (Math.abs(width - ref) < 1e-6) return [...base];
+  if (abs(width - ref) < 1e-6) return [...base];
 
   const scale = width / ref;
-  const gapBoost = scale > 1 ? Math.sqrt(scale) : 1;
+  const gapBoost = scale > 1 ? sqrt(scale) : 1;
   return base.map((seg, i) => {
     const scaled = seg * scale;
     return i % 2 === 1 ? scaled * gapBoost : scaled;
@@ -79,13 +81,13 @@ export function selectedColorId(color: string | undefined): ColorPresetId {
 
 export function selectedLineWidthId(width: number | undefined): SizePresetId | null {
   if (width == null) return "normal";
-  const hit = LINE_WIDTH_PRESETS.find((preset) => Math.abs(preset.width - width) < 0.01);
+  const hit = LINE_WIDTH_PRESETS.find((preset) => abs(preset.width - width) < 0.01);
   return hit?.id ?? null;
 }
 
 export function selectedPointSizeId(size: number | undefined): SizePresetId | null {
   if (size == null) return "normal";
-  const hit = POINT_SIZE_PRESETS.find((preset) => Math.abs(preset.size - size) < 0.01);
+  const hit = POINT_SIZE_PRESETS.find((preset) => abs(preset.size - size) < 0.01);
   return hit?.id ?? null;
 }
 

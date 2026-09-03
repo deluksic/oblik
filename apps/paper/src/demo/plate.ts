@@ -9,6 +9,8 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 
+
+const { PI, abs, cos, max, round, sin } = Math;
 export type Hole = { center: Vec2; radius: number };
 
 export type PlateOpts = {
@@ -25,14 +27,14 @@ export type PlateOpts = {
 
 /** Polar hole pattern. Loop iterations share a stack (same helper line). */
 export function boltCircle(center: Vec2, radius: number, count: number, holeR: number): Hole[] {
-  const n = Math.max(3, Math.round(count));
+  const n = max(3, round(count));
   const out: Hole[] = [];
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const a = (i / n) * PI * 2 - PI / 2;
     out.push({
       center: {
-        x: center.x + Math.cos(a) * radius,
-        y: center.y + Math.sin(a) * radius,
+        x: center.x + cos(a) * radius,
+        y: center.y + sin(a) * radius,
       },
       radius: holeR,
     });
@@ -70,9 +72,9 @@ export function translatePlate(opts: PlateOpts, dx: number, dy: number): PlateOp
 export function withRingCount(opts: PlateOpts, count: number): PlateOpts {
   const bc = opts.boltCircle;
   if (!bc) return opts;
-  const nRing = Math.max(3, Math.round(bc.count));
-  const corners = opts.holes.slice(0, Math.max(0, opts.holes.length - nRing));
-  const n = Math.max(3, Math.round(count));
+  const nRing = max(3, round(bc.count));
+  const corners = opts.holes.slice(0, max(0, opts.holes.length - nRing));
+  const n = max(3, round(count));
   return {
     ...opts,
     boltCircle: { ...bc, count: n },
@@ -85,9 +87,9 @@ export function drawPlateNest(
   master: PlateOpts,
   grid: { cols: number; rows: number; gap: number; countStep?: number },
 ): Geom[] {
-  const cols = Math.max(1, Math.round(grid.cols));
-  const rows = Math.max(1, Math.round(grid.rows));
-  const gap = Math.max(0.05, grid.gap);
+  const cols = max(1, round(grid.cols));
+  const rows = max(1, round(grid.rows));
+  const gap = max(0.05, grid.gap);
   const step = grid.countStep ?? 0;
   const w = master.stock.max.x - master.stock.min.x;
   const h = master.stock.max.y - master.stock.min.y;
@@ -177,13 +179,13 @@ function buildPlateParts(opts: PlateOpts): Geom[] {
   const parts: Geom[] = [rectOutline(opts.stock.min, opts.stock.max)];
 
   for (const hole of opts.holes) {
-    parts.push(circle(hole.center, Math.abs(hole.radius)));
+    parts.push(circle(hole.center, abs(hole.radius)));
     parts.push(...crossAt(hole.center, hole.radius * 0.55));
   }
 
   const bc = opts.boltCircle;
   if (bc) {
-    parts.push(circle(bc.center, Math.abs(bc.radius)));
+    parts.push(circle(bc.center, abs(bc.radius)));
   }
 
   parts.push(...pocketWithFillets(opts.pocket.min, opts.pocket.max, opts.pocket.filletR));

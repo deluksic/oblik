@@ -14,6 +14,8 @@ import type {
 } from "./types";
 import { dist, isFiniteVec, type Vec2 } from "./vec";
 
+
+const { abs, max, min } = Math;
 export type Aabb = { minX: number; minY: number; maxX: number; maxY: number };
 
 export function isHalfPlane(v: unknown): v is HalfPlane {
@@ -141,7 +143,7 @@ export function pickValue(of: unknown, at: Vec2): Pick {
 
 export function operandSdf(op: CsgOperand, p: Vec2): number {
   if (op.kind === "region") return signedDistToRegion(op, p);
-  if (op.kind === "circle") return dist(p, op.center) - Math.abs(op.radius);
+  if (op.kind === "circle") return dist(p, op.center) - abs(op.radius);
   if (op.kind === "halfPlane") {
     const s = signedDist(p, op.line);
     return op.side === 1 ? -s : s;
@@ -164,7 +166,7 @@ export function csgSdf(r: Csg2, p: Vec2): number {
     for (let i = 1; i < r.of.length; i++) {
       const b = operandSdf(r.of[i]!, p);
       if (!Number.isFinite(b)) return Number.NaN;
-      d = Math.min(d, b);
+      d = min(d, b);
     }
     return d;
   }
@@ -174,7 +176,7 @@ export function csgSdf(r: Csg2, p: Vec2): number {
     for (let i = 1; i < r.of.length; i++) {
       const b = operandSdf(r.of[i]!, p);
       if (!Number.isFinite(b)) return Number.NaN;
-      d = Math.max(d, b);
+      d = max(d, b);
     }
     return d;
   }
@@ -183,31 +185,31 @@ export function csgSdf(r: Csg2, p: Vec2): number {
   for (let i = 1; i < r.of.length; i++) {
     const b = operandSdf(r.of[i]!, p);
     if (!Number.isFinite(b)) return Number.NaN;
-    d = Math.max(d, -b);
+    d = max(d, -b);
   }
   return d;
 }
 
 function expand(a: Aabb, b: Aabb): Aabb {
   return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
+    minX: min(a.minX, b.minX),
+    minY: min(a.minY, b.minY),
+    maxX: max(a.maxX, b.maxX),
+    maxY: max(a.maxY, b.maxY),
   };
 }
 
 function intersectAabb(a: Aabb, b: Aabb): Aabb | null {
-  const minX = Math.max(a.minX, b.minX);
-  const minY = Math.max(a.minY, b.minY);
-  const maxX = Math.min(a.maxX, b.maxX);
-  const maxY = Math.min(a.maxY, b.maxY);
+  const minX = max(a.minX, b.minX);
+  const minY = max(a.minY, b.minY);
+  const maxX = min(a.maxX, b.maxX);
+  const maxY = min(a.maxY, b.maxY);
   if (maxX < minX || maxY < minY) return null;
   return { minX, minY, maxX, maxY };
 }
 
 function circleAabb(c: Circle): Aabb {
-  const r = Math.abs(c.radius);
+  const r = abs(c.radius);
   return {
     minX: c.center.x - r,
     minY: c.center.y - r,
@@ -224,10 +226,10 @@ function regionAabb(p: Region): Aabb | null {
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const q of poly) {
-    minX = Math.min(minX, q.x);
-    minY = Math.min(minY, q.y);
-    maxX = Math.max(maxX, q.x);
-    maxY = Math.max(maxY, q.y);
+    minX = min(minX, q.x);
+    minY = min(minY, q.y);
+    maxX = max(maxX, q.x);
+    maxY = max(maxY, q.y);
   }
   if (!Number.isFinite(minX)) return null;
   return { minX, minY, maxX, maxY };
@@ -240,7 +242,7 @@ export function operandAabb(op: CsgOperand): Aabb | null {
   if (op.kind === "offset") {
     const inner = operandAabb(op.of);
     if (!inner) return null;
-    const pad = Math.abs(op.d);
+    const pad = abs(op.d);
     return {
       minX: inner.minX - pad,
       minY: inner.minY - pad,
@@ -290,7 +292,7 @@ function occupiedOperand(op: CsgOperand, q: Vec2): boolean {
 export function signedDistToCsg(op: CsgOperand, q: Vec2): number {
   if (!isFiniteOperand(op) || !isFiniteVec(q)) return Number.NaN;
   const d = operandSdf(op, q);
-  if (!occupiedOperand(op, q)) return Number.isFinite(d) ? Math.max(d, 0) : Number.NaN;
+  if (!occupiedOperand(op, q)) return Number.isFinite(d) ? max(d, 0) : Number.NaN;
   return d;
 }
 
@@ -303,5 +305,5 @@ export function distToCsg(op: CsgOperand, q: Vec2): number {
   if (!isFiniteOperand(op) || !isFiniteVec(q)) return Infinity;
   if (occupiedOperand(op, q)) return 0;
   const d = operandSdf(op, q);
-  return Number.isFinite(d) ? Math.max(0, d) : Infinity;
+  return Number.isFinite(d) ? max(0, d) : Infinity;
 }

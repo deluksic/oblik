@@ -5,6 +5,8 @@ import { inSlot, nameField, previewName, withBind } from "./draft";
 import { attachLengthHit, lengthRefName, numberField, resolveNumberExpr } from "./length";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
+
+const { max, sqrt } = Math;
 type SliderSession = Extract<ToolSession, { verb: "slider" }>;
 
 const fields: Field<SliderSession>[] = [
@@ -36,7 +38,7 @@ const fields: Field<SliderSession>[] = [
 ];
 
 function measure(hit: PlaceHit): number {
-  return round(Math.max(0.05, Math.hypot(hit.world.x, hit.world.y) || 1));
+  return round(max(0.05, sqrt((hit.world.x) * (hit.world.x) + (hit.world.y) * (hit.world.y)) || 1));
 }
 
 function optProp(raw: string, scope: Scope): Expr | undefined {
@@ -45,10 +47,10 @@ function optProp(raw: string, scope: Scope): Expr | undefined {
 
 function sliderArgs(session: SliderSession, value: Expr, scope: Scope): Expr[] {
   const props: Record<string, Expr> = {};
-  const min = optProp(session.min, scope);
-  if (min) props.min = min;
-  const max = optProp(session.max, scope);
-  if (max) props.max = max;
+  const minExpr = optProp(session.min, scope);
+  if (minExpr) props.min = minExpr;
+  const maxExpr = optProp(session.max, scope);
+  if (maxExpr) props.max = maxExpr;
   const step = optProp(session.step, scope);
   if (step) props.step = step;
   return [value, { kind: "props", props }];

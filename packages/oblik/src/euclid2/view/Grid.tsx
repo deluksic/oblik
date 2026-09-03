@@ -4,16 +4,18 @@ import type { Camera2, PaneSize } from "../camera";
 
 import styles from "./View.module.css";
 
+
+const { ceil, floor } = Math;
 export function Grid(props: { camera: Camera2; size: PaneSize }) {
   const ticks = createMemo(() => {
     const cam = props.camera;
     const size = props.size;
     const halfH = size.h / 2 / cam.scale + 1;
     const halfW = size.w / 2 / cam.scale + 1;
-    const x0 = Math.floor(cam.x - halfW);
-    const x1 = Math.ceil(cam.x + halfW);
-    const y0 = Math.floor(cam.y - halfH);
-    const y1 = Math.ceil(cam.y + halfH);
+    const x0 = floor(cam.x - halfW);
+    const x1 = ceil(cam.x + halfW);
+    const y0 = floor(cam.y - halfH);
+    const y1 = ceil(cam.y + halfH);
     const xs: number[] = [];
     const ys: number[] = [];
     for (let x = x0; x <= x1; x++) xs.push(x);

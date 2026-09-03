@@ -1,5 +1,7 @@
 import { circle, point, line, signedDist, offsetLine, dist } from "@design-scenes/geom";
 
+
+const { PI, cos, sin } = Math;
 export const title = "Shared loop";
 export const sceneFile = "shared-loop.scene.ts";
 export const hint = "Five rings, one 0.4. Drag any ring — all follow.";
@@ -12,10 +14,10 @@ export const camera = { x: 0, y: 0, scale: 48 };
 export function scene() {
   const o = point(0, -0.03);
   for (let i = 0; i < 5; i++) {
-    const ang = (i / 5) * Math.PI * 2;
+    const ang = (i / 5) * PI * 2;
     const p = {
-      x: o.x + Math.cos(ang) * 2.2,
-      y: o.y + Math.sin(ang) * 2.2,
+      x: o.x + cos(ang) * 2.2,
+      y: o.y + sin(ang) * 2.2,
     };
     circle(p, 1);
   }

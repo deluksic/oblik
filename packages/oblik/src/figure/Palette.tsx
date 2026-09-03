@@ -7,6 +7,8 @@ import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./too
 
 import styles from "./Palette.module.css";
 
+
+const { max, min } = Math;
 function toolIcon(id: FigureToolId) {
   switch (id) {
     case "brush":
@@ -58,12 +60,12 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
         }
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setActive((i) => Math.min(items().length - 1, i + 1));
+          setActive((i) => min(items().length - 1, i + 1));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
-          setActive((i) => Math.max(0, i - 1));
+          setActive((i) => max(0, i - 1));
           return;
         }
         if (e.key === "Enter") {

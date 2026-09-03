@@ -2,6 +2,8 @@ import type { Vec2, Vec3 } from "@design-scenes/geom";
 
 import type { Sdf2 } from "./tree2";
 
+
+const { abs, max } = Math;
 /** Field CSG. No id / path / provenance — the surface is not pickable. */
 export type Sdf =
   | { k: "sphere"; c: Vec3; r: number }
@@ -16,7 +18,7 @@ export type Sdf =
   | { k: "inter"; a: Sdf; b: Sdf };
 
 export function sphere(c: Vec3, r: number): Sdf {
-  return { k: "sphere", c, r: Math.abs(r) };
+  return { k: "sphere", c, r: abs(r) };
 }
 
 export function box(c: Vec3, half: Vec3): Sdf {
@@ -25,22 +27,22 @@ export function box(c: Vec3, half: Vec3): Sdf {
 
 /** Z-up capped cylinder. `halfH` is half the height along Z. */
 export function cylinder(c: Vec3, r: number, halfH: number): Sdf {
-  return { k: "cylinder", c, r: Math.abs(r), halfH: Math.abs(halfH) };
+  return { k: "cylinder", c, r: abs(r), halfH: abs(halfH) };
 }
 
 /** Capped round cylinder (capsule) from `a` to `b`. */
 export function capsule(a: Vec3, b: Vec3, r: number): Sdf {
-  return { k: "capsule", a, b, r: Math.abs(r) };
+  return { k: "capsule", a, b, r: abs(r) };
 }
 
 /** Torus in the XY plane (Z-up), major `R`, minor `r`. */
 export function torus(c: Vec3, R: number, r: number): Sdf {
-  return { k: "torus", c, R: Math.abs(R), r: Math.abs(r) };
+  return { k: "torus", c, R: abs(R), r: abs(r) };
 }
 
 /** Torus-like sweep: 2D profile in (radial, z), around a circle in XY. */
 export function sweep2(c: Vec2, pathR: number, profile: Sdf2): Sdf {
-  return { k: "sweep2", c, pathR: Math.abs(pathR), profile };
+  return { k: "sweep2", c, pathR: abs(pathR), profile };
 }
 
 export function union(a: Sdf, b: Sdf): Sdf {
@@ -48,7 +50,7 @@ export function union(a: Sdf, b: Sdf): Sdf {
 }
 
 export function smoothUnion(a: Sdf, b: Sdf, ksoft: number): Sdf {
-  return { k: "smoothUnion", a, b, ksoft: Math.max(0, ksoft) };
+  return { k: "smoothUnion", a, b, ksoft: max(0, ksoft) };
 }
 
 export function difference(a: Sdf, b: Sdf): Sdf {

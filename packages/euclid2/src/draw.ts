@@ -6,6 +6,8 @@ import { layoutNumberSliders } from "./hud";
 import { handleOwnsInk } from "./ink";
 import { angleDisplayRad, gizmoIsPointLike, type Gizmo } from "./widgets";
 
+
+const { PI, abs, cos, floor, max, min, round, sin, sqrt } = Math;
 const COL = {
   bg: "#12141c",
   grid: "#1d2230",
@@ -29,10 +31,10 @@ export type DrawInk = {
 export type InkLookup = (id: string) => DrawInk | undefined;
 
 export function resizeCanvas(canvas: HTMLCanvasElement): void {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = min(2, window.devicePixelRatio || 1);
   const rect = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width * dpr));
-  const h = Math.max(1, Math.floor(rect.height * dpr));
+  const w = max(1, floor(rect.width * dpr));
+  const h = max(1, floor(rect.height * dpr));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
@@ -213,7 +215,7 @@ function strokeGeom(
   if (g.kind === "point") {
     const s = worldToScreen(cam, g, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, PI * 2);
     ctx.fill();
   } else if (g.kind === "segment") {
     pathSeg(ctx, cam, w, h, g.a, g.b);
@@ -224,12 +226,12 @@ function strokeGeom(
   } else if (g.kind === "circle") {
     const c = worldToScreen(cam, g.center, w, h);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, Math.abs(g.radius) * cam.scale, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, abs(g.radius) * cam.scale, 0, PI * 2);
     ctx.stroke();
   } else if (g.kind === "arc") {
     const c = worldToScreen(cam, g.center, w, h);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, Math.abs(g.radius) * cam.scale, -g.a0, -g.a1, true);
+    ctx.arc(c.x, c.y, abs(g.radius) * cam.scale, -g.a0, -g.a1, true);
     ctx.stroke();
   } else {
     if (g.points.length < 2) return;
@@ -267,7 +269,7 @@ function pathInfiniteLine(
   origin: Vec2,
   dir: Vec2,
 ): void {
-  const span = Math.max(w, h) / cam.scale + Math.hypot(cam.x, cam.y) + 20;
+  const span = max(w, h) / cam.scale + sqrt((cam.x) * (cam.x) + (cam.y) * (cam.y)) + 20;
   const a = { x: origin.x - dir.x * span, y: origin.y - dir.y * span };
   const b = { x: origin.x + dir.x * span, y: origin.y + dir.y * span };
   pathSeg(ctx, cam, w, h, a, b);
@@ -302,7 +304,7 @@ function drawGizmo(
             };
     const s = worldToScreen(cam, p, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
@@ -332,22 +334,22 @@ function drawGizmo(
   } else if (g.kind === "distance") {
     const c = worldToScreen(cam, g.origin, w, h);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, Math.abs(g.d) * cam.scale, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, abs(g.d) * cam.scale, 0, PI * 2);
     ctx.stroke();
   } else if (g.kind === "angle") {
     const from = g.from;
     const rad = angleDisplayRad(from, g.deg, g.mirror);
     const ref = {
-      x: g.origin.x + Math.cos(from) * g.radius,
-      y: g.origin.y + Math.sin(from) * g.radius,
+      x: g.origin.x + cos(from) * g.radius,
+      y: g.origin.y + sin(from) * g.radius,
     };
     const tip = {
-      x: g.origin.x + Math.cos(rad) * g.radius,
-      y: g.origin.y + Math.sin(rad) * g.radius,
+      x: g.origin.x + cos(rad) * g.radius,
+      y: g.origin.y + sin(rad) * g.radius,
     };
     pathSeg(ctx, cam, w, h, g.origin, ref);
     ctx.strokeStyle = `${color}66`;
-    ctx.lineWidth = Math.max(1, paint.width * 0.75);
+    ctx.lineWidth = max(1, paint.width * 0.75);
     ctx.setLineDash([]);
     ctx.stroke();
     ctx.strokeStyle = color;
@@ -360,16 +362,16 @@ function drawGizmo(
     ctx.arc(
       c.x,
       c.y,
-      Math.abs(g.radius) * 0.38 * cam.scale,
+      abs(g.radius) * 0.38 * cam.scale,
       -from,
       -rad,
-      sweepCCW(from, rad) <= Math.PI,
+      sweepCCW(from, rad) <= PI,
     );
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, hot ? 7 : 6, 0, PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
@@ -381,7 +383,7 @@ function drawGizmo(
     ctx.stroke();
     const s = worldToScreen(cam, tip, w, h);
     ctx.beginPath();
-    ctx.arc(s.x, s.y, paint.pointSize, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, paint.pointSize, 0, PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;
@@ -429,7 +431,7 @@ function drawNumberSliders(
     ctx.fillStyle = COL.geom;
     ctx.textAlign = "right";
     ctx.font = "600 13px ui-monospace, monospace";
-    const shown = L.gizmo.step >= 1 ? String(Math.round(L.gizmo.n)) : String(L.gizmo.n);
+    const shown = L.gizmo.step >= 1 ? String(round(L.gizmo.n)) : String(L.gizmo.n);
     ctx.fillText(shown, x + w - 14, y + 18);
 
     ctx.fillStyle = "#2a3040";
@@ -443,7 +445,7 @@ function drawNumberSliders(
 
     ctx.fillStyle = `${COL.gizmo}55`;
     ctx.beginPath();
-    const filled = Math.max(0, L.knobX - L.track.x);
+    const filled = max(0, L.knobX - L.track.x);
     if (typeof ctx.roundRect === "function") {
       ctx.roundRect(L.track.x, L.track.y, filled, L.track.h, 3);
     } else {
@@ -453,7 +455,7 @@ function drawNumberSliders(
 
     ctx.fillStyle = ink.color;
     ctx.beginPath();
-    ctx.arc(L.knobX, L.knobY, ink.hot ? 8 : 7, 0, Math.PI * 2);
+    ctx.arc(L.knobX, L.knobY, ink.hot ? 8 : 7, 0, PI * 2);
     ctx.fill();
     ctx.strokeStyle = COL.bg;
     ctx.lineWidth = 2;

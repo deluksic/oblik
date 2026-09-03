@@ -1,5 +1,7 @@
 import { worldToScreen, type Camera2, type PaneSize } from "../euclid2/camera";
 
+
+const { abs, max, min } = Math;
 export type FigureFrame = { width: number; height: number; x?: number; y?: number };
 
 export type FrameRect = { x: number; y: number; w: number; h: number };
@@ -25,13 +27,13 @@ export function frameMoved(
 export function frameResized(
   anchor: { x: number; y: number },
   corner: { x: number; y: number },
-  min = FRAME_MIN_SIZE,
+  minSize = FRAME_MIN_SIZE,
 ): FrameXywh {
   return {
     x: anchor.x,
     y: anchor.y,
-    width: Math.max(min, corner.x - anchor.x),
-    height: Math.max(min, corner.y - anchor.y),
+    width: max(minSize, corner.x - anchor.x),
+    height: max(minSize, corner.y - anchor.y),
   };
 }
 
@@ -57,7 +59,7 @@ export function frameRect(
 export function pageScreenRect(page: FrameRect, cam: Camera2, size: PaneSize): FrameScreenRect {
   const a = worldToScreen({ x: page.x, y: page.y }, cam, size);
   const b = worldToScreen({ x: page.x + page.w, y: page.y + page.h }, cam, size);
-  const left = Math.min(a.x, b.x);
-  const top = Math.min(a.y, b.y);
-  return { left, top, width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+  const left = min(a.x, b.x);
+  const top = min(a.y, b.y);
+  return { left, top, width: abs(b.x - a.x), height: abs(b.y - a.y) };
 }

@@ -2,6 +2,8 @@ import type { TraceNode } from "@/eval/context";
 
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
+
+const { max, min, round } = Math;
 const MARGIN = 12;
 const PANEL_W = 200;
 const PANEL_H = 56;
@@ -16,10 +18,10 @@ export type SliderLayout = {
   knobY: number;
 };
 
-export function snapEditNumber(raw: number, min: number, max: number, step: number): number {
-  const clamped = Math.min(max, Math.max(min, raw));
+export function snapEditNumber(raw: number, minVal: number, maxVal: number, step: number): number {
+  const clamped = min(maxVal, max(minVal, raw));
   if (!(step > 0)) return clamped;
-  return Math.round((clamped - min) / step) * step + min;
+  return round((clamped - minVal) / step) * step + minVal;
 }
 
 export function sliderNodes(trace: readonly TraceNode[], filter?: SnapFilter): TraceNode[] {
@@ -43,8 +45,8 @@ export function layoutSliders(nodes: readonly TraceNode[]): SliderLayout[] {
     const trackX = x + 14;
     const trackW = PANEL_W - 28;
     const trackY = y + 36;
-    const span = Math.max(1e-9, g.max - g.min);
-    const t = Math.min(1, Math.max(0, (g.n - g.min) / span));
+    const span = max(1e-9, g.max - g.min);
+    const t = min(1, max(0, (g.n - g.min) / span));
     return {
       node,
       panel: { x, y, w: PANEL_W, h: PANEL_H },

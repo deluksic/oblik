@@ -16,6 +16,8 @@ import { handleOwnsInk } from "./ink";
 import type { Vec2 } from "@design-scenes/geom";
 import { lerp } from "@design-scenes/geom";
 
+
+const { PI, abs, max, min, round, sqrt } = Math;
 export type SiteOpts = {
   file?: string;
   at?: [number, number];
@@ -321,18 +323,18 @@ export type SliderOpts = {
 export function slider(n: number, opts?: SliderOpts): number {
   const located = siteFrom(opts);
   const raw = located ? (readOverride(located.site)?.[0] ?? n) : n;
-  const min = opts?.min ?? Math.min(0, raw);
-  const max = opts?.max ?? Math.max(Math.abs(raw) * 2, 1, min + 1);
+  const minVal = opts?.min ?? min(0, raw);
+  const maxVal = opts?.max ?? max(abs(raw) * 2, 1, minVal + 1);
   const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
-  const v = snapEditNumber(raw, min, max, step);
+  const v = snapEditNumber(raw, minVal, maxVal, step);
   if (!silent && located && Number.isFinite(v)) {
     gizmos.push({
       kind: "number",
       ...located,
       n: v,
       label: opts?.label?.trim() || "value",
-      min,
-      max,
+      min: minVal,
+      max: maxVal,
       step,
     });
   }
@@ -343,7 +345,7 @@ export function slider(n: number, opts?: SliderOpts): number {
 export function pointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts): Point {
   const located = siteFrom(site);
   const o = readOverride(located?.site);
-  const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
+  const tt = min(1, max(0, o?.[0] ?? t));
   if (!silent && located) {
     gizmos.push({
       kind: "glider",
@@ -360,7 +362,7 @@ export function pointOnSegment(lineSeg: Segment, t: number, site?: SiteOpts): Po
 export type LineEditOpts = SiteOpts & { min?: number; max?: number };
 
 function unitDir(direction: Vec2): Vec2 {
-  const len = Math.hypot(direction.x, direction.y);
+  const len = sqrt((direction.x) * (direction.x) + (direction.y) * (direction.y));
   if (len < 1e-12) return { x: 1, y: 0 };
   return { x: direction.x / len, y: direction.y / len };
 }
@@ -378,8 +380,8 @@ export function pointOnLine(
   const located = siteFrom(opts);
   const o = readOverride(located?.site);
   let ss = o?.[0] ?? s;
-  if (opts?.min != null) ss = Math.max(opts.min, ss);
-  if (opts?.max != null) ss = Math.min(opts.max, ss);
+  if (opts?.min != null) ss = max(opts.min, ss);
+  if (opts?.max != null) ss = min(opts.max, ss);
   const dir = unitDir(direction);
   if (!silent && located) {
     gizmos.push({
@@ -416,11 +418,11 @@ export function vector(origin: Vec2, dx: number, dy: number, site?: SiteOpts): V
   return { x: vx, y: vy };
 }
 
-export function snapEditNumber(n: number, min: number, max: number, step: number): number {
-  const clamped = Math.min(max, Math.max(min, n));
-  const k = Math.round(clamped / step) * step;
-  const q = Math.round(k * 1000) / 1000;
-  return Math.min(max, Math.max(min, q));
+export function snapEditNumber(n: number, minVal: number, maxVal: number, step: number): number {
+  const clamped = min(maxVal, max(minVal, n));
+  const k = round(clamped / step) * step;
+  const q = round(k * 1000) / 1000;
+  return min(maxVal, max(minVal, q));
 }
 
 export type AngleEditOpts = {
@@ -436,11 +438,11 @@ export type AngleEditOpts = {
 export function wrapAngleDeg(deg: number): number {
   let d = ((((deg + 180) % 360) + 360) % 360) - 180;
   if (d === -180) return 180;
-  return Math.round(d);
+  return round(d);
 }
 
 export function angleWorldRad(from: number, deg: number): number {
-  return from + (deg * Math.PI) / 180;
+  return from + (deg * PI) / 180;
 }
 
 /** World radians for the open leaf (after optional mirror). */
@@ -454,7 +456,7 @@ export function angleDisplayRad(from: number, deg: number, mirror = false): numb
  * (default +X). Returns world radians.
  */
 export function angle(origin: Vec2, degrees: number, opts?: AngleEditOpts): number {
-  const radius = Math.max(0.2, opts?.radius ?? 1.5);
+  const radius = max(0.2, opts?.radius ?? 1.5);
   const from = opts?.from ?? 0;
   const mirror = opts?.mirror ?? false;
   const located = siteFrom(opts);

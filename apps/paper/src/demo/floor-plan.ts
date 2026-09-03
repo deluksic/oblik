@@ -10,6 +10,8 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 
+
+const { PI, cos, max, min, round, sin, sqrt } = Math;
 export type Bounds = { min: Vec2; max: Vec2 };
 
 export type Opening = {
@@ -36,7 +38,7 @@ export type FloorPlanOpts = {
 };
 
 function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
+  return min(hi, max(lo, v));
 }
 
 function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
@@ -65,14 +67,14 @@ function rectRing(min: Vec2, max: Vec2): Geom {
 function wallRun(a: Vec2, b: Vec2, thickness: number, gaps: { t0: number; t1: number }[]): Geom[] {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const len = Math.hypot(dx, dy);
+  const len = sqrt((dx) * (dx) + (dy) * (dy));
   if (len < 1e-9) return [];
   const nx = (-dy / len) * (thickness / 2);
   const ny = (dx / len) * (thickness / 2);
   const spans = gaps
     .map((g) => ({
-      t0: clamp(Math.min(g.t0, g.t1), 0, 1),
-      t1: clamp(Math.max(g.t0, g.t1), 0, 1),
+      t0: clamp(min(g.t0, g.t1), 0, 1),
+      t1: clamp(max(g.t0, g.t1), 0, 1),
     }))
     .filter((g) => g.t1 - g.t0 > 1e-4)
     .toSorted((x, y) => x.t0 - y.t0);
@@ -90,7 +92,7 @@ function wallRun(a: Vec2, b: Vec2, thickness: number, gaps: { t0: number; t1: nu
   let t = 0;
   for (const g of spans) {
     if (g.t0 > t + 1e-4) parts.push(box(lerp(a, b, t), lerp(a, b, g.t0)));
-    t = Math.max(t, g.t1);
+    t = max(t, g.t1);
   }
   if (t < 1 - 1e-4) parts.push(box(lerp(a, b, t), b));
   return parts;
@@ -101,8 +103,8 @@ function gapFromHinge(a: Vec2, b: Vec2, hinge: Vec2, width: number, closed: numb
   t1: number;
 } {
   const end = {
-    x: hinge.x + Math.cos(closed) * width,
-    y: hinge.y + Math.sin(closed) * width,
+    x: hinge.x + cos(closed) * width,
+    y: hinge.y + sin(closed) * width,
   };
   return { t0: tAlong(a, b, hinge), t1: tAlong(a, b, end) };
 }
@@ -112,8 +114,8 @@ function gapFromCenter(a: Vec2, b: Vec2, center: Vec2, width: number, along: num
   t1: number;
 } {
   const half = width / 2;
-  const p0 = { x: center.x - Math.cos(along) * half, y: center.y - Math.sin(along) * half };
-  const p1 = { x: center.x + Math.cos(along) * half, y: center.y + Math.sin(along) * half };
+  const p0 = { x: center.x - cos(along) * half, y: center.y - sin(along) * half };
+  const p1 = { x: center.x + cos(along) * half, y: center.y + sin(along) * half };
   return { t0: tAlong(a, b, p0), t1: tAlong(a, b, p1) };
 }
 
@@ -121,12 +123,12 @@ function doorLeaf(opening: Opening, inset: Vec2): Geom[] {
   const hinge = { x: opening.hinge.x + inset.x, y: opening.hinge.y + inset.y };
   const w = opening.width;
   const tip = {
-    x: hinge.x + Math.cos(opening.swing) * w,
-    y: hinge.y + Math.sin(opening.swing) * w,
+    x: hinge.x + cos(opening.swing) * w,
+    y: hinge.y + sin(opening.swing) * w,
   };
   const ccw = sweepCCW(opening.closed, opening.swing);
-  const a0 = ccw <= Math.PI ? opening.closed : opening.swing;
-  const a1 = ccw <= Math.PI ? opening.swing : opening.closed;
+  const a0 = ccw <= PI ? opening.closed : opening.swing;
+  const a1 = ccw <= PI ? opening.swing : opening.closed;
   return [segment(hinge, tip), arc(hinge, w, a0, a1)];
 }
 
@@ -163,7 +165,7 @@ export function drawBed(origin: Vec2, width: number, depth: number): Geom[] {
 
 export function drawDrawers(origin: Vec2, width: number, depth: number, drawers: number): Geom[] {
   const max = { x: origin.x + width, y: origin.y + depth };
-  const n = Math.max(2, Math.round(drawers));
+  const n = max(2, round(drawers));
   const parts: Geom[] = [rectRing(origin, max)];
   for (let i = 1; i < n; i++) {
     const y = origin.y + (depth * i) / n;
@@ -176,8 +178,8 @@ export function drawDiningTable(center: Vec2, diameter: number): Geom[] {
   const r = diameter / 2;
   const parts: Geom[] = [circle(center, r)];
   for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const chair = add(center, mul({ x: Math.cos(a), y: Math.sin(a) }, r + 0.3));
+    const a = (i / 4) * PI * 2 + PI / 4;
+    const chair = add(center, mul({ x: cos(a), y: sin(a) }, r + 0.3));
     parts.push(
       rectRing({ x: chair.x - 0.18, y: chair.y - 0.16 }, { x: chair.x + 0.18, y: chair.y + 0.16 }),
     );
@@ -219,7 +221,7 @@ export function drawIsland(center: Vec2, width: number, depth: number): Geom[] {
 
 export function drawFloorPlan(opts: FloorPlanOpts): Geom[] {
   const { min, max } = opts.bounds;
-  const w = Math.max(0.06, opts.wall);
+  const w = max(0.06, opts.wall);
   const bedX = opts.bedroomX;
   const kY = opts.kitchenY;
   const bathX = max.x - opts.bathW;
@@ -252,7 +254,7 @@ export function drawFloorPlan(opts: FloorPlanOpts): Geom[] {
   const kWest = { x: min.x + h, y: kY };
   const kEast = { x: max.x - h, y: kY };
   const passW = 1.15;
-  const passEnd = Math.min(bedX, bathX);
+  const passEnd = min(bedX, bathX);
   const passGap = {
     t0: tAlong(kWest, kEast, { x: passEnd - passW - 0.25, y: kY }),
     t1: tAlong(kWest, kEast, { x: passEnd - 0.25, y: kY }),
@@ -286,14 +288,14 @@ export function drawFloorPlan(opts: FloorPlanOpts): Geom[] {
   const bathD = bath.max.y - bath.min.y;
 
   const sofaW = clamp(livingW * 0.62, 1.6, 2.4);
-  const tableR = clamp(Math.min(livingW, livingD) * 0.28, 0.85, 1.15);
+  const tableR = clamp(min(livingW, livingD) * 0.28, 0.85, 1.15);
   const mattressW = clamp(bedW * 0.72, 1.2, 1.6);
   const mattressD = clamp(bedD * 0.62, 1.6, 2.05);
   const dresserD = clamp(bedD * 0.4, 0.9, 1.2);
   const stoveW = clamp(kitW * 0.16, 0.55, 0.7);
   const fridgeW = clamp(kitW * 0.14, 0.5, 0.62);
   const fridgeD = clamp(kitD - stoveW * 0.85 - 0.2, 0.7, 0.95);
-  const showerS = clamp(Math.min(bathW, bathD) * 0.72, 0.8, 0.95);
+  const showerS = clamp(min(bathW, bathD) * 0.72, 0.8, 0.95);
 
   const fixtures: Geom[] = [
     ...drawSofa({ x: living.min.x + 0.12, y: living.min.y + 0.15 }, sofaW, 0.82),

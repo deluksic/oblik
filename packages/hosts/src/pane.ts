@@ -2,6 +2,8 @@ import type { InspectPatch } from "@design-scenes/shell";
 
 import { commitWidget, mapStack, originFromStack, peekFile, pinConstructorSite, stackLabel } from "./inspect";
 
+
+const { sqrt } = Math;
 export function scenePeekPath(sceneFile: string): string {
   return `apps/paper/src/scenes/${sceneFile}`;
 }
@@ -37,7 +39,7 @@ export function eventPos(canvas: HTMLCanvasElement, e: PointerEvent): { x: numbe
 export const PICK_CLICK_PX = 4;
 
 export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
-  return Math.hypot(toX - fromX, toY - fromY) >= PICK_CLICK_PX;
+  return sqrt((toX - fromX) * (toX - fromX) + (toY - fromY) * (toY - fromY)) >= PICK_CLICK_PX;
 }
 
 export type InspectPush = (patch: InspectPatch) => void;

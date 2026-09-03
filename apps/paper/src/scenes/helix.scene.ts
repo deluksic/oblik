@@ -5,6 +5,8 @@ import { segment3 } from "@design-scenes/geom";
 import { drawHelicalPair } from "../demo/gear";
 import { gearLayout } from "./gear.scene";
 
+
+const { max } = Math;
 export const title = "Helix 3D";
 export const view = "euclid3" as const;
 export const sceneFile = "helix.scene.ts";
@@ -35,6 +37,6 @@ export function scene() {
     { x: g.pinion.x, y: g.pinion.y, z: 0 },
     { x: g.pinion.x, y: g.pinion.y, z: 6 },
   );
-  const height = Math.max(0.4, pointOnSegment3(mast, 0.1).z);
+  const height = max(0.4, pointOnSegment3(mast, 0.1).z);
   return drawHelicalPair(g, height);
 }

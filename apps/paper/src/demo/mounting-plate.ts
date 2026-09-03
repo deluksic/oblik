@@ -9,6 +9,8 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 
+
+const { max, min } = Math;
 export type MountingPlateCorners = {
   /** Bottom-left and top-right edit corners (any diagonal pair). */
   origin: Vec2;
@@ -18,10 +20,10 @@ export type MountingPlateCorners = {
 };
 
 function aabbCorners(origin: Vec2, opp: Vec2) {
-  const minX = Math.min(origin.x, opp.x);
-  const maxX = Math.max(origin.x, opp.x);
-  const minY = Math.min(origin.y, opp.y);
-  const maxY = Math.max(origin.y, opp.y);
+  const minX = min(origin.x, opp.x);
+  const maxX = max(origin.x, opp.x);
+  const minY = min(origin.y, opp.y);
+  const maxY = max(origin.y, opp.y);
   return {
     bl: { x: minX, y: minY },
     tr: { x: maxX, y: minY },

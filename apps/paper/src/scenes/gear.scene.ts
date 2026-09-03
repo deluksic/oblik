@@ -11,6 +11,8 @@ import {
   type GearLayout,
 } from "../demo/gear";
 
+
+const { PI } = Math;
 export const title = "Gears";
 export const sceneFile = "gear.scene.ts";
 export const camera = { x: 0.4, y: 0.15, scale: 28 };
@@ -46,7 +48,7 @@ export function gearLayout(): GearLayout {
     x: pinion.x + centerDistance(pitch1, pitch2),
     y: pinion.y,
   };
-  const alpha = (pressureDeg * Math.PI) / 180;
+  const alpha = (pressureDeg * PI) / 180;
   const rot2 = meshMateRotation(z1, z2, rot1);
 
   return {

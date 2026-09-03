@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import type { TraceNode } from "../eval/context";
 import { gliderOnTraceNode, resolvePlacePoint } from "./place";
 
+
+const { sqrt } = Math;
 function node(partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>): TraceNode {
   return {
     occ: 0,
@@ -131,14 +133,14 @@ describe("resolvePlacePoint", () => {
       bind: "lamp",
       value: { kind: "circle", center: { x: 2, y: 0 }, radius: 2 },
     });
-    const plus = resolvePlacePoint([reach, other], { x: 1, y: Math.sqrt(3) }, 0.3);
+    const plus = resolvePlacePoint([reach, other], { x: 1, y: sqrt(3) }, 0.3);
     expect(plus).toMatchObject({
       kind: "circleCircleIntersection",
       a: "reach",
       b: "lamp",
       k: 1,
     });
-    const minus = resolvePlacePoint([reach, other], { x: 1, y: -Math.sqrt(3) }, 0.3);
+    const minus = resolvePlacePoint([reach, other], { x: 1, y: -sqrt(3) }, 0.3);
     expect(minus).toMatchObject({
       kind: "circleCircleIntersection",
       a: "reach",

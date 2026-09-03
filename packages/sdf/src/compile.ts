@@ -1,6 +1,8 @@
 import type { Sdf } from "./tree";
 import type { Sdf2 } from "./tree2";
 
+
+const { max } = Math;
 export type SdfUniform =
   | { name: string; kind: "f"; value: number }
   | { name: string; kind: "v2"; value: [number, number] }
@@ -48,7 +50,7 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
       case "union":
         return `min(${emit2(s.a)}, ${emit2(s.b)})`;
       case "smoothUnion": {
-        const k = u("f", Math.max(s.ksoft, 1e-4));
+        const k = u("f", max(s.ksoft, 1e-4));
         return `smin(${emit2(s.a)}, ${emit2(s.b)}, ${k})`;
       }
     }
@@ -96,7 +98,7 @@ export function compileSdf(sdf: Sdf): CompiledSdf {
       case "union":
         return `min(${emit(s.a)}, ${emit(s.b)})`;
       case "smoothUnion": {
-        const k = u("f", Math.max(s.ksoft, 1e-4));
+        const k = u("f", max(s.ksoft, 1e-4));
         return `smin(${emit(s.a)}, ${emit(s.b)}, ${k})`;
       }
       case "diff":

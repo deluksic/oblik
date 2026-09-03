@@ -13,6 +13,8 @@ import {
   union,
 } from "oblik";
 
+
+const { max, min } = Math;
 export default defineScene({
   kind: "euclid2",
   title: "Islands",
@@ -30,10 +32,10 @@ export default defineScene({
 
     const origin = point(4.45, 0.28, "o_is_origin");
     const opp = point(8.55, 2.82, "o_is_opp");
-    const minX = Math.min(origin.x, opp.x);
-    const maxX = Math.max(origin.x, opp.x);
-    const minY = Math.min(origin.y, opp.y);
-    const maxY = Math.max(origin.y, opp.y);
+    const minX = min(origin.x, opp.x);
+    const maxX = max(origin.x, opp.x);
+    const minY = min(origin.y, opp.y);
+    const maxY = max(origin.y, opp.y);
     const bl = { x: minX, y: minY };
     const br = { x: maxX, y: minY };
     const tr = { x: maxX, y: maxY };
@@ -56,7 +58,7 @@ export default defineScene({
     const slotL = slider(4.4, { min: 0.5, max: 6, step: 0.02 }, "o_is_slotL");
     const slotW = slider(0.4, { min: 0.16, max: 1.1, step: 0.02 }, "o_is_slotW");
     const r = slotW / 2;
-    const half = Math.max(slotL, slotW) / 2 - r;
+    const half = max(slotL, slotW) / 2 - r;
     const Lc = { x: slotX - half, y: slotY };
     const Rc = { x: slotX + half, y: slotY };
     const leftC = circle(Lc, r);

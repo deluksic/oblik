@@ -30,6 +30,8 @@ import {
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
+
+const { max } = Math;
 type CircleSession = Extract<ToolSession, { verb: "circle" }>;
 
 const fields: Field<CircleSession>[] = [
@@ -58,7 +60,7 @@ function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope
   }
   if (hit.length) return hit.length.expr;
   if (bound) return bound;
-  const r = Math.max(0.05, dist(hit.point.at, center.at));
+  const r = max(0.05, dist(hit.point.at, center.at));
   return { kind: "num" as const, value: round(r) };
 }
 
@@ -144,28 +146,28 @@ export const circle: Tool<CircleSession> = {
       return {
         kind: "circle",
         center: center.at,
-        radius: Math.max(0.05, lengthValue(session, scope, fallback)),
+        radius: max(0.05, lengthValue(session, scope, fallback)),
       };
     }
     if (place && isPinnedPoint(place.point) && !sameRef(center.expr, place.point)) {
       return {
         kind: "circle",
         center: center.at,
-        radius: Math.max(0.05, dist(place.point.at, center.at)),
+        radius: max(0.05, dist(place.point.at, center.at)),
       };
     }
     if (place?.length) {
       return {
         kind: "circle",
         center: center.at,
-        radius: Math.max(0.05, lengthValue(session, scope, place.length.value)),
+        radius: max(0.05, lengthValue(session, scope, place.length.value)),
       };
     }
     if (!place) return { kind: "circle", center: center.at, radius: 0.05 };
     return {
       kind: "circle",
       center: center.at,
-      radius: Math.max(0.05, lengthValue(session, scope, dist(place.point.at, center.at))),
+      radius: max(0.05, lengthValue(session, scope, dist(place.point.at, center.at))),
     };
   },
   preview(session, place, scope): Preview {

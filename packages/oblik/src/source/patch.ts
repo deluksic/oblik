@@ -3,6 +3,8 @@ import * as ts from "typescript";
 
 import { siteSpecs, trailingId } from "./analyze";
 
+
+const { round } = Math;
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
@@ -18,7 +20,7 @@ function isNumeric(expr: ts.Expression | undefined): boolean {
 }
 
 export function formatNum(n: number): string {
-  const q = Math.round(n * 100) / 100;
+  const q = round(n * 100) / 100;
   if (Object.is(q, -0)) return "0";
   return String(q);
 }

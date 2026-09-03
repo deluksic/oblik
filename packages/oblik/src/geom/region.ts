@@ -15,6 +15,8 @@ import {
   type Vec2,
 } from "./vec";
 
+
+const { PI, abs, atan2, ceil, cos, max, min, sin } = Math;
 const EPS = 1e-9;
 
 export function isAlong(v: unknown): v is Along {
@@ -52,7 +54,7 @@ export function walkEdges(w: Loop): LoopEdge[] {
 
 export function isFiniteWalk(w: Loop): boolean {
   if (isCircleWalk(w)) {
-    return isFiniteVec(w.center) && Number.isFinite(w.radius) && Math.abs(w.radius) > EPS;
+    return isFiniteVec(w.center) && Number.isFinite(w.radius) && abs(w.radius) > EPS;
   }
   if (w.length < 2) return false;
   return w.every((e) => isFiniteEdge(e));
@@ -67,7 +69,7 @@ function isFiniteEdge(e: LoopEdge): boolean {
   if (!isFiniteVec(e.a) || !isFiniteVec(e.b)) return false;
   if (e.carrier.kind === "circle") {
     const c = e.carrier;
-    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || Math.abs(c.radius) < EPS)
+    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EPS)
       return false;
     if (e.k !== 1 && e.k !== -1) return false;
     return dist(e.a, e.b) > EPS;
@@ -108,13 +110,13 @@ export function projectOnLine(geom: LineLike, p: Vec2): Vec2 {
 
 export function projectOnCircle(c: Circle, p: Vec2): Vec2 {
   const u = circleUnitAt(c, p);
-  return add(c.center, mul({ x: u.ux, y: u.uy }, Math.abs(c.radius)));
+  return add(c.center, mul({ x: u.ux, y: u.uy }, abs(c.radius)));
 }
 
 /** CCW from `from` through `through` is `1`. */
 export function alongK(c: Circle, from: Vec2, through: Vec2): Branch {
   const cr = cross2(sub(from, c.center), sub(through, c.center));
-  if (Math.abs(cr) < 1e-12) return 1;
+  if (abs(cr) < 1e-12) return 1;
   return cr > 0 ? 1 : -1;
 }
 
@@ -122,13 +124,13 @@ export function alongK(c: Circle, from: Vec2, through: Vec2): Branch {
 export function circleDelta(c: Circle, a: Vec2, b: Vec2, k: Branch): number {
   const ua = circleUnitAt(c, a);
   const ub = circleUnitAt(c, b);
-  let delta = Math.atan2(ub.uy, ub.ux) - Math.atan2(ua.uy, ua.ux);
+  let delta = atan2(ub.uy, ub.ux) - atan2(ua.uy, ua.ux);
   if (k === 1) {
-    while (delta <= 0) delta += 2 * Math.PI;
-    while (delta > 2 * Math.PI) delta -= 2 * Math.PI;
+    while (delta <= 0) delta += 2 * PI;
+    while (delta > 2 * PI) delta -= 2 * PI;
   } else {
-    while (delta >= 0) delta -= 2 * Math.PI;
-    while (delta < -2 * Math.PI) delta += 2 * Math.PI;
+    while (delta >= 0) delta -= 2 * PI;
+    while (delta < -2 * PI) delta += 2 * PI;
   }
   return delta;
 }
@@ -151,13 +153,13 @@ function asCircleWalk(v: unknown): Circle | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const c = v as { kind?: string; center?: Vec2; radius?: unknown };
   if (c.kind !== "circle" || !c.center || !isFiniteVec(c.center)) return null;
-  if (typeof c.radius !== "number" || !Number.isFinite(c.radius) || Math.abs(c.radius) < EPS) {
+  if (typeof c.radius !== "number" || !Number.isFinite(c.radius) || abs(c.radius) < EPS) {
     return null;
   }
   return {
     kind: "circle",
     center: { x: c.center.x, y: c.center.y },
-    radius: Math.abs(c.radius),
+    radius: abs(c.radius),
   };
 }
 
@@ -273,13 +275,13 @@ function sampleArc(e: LoopEdge, steps = 24): Vec2[] {
   const c = e.carrier;
   const delta = circleDelta(c, e.a, e.b, e.k);
   const ua = circleUnitAt(c, e.a);
-  const a0 = Math.atan2(ua.uy, ua.ux);
+  const a0 = atan2(ua.uy, ua.ux);
   const out: Vec2[] = [];
-  const n = Math.max(2, Math.ceil((Math.abs(delta) / Math.PI) * steps));
+  const n = max(2, ceil((abs(delta) / PI) * steps));
   for (let i = 1; i < n; i++) {
     const t = i / n;
     const ang = a0 + delta * t;
-    out.push(add(c.center, mul(vec(Math.cos(ang), Math.sin(ang)), Math.abs(c.radius))));
+    out.push(add(c.center, mul(vec(cos(ang), sin(ang)), abs(c.radius))));
   }
   return out;
 }
@@ -291,12 +293,12 @@ export function tessellateWalk(w: Loop): Vec2[] {
   const hit = tessellatedWalks.get(w);
   if (hit) return hit;
   if (isCircleWalk(w)) {
-    const r = Math.abs(w.radius);
+    const r = abs(w.radius);
     const poly: Vec2[] = [];
     const n = 48;
     for (let i = 0; i < n; i++) {
-      const a = (2 * Math.PI * i) / n;
-      poly.push({ x: w.center.x + r * Math.cos(a), y: w.center.y + r * Math.sin(a) });
+      const a = (2 * PI * i) / n;
+      poly.push({ x: w.center.x + r * cos(a), y: w.center.y + r * sin(a) });
     }
     tessellatedWalks.set(w, poly);
     return poly;
@@ -378,7 +380,7 @@ function polysInterfere(a: readonly Vec2[], b: readonly Vec2[]): boolean {
 
 export function walkContains(w: Loop, q: Vec2): boolean {
   if (!isFiniteWalk(w) || !isFiniteVec(q)) return false;
-  if (isCircleWalk(w)) return dist(q, w.center) < Math.abs(w.radius) - EPS;
+  if (isCircleWalk(w)) return dist(q, w.center) < abs(w.radius) - EPS;
   return polyContains(tessellateWalk(w), q);
 }
 
@@ -398,15 +400,15 @@ function distToArc(e: LoopEdge, q: Vec2): number {
   const cr = alongK(c, e.a, closest);
   const onArc = cr === e.k || dist(closest, e.a) < EPS || dist(closest, e.b) < EPS;
   if (onArc) {
-    const delta = Math.abs(circleDelta(c, e.a, closest, e.k));
-    const full = Math.abs(circleDelta(c, e.a, e.b, e.k));
+    const delta = abs(circleDelta(c, e.a, closest, e.k));
+    const full = abs(circleDelta(c, e.a, e.b, e.k));
     if (delta <= full + 1e-6) return dist(q, closest);
   }
-  return Math.min(dist(q, e.a), dist(q, e.b));
+  return min(dist(q, e.a), dist(q, e.b));
 }
 
 function distToWalkBoundary(w: Loop, q: Vec2): number {
-  if (isCircleWalk(w)) return Math.abs(dist(q, w.center) - Math.abs(w.radius));
+  if (isCircleWalk(w)) return abs(dist(q, w.center) - abs(w.radius));
   let best = Infinity;
   for (const e of w) {
     const d = e.carrier.kind === "circle" ? distToArc(e, q) : distToSegment(q, e.a, e.b);
@@ -446,9 +448,9 @@ export function edgesSvgPath(edges: readonly LoopEdge[], close = false): string 
   const parts = [`M ${start.x} ${start.y}`];
   for (const e of edges) {
     if (e.carrier.kind === "circle" && (e.k === 1 || e.k === -1)) {
-      const r = Math.abs(e.carrier.radius);
+      const r = abs(e.carrier.radius);
       const delta = circleDelta(e.carrier, e.a, e.b, e.k);
-      const large = Math.abs(delta) > Math.PI ? 1 : 0;
+      const large = abs(delta) > PI ? 1 : 0;
       const sweep = e.k === 1 ? 1 : 0;
       parts.push(`A ${r} ${r} 0 ${large} ${sweep} ${e.b.x} ${e.b.y}`);
     } else {
@@ -461,7 +463,7 @@ export function edgesSvgPath(edges: readonly LoopEdge[], close = false): string 
 
 export function walkSvgPath(w: Loop, close = false): string {
   if (isCircleWalk(w)) {
-    const r = Math.abs(w.radius);
+    const r = abs(w.radius);
     const { x, y } = w.center;
     const d = `M ${x + r} ${y} A ${r} ${r} 0 1 1 ${x - r} ${y} A ${r} ${r} 0 1 1 ${x + r} ${y}`;
     return close ? `${d} Z` : d;

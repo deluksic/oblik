@@ -14,6 +14,8 @@ import {
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
+
+const { PI, cos, sin } = Math;
 const A = { x: 2, y: 0 };
 const B = { x: 0, y: 2 };
 const chord: Segment = { kind: "segment", a: A, b: B };
@@ -210,8 +212,8 @@ describe("regionValue", () => {
     const reach: Circle = { kind: "circle", center: O, radius: R };
     const P = { x: R, y: 0 };
     for (const deg of [200, 270]) {
-      const a = (deg * Math.PI) / 180;
-      const Q = { x: R * Math.cos(a), y: R * Math.sin(a) };
+      const a = (deg * PI) / 180;
+      const Q = { x: R * cos(a), y: R * sin(a) };
       const p = regionValue(
         [O, seg(O, P), filletValue(P, 0.35), alongValue(reach, 1), filletValue(Q, 0.35), seg(O, Q)],
         [],

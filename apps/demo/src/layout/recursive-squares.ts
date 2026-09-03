@@ -1,5 +1,7 @@
 import { pointOnSegment, segment, type Vec2, paint, lineIntersection } from "oblik";
 
+
+const { sin } = Math;
 export function recursiveQuad(x: number, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, depth = 0) {
   const s1 = segment(p1, p2, "o_b6a183ac7d");
   const s2 = segment(p2, p3, "o_6c558e6757");
@@ -14,7 +16,7 @@ export function recursiveQuad(x: number, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2,
   }
   const k1 = segment(p1, g1, "o_d28d181c4a");
   const k2 = segment(p3, g3, "o_d61730dfe0");
-  const style = { stroke: `rgb(${255 * Math.sin(depth * 0.1)},0,${depth * 10})`, width: 5.6 };
+  const style = { stroke: `rgb(${255 * sin(depth * 0.1)},0,${depth * 10})`, width: 5.6 };
   paint(s2, style, "o_71876b1657");
   paint(s4, style, "o_d6a42746be");
   paint(k1, style, "o_7a6e9bd7fe");

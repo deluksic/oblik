@@ -56,6 +56,8 @@ import {
 import { $site, type SiteSpec } from "./site";
 import { captureUserStack } from "./stack";
 
+
+const { abs, max, min, round, sqrt } = Math;
 function draftAt(id: string | undefined, i: number, fallback: number): number {
   if (!id) return fallback;
   const row = currentEval()?.draft.get(id);
@@ -157,7 +159,7 @@ export const line = mark(
   (a: Vec2, b: Vec2, id?: string): Line => {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const l = Math.hypot(dx, dy);
+    const l = sqrt((dx) * (dx) + (dy) * (dy));
     const direction = l < 1e-9 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
     return traced({ kind: "line", origin: a, direction }, id);
   },
@@ -317,10 +319,10 @@ export type SliderOpts = {
   step?: number;
 };
 
-function snapEditNumber(raw: number, min: number, max: number, step: number): number {
-  const clamped = Math.min(max, Math.max(min, raw));
+function snapEditNumber(raw: number, minVal: number, maxVal: number, step: number): number {
+  const clamped = min(maxVal, max(minVal, raw));
   if (!(step > 0)) return clamped;
-  return Math.round((clamped - min) / step) * step + min;
+  return round((clamped - minVal) / step) * step + minVal;
 }
 
 function tracedSlider(
@@ -352,11 +354,11 @@ function tracedSlider(
 export const slider = mark(
   (n: number, opts?: SliderOpts, id?: string): number => {
     const raw = draftAt(id, 0, n);
-    const min = opts?.min ?? Math.min(0, raw);
-    const max = opts?.max ?? Math.max(Math.abs(raw) * 2, 1, min + 1);
+    const minVal = opts?.min ?? min(0, raw);
+    const maxVal = opts?.max ?? max(abs(raw) * 2, 1, minVal + 1);
     const step = opts?.step && opts.step > 0 ? opts.step : 0.01;
-    const v = snapEditNumber(raw, min, max, step);
-    return tracedSlider(v, { min, max, step }, id);
+    const v = snapEditNumber(raw, minVal, maxVal, step);
+    return tracedSlider(v, { min: minVal, max: maxVal, step }, id);
   },
   { dof: [0] },
 );

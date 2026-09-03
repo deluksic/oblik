@@ -8,6 +8,8 @@ import {
 } from "@jridgewell/trace-mapping";
 import type { ViteDevServer } from "vite";
 
+
+const { max } = Math;
 export type StackLoc = {
   file: string;
   line: number;
@@ -58,7 +60,7 @@ export function originalFromMap(
   const tracer = map instanceof TraceMap ? map : new TraceMap(map);
   const orig = originalPositionFor(tracer, {
     line: generatedLine,
-    column: Math.max(0, generatedColumn - 1),
+    column: max(0, generatedColumn - 1),
     bias: GREATEST_LOWER_BOUND,
   });
   if (orig.line == null || orig.column == null) return null;

@@ -7,6 +7,8 @@ import {
   type Vec2,
 } from "@design-scenes/geom";
 
+
+const { max, min } = Math;
 /**
  * Shared mounting-plate parameters — constructors live here so the pair
  * scene reuses inset and holeR.
@@ -14,9 +16,9 @@ import {
 export function mountingPlateLayout() {
   const origin = point(0.13, 0.25);
   const opp = point(3.86, 3.02);
-  const bl: Vec2 = point(Math.min(origin.x, opp.x), Math.min(origin.y, opp.y));
-  const tr: Vec2 = point(Math.max(origin.x, opp.x), Math.min(origin.y, opp.y));
-  const tl: Vec2 = point(Math.min(origin.x, opp.x), Math.max(origin.y, opp.y));
+  const bl: Vec2 = point(min(origin.x, opp.x), min(origin.y, opp.y));
+  const tr: Vec2 = point(max(origin.x, opp.x), min(origin.y, opp.y));
+  const tl: Vec2 = point(min(origin.x, opp.x), max(origin.y, opp.y));
 
   const bottom = segment(bl, tr);
   const left = segment(tl, bl);

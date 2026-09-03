@@ -1,5 +1,7 @@
 import { circle, type Geom, type Vec2 } from "@design-scenes/geom";
 
+
+const { PI, atan2, cos, max, round, sin } = Math;
 /** Stock radius. Not a widget — the dashed handle was covering the plan. */
 export const CYLINDER_RADIUS = 2.2;
 
@@ -16,7 +18,7 @@ export type PackCell = {
 export function pack7(radius: number): PackCell[] {
   const cells: PackCell[] = [{ origin: { x: 0, y: 0 }, rotation: 0 }];
   for (const origin of polarRing(6, 2 * radius)) {
-    cells.push({ origin, rotation: Math.atan2(origin.y, origin.x) });
+    cells.push({ origin, rotation: atan2(origin.y, origin.x) });
   }
   return cells;
 }
@@ -29,12 +31,12 @@ export type CylinderLayout = {
 };
 
 export function polarRing(count: number, ringR: number, rotation = 0): Vec2[] {
-  const n = Math.max(1, Math.round(count));
-  const r = Math.max(0, ringR);
+  const n = max(1, round(count));
+  const r = max(0, ringR);
   const out: Vec2[] = [];
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 - Math.PI / 2 + rotation;
-    out.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+    const a = (i / n) * PI * 2 - PI / 2 + rotation;
+    out.push({ x: cos(a) * r, y: sin(a) * r });
   }
   return out;
 }

@@ -15,6 +15,8 @@ import {
   union,
 } from "oblik";
 
+
+const { max, min } = Math;
 /**
  * Nested booleans for the CSG tree demo:
  *   shell = diff( union([stock, earL, earR]), [drills…, slot] )
@@ -27,10 +29,10 @@ import {
 export function csgTreeLayout() {
   const origin = point(0.2, 0.25, "o_ct_origin");
   const opp = point(5.1, 3.35, "o_ct_opp");
-  const minX = Math.min(origin.x, opp.x);
-  const maxX = Math.max(origin.x, opp.x);
-  const minY = Math.min(origin.y, opp.y);
-  const maxY = Math.max(origin.y, opp.y);
+  const minX = min(origin.x, opp.x);
+  const maxX = max(origin.x, opp.x);
+  const minY = min(origin.y, opp.y);
+  const maxY = max(origin.y, opp.y);
   const bl = { x: minX, y: minY };
   const br = { x: maxX, y: minY };
   const tr = { x: maxX, y: maxY };
@@ -91,7 +93,7 @@ export function csgTreeLayout() {
   const slotL = slider(1.35, { min: 0.35, max: 3.5, step: 0.02 }, "o_ct_slotL");
   const slotW = slider(0.38, { min: 0.14, max: 0.9, step: 0.02 }, "o_ct_slotW");
   const r = slotW / 2;
-  const half = Math.max(slotL, slotW) / 2 - r;
+  const half = max(slotL, slotW) / 2 - r;
   const Lc = { x: slotX - half, y: slotY };
   const Rc = { x: slotX + half, y: slotY };
   const leftC = circle(Lc, r);

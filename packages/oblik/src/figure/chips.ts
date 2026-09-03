@@ -1,6 +1,8 @@
 import { cloneStyle, type FigureStyle } from "../eval/paint";
 import type { Expr } from "../source/expr";
 
+
+const { round } = Math;
 export const STROKE_COLORS = ["#1c1917", "#c23b22", "#2b7a3e", "#1f5fa8", "#d97706"] as const;
 
 export const FILL_COLORS = ["none", "#f3c5bc", "#cfe8d4", "#c5ddf5", "#f6e2b8"] as const;
@@ -31,7 +33,7 @@ export const DEFAULT_BRUSH: BrushSettings = {
 };
 
 function roundDash(n: number): number {
-  return Math.round(n * 100) / 100;
+  return round(n * 100) / 100;
 }
 
 export function dashForLine(

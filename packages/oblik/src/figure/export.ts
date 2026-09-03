@@ -9,6 +9,8 @@ import type { Csg2, Pick } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
+
+const { abs, max, min, round } = Math;
 export type FigureExportOptions = {
   trace: readonly TraceNode[];
   frame?: FigureFrame;
@@ -40,11 +42,11 @@ const MAX_DIM = 2000;
 const MIN_DIM = 48;
 
 function num(n: number): string {
-  return (Math.round(n * 1000) / 1000).toString();
+  return (round(n * 1000) / 1000).toString();
 }
 
 function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n));
+  return min(hi, max(lo, n));
 }
 
 /** Clip an infinite line (origin + direction) to a rectangle. Liang–Barsky. */
@@ -63,8 +65,8 @@ function clipInfiniteLine(origin: Vec2, dir: Vec2, rect: Rect): [Vec2, Vec2] | n
       continue;
     }
     const t = q[i] / p[i];
-    if (p[i] < 0) tMin = Math.max(tMin, t);
-    else tMax = Math.min(tMax, t);
+    if (p[i] < 0) tMin = max(tMin, t);
+    else tMax = min(tMax, t);
   }
   if (tMin > tMax || !Number.isFinite(tMin) || !Number.isFinite(tMax)) return null;
   return [
@@ -82,10 +84,10 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
   const inc = (x: number, y: number) => {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     has = true;
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
+    minX = min(minX, x);
+    minY = min(minY, y);
+    maxX = max(maxX, x);
+    maxY = max(maxY, y);
   };
   for (const { geom } of strokes) {
     const v = geom.value;
@@ -94,12 +96,12 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
       inc(v.a.x, v.a.y);
       inc(v.b.x, v.b.y);
     } else if (v.kind === "circle") {
-      const r = Math.abs(v.radius);
+      const r = abs(v.radius);
       inc(v.center.x - r, v.center.y - r);
       inc(v.center.x + r, v.center.y + r);
     } else if (v.kind === "region") {
       if (isCircleWalk(v.outer)) {
-        const r = Math.abs(v.outer.radius);
+        const r = abs(v.outer.radius);
         inc(v.outer.center.x - r, v.outer.center.y - r);
         inc(v.outer.center.x + r, v.outer.center.y + r);
       } else {
@@ -124,7 +126,7 @@ function exportBounds(strokes: readonly PaintStroke[], opts: FigureExportOptions
   if (framed && framed.w > 0 && framed.h > 0) return framed;
   const b = boundsOfStrokes(strokes);
   if (b && b.w >= 0 && b.h >= 0) {
-    const pad = Math.max(0.5, Math.max(b.w, b.h) * 0.08);
+    const pad = max(0.5, max(b.w, b.h) * 0.08);
     const rect = { x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad };
     if (rect.w > 0 && rect.h > 0) return rect;
   }
@@ -207,7 +209,7 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
     return `<line x1="${num(a.x)}" y1="${num(a.y)}" x2="${num(b.x)}" y2="${num(b.y)}" ${styleAttrs(s.style, false)}/>`;
   }
   if (v.kind === "circle") {
-    return `<circle cx="${num(v.center.x)}" cy="${num(v.center.y)}" r="${num(Math.abs(v.radius))}" ${styleAttrs(s.style, true)}/>`;
+    return `<circle cx="${num(v.center.x)}" cy="${num(v.center.y)}" r="${num(abs(v.radius))}" ${styleAttrs(s.style, true)}/>`;
   }
   if (v.kind === "region") {
     const d = regionSvgPath(v);
@@ -258,11 +260,11 @@ export function figureToSvg(opts: FigureExportOptions): FigureExport {
   const bounds = exportBounds(strokes, opts);
 
   const perUnit = clamp(opts.camera?.scale ?? 48, 4, 400);
-  const rawW = Math.max(1, bounds.w * perUnit);
-  const rawH = Math.max(1, bounds.h * perUnit);
-  const shrink = Math.min(1, MAX_DIM / Math.max(rawW, rawH));
-  const width = Math.max(MIN_DIM, Math.round(rawW * shrink));
-  const height = Math.max(MIN_DIM, Math.round(rawH * shrink));
+  const rawW = max(1, bounds.w * perUnit);
+  const rawH = max(1, bounds.h * perUnit);
+  const shrink = min(1, MAX_DIM / max(rawW, rawH));
+  const width = max(MIN_DIM, round(rawW * shrink));
+  const height = max(MIN_DIM, round(rawH * shrink));
   const pointRadius = (4 * bounds.w) / width;
 
   const tx = -bounds.x;

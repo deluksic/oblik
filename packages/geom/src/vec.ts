@@ -1,3 +1,4 @@
+const { PI, abs, atan2, cos, max, min, sin, sqrt } = Math;
 export type Vec2 = { readonly x: number; readonly y: number };
 
 export function vec(x: number, y: number): Vec2 {
@@ -21,7 +22,7 @@ export function dot(a: Vec2, b: Vec2): number {
 }
 
 export function len(a: Vec2): number {
-  return Math.hypot(a.x, a.y);
+  return sqrt((a.x) * (a.x) + (a.y) * (a.y));
 }
 
 export function norm(a: Vec2): Vec2 {
@@ -50,7 +51,7 @@ export function projectT(a: Vec2, b: Vec2, p: Vec2): number {
 }
 
 export function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
-  const t = Math.min(1, Math.max(0, projectT(a, b, p)));
+  const t = min(1, max(0, projectT(a, b, p)));
   return dist(p, lerp(a, b, t));
 }
 
@@ -62,7 +63,7 @@ export function cross2(a: Vec2, b: Vec2): number {
 /** Distance from `p` to the infinite line through `origin` along unit `dir`. */
 export function distToLine(p: Vec2, origin: Vec2, dir: Vec2): number {
   const n = perp(dir);
-  return Math.abs(dot(sub(p, origin), n));
+  return abs(dot(sub(p, origin), n));
 }
 
 /** Left-normal signed distance (same sign as `offsetLine`). */
@@ -75,17 +76,17 @@ export function isFiniteVec(p: Vec2): boolean {
 }
 
 export function polar(r: number, radians: number): Vec2 {
-  return vec(r * Math.cos(radians), r * Math.sin(radians));
+  return vec(r * cos(radians), r * sin(radians));
 }
 
 export function ang(p: Vec2): number {
-  return Math.atan2(p.y, p.x);
+  return atan2(p.y, p.x);
 }
 
 /** Rotate `p` around the origin. */
 export function rotate(p: Vec2, radians: number): Vec2 {
-  const c = Math.cos(radians);
-  const s = Math.sin(radians);
+  const c = cos(radians);
+  const s = sin(radians);
   return vec(p.x * c - p.y * s, p.x * s + p.y * c);
 }
 
@@ -94,7 +95,7 @@ export function rotateAround(p: Vec2, origin: Vec2, radians: number): Vec2 {
 }
 
 export function wrapTau(a: number): number {
-  const tau = Math.PI * 2;
+  const tau = PI * 2;
   let x = a % tau;
   if (x < 0) x += tau;
   return x;
@@ -106,14 +107,14 @@ export function sweepCCW(a0: number, a1: number): number {
 }
 
 export function distToArc(p: Vec2, center: Vec2, radius: number, a0: number, a1: number): number {
-  const r = Math.abs(radius);
+  const r = abs(radius);
   const rel = sub(p, center);
   const d = len(rel);
   const theta = ang(rel);
   const span = sweepCCW(a0, a1);
   const fromStart = wrapTau(theta - a0);
   if (fromStart <= span || span < 1e-9) {
-    return Math.abs(d - r);
+    return abs(d - r);
   }
-  return Math.min(dist(p, add(center, polar(r, a0))), dist(p, add(center, polar(r, a1))));
+  return min(dist(p, add(center, polar(r, a0))), dist(p, add(center, polar(r, a1))));
 }

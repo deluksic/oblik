@@ -1,9 +1,10 @@
+const { max, min, sqrt } = Math;
 export type Camera2 = { x: number; y: number; scale: number };
 
 export type PaneSize = { w: number; h: number };
 
 export function kWorldToNdc(cam: Camera2, size: PaneSize): number {
-  return (2 * cam.scale) / Math.max(1, size.h);
+  return (2 * cam.scale) / max(1, size.h);
 }
 
 export function worldToNdc(
@@ -37,7 +38,7 @@ export function wheelZoomFactor(deltaY: number, deltaMode = 0): number {
   if (!Number.isFinite(deltaY) || deltaY === 0) return 1;
   const raw =
     deltaMode === 1 ? deltaY : deltaMode === 2 ? deltaY * LINES_PER_PAGE : deltaY / PIXEL_PER_NOTCH;
-  const notches = Math.max(-MAX_NOTCHES, Math.min(MAX_NOTCHES, raw));
+  const notches = max(-MAX_NOTCHES, min(MAX_NOTCHES, raw));
   return ZOOM_NOTCH ** -notches;
 }
 
@@ -72,7 +73,7 @@ export function zoomAt(
   factor: number,
 ): Camera2 {
   const before = screenToWorld(screen, cam, size);
-  const scale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, cam.scale * factor));
+  const scale = min(SCALE_MAX, max(SCALE_MIN, cam.scale * factor));
   const next = { ...cam, scale };
   const after = screenToWorld(screen, next, size);
   return {
@@ -87,14 +88,14 @@ export function clientToNdc(
   rect: DOMRect,
   size: PaneSize,
 ): { x: number; y: number } {
-  const aspect = size.w / Math.max(1, size.h);
-  const nx = ((client.x - rect.left) / Math.max(1, rect.width)) * 2 * aspect - aspect;
-  const ny = ((client.y - rect.top) / Math.max(1, rect.height)) * 2 - 1;
+  const aspect = size.w / max(1, size.h);
+  const nx = ((client.x - rect.left) / max(1, rect.width)) * 2 * aspect - aspect;
+  const ny = ((client.y - rect.top) / max(1, rect.height)) * 2 - 1;
   return { x: nx, y: ny };
 }
 
 export function viewBox(size: PaneSize): string {
-  const aspect = size.w / Math.max(1, size.h);
+  const aspect = size.w / max(1, size.h);
   return `${-aspect} -1 ${2 * aspect} 2`;
 }
 
@@ -104,7 +105,7 @@ export function infiniteClip(
   cam: Camera2,
   size: PaneSize,
 ): { a: { x: number; y: number }; b: { x: number; y: number } } {
-  const span = Math.max(size.w, size.h) / cam.scale + Math.hypot(cam.x, cam.y) + 8;
+  const span = max(size.w, size.h) / cam.scale + sqrt((cam.x) * (cam.x) + (cam.y) * (cam.y)) + 8;
   return {
     a: { x: origin.x - dir.x * span, y: origin.y - dir.y * span },
     b: { x: origin.x + dir.x * span, y: origin.y + dir.y * span },

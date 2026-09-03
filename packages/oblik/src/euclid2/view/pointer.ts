@@ -18,6 +18,8 @@ import {
 import { enrichHit, type PlaceHit, type Scope, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
+
+const { max, round: mathRound, sqrt } = Math;
 export type Drag =
   | {
       kind: "pan";
@@ -117,7 +119,7 @@ export type Drag =
 export type EditDrag = Exclude<Drag, { kind: "pan" }>;
 
 export function round(n: number): number {
-  return Math.round(n * 100) / 100;
+  return mathRound(n * 100) / 100;
 }
 
 export function worldOf(
@@ -164,7 +166,7 @@ export function radiusDrag(
     node,
     startR: c.radius,
     origin: c.center,
-    grabDist: Math.hypot(w.x - c.center.x, w.y - c.center.y),
+    grabDist: sqrt((w.x - c.center.x) * (w.x - c.center.x) + (w.y - c.center.y) * (w.y - c.center.y)),
     downX: e.clientX,
     downY: e.clientY,
     moved: false,
@@ -460,9 +462,9 @@ export function applyDrag(
     if (!Number.isFinite(sdf)) return {};
     return { draft: { id: drag.id, values: [round(drag.startD + (sdf - drag.grabSdf))] } };
   }
-  const now = Math.hypot(w.x - drag.origin.x, w.y - drag.origin.y);
+  const now = sqrt((w.x - drag.origin.x) * (w.x - drag.origin.x) + (w.y - drag.origin.y) * (w.y - drag.origin.y));
   return {
-    draft: { id: drag.id, values: [round(Math.max(0.05, drag.startR + (now - drag.grabDist)))] },
+    draft: { id: drag.id, values: [round(max(0.05, drag.startR + (now - drag.grabDist)))] },
   };
 }
 

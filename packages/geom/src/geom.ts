@@ -24,6 +24,8 @@ import {
   type Vec2,
 } from "./vec";
 
+
+const { abs, sqrt } = Math;
 export type Point = Base & { kind: "point"; x: number; y: number };
 /** Finite stroke between two endpoints. */
 export type Segment = Base & { kind: "segment"; a: Point; b: Point };
@@ -212,7 +214,7 @@ export function lineIntersection(a: LineLike, b: LineLike, site?: GeomSiteOpts):
     const la = lineBasis(a);
     const lb = lineBasis(b);
     const denom = cross2(la.dir, lb.dir);
-    if (!Number.isFinite(denom) || Math.abs(denom) < 1e-12) return nanPoint(site);
+    if (!Number.isFinite(denom) || abs(denom) < 1e-12) return nanPoint(site);
     const t = cross2(sub(lb.origin, la.origin), lb.dir) / denom;
     const p = add(la.origin, mul(la.dir, t));
     if (!isFiniteVec(p)) return nanPoint(site);
@@ -237,7 +239,7 @@ export function circleLineIntersection(
     const dw = dot(dir, w);
     const disc = dw * dw - (dot(w, w) - c.radius * c.radius);
     if (!(disc >= 0) || !Number.isFinite(disc)) return nanPoint(site);
-    const t = -dw + k * Math.sqrt(disc);
+    const t = -dw + k * sqrt(disc);
     const p = add(origin, mul(dir, t));
     if (!isFiniteVec(p)) return nanPoint(site);
     return point(p.x, p.y, site);
@@ -255,12 +257,12 @@ export function circleCircleIntersection(
     if (!isFiniteVec(a.center) || !isFiniteVec(b.center)) return nanPoint(site);
     if (!Number.isFinite(a.radius) || !Number.isFinite(b.radius)) return nanPoint(site);
     const dvec = sub(b.center, a.center);
-    const d = Math.hypot(dvec.x, dvec.y);
+    const d = sqrt((dvec.x) * (dvec.x) + (dvec.y) * (dvec.y));
     if (d < 1e-12) return nanPoint(site);
     const aa = (a.radius * a.radius - b.radius * b.radius + d * d) / (2 * d);
     const h2 = a.radius * a.radius - aa * aa;
     if (!(h2 >= 0) || !Number.isFinite(h2)) return nanPoint(site);
-    const h = Math.sqrt(h2);
+    const h = sqrt(h2);
     const mid = add(a.center, mul(dvec, aa / d));
     const n = perp({ x: dvec.x / d, y: dvec.y / d });
     const p = add(mid, mul(n, k * h));

@@ -3,6 +3,8 @@ import { circle, point, type Vec2 } from "@design-scenes/geom";
 
 import { drawRingPlan, drawUnrolled } from "../demo/ring";
 
+
+const { PI } = Math;
 export const title = "Ring";
 export const sceneFile = "ring.scene.ts";
 export const camera = { x: 18, y: 3.2, scale: 14 };
@@ -30,7 +32,7 @@ export function ringLayout(): RingLayout {
   };
   const shank = circle(origin, 2.37).radius;
   const mid: Vec2 = {
-    x: origin.x + Math.PI * innerR,
+    x: origin.x + PI * innerR,
     y: origin.y,
   };
   const signet = circle(mid, 5.81).radius;

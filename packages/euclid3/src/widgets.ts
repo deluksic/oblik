@@ -1,5 +1,7 @@
 import { allocId, captureUserStack, currentBind, lerp3, point3 as makePoint3, resetIdentity, type CallSite, type Segment3, type Point3, type Vec3 } from "@design-scenes/geom";
 
+
+const { max, min } = Math;
 export type SiteOpts3 = {
   file?: string;
   at?: [number, number];
@@ -109,7 +111,7 @@ export function distance3(origin: Vec3, d: number, site?: SiteOpts3): number {
 export function pointOnSegment3(seg: Segment3, t: number, site?: SiteOpts3): Point3 {
   const located = siteFrom(site);
   const o = located ? overrides.get(located.site) : undefined;
-  const tt = Math.min(1, Math.max(0, o?.[0] ?? t));
+  const tt = min(1, max(0, o?.[0] ?? t));
   if (located) {
     gizmos.push({
       kind: "glider3",

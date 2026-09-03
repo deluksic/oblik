@@ -1,6 +1,8 @@
 import { angle, slider } from "@design-scenes/euclid2";
 import { arc, circle, point, segment, type Geom, type Vec2 } from "@design-scenes/geom";
 
+
+const { PI, cos, max, round, sin } = Math;
 export const title = "Fan";
 export const sceneFile = "fan.scene.ts";
 export const hint = "Five spokes, one shared tilt. Grab any handle — all spokes follow.";
@@ -11,15 +13,15 @@ const spokeTilt = (hub: Vec2, from: number, reach: number) =>
   angle(hub, 28, { from, radius: reach });
 
 function blade(hub: Vec2, dir: number, reach: number, width: number): Geom[] {
-  const nx = -Math.sin(dir);
-  const ny = Math.cos(dir);
+  const nx = -sin(dir);
+  const ny = cos(dir);
   const tip: Vec2 = {
-    x: hub.x + Math.cos(dir) * reach,
-    y: hub.y + Math.sin(dir) * reach,
+    x: hub.x + cos(dir) * reach,
+    y: hub.y + sin(dir) * reach,
   };
   const root: Vec2 = {
-    x: hub.x + Math.cos(dir) * reach * 0.12,
-    y: hub.y + Math.sin(dir) * reach * 0.12,
+    x: hub.x + cos(dir) * reach * 0.12,
+    y: hub.y + sin(dir) * reach * 0.12,
   };
   const half = width * 0.5;
   const a: Vec2 = { x: root.x + nx * half * 0.35, y: root.y + ny * half * 0.35 };
@@ -36,18 +38,18 @@ export function scene() {
   const hubR = slider(0.28, { label: "Hub", min: 0.12, max: 0.45, step: 0.02 });
   const bladeW = slider(0.42, { label: "Blade", min: 0.18, max: 0.7, step: 0.02 });
 
-  const n = Math.max(3, Math.round(count));
+  const n = max(3, round(count));
   const geoms: Geom[] = [circle(hub, hubR)];
 
   for (let i = 0; i < n; i++) {
-    const from = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const from = (i / n) * PI * 2 - PI / 2;
     const dir = spokeTilt(hub, from, reach);
     geoms.push(...blade(hub, dir, reach, bladeW));
     geoms.push(
       arc(hub, reach * 0.92, from, dir),
       segment(hub, {
-        x: hub.x + Math.cos(from) * reach * 0.18,
-        y: hub.y + Math.sin(from) * reach * 0.18,
+        x: hub.x + cos(from) * reach * 0.18,
+        y: hub.y + sin(from) * reach * 0.18,
       }),
     );
   }

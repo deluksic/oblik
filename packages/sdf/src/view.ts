@@ -6,6 +6,8 @@ import { compileSdf, sdfMapSignature, type CompiledSdf } from "./compile";
 import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdfFragSource } from "./shader";
 import type { Sdf } from "./tree";
 
+
+const { PI, abs, cos, floor, max, min, sin, sqrt } = Math;
 type Gizmo3 =
   | {
       kind: "point3";
@@ -143,14 +145,14 @@ export class SdfView {
 
   resize(): void {
     const r = this.canvas.getBoundingClientRect();
-    const w = Math.max(1, r.width);
-    const h = Math.max(1, r.height);
+    const w = max(1, r.width);
+    const h = max(1, r.height);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.fieldTarget.setSize(
-      Math.max(1, Math.floor(w * FIELD_SCALE)),
-      Math.max(1, Math.floor(h * FIELD_SCALE)),
+      max(1, floor(w * FIELD_SCALE)),
+      max(1, floor(h * FIELD_SCALE)),
     );
   }
 
@@ -217,7 +219,7 @@ export class SdfView {
   dragDistance(origin: Vec3, clientX: number, clientY: number): number | null {
     const hit = this.intersectPlane(cameraPlane(this.camera, origin), clientX, clientY);
     if (!hit) return null;
-    return Math.max(0.05, Math.hypot(hit.x - origin.x, hit.y - origin.y, hit.z - origin.z));
+    return max(0.05, sqrt((hit.x - origin.x) * (hit.x - origin.x) + (hit.y - origin.y) * (hit.y - origin.y) + (hit.z - origin.z) * (hit.z - origin.z)));
   }
 
   dragGlider(a: Vec3, b: Vec3, clientX: number, clientY: number): number | null {
@@ -232,7 +234,7 @@ export class SdfView {
     const l2 = ab.x * ab.x + ab.y * ab.y + ab.z * ab.z;
     if (l2 < 1e-12) return 0;
     const t = ((hit.x - a.x) * ab.x + (hit.y - a.y) * ab.y + (hit.z - a.z) * ab.z) / l2;
-    return Math.min(1, Math.max(0, t));
+    return min(1, max(0, t));
   }
 
   private applyUniforms(): void {
@@ -395,7 +397,7 @@ function meshGizmo(
       ),
     );
   } else {
-    group.add(...unitCircles(g.origin, Math.abs(g.d), color));
+    group.add(...unitCircles(g.origin, abs(g.d), color));
   }
   group.userData.gizmo = g;
   return group;
@@ -424,12 +426,12 @@ function unitCircles(origin: Vec3, r: number, color: number): THREE.Object3D[] {
   return axes.map(([u, v]) => {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= 48; i++) {
-      const a = (i / 48) * Math.PI * 2;
+      const a = (i / 48) * PI * 2;
       pts.push(
         new THREE.Vector3(
-          origin.x + (u.x * Math.cos(a) + v.x * Math.sin(a)) * r,
-          origin.y + (u.y * Math.cos(a) + v.y * Math.sin(a)) * r,
-          origin.z + (u.z * Math.cos(a) + v.z * Math.sin(a)) * r,
+          origin.x + (u.x * cos(a) + v.x * sin(a)) * r,
+          origin.y + (u.y * cos(a) + v.y * sin(a)) * r,
+          origin.z + (u.z * cos(a) + v.z * sin(a)) * r,
         ),
       );
     }

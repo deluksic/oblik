@@ -5,6 +5,8 @@ import { segment3 } from "@design-scenes/geom";
 import { drawMill, millFromPlate } from "../demo/mill";
 import { plateLayout } from "./plate-layout";
 
+
+const { max } = Math;
 export const title = "Mill 3D";
 export const view = "euclid3" as const;
 export const sceneFile = "mill.scene.ts";
@@ -18,6 +20,6 @@ export function scene() {
   const plate = withoutWidgets(() => plateLayout(), "plate");
   const { x, y } = plate.stock.min;
   const mast = segment3({ x, y, z: 0 }, { x, y, z: 8 });
-  const thickness = Math.max(0.5, pointOnSegment3(mast, 0.16).z);
+  const thickness = max(0.5, pointOnSegment3(mast, 0.16).z);
   return drawMill(millFromPlate(plate, thickness));
 }

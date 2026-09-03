@@ -21,6 +21,8 @@ import type { Csg2, Pick, Region } from "../geom/types";
 
 import styles from "./View.module.css";
 
+
+const { abs, max } = Math;
 const ONION: FigureStyle = { kind: "style", stroke: "#8a8478", width: 1.05 };
 
 function dash(s: FigureStyle): string | undefined {
@@ -255,7 +257,7 @@ function Circ(props: {
               data-ink={traceKey(props.node)}
               cx={circ().center.x}
               cy={circ().center.y}
-              r={Math.abs(circ().radius)}
+              r={abs(circ().radius)}
             />
           )}
           <For each={props.layers}>
@@ -271,7 +273,7 @@ function Circ(props: {
                 vector-effect="non-scaling-stroke"
                 cx={circ().center.x}
                 cy={circ().center.y}
-                r={Math.abs(circ().radius)}
+                r={abs(circ().radius)}
               />
             )}
           </For>
@@ -424,7 +426,7 @@ function PointInk(props: { node: TraceNode } & PointProps) {
     return { x: 0, y: 0 };
   });
   const mark = () => (props.onion ? "open" : (props.look?.point ?? "dot"));
-  const r = () => 5 / Math.max(12, props.camera.scale);
+  const r = () => 5 / max(12, props.camera.scale);
   const stroke = () => (props.onion ? ONION.stroke : (props.look?.stroke ?? "#1c1917"));
   const fill = () => {
     if (props.onion || mark() === "open") return "none";

@@ -18,24 +18,26 @@ import {
 import type { Circle, Csg2, CsgOp, CsgOperand, HalfPlane, Loop, LoopEdge, Region } from "./types";
 import { add, dist, isFiniteVec, mul, norm, perp, type Vec2 } from "./vec";
 
+
+const { abs, max, min } = Math;
 const EDGE_MIN = 1e-6;
 /** Cheap reject: |sdf(mid)| above this is not a boundary candidate. */
 const COARSE = 1e-3;
 
 function circleRegion(c: Circle): Region | null {
-  if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || Math.abs(c.radius) < EDGE_MIN) {
+  if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EDGE_MIN) {
     return null;
   }
   return {
     kind: "region",
-    outer: { kind: "circle", center: { x: c.center.x, y: c.center.y }, radius: Math.abs(c.radius) },
+    outer: { kind: "circle", center: { x: c.center.x, y: c.center.y }, radius: abs(c.radius) },
     holes: [],
   };
 }
 
 /** Two semicircles so a full disk participates in splitWalks. */
 function circleAsEdges(c: Circle): LoopEdge[] {
-  const r = Math.abs(c.radius);
+  const r = abs(c.radius);
   const e = { x: c.center.x + r, y: c.center.y };
   const w = { x: c.center.x - r, y: c.center.y };
   return [
@@ -59,7 +61,7 @@ export function islandsSdf(islands: readonly Region[], p: Vec2): number {
   for (let i = 1; i < islands.length; i++) {
     const b = signedDistToRegion(islands[i]!, p);
     if (!Number.isFinite(b)) return Number.NaN;
-    d = Math.min(d, b);
+    d = min(d, b);
   }
   return d;
 }
@@ -78,10 +80,10 @@ export function islandsAabb(islands: readonly Region[]): Aabb | null {
     if (!b) continue;
     box = box
       ? {
-          minX: Math.min(box.minX, b.minX),
-          minY: Math.min(box.minY, b.minY),
-          maxX: Math.max(box.maxX, b.maxX),
-          maxY: Math.max(box.maxY, b.maxY),
+          minX: min(box.minX, b.minX),
+          minY: min(box.minY, b.minY),
+          maxX: max(box.maxX, b.maxX),
+          maxY: max(box.maxY, b.maxY),
         }
       : b;
   }
@@ -96,7 +98,7 @@ function booleanSdf(op: CsgOp, groups: readonly (readonly Region[])[], p: Vec2):
     for (let i = 1; i < groups.length; i++) {
       const b = islandsSdf(groups[i]!, p);
       if (!Number.isFinite(b)) return Number.NaN;
-      d = Math.min(d, b);
+      d = min(d, b);
     }
     return d;
   }
@@ -106,7 +108,7 @@ function booleanSdf(op: CsgOp, groups: readonly (readonly Region[])[], p: Vec2):
     for (let i = 1; i < groups.length; i++) {
       const b = islandsSdf(groups[i]!, p);
       if (!Number.isFinite(b)) return Number.NaN;
-      d = Math.max(d, b);
+      d = max(d, b);
     }
     return d;
   }
@@ -115,7 +117,7 @@ function booleanSdf(op: CsgOp, groups: readonly (readonly Region[])[], p: Vec2):
   for (let i = 1; i < groups.length; i++) {
     const b = islandsSdf(groups[i]!, p);
     if (!Number.isFinite(b)) return Number.NaN;
-    d = Math.max(d, -b);
+    d = max(d, -b);
   }
   return d;
 }
@@ -124,25 +126,25 @@ function cheapMaybeBoundary(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
   if (dist(e.a, e.b) < EDGE_MIN) return false;
   const mid = edgeMid(e);
   const dm = sdf(mid);
-  if (!Number.isFinite(dm) || Math.abs(dm) > COARSE) return false;
+  if (!Number.isFinite(dm) || abs(dm) > COARSE) return false;
   const da = sdf(e.a);
   const db = sdf(e.b);
-  if (Number.isFinite(da) && Math.abs(da) > COARSE * 4) return false;
-  if (Number.isFinite(db) && Math.abs(db) > COARSE * 4) return false;
+  if (Number.isFinite(da) && abs(da) > COARSE * 4) return false;
+  if (Number.isFinite(db) && abs(db) > COARSE * 4) return false;
   return true;
 }
 
 function transverseHairs(e: LoopEdge): number[] {
   const span = dist(e.a, e.b);
-  const base = Math.max(1e-5, Math.min(span * 0.05, 1e-3));
+  const base = max(1e-5, min(span * 0.05, 1e-3));
   const hairs = [base];
   if (e.carrier.kind !== "circle") return hairs;
-  const r = Math.abs(e.carrier.radius);
+  const r = abs(e.carrier.radius);
   // `signedDistToRegion` signs from a tessellated walk. sampleArc(24) sagittas
   // ~0.002 r, so a 1e-3 hair can land both samples outside the polygon even
   // when the true circle is a result boundary. Clear that band.
-  const arc = Math.min(r * 0.02, span * 0.25, 5e-2);
-  if (arc > base * 1.05) hairs.push(Math.max(base, arc));
+  const arc = min(r * 0.02, span * 0.25, 5e-2);
+  if (arc > base * 1.05) hairs.push(max(base, arc));
   return hairs;
 }
 
@@ -224,10 +226,10 @@ function booleanRegions(op: CsgOp, groups: readonly (readonly Region[])[]): Regi
 
 function expandBox(a: Aabb, b: Aabb): Aabb {
   return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
+    minX: min(a.minX, b.minX),
+    minY: min(a.minY, b.minY),
+    maxX: max(a.maxX, b.maxX),
+    maxY: max(a.maxY, b.maxY),
   };
 }
 
@@ -256,7 +258,7 @@ function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | null {
   const { origin, dir } = lineBasis(h.line);
   const n = norm(dir);
   if (!isFiniteVec(n) || !isFiniteVec(origin)) return null;
-  const pad = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1) * 0.08;
+  const pad = max(box.maxX - box.minX, box.maxY - box.minY, 1) * 0.08;
   const minX = box.minX - pad;
   const minY = box.minY - pad;
   const maxX = box.maxX + pad;
@@ -313,7 +315,7 @@ function clipByPlanes(islands: Region[], planes: readonly HalfPlane[]): Region[]
     for (const h of planes) {
       const b = planeSdf(h, p);
       if (!Number.isFinite(b)) return Number.NaN;
-      d = Math.max(d, b);
+      d = max(d, b);
     }
     return d;
   };
@@ -389,7 +391,7 @@ export function compileAgrees(op: CsgOperand, probes: readonly Vec2[]): boolean 
   for (const p of probes) {
     if (!isFiniteVec(p) || !isFiniteOperand(op)) continue;
     const d = operandSdf(op, p);
-    if (!Number.isFinite(d) || Math.abs(d) < COARSE) continue;
+    if (!Number.isFinite(d) || abs(d) < COARSE) continue;
     const field = d < 0;
     const compiled = islands.some((r) => regionContains(r, p));
     if (field !== compiled) return false;

@@ -7,6 +7,8 @@ import type { Ghost } from "../tool";
 
 import styles from "./View.module.css";
 
+
+const { abs, sqrt } = Math;
 const GHOST_POINT_R = 4;
 const CORNER_R = 5;
 const CORNER_RING_R = 11;
@@ -39,7 +41,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
     if (!g) return null;
     const dx = g.b.x - g.a.x;
     const dy = g.b.y - g.a.y;
-    const len = Math.hypot(dx, dy);
+    const len = sqrt((dx) * (dx) + (dy) * (dy));
     const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
     return screenEnds(infiniteClip(g.a, dir, props.camera, props.size), props.camera, props.size);
   });
@@ -66,7 +68,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
     if (!c) return null;
     return {
       center: screenOf(c.center, props.camera, props.size),
-      r: Math.abs(c.radius) * props.camera.scale,
+      r: abs(c.radius) * props.camera.scale,
     };
   });
   const segmentEnds = createMemo(() => {

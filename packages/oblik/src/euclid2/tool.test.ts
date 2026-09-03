@@ -19,6 +19,8 @@ import {
 } from "./tool";
 import { regionEligibleCarriers } from "./tools/region";
 
+
+const { sqrt } = Math;
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
 const namedP: PlacePoint = { kind: "ref", bind: "P", id: "o_p", at: { x: 2, y: 0 } };
@@ -40,7 +42,7 @@ const cc: PlacePoint = {
   a: "reach",
   b: "lamp",
   k: 1,
-  at: { x: 1, y: Math.sqrt(3) },
+  at: { x: 1, y: sqrt(3) },
 };
 
 describe("enrichHit", () => {

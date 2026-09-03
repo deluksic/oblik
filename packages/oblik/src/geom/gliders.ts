@@ -2,6 +2,8 @@ import { lineBasis } from "./ops";
 import type { Circle, LineLike, Segment } from "./types";
 import { add, dot, isFiniteVec, lerp, mul, norm, sub, type Vec2 } from "./vec";
 
+
+const { abs, max, min } = Math;
 export type GliderSegment = {
   kind: "gliderSegment";
   a: Vec2;
@@ -41,7 +43,7 @@ export function gliderAt(g: Glider): Vec2 {
 }
 
 export function clamp01(t: number): number {
-  return Math.min(1, Math.max(0, t));
+  return min(1, max(0, t));
 }
 
 export function unit2(x: number, y: number): { ux: number; uy: number } {
@@ -93,7 +95,7 @@ export function lineSAt(geom: LineLike, p: Vec2): number {
 
 export function circleUnitAt(c: Circle, p: Vec2): { ux: number; uy: number } {
   const v = sub(p, c.center);
-  if (!isFiniteVec(v) || (Math.abs(v.x) < 1e-12 && Math.abs(v.y) < 1e-12)) {
+  if (!isFiniteVec(v) || (abs(v.x) < 1e-12 && abs(v.y) < 1e-12)) {
     return { ux: 1, uy: 0 };
   }
   return unit2(v.x, v.y);

@@ -10,6 +10,8 @@ import {
 import type { MentionFile, MentionFn } from "../source/mention";
 import { normalizeSceneRelPath } from "../source/scene-path";
 
+
+const { abs, max, min, round } = Math;
 export type OriginCodeLine = {
   kind: "code";
   line: number;
@@ -121,7 +123,7 @@ export function findFunctionHeaderRow(
   line: number,
   name?: string,
 ): number | null {
-  const target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
+  const target = min(max(line - 1, 0), max(0, rows.length - 1));
   for (let n = target; n >= 0; n--) {
     if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
   }
@@ -168,8 +170,8 @@ function indentColumns(indent: string): number {
 }
 
 function gcd(a: number, b: number): number {
-  let x = Math.abs(a);
-  let y = Math.abs(b);
+  let x = abs(a);
+  let y = abs(b);
   while (y) {
     const next = x % y;
     x = y;
@@ -203,7 +205,7 @@ function twoSpaceIndent(text: string, unit: number): string {
   const rest = text.slice(indent.length);
   const cols = indentColumns(indent);
   if (cols === 0) return rest;
-  const levels = unit >= 2 ? Math.round(cols / unit) : cols;
+  const levels = unit >= 2 ? round(cols / unit) : cols;
   return `${"  ".repeat(levels)}${rest}`;
 }
 
@@ -257,12 +259,12 @@ export function buildOriginFrameLines(
 ): OriginDisplayLine[] {
   const rows = text.split("\n");
   const headerIdx = findFunctionHeaderRow(rows, line, name);
-  let target = Math.min(Math.max(line - 1, 0), Math.max(0, rows.length - 1));
+  let target = min(max(line - 1, 0), max(0, rows.length - 1));
   const pinOnHeader = headerIdx != null && isClosingBraceLine(rows[target] ?? "");
   if (pinOnHeader) target = headerIdx;
   const bodyStart = headerIdx != null ? headerIdx + 1 : 0;
-  const from = Math.max(bodyStart, target - 1);
-  const to = Math.min(rows.length, Math.max(from, target) + 2);
+  const from = max(bodyStart, target - 1);
+  const to = min(rows.length, max(from, target) + 2);
   const out: OriginDisplayLine[] = [];
 
   if (headerIdx != null) {
@@ -322,8 +324,8 @@ export function buildFunctionSourceLines(
   span: { startLine: number; endLine: number },
 ): OriginDisplayLine[] {
   const rows = text.split("\n");
-  const from = Math.max(0, span.startLine - 1);
-  const to = Math.min(rows.length, Math.max(from + 1, span.endLine));
+  const from = max(0, span.startLine - 1);
+  const to = min(rows.length, max(from + 1, span.endLine));
   const out: OriginDisplayLine[] = [];
   for (let n = from; n < to; n++) {
     const line = n + 1;

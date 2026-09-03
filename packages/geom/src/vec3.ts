@@ -1,3 +1,4 @@
+const { sqrt } = Math;
 export type Vec3 = { readonly x: number; readonly y: number; readonly z: number };
 
 export function vec3(x: number, y: number, z: number): Vec3 {
@@ -21,7 +22,7 @@ export function dot3(a: Vec3, b: Vec3): number {
 }
 
 export function len3(a: Vec3): number {
-  return Math.hypot(a.x, a.y, a.z);
+  return sqrt((a.x) * (a.x) + (a.y) * (a.y) + (a.z) * (a.z));
 }
 
 export function dist3(a: Vec3, b: Vec3): number {

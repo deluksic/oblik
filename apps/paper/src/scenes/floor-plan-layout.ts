@@ -3,6 +3,8 @@ import { circle, offsetLine, point, segment, type Vec2 } from "@design-scenes/ge
 
 import type { FloorPlanOpts } from "../demo/floor-plan";
 
+
+const { PI, cos, sin } = Math;
 /** One angle call site — every door shares the same open sweep. */
 const doorOpen = (hinge: Vec2, closed: number, width: number, mirror = false) =>
   angle(hinge, 60, { radius: width, from: closed, mirror });
@@ -12,10 +14,10 @@ const doorSide = (anchor: Vec2, closed: number, width: number, flip: boolean) =>
   if (!flip) return { hinge: anchor, closed };
   return {
     hinge: {
-      x: anchor.x + Math.cos(closed) * width,
-      y: anchor.y + Math.sin(closed) * width,
+      x: anchor.x + cos(closed) * width,
+      y: anchor.y + sin(closed) * width,
     },
-    closed: closed + Math.PI,
+    closed: closed + PI,
   };
 };
 
@@ -60,12 +62,12 @@ export function floorPlanLayout(): FloorPlanOpts {
 
   const bedT = slider(0.58, { label: "Bed door", min: 0.2, max: 0.75, step: 0.01 });
   const bedAnchor = point(bedX, kY + bedT * (max.y - kY));
-  const bedDoorSide = doorSide(bedAnchor, Math.PI / 2, doorW, false);
+  const bedDoorSide = doorSide(bedAnchor, PI / 2, doorW, false);
   const bedSwing = doorOpen(bedDoorSide.hinge, bedDoorSide.closed, doorW, true);
 
   const bathT = slider(0.54, { label: "Bath door", min: 0.2, max: 0.75, step: 0.01 });
   const bathAnchor = point(bathX, min.y + bathT * (kY - min.y));
-  const bathDoorSide = doorSide(bathAnchor, Math.PI / 2, doorW, true);
+  const bathDoorSide = doorSide(bathAnchor, PI / 2, doorW, true);
   const bathSwing = doorOpen(bathDoorSide.hinge, bathDoorSide.closed, doorW, true);
 
   const windowT = slider(0.32, { label: "Window", min: 0.18, max: 0.62, step: 0.01 });

@@ -3,6 +3,8 @@ import * as ts from "typescript";
 import { SITE_CALL_NAMES } from "./call-sites.ts";
 import { findEditCallAt, findIdentifierCallAt } from "./patch-widget.ts";
 
+
+const { abs, max, min, round, sqrt } = Math;
 export type SourceAt = { line: number; column: number };
 
 export type PointRef = { name: string } | { x: number; y: number };
@@ -19,7 +21,7 @@ export type EditorInsert =
   | { kind: "offsetReuse"; base: string; inset: string };
 
 export function formatNum(n: number): string {
-  const q = Math.round(n * 100) / 100;
+  const q = round(n * 100) / 100;
   if (Object.is(q, -0)) return "0";
   return String(q);
 }
@@ -101,7 +103,7 @@ export function namedScenePointNear(
   for (const e of evals) {
     const kind = names.get(e.name);
     if (!kind) continue;
-    const d = Math.hypot(e.x - x, e.y - y);
+    const d = sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
     if (d > maxDist) continue;
     if (!best || d < best.d) best = { name: e.name, kind, d };
   }
@@ -195,7 +197,7 @@ function mul(v: Vec2Like, s: number): Vec2Like {
 }
 
 function norm(v: Vec2Like): Vec2Like {
-  const l = Math.hypot(v.x, v.y);
+  const l = sqrt((v.x) * (v.x) + (v.y) * (v.y));
   if (l < 1e-9) return { x: 1, y: 0 };
   return { x: v.x / l, y: v.y / l };
 }
@@ -221,7 +223,7 @@ function lineIntersectionMath(
   b: { origin: Vec2Like; dir: Vec2Like },
 ): Vec2Like | null {
   const denom = cross2(a.dir, b.dir);
-  if (Math.abs(denom) < 1e-12) return null;
+  if (abs(denom) < 1e-12) return null;
   const t = cross2(sub(b.origin, a.origin), b.dir) / denom;
   return add(a.origin, mul(a.dir, t));
 }
@@ -239,7 +241,7 @@ function circleLineMath(
   const dw = dot2(l.dir, w);
   const disc = dw * dw - (dot2(w, w) - c.radius * c.radius);
   if (!(disc >= 0) || !Number.isFinite(disc)) return null;
-  const t = -dw + k * Math.sqrt(disc);
+  const t = -dw + k * sqrt(disc);
   const p = add(l.origin, mul(l.dir, t));
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
   return p;
@@ -314,12 +316,12 @@ function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | n
   if (ts.isCallExpression(node)) {
     const call = unwrapCall(node);
     if (!call || !ts.isIdentifier(call.expression)) return null;
-    if (call.expression.text === "Math.min" || call.expression.text === "Math.max") {
+    if (call.expression.text === "min" || call.expression.text === "max") {
       const args = call.arguments
         .map((arg) => evalNumber(arg, env))
         .filter((n): n is number => n != null);
       if (args.length !== call.arguments.length) return null;
-      return call.expression.text === "Math.min" ? Math.min(...args) : Math.max(...args);
+      return call.expression.text === "min" ? min(...args) : max(...args);
     }
     if (call.expression.text === "dist") {
       const aName = call.arguments[0] ? pointRef(call.arguments[0]) : null;
@@ -328,7 +330,7 @@ function evalNumber(node: ts.Expression, env: Map<string, Vec2Like>): number | n
       const a = env.get(aName);
       const b = env.get(bName);
       if (!a || !b) return null;
-      return Math.hypot(a.x - b.x, a.y - b.y);
+      return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
     }
   }
   if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
@@ -521,11 +523,11 @@ export function resolveLineBindingName(
   const matchEndpoints = (line: SceneLineEval): boolean => {
     if (!line.a || !line.b) return false;
     const direct =
-      Math.hypot(line.a.x - a.x, line.a.y - a.y) <= maxDist &&
-      Math.hypot(line.b.x - b.x, line.b.y - b.y) <= maxDist;
+      sqrt((line.a.x - a.x) * (line.a.x - a.x) + (line.a.y - a.y) * (line.a.y - a.y)) <= maxDist &&
+      sqrt((line.b.x - b.x) * (line.b.x - b.x) + (line.b.y - b.y) * (line.b.y - b.y)) <= maxDist;
     const swapped =
-      Math.hypot(line.a.x - b.x, line.a.y - b.y) <= maxDist &&
-      Math.hypot(line.b.x - a.x, line.b.y - a.y) <= maxDist;
+      sqrt((line.a.x - b.x) * (line.a.x - b.x) + (line.a.y - b.y) * (line.a.y - b.y)) <= maxDist &&
+      sqrt((line.b.x - a.x) * (line.b.x - a.x) + (line.b.y - a.y) * (line.b.y - a.y)) <= maxDist;
     return direct || swapped;
   };
   const hit = namedSceneLineNear(source, "segment", matchEndpoints, pointEnv);

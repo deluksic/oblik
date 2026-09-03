@@ -2,6 +2,8 @@ import { box3, circle3, cylinder3, segment3, type Geom, type Vec3 } from "@desig
 
 import type { PlateOpts } from "./plate";
 
+
+const { abs, max, min } = Math;
 export type MillHole = { x: number; y: number; radius: number };
 
 export type MillOpts = {
@@ -14,9 +16,9 @@ export type MillOpts = {
 
 /** Extrude a 2D plate layout along Z. */
 export function millFromPlate(plate: PlateOpts, thickness: number): MillOpts {
-  const z1 = Math.max(0.12, thickness);
-  const zPocket = Math.max(0.05, z1 - Math.min(0.55, z1 * 0.45));
-  const zSlot = Math.max(0.05, z1 - Math.min(0.35, z1 * 0.35));
+  const z1 = max(0.12, thickness);
+  const zPocket = max(0.05, z1 - min(0.55, z1 * 0.45));
+  const zSlot = max(0.05, z1 - min(0.35, z1 * 0.35));
   return {
     stock: {
       min: { x: plate.stock.min.x, y: plate.stock.min.y, z: 0 },
@@ -58,8 +60,8 @@ function stockBox(min: Vec3, max: Vec3): Geom {
 
 /** Through-holes + top circles. Loop is intentional for provenance stress. */
 function holeSet(stock: MillOpts["stock"], holes: MillHole[]): Geom[] {
-  const z0 = Math.min(stock.min.z, stock.max.z);
-  const z1 = Math.max(stock.min.z, stock.max.z);
+  const z0 = min(stock.min.z, stock.max.z);
+  const z1 = max(stock.min.z, stock.max.z);
   const out: Geom[] = [];
   for (const h of holes) {
     out.push(cylinder3({ x: h.x, y: h.y, z: z0 }, { x: h.x, y: h.y, z: z1 }, h.radius));
@@ -71,7 +73,7 @@ function holeSet(stock: MillOpts["stock"], holes: MillHole[]): Geom[] {
 function slotCut(opts: MillOpts["slot"], zTop: number): Geom[] {
   const halfL = opts.length / 2;
   const halfW = opts.width / 2;
-  const z0 = zTop - Math.abs(opts.depth);
+  const z0 = zTop - abs(opts.depth);
   return [
     box3(
       { x: opts.center.x - halfL, y: opts.center.y - halfW, z: z0 },
@@ -86,19 +88,19 @@ function slotCut(opts: MillOpts["slot"], zTop: number): Geom[] {
 
 /** Z-up mill block: stock, through holes, pocket, edge slot. */
 export function drawMill(opts: MillOpts): Geom[] {
-  const zTop = Math.max(opts.stock.min.z, opts.stock.max.z);
+  const zTop = max(opts.stock.min.z, opts.stock.max.z);
   const parts: Geom[] = [stockBox(opts.stock.min, opts.stock.max)];
   parts.push(...holeSet(opts.stock, opts.holes));
   const bc = opts.boltCircle;
   if (bc) {
-    const z1 = Math.max(opts.stock.min.z, opts.stock.max.z);
+    const z1 = max(opts.stock.min.z, opts.stock.max.z);
     parts.push(circle3({ x: bc.x, y: bc.y, z: z1 }, bc.radius, { x: 0, y: 0, z: 1 }));
   }
   const p = opts.pocket;
   parts.push(box3(p.min, p.max));
   const r = p.filletR ?? 0;
   if (r > 0) {
-    const z = Math.max(p.min.z, p.max.z);
+    const z = max(p.min.z, p.max.z);
     const n = { x: 0, y: 0, z: 1 };
     parts.push(circle3({ x: p.min.x + r, y: p.min.y + r, z }, r, n));
     parts.push(circle3({ x: p.max.x - r, y: p.min.y + r, z }, r, n));

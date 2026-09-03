@@ -13,6 +13,8 @@ import {
 import type { Circle, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
+
+const { PI, cos, sin } = Math;
 function poly(pts: readonly Vec2[]): Region {
   const cycle: unknown[] = [];
   for (let i = 0; i < pts.length; i++) {
@@ -84,10 +86,10 @@ function roundedSquare(r: number): Region {
 
 function sector(deg: number): Region {
   const r = 2;
-  const a = (deg * Math.PI) / 180;
+  const a = (deg * PI) / 180;
   const O = { x: 0, y: 0 };
   const P = { x: r, y: 0 };
-  const Q = { x: r * Math.cos(a), y: r * Math.sin(a) };
+  const Q = { x: r * cos(a), y: r * sin(a) };
   const oa: Segment = { kind: "segment", a: O, b: P };
   const ob: Segment = { kind: "segment", a: O, b: Q };
   const c: Circle = { kind: "circle", center: O, radius: r };

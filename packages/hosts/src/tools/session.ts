@@ -1,3 +1,4 @@
+const { abs, max, round, sqrt } = Math;
 /**
  * Tool session: slot resolvers, click, compile, command-bar preview.
  * Palette membership is `tools/catalog.ts`. Ghost paint is `tools/ghost.ts`.
@@ -271,7 +272,7 @@ function fn(name: string, args: string[]): string {
 }
 
 function fmt(n: number): string {
-  const q = Math.round(n * 100) / 100;
+  const q = round(n * 100) / 100;
   if (Object.is(q, -0)) return "0";
   return String(q);
 }
@@ -286,7 +287,7 @@ function siteAt(site: GeomSite | undefined, sceneFile: string): SourceAt | null 
 }
 
 function pickRadius(ctx: PickCtx): number {
-  return Math.max(0.12, 12 / ctx.cam.scale);
+  return max(0.12, 12 / ctx.cam.scale);
 }
 
 function namedPointNear(
@@ -297,7 +298,7 @@ function namedPointNear(
   let best: PointBind | null = null;
   let bestD = max;
   for (const p of pts) {
-    const d = Math.hypot(p.x - world.x, p.y - world.y);
+    const d = sqrt((p.x - world.x) * (p.x - world.x) + (p.y - world.y) * (p.y - world.y));
     if (d <= bestD) {
       bestD = d;
       best = { kind: "named", name: p.name, x: p.x, y: p.y };
@@ -308,7 +309,7 @@ function namedPointNear(
 
 function worldOriginNear(ctx: PickCtx): PointBind | null {
   const max = pickRadius(ctx);
-  if (Math.hypot(ctx.world.x, ctx.world.y) > max) return null;
+  if (sqrt((ctx.world.x) * (ctx.world.x) + (ctx.world.y) * (ctx.world.y)) > max) return null;
   const named = namedPointNear(ctx.namedPoints, { x: 0, y: 0 }, max);
   if (named) return named;
   return { kind: "free", x: 0, y: 0 };
@@ -372,7 +373,7 @@ function offsetAsLine(
 function lineOriginDir(ll: LineLike): { origin: Vec2; dir: Vec2 } {
   if (ll.kind === "line") return { origin: ll.origin, dir: ll.direction };
   const dir = sub(ll.b, ll.a);
-  const len = Math.hypot(dir.x, dir.y) || 1;
+  const len = sqrt((dir.x) * (dir.x) + (dir.y) * (dir.y)) || 1;
   return { origin: ll.a, dir: { x: dir.x / len, y: dir.y / len } };
 }
 
@@ -435,7 +436,7 @@ function resolveLineLineCrossing(ctx: PickCtx): PointBind | null {
       const b = likes[j]!;
       const pt = lineIntersection(a.line, b.line);
       if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
-      if (Math.hypot(pt.x - ctx.world.x, pt.y - ctx.world.y) > 0.35) continue;
+      if (sqrt((pt.x - ctx.world.x) * (pt.x - ctx.world.x) + (pt.y - ctx.world.y) * (pt.y - ctx.world.y)) > 0.35) continue;
       return { kind: "intersection", a: a.bind, b: b.bind, x: pt.x, y: pt.y };
     }
   }
@@ -454,7 +455,7 @@ function resolveCircleLineCrossing(ctx: PickCtx): PointBind | null {
       for (const k of [1, -1] as const) {
         const pt = circleLineIntersection(c.circle, ll.line, k);
         if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
-        const d = Math.hypot(pt.x - ctx.world.x, pt.y - ctx.world.y);
+        const d = sqrt((pt.x - ctx.world.x) * (pt.x - ctx.world.x) + (pt.y - ctx.world.y) * (pt.y - ctx.world.y));
         if (d <= bestD) {
           bestD = d;
           best = { kind: "circleLine", circle: c.name, line: ll.bind, k, x: pt.x, y: pt.y };
@@ -469,8 +470,8 @@ export function resolveCrossing(ctx: PickCtx): PointBind | null {
   const cl = resolveCircleLineCrossing(ctx);
   const ll = resolveLineLineCrossing(ctx);
   if (cl && ll) {
-    const dCl = Math.hypot(cl.x - ctx.world.x, cl.y - ctx.world.y);
-    const dLl = Math.hypot(ll.x - ctx.world.x, ll.y - ctx.world.y);
+    const dCl = sqrt((cl.x - ctx.world.x) * (cl.x - ctx.world.x) + (cl.y - ctx.world.y) * (cl.y - ctx.world.y));
+    const dLl = sqrt((ll.x - ctx.world.x) * (ll.x - ctx.world.x) + (ll.y - ctx.world.y) * (ll.y - ctx.world.y));
     return dCl <= dLl ? cl : ll;
   }
   return cl ?? ll;
@@ -1088,7 +1089,7 @@ export function compilePoint(
 
 function samePoint(a: PointBind, b: PointBind): boolean {
   if (a.kind === "named" && b.kind === "named") return a.name === b.name;
-  return Math.hypot(a.x - b.x, a.y - b.y) < 0.05;
+  return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)) < 0.05;
 }
 
 function lineBindPreview(bind: LineBind | undefined, empty = "<line>"): string {
@@ -1336,7 +1337,7 @@ export function signedOffset(origin: Vec2, dir: Vec2, world: Vec2): number {
 }
 
 export function radiusBetween(a: Vec2, b: Vec2): number {
-  return Math.max(0.05, dist(a, b));
+  return max(0.05, dist(a, b));
 }
 
 function commitOrError(session: ToolSession, patch: ScenePatch | { error: string }): SessionResult {
@@ -1412,7 +1413,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
     const typed = parseOptNum(session.value);
     if (typed != null) return commitOrError(session, compileSlider(src, sliderWrite(session, typed)));
     return commitOrError(session, 
-      compileSlider(src, sliderWrite(session, Math.max(0.05, Math.hypot(ctx.world.x, ctx.world.y) || 1))),
+      compileSlider(src, sliderWrite(session, max(0.05, sqrt((ctx.world.x) * (ctx.world.x) + (ctx.world.y) * (ctx.world.y)) || 1))),
     );
   }
 
@@ -1507,7 +1508,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
       );
     }
     const s = signedOffset(from.origin, from.dir, ctx.world);
-    const mag = Math.max(0.05, Math.abs(s));
+    const mag = max(0.05, abs(s));
     return commitOrError(session, compileOffset(src, from, { kind: "fresh", value: s < 0 ? -mag : mag }, named));
   }
 
@@ -1596,7 +1597,7 @@ export function onSessionClick(session: ToolSession, ctx: PickCtx, src: string):
     );
   }
   const s = signedOffset(session.from.origin, session.from.dir, ctx.world);
-  const mag = Math.max(0.05, Math.abs(s));
+  const mag = max(0.05, abs(s));
   return commitOrError(session, compileDistance(src, session.from, { kind: "fresh", value: s < 0 ? -mag : mag }, asName(session)));
 }
 

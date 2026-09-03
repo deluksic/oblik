@@ -5,6 +5,8 @@ import type { CommandBarState, CommandSpec } from "@/types";
 
 import styles from "./Palette.module.css";
 
+
+const { max, min } = Math;
 export type PaletteMode = "closed" | "picker" | "prompt";
 
 function parseDraft(raw: string): number | null {
@@ -54,12 +56,12 @@ function PickerPanel(props: {
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(items().length - 1, i + 1));
+      setActive((i) => min(items().length - 1, i + 1));
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => Math.max(0, i - 1));
+      setActive((i) => max(0, i - 1));
       return;
     }
     if (e.key === "Enter") {
@@ -163,7 +165,7 @@ export function Palette(props: PaletteProps) {
     const rowRect = row.getBoundingClientRect();
     numberRef.current.style.left = `${slotRect.left - rowRect.left}px`;
     numberRef.current.style.top = `${slotRect.top - rowRect.top}px`;
-    numberRef.current.style.width = `${Math.max(slotRect.width, 1)}px`;
+    numberRef.current.style.width = `${max(slotRect.width, 1)}px`;
     numberRef.current.style.height = `${slotRect.height}px`;
   }
 

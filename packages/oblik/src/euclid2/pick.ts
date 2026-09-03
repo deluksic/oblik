@@ -16,6 +16,8 @@ import { lineBasis } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
+
+const { abs, max, sqrt } = Math;
 export type Vec2 = { x: number; y: number };
 
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
@@ -106,7 +108,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
   }
   if (v.kind === "circle") {
     const c = v as Circle;
-    return Math.abs(dist(world, c.center) - Math.abs(c.radius));
+    return abs(dist(world, c.center) - abs(c.radius));
   }
   if (isRegion(v)) return distToRegion(v, world);
   if (isCsg2(v) || isPick(v)) return distToCsg(v, world);
@@ -128,7 +130,7 @@ export function snapBoundPoint(
     const bind = snapPrint(n, filter);
     const p = n.value.kind === "point" ? n.value : gliderAt(n.value);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-    const d = Math.hypot(p.x - world.x, p.y - world.y);
+    const d = sqrt((p.x - world.x) * (p.x - world.x) + (p.y - world.y) * (p.y - world.y));
     if (d > maxDist) continue;
     if (!best || d < best.d) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d };
   }
@@ -137,7 +139,7 @@ export function snapBoundPoint(
 
 function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
   const px = n.value.kind === "point" ? POINT_PX : maxPx;
-  return px / Math.max(8, camera.scale);
+  return px / max(8, camera.scale);
 }
 
 function pickRank(n: TraceNode): number {
@@ -186,7 +188,7 @@ export function hitTest(
 export const PICK_CLICK_PX = 4;
 
 export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
-  return Math.hypot(toX - fromX, toY - fromY) >= PICK_CLICK_PX;
+  return sqrt((toX - fromX) * (toX - fromX) + (toY - fromY) * (toY - fromY)) >= PICK_CLICK_PX;
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);

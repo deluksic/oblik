@@ -14,6 +14,8 @@ import type {
   ToolStep,
 } from "./types";
 
+
+const { max } = Math;
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 
@@ -248,7 +250,7 @@ export function tabSession<S extends ToolSession>(tool: Tool<S>, session: S, dir
   if (open.length === 0 || !tool.setFocus) return session;
   const ids = open.map((f) => f.id);
   const cur = tool.focus?.(session) ?? ids[0]!;
-  const i = Math.max(0, ids.indexOf(cur));
+  const i = max(0, ids.indexOf(cur));
   return tool.setFocus(session, ids[(i + dir + ids.length) % ids.length]!);
 }
 

@@ -10,6 +10,8 @@ import {
 import type { Circle, Line, ParallelLine } from "./types";
 import { dot, perp } from "./vec";
 
+
+const { sqrt } = Math;
 const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const b: Circle = { kind: "circle", center: { x: 2, y: 0 }, radius: 2 };
 const ground: Line = { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
@@ -57,9 +59,9 @@ describe("circleCircleIntersectionValue", () => {
     const plus = circleCircleIntersectionValue(a, b, 1);
     const minus = circleCircleIntersectionValue(a, b, -1);
     expect(plus.x).toBeCloseTo(1);
-    expect(plus.y).toBeCloseTo(Math.sqrt(3));
+    expect(plus.y).toBeCloseTo(sqrt(3));
     expect(minus.x).toBeCloseTo(1);
-    expect(minus.y).toBeCloseTo(-Math.sqrt(3));
+    expect(minus.y).toBeCloseTo(-sqrt(3));
   });
 
   test("misses are NaN, not a hop to the other root", () => {

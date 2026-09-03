@@ -14,6 +14,8 @@ import {
   vec,
 } from "@design-scenes/geom";
 
+
+const { PI, abs, cos, max, min, round, sin, sqrt, tan } = Math;
 export type SpurGearOpts = {
   center: Vec2;
   /** Number of teeth. */
@@ -27,13 +29,13 @@ export type SpurGearOpts = {
 };
 
 function involuteAt(rb: number, t: number): Vec2 {
-  return vec(rb * (Math.cos(t) + t * Math.sin(t)), rb * (Math.sin(t) - t * Math.cos(t)));
+  return vec(rb * (cos(t) + t * sin(t)), rb * (sin(t) - t * cos(t)));
 }
 
 function tAtRadius(rb: number, r: number): number {
   const x = r / rb;
   if (x <= 1) return 0;
-  return Math.sqrt(x * x - 1);
+  return sqrt(x * x - 1);
 }
 
 function flank(rb: number, t0: number, t1: number, samples: number, spin: number): Vec2[] {
@@ -69,20 +71,20 @@ function toothParts(
   baseR: number;
   needsRadial: boolean;
 } {
-  const z = Math.max(8, Math.round(teeth));
+  const z = max(8, round(teeth));
   const m = (2 * pitchR) / z;
-  const baseR = pitchR * Math.cos(alpha);
+  const baseR = pitchR * cos(alpha);
   const addR = pitchR + m;
-  const rootR = Math.max(0.18 * pitchR, pitchR - 1.25 * m);
-  const half = Math.PI / (2 * z);
+  const rootR = max(0.18 * pitchR, pitchR - 1.25 * m);
+  const half = PI / (2 * z);
   const tPitch = tAtRadius(baseR, pitchR);
   const spin = half - ang(involuteAt(baseR, -tPitch));
-  const t0 = tAtRadius(baseR, Math.max(baseR * 1.001, rootR));
+  const t0 = tAtRadius(baseR, max(baseR * 1.001, rootR));
   const t1 = tAtRadius(baseR, addR);
   const right = flank(baseR, t0, t1, flankSamples, spin);
   const left = right.map((p) => vec(p.x, -p.y)).toReversed();
   const tip = right[right.length - 1] ?? polar(addR, half);
-  const rootPt = right[0] ?? polar(Math.max(rootR, baseR), half);
+  const rootPt = right[0] ?? polar(max(rootR, baseR), half);
   const add1 = ang(tip);
   const root1 = ang(rootPt);
   return {
@@ -108,12 +110,12 @@ function at(local: Vec2, center: Vec2, rot: number): Vec2 {
  * so a pinion tooth (centerline at rot1) fits the wheel gap.
  */
 export function meshMateRotation(z1: number, z2: number, rot1: number): number {
-  return -rot1 * (z1 / z2) + Math.PI - Math.PI / z2;
+  return -rot1 * (z1 / z2) + PI - PI / z2;
 }
 
 /** Involute spur: one closed outline polyline, pitch + bore, pitch marker. */
 export function drawSpurGear(opts: SpurGearOpts): Geom[] {
-  const pitchR = Math.max(0.4, Math.abs(opts.pitchRadius));
+  const pitchR = max(0.4, abs(opts.pitchRadius));
   const rot = opts.rotation ?? 0;
   const c = opts.center;
   const bore = opts.bore ?? pitchR * 0.32;
@@ -132,15 +134,15 @@ export function drawSpurGear(opts: SpurGearOpts): Geom[] {
 }
 
 export function gearModule(pitchRadius: number, teeth: number): number {
-  return (2 * Math.abs(pitchRadius)) / Math.max(8, Math.round(teeth));
+  return (2 * abs(pitchRadius)) / max(8, round(teeth));
 }
 
 export function pitchRadiusFor(module: number, teeth: number): number {
-  return (Math.abs(module) * Math.max(8, Math.round(teeth))) / 2;
+  return (abs(module) * max(8, round(teeth))) / 2;
 }
 
 export function centerDistance(pitchA: number, pitchB: number): number {
-  return Math.abs(pitchA) + Math.abs(pitchB);
+  return abs(pitchA) + abs(pitchB);
 }
 
 /** Pitch point of an external pair on the +X line of centres. */
@@ -156,7 +158,7 @@ export function lineOfAction(
   length: number,
 ): Geom {
   const p = pitchPoint(pinion, pitchRadius);
-  const dir = polar(length, Math.PI / 2 - pressureAngle);
+  const dir = polar(length, PI / 2 - pressureAngle);
   return segment(vec(p.x - dir.x, p.y - dir.y), vec(p.x + dir.x, p.y + dir.y));
 }
 
@@ -175,18 +177,18 @@ export type GearLayout = {
 
 /** Closed outer tooth loop, CCW, for `extrude`. */
 export function gearOutline(opts: SpurGearOpts, flankSamples = 8): Vec2[] {
-  const z = Math.max(8, Math.round(opts.teeth));
-  const pitchR = Math.max(0.4, Math.abs(opts.pitchRadius));
-  const alpha = Math.min(0.5, Math.max(0.2, opts.pressureAngle));
+  const z = max(8, round(opts.teeth));
+  const pitchR = max(0.4, abs(opts.pitchRadius));
+  const alpha = min(0.5, max(0.2, opts.pressureAngle));
   const rot = opts.rotation ?? 0;
   const c = opts.center;
   const tooth = toothParts(pitchR, z, alpha, flankSamples);
-  const step = (Math.PI * 2) / z;
+  const step = (PI * 2) / z;
   const ring: Vec2[] = [];
 
   const sampleArc = (radius: number, a0: number, a1: number): Vec2[] => {
     const sweep = sweepCCW(a0, a1);
-    const n = Math.max(3, Math.round(8 * (sweep / (Math.PI / 8))));
+    const n = max(3, round(8 * (sweep / (PI / 8))));
     const pts: Vec2[] = [];
     for (let i = 0; i <= n; i++) {
       pts.push(add(c, polar(radius, a0 + (sweep * i) / n)));
@@ -222,8 +224,8 @@ export function gearOutline(opts: SpurGearOpts, flankSamples = 8): Vec2[] {
 
 /** Total twist (radians) so the pitch helix angle is `helixAngle`. */
 export function helixTwist(faceWidth: number, helixAngle: number, pitchRadius: number): number {
-  if (Math.abs(pitchRadius) < 1e-6) return 0;
-  return (Math.abs(faceWidth) * Math.tan(helixAngle)) / pitchRadius;
+  if (abs(pitchRadius) < 1e-6) return 0;
+  return (abs(faceWidth) * tan(helixAngle)) / pitchRadius;
 }
 
 export function drawHelicalGear(opts: SpurGearOpts & { height: number; helixAngle: number }): Geom {
@@ -237,8 +239,8 @@ export function drawHelicalGear(opts: SpurGearOpts & { height: number; helixAngl
 }
 
 export function drawHelicalPair(layout: GearLayout, height: number): Geom[] {
-  const h = Math.max(0.35, height);
-  const beta = (layout.helixDeg * Math.PI) / 180;
+  const h = max(0.35, height);
+  const beta = (layout.helixDeg * PI) / 180;
   return [
     drawHelicalGear({
       center: layout.pinion,

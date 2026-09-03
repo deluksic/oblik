@@ -14,6 +14,8 @@ import { regionSvgPath } from "./region";
 import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
 import { lerp, type Vec2 } from "./vec";
 
+
+const { abs, max, round } = Math;
 export type DrawOp =
   | { kind: "path"; d: string }
   | { kind: "circle"; cx: number; cy: number; r: number };
@@ -129,7 +131,7 @@ export function flattenCsg(op: CsgOperand): FlattenedCsg | null {
 
 function drawOp(op: Region | Circle): DrawOp {
   if (op.kind === "circle") {
-    return { kind: "circle", cx: op.center.x, cy: op.center.y, r: Math.abs(op.radius) };
+    return { kind: "circle", cx: op.center.x, cy: op.center.y, r: abs(op.radius) };
   }
   return { kind: "path", d: regionSvgPath(op) };
 }
@@ -183,7 +185,7 @@ function polyPath(poly: readonly Vec2[]): string {
 
 function keepClipPath(keeps: readonly HalfPlane[], box: Aabb): string | undefined {
   if (keeps.length === 0) return undefined;
-  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1);
+  const span = max(box.maxX - box.minX, box.maxY - box.minY, 1);
   let poly = aabbPoly(padAabb(box, span * 4));
   for (const h of keeps) poly = clipByHalfPlane(poly, h);
   return polyPath(poly);
@@ -223,14 +225,14 @@ function drawOf(op: CsgOperand, box: Aabb): CsgDraw | null {
 function paintBox(op: CsgOperand): Aabb | null {
   const box = op.kind === "csg2" ? csgAabb(op) : operandAabb(op);
   if (!box) return null;
-  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
   return padAabb(box, span * 0.08);
 }
 
 function drawOpPath(op: DrawOp): string {
   if (op.kind === "path") return op.d;
   if (op.kind === "circle") {
-    const r = Math.abs(op.r);
+    const r = abs(op.r);
     const x = op.cx;
     const y = op.cy;
     return `M ${x + r} ${y} A ${r} ${r} 0 1 1 ${x - r} ${y} A ${r} ${r} 0 1 1 ${x + r} ${y} Z`;
@@ -256,7 +258,7 @@ function paintCompiledRegion(r: Region): CsgPaint {
   if (!d) return emptyPaint();
   const box = fillAabb(r);
   if (!box) return emptyPaint();
-  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
   return {
     empty: false,
     box: padAabb(box, span * 0.08),
@@ -270,7 +272,7 @@ function paintCompiledIslands(islands: readonly Region[]): CsgPaint {
   const d = islandsSvgPath(islands);
   const box = islandsAabb(islands);
   if (!d || !box) return emptyPaint();
-  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
   return {
     empty: false,
     box: padAabb(box, span * 0.08),
@@ -330,7 +332,7 @@ function fillPaintFresh(v: Region | Csg2 | Pick): CsgPaint {
     if (!d) return emptyPaint();
     const box = fillAabb(v);
     if (!box) return emptyPaint();
-    const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+    const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
     return {
       empty: false,
       box: padAabb(box, span * 0.08),
@@ -347,7 +349,7 @@ function fillPaintFresh(v: Region | Csg2 | Pick): CsgPaint {
 }
 
 function n(v: number): string {
-  return (Math.round(v * 1000) / 1000).toString();
+  return (round(v * 1000) / 1000).toString();
 }
 
 function aabbAttrs(box: Aabb): string {

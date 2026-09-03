@@ -1,6 +1,8 @@
 import { pointOnLine, pointOnSegment, slider, vector } from "@design-scenes/euclid2";
 import { circle, point, segment, type Vec2 } from "@design-scenes/geom";
 
+
+const { PI, cos, max, min, round, sin, sqrt } = Math;
 function stockEdges(min: Vec2, max: Vec2) {
   return {
     bottom: segment(min, { x: max.x, y: min.y }),
@@ -50,13 +52,13 @@ export function plateLayout() {
     step: 1,
   });
 
-  const ringCount = Math.max(3, Math.round(ringN));
+  const ringCount = max(3, round(ringN));
   const ringHoles: { center: Vec2; radius: number }[] = [];
   for (let i = 0; i < ringCount; i++) {
-    const a = (i / ringCount) * Math.PI * 2 - Math.PI / 2;
+    const a = (i / ringCount) * PI * 2 - PI / 2;
     const center = {
-      x: bc.x + Math.cos(a) * pcd,
-      y: bc.y + Math.sin(a) * pcd,
+      x: bc.x + cos(a) * pcd,
+      y: bc.y + sin(a) * pcd,
     };
     ringHoles.push({ center, radius: ringR(center) });
   }
@@ -67,7 +69,7 @@ export function plateLayout() {
     x: pocketMin.x + pocketSpan.x,
     y: pocketMin.y + pocketSpan.y,
   };
-  const filletMax = Math.sqrt(2) * Math.min(pocketSpan.x / 2, pocketSpan.y / 2);
+  const filletMax = sqrt(2) * min(pocketSpan.x / 2, pocketSpan.y / 2);
   const onBisector = (origin: Vec2, dir: Vec2) =>
     pointOnLine(origin, dir, 0.85, { min: 0, max: filletMax });
   const bl = onBisector(pocketMin, { x: 1, y: 1 });

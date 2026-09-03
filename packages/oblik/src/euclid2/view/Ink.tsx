@@ -24,6 +24,8 @@ import { RegionOp } from "./RegionInk";
 
 import styles from "./View.module.css";
 
+
+const { abs, max, sqrt } = Math;
 function inkClass(editable: boolean, muted = false, selected = false, hot = false) {
   const white = selected || hot;
   return [
@@ -166,7 +168,7 @@ function CircleStroke(props: {
           data-ink={traceKey(props.node)}
           cx={c().center.x}
           cy={c().center.y}
-          r={Math.abs(c().radius)}
+          r={abs(c().radius)}
         />
       )}
       <For each={props.layers}>
@@ -183,7 +185,7 @@ function CircleStroke(props: {
             stroke-width={layerStrokeWidth(layer)}
             cx={c().center.x}
             cy={c().center.y}
-            r={Math.abs(c().radius)}
+            r={abs(c().radius)}
           />
         )}
       </For>
@@ -336,10 +338,10 @@ export function RegionGhost(props: { ghost: Extract<Ghost, { kind: "region" }>; 
   const arrow = createMemo(() => {
     const a = props.ghost.arrow;
     if (!a) return null;
-    const n = Math.hypot(a.tx, a.ty) || 1;
+    const n = sqrt((a.tx) * (a.tx) + (a.ty) * (a.ty)) || 1;
     const ux = a.tx / n;
     const uy = a.ty / n;
-    const scale = Math.max(8, props.camera.scale);
+    const scale = max(8, props.camera.scale);
     const pad = 10 / scale;
     const shaft = 20 / scale;
     const head = 7 / scale;

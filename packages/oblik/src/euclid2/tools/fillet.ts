@@ -13,6 +13,8 @@ import {
 } from "./length";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
+
+const { max } = Math;
 type FilletSession = Extract<ToolSession, { verb: "fillet" }>;
 
 const fields: Field<FilletSession>[] = [lengthField("<radius>")];
@@ -71,7 +73,7 @@ function vertexLabel(session: FilletSession, scope: Scope, place: PlaceHit | nul
 function radiusAt(session: FilletSession, hit: PlaceHit): number {
   if (!session.at) return 0;
   const at = hit.point.kind === "free" ? hit.world : hit.point.at;
-  return Math.max(0, dist(at, session.at));
+  return max(0, dist(at, session.at));
 }
 
 function radiusExpr(session: FilletSession, hit: PlaceHit, scope: Scope): Expr {
@@ -85,7 +87,7 @@ function radiusExpr(session: FilletSession, hit: PlaceHit, scope: Scope): Expr {
   if (hit.length && hit.length.value >= 0) return hit.length.expr;
   if (bound) return bound;
   if (isPinnedPoint(hit.point) && session.at) {
-    return { kind: "num", value: round(Math.max(0, dist(hit.point.at, session.at))) };
+    return { kind: "num", value: round(max(0, dist(hit.point.at, session.at))) };
   }
   return { kind: "num", value: round(radiusAt(session, hit)) };
 }
@@ -93,10 +95,10 @@ function radiusExpr(session: FilletSession, hit: PlaceHit, scope: Scope): Expr {
 function radiusNumber(session: FilletSession, place: PlaceHit | null, scope: Scope): number {
   if (resolveLengthExpr(session, scope, { min: 0 }) != null) {
     const fallback = place?.length?.value ?? 0;
-    return Math.max(0, lengthValue(session, scope, fallback));
+    return max(0, lengthValue(session, scope, fallback));
   }
   if (place?.length && place.length.value >= 0) {
-    return Math.max(0, lengthValue(session, scope, place.length.value));
+    return max(0, lengthValue(session, scope, place.length.value));
   }
   if (
     place &&
@@ -104,7 +106,7 @@ function radiusNumber(session: FilletSession, place: PlaceHit | null, scope: Sco
     session.vertexExpr &&
     !sameRef(session.vertexExpr, place.point)
   ) {
-    return Math.max(0, dist(place.point.at, session.at ?? place.point.at));
+    return max(0, dist(place.point.at, session.at ?? place.point.at));
   }
   if (!place || !session.at) return 0;
   return radiusAt(session, place);

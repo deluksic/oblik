@@ -4,6 +4,8 @@ import { compileSdf2, sdf2MapSignature, type CompiledSdf2 } from "./compile2";
 import { BLIT_FRAG, BLIT_VERT, SDF_VERT, sdf2FragSource } from "./shader";
 import type { Sdf2 } from "./tree2";
 
+
+const { floor, max } = Math;
 export type Cam2 = { x: number; y: number; scale: number };
 
 const COL = {
@@ -119,12 +121,12 @@ export class Sdf2View {
 
   resize(): void {
     const r = this.canvas.getBoundingClientRect();
-    const w = Math.max(1, r.width);
-    const h = Math.max(1, r.height);
+    const w = max(1, r.width);
+    const h = max(1, r.height);
     this.renderer.setSize(w, h, false);
     this.fieldTarget.setSize(
-      Math.max(1, Math.floor(w * FIELD_SCALE)),
-      Math.max(1, Math.floor(h * FIELD_SCALE)),
+      max(1, floor(w * FIELD_SCALE)),
+      max(1, floor(h * FIELD_SCALE)),
     );
   }
 

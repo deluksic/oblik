@@ -14,6 +14,8 @@ import {
   signedDist,
 } from "./index";
 
+
+const { abs } = Math;
 test("offsetLine returns { line, distance } and draws the parallel", () => {
   beginGeomFrame();
   const ground = line(point(0, 0), point(4, 0));
@@ -81,9 +83,9 @@ test("perpendicularLine passes through point and is normal to carrier", () => {
   const p = point(2, 1);
   const perpLn = perpendicularLine(ground, p);
   expect(perpLn.kind).toBe("line");
-  expect(Math.abs(perpLn.direction.x)).toBeLessThan(1e-9);
-  expect(Math.abs(Math.abs(perpLn.direction.y) - 1)).toBeLessThan(1e-9);
-  expect(Math.abs(signedDist(p, perpLn))).toBeLessThan(1e-9);
+  expect(abs(perpLn.direction.x)).toBeLessThan(1e-9);
+  expect(abs(abs(perpLn.direction.y) - 1)).toBeLessThan(1e-9);
+  expect(abs(signedDist(p, perpLn))).toBeLessThan(1e-9);
 });
 
 function doorLeaf() {

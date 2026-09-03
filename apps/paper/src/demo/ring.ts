@@ -9,6 +9,8 @@ import {
   vec,
 } from "@design-scenes/geom";
 
+
+const { PI, abs, cos, max } = Math;
 export type RingOpts = {
   /** Bottom-left of the unrolled strip (seam). */
   origin: Vec2;
@@ -23,13 +25,13 @@ export type RingOpts = {
 };
 
 export function circumference(innerR: number): number {
-  return Math.max(0.4, Math.abs(innerR)) * Math.PI * 2;
+  return max(0.4, abs(innerR)) * PI * 2;
 }
 
 function topZ(s: number, circ: number, shank: number, signet: number): number {
   const t = circ < 1e-6 ? 0 : s / circ;
-  const w = 0.5 * (1 - Math.cos(2 * Math.PI * t));
-  return shank + (Math.max(shank, signet) - shank) * w;
+  const w = 0.5 * (1 - cos(2 * PI * t));
+  return shank + (max(shank, signet) - shank) * w;
 }
 
 const SAMPLES = 72;
@@ -37,8 +39,8 @@ const SAMPLES = 72;
 /** Developed curves in (s, z). Last sample is before 2π so wrap welds. */
 export function bandCurves(opts: RingOpts): { bottom: Vec2[]; top: Vec2[] } {
   const circ = circumference(opts.innerR);
-  const shank = Math.max(0.4, opts.shank);
-  const signet = Math.max(shank, opts.signet);
+  const shank = max(0.4, opts.shank);
+  const signet = max(shank, opts.signet);
   const bottom: Vec2[] = [];
   const top: Vec2[] = [];
   for (let i = 0; i < SAMPLES; i++) {
@@ -76,14 +78,14 @@ export function drawUnrolled(opts: RingOpts): Geom[] {
 }
 
 export function drawRingPlan(center: Vec2, innerR: number, gauge: number): Geom[] {
-  const r = Math.max(0.4, innerR);
-  return [circle(center, r), circle(center, r + Math.max(0.15, gauge))];
+  const r = max(0.4, innerR);
+  return [circle(center, r), circle(center, r + max(0.15, gauge))];
 }
 
 export function drawRing3(opts: RingOpts): Geom {
   const { bottom, top } = bandCurves(opts);
   return wrapBand(bottom, top, {
-    radius: Math.max(0.4, opts.innerR),
-    thickness: Math.max(0.15, opts.gauge),
+    radius: max(0.4, opts.innerR),
+    thickness: max(0.15, opts.gauge),
   });
 }

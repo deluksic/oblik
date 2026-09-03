@@ -6,6 +6,8 @@ import { evaluate } from "../eval/evaluate";
 import { defineScene } from "../eval/scene";
 import { figureToSvg, type FigureExportOptions } from "./export";
 
+
+const { round } = Math;
 function traceFor(build: () => void): TraceNode[] {
   const scene = defineScene({ kind: "figure", title: "Test figure", build });
   return evaluate(scene, {}).trace;
@@ -60,8 +62,8 @@ describe("figureToSvg", () => {
     );
 
     expect(out.svg).toContain('viewBox="0 0 5.2 4.2"');
-    expect(out.width).toBe(Math.round(5.2 * 72));
-    expect(out.height).toBe(Math.round(4.2 * 72));
+    expect(out.width).toBe(round(5.2 * 72));
+    expect(out.height).toBe(round(4.2 * 72));
     expect(out.svg).toContain('fill="#ffffff"'); // white paper
   });
 

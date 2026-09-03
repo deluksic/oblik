@@ -6,6 +6,8 @@ import { alongValue, filletValue, isCircleWalk, regionContains, regionValue } fr
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
+
+const { max } = Math;
 function seg(a: Vec2, b: Vec2): Segment {
   return { kind: "segment", a, b };
 }
@@ -28,7 +30,7 @@ function disk(cx: number, cy: number, r: number): Circle {
 
 function stadium(cx: number, cy: number, length: number, width: number): Region {
   const r = width / 2;
-  const half = Math.max(length, width) / 2 - r;
+  const half = max(length, width) / 2 - r;
   const L = { x: cx - half, y: cy };
   const R = { x: cx + half, y: cy };
   const leftC: Circle = { kind: "circle", center: L, radius: r };

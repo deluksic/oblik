@@ -1,5 +1,7 @@
 import { circle, dist, line, parallelLine, point, signedDist, defineScene } from "oblik";
 
+
+const { PI, cos, sin } = Math;
 export default defineScene({
   kind: "euclid2",
   title: "Shared loop",
@@ -8,10 +10,10 @@ export default defineScene({
   build() {
     const o = point(0, -0.03, "o_o");
     for (let i = 0; i < 5; i++) {
-      const ang = (i / 5) * Math.PI * 2;
+      const ang = (i / 5) * PI * 2;
       const p = {
-        x: o.x + Math.cos(ang) * 2.2,
-        y: o.y + Math.sin(ang) * 2.2,
+        x: o.x + cos(ang) * 2.2,
+        y: o.y + sin(ang) * 2.2,
       };
       circle(p, 1, "o_ring");
     }

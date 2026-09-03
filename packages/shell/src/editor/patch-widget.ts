@@ -2,12 +2,14 @@ import * as ts from "typescript";
 
 import { callSiteSpec, patchSpan, WRITABLE_CALL_NAMES } from "./call-sites.ts";
 
+
+const { round } = Math;
 function isWritableCall(name: string): boolean {
   return WRITABLE_CALL_NAMES.has(name);
 }
 
 export function formatNum(n: number): string {
-  const q = Math.round(n * 100) / 100;
+  const q = round(n * 100) / 100;
   if (Object.is(q, -0)) return "0";
   return String(q);
 }

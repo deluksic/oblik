@@ -1,5 +1,7 @@
 import type { Vec2 } from "@design-scenes/geom";
 
+
+const { abs, max, min, sqrt } = Math;
 /** 2D field. No identity. `q.x` is radial, `q.y` is Z when swept. */
 export type Sdf2 =
   | { k: "circle"; c: Vec2; r: number }
@@ -7,7 +9,7 @@ export type Sdf2 =
   | { k: "union"; a: Sdf2; b: Sdf2 };
 
 export function circle2(c: Vec2, r: number): Sdf2 {
-  return { k: "circle", c, r: Math.abs(r) };
+  return { k: "circle", c, r: abs(r) };
 }
 
 export function union2(a: Sdf2, b: Sdf2): Sdf2 {
@@ -15,7 +17,7 @@ export function union2(a: Sdf2, b: Sdf2): Sdf2 {
 }
 
 export function smoothUnion2(a: Sdf2, b: Sdf2, ksoft: number): Sdf2 {
-  return { k: "smoothUnion", a, b, ksoft: Math.max(0, ksoft) };
+  return { k: "smoothUnion", a, b, ksoft: max(0, ksoft) };
 }
 
 export function smoothUnionAll2(nodes: Sdf2[], ksoft: number): Sdf2 {
@@ -28,17 +30,17 @@ export function smoothUnionAll2(nodes: Sdf2[], ksoft: number): Sdf2 {
 }
 
 function smin(a: number, b: number, k: number): number {
-  const kk = Math.max(k, 1e-6);
-  const h = Math.min(1, Math.max(0, 0.5 + (0.5 * (b - a)) / kk));
+  const kk = max(k, 1e-6);
+  const h = min(1, max(0, 0.5 + (0.5 * (b - a)) / kk));
   return b * (1 - h) + a * h - kk * h * (1 - h);
 }
 
 export function evalSdf2(sdf: Sdf2, p: Vec2): number {
   switch (sdf.k) {
     case "circle":
-      return Math.hypot(p.x - sdf.c.x, p.y - sdf.c.y) - sdf.r;
+      return sqrt((p.x - sdf.c.x) * (p.x - sdf.c.x) + (p.y - sdf.c.y) * (p.y - sdf.c.y)) - sdf.r;
     case "union":
-      return Math.min(evalSdf2(sdf.a, p), evalSdf2(sdf.b, p));
+      return min(evalSdf2(sdf.a, p), evalSdf2(sdf.b, p));
     case "smoothUnion":
       return smin(evalSdf2(sdf.a, p), evalSdf2(sdf.b, p), sdf.ksoft);
   }

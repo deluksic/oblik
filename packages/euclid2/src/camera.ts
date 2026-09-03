@@ -1,5 +1,7 @@
 import type { Vec2 } from "@design-scenes/geom";
 
+
+const { max, min } = Math;
 export type Camera = {
   x: number;
   y: number;
@@ -32,7 +34,7 @@ export function zoomAt(
   factor: number,
 ): Camera {
   const before = screenToWorld(cam, screen, width, height);
-  const scale = Math.min(280, Math.max(8, cam.scale * factor));
+  const scale = min(280, max(8, cam.scale * factor));
   const next = { ...cam, scale };
   const after = screenToWorld(next, screen, width, height);
   return {

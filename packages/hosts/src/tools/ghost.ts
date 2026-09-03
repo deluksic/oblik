@@ -3,6 +3,8 @@ import { add, mul, perp, sub, type Vec2 } from "@design-scenes/geom";
 
 import { radiusBetween, signedOffset, type SessionHover, type ToolSession } from "./session";
 
+
+const { PI, abs, max, sqrt } = Math;
 const EDITOR = "#e8876a";
 const SNAP = "#f0c14a";
 
@@ -15,7 +17,7 @@ export type GhostView =
   | { kind: "offset"; origin: Vec2; dir: Vec2; d: number; snapped: boolean };
 
 function norm(v: Vec2): Vec2 {
-  const l = Math.hypot(v.x, v.y);
+  const l = sqrt((v.x) * (v.x) + (v.y) * (v.y));
   if (l < 1e-9) return { x: 1, y: 0 };
   return { x: v.x / l, y: v.y / l };
 }
@@ -33,7 +35,7 @@ function typedLength(session: ToolSession): number | null {
   if (session.verb === "offset" || (session.verb === "distance" && session.from?.kind === "line")) {
     return n;
   }
-  return Math.max(0.05, Math.abs(n));
+  return max(0.05, abs(n));
 }
 
 function asVec(p: { x: number; y: number }): Vec2 {
@@ -119,7 +121,7 @@ function drawInfiniteThrough(
   origin: Vec2,
   dir: Vec2,
 ): void {
-  const span = Math.max(w, h) / cam.scale + Math.hypot(cam.x, cam.y) + 20;
+  const span = max(w, h) / cam.scale + sqrt((cam.x) * (cam.x) + (cam.y) * (cam.y)) + 20;
   const a = { x: origin.x - dir.x * span, y: origin.y - dir.y * span };
   const b = { x: origin.x + dir.x * span, y: origin.y + dir.y * span };
   const sa = worldToScreen(cam, a, w, h);
@@ -133,7 +135,7 @@ function drawInfiniteThrough(
 function fillDot(ctx: CanvasRenderingContext2D, cam: Camera, w: number, h: number, p: Vec2, r: number): void {
   const s = worldToScreen(cam, p, w, h);
   ctx.beginPath();
-  ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+  ctx.arc(s.x, s.y, r, 0, PI * 2);
   ctx.fill();
 }
 
@@ -172,11 +174,11 @@ export function drawGhost(
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, view.r * cam.scale, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, view.r * cam.scale, 0, PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 0.85;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, 5, 0, PI * 2);
     ctx.fill();
   } else {
     const offOrigin = add(view.origin, mul(perp(view.dir), view.d));

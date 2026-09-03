@@ -22,6 +22,8 @@ import {
 import { injectSceneSites } from "./inject-sites";
 import { collectEditCalls } from "./patch-widget";
 
+
+const { abs, max, min } = Math;
 const matchSegmentCp = (line: { a?: { x: number; y: number }; b?: { x: number; y: number } }) =>
   line.a?.x === 0 && line.a?.y === 0 && line.b?.x === 5 && line.b?.y === 0;
 
@@ -292,8 +294,8 @@ export function scene() {
   const r = circle(c, 2.87);
   const __scene = circle(c, r);
   const p = point(5, 2.96);
-  const bl = point(Math.min(c.x, p.x), Math.min(c.y, p.y));
-  const tr = point(Math.max(c.x, p.x), Math.max(c.y, p.y));
+  const bl = point(min(c.x, p.x), min(c.y, p.y));
+  const tr = point(max(c.x, p.x), max(c.y, p.y));
   const tl = point(bl.x, tr.y);
   const br = point(tr.x, bl.y);
   const p2 = point(0.02, 2.95);
@@ -314,7 +316,7 @@ export function scene() {
       line.a?.x === 0 &&
       line.a?.y === 0 &&
       line.b?.x === 5 &&
-      Math.abs(line.b.y - 2.96) < 0.01,
+      abs(line.b.y - 2.96) < 0.01,
     env,
   );
   expect(promoted?.name).toBe("s");
