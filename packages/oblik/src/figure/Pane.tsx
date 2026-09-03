@@ -113,9 +113,6 @@ export function FigurePane(props: FigurePaneProps) {
 
   const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
-  let prevTrace: TraceNode[] = [];
-  let prevScene: FigurePaneProps["scene"] | undefined;
-  let prevFile: string | undefined;
 
   const frameXywh = createMemo<FrameXywh | null>(() => {
     const local = editedFrame();
@@ -130,19 +127,13 @@ export function FigurePane(props: FigurePaneProps) {
     return { ...base, x: local.x, y: local.y, width: local.width, height: local.height };
   });
 
-  const world = createMemo(() => {
-    if (prevScene !== props.scene || prevFile !== props.file) {
-      prevTrace = [];
-      prevScene = props.scene;
-      prevFile = props.file;
-    }
+  const world = createMemo((prev: ReturnType<typeof tryEvaluate> | undefined) => {
     const w = tryEvaluate(props.scene, {
       annotations: props.annotations,
       module: props.file,
     });
-    w.trace = reuseUnchangedTrace(prevTrace, w.trace);
+    w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
     if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
-    prevTrace = w.trace;
     return w;
   });
 

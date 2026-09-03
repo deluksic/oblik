@@ -104,24 +104,14 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [writeError, setWriteError] = createSignal<string | null>(null);
 
   const mentions = createMemo(() => props.mentions ?? []);
-  let prevTrace: TraceNode[] = [];
-  let prevScene: Euclid2PaneProps["scene"] | undefined;
-  let prevFile: string | undefined;
-
-  const world = createMemo(() => {
-    if (prevScene !== props.scene || prevFile !== props.file) {
-      prevTrace = [];
-      prevScene = props.scene;
-      prevFile = props.file;
-    }
+  const world = createMemo((prev: ReturnType<typeof tryEvaluate> | undefined) => {
     const w = tryEvaluate(props.scene, {
       draft: draft(),
       annotations: props.annotations,
       module: props.file,
     });
-    w.trace = reuseUnchangedTrace(prevTrace, w.trace);
+    w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
     if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
-    prevTrace = w.trace;
     return w;
   });
 

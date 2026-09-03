@@ -91,7 +91,6 @@ export function FigureView(props: FigureViewProps) {
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
-  let prevPaintStrokes: PaintStroke[] = [];
 
   createEffect(
     () => paneEl(),
@@ -118,11 +117,10 @@ export function FigureView(props: FigureViewProps) {
     return r ? pageScreenRect(r, camera(), size()) : null;
   });
   const geom = createMemo(() => props.trace.filter(isDrawnGeom), { equals: sameList });
-  const strokes = createMemo(() => {
-    const next = reusePaintStrokes(prevPaintStrokes, paintStrokesFromTrace(props.trace));
-    prevPaintStrokes = next;
-    return next;
-  }, { equals: sameList });
+  const strokes = createMemo(
+    (prev: PaintStroke[] | undefined) => reusePaintStrokes(prev, paintStrokesFromTrace(props.trace)),
+    { equals: sameList },
+  );
   const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)), { equals: sameList });
   const onionFills = createMemo(
     () => onionInk().filter((n) => isFillGeom(n.value)),
