@@ -82,6 +82,27 @@ describe("stackForNode", () => {
       name: "build",
     });
   });
+
+  test("normalizes raw Vite dev-server stack paths at presentation", () => {
+    const stack = stackForNode({
+      ...node,
+      module: "apps/demo/src/scenes/shelf.ts",
+      stack: [
+        {
+          file: "http://127.0.0.1:43127/src/scenes/shelf.ts",
+          line: 12,
+          column: 6,
+          name: "build",
+        },
+      ],
+    });
+    expect(stack).toHaveLength(1);
+    expect(stack[0]).toMatchObject({
+      file: "apps/demo/src/scenes/shelf.ts",
+      line: 10,
+      column: 4,
+    });
+  });
 });
 
 describe("pinConstructorSite", () => {

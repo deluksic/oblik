@@ -1,10 +1,25 @@
 import { describe, expect, test } from "vitest";
 
-import { isUserSourcePath, normalizeStackFile, parseFrame } from "./stack";
+import { isCaptureCandidate, isUserSourcePath, normalizeStackFile, parseFrame } from "./stack";
+
+describe("isCaptureCandidate", () => {
+  test("accepts raw Vite and repo paths without normalizing", () => {
+    expect(isCaptureCandidate("http://127.0.0.1:43127/src/layout/mounting-plate.ts")).toBe(true);
+    expect(isCaptureCandidate("apps/demo/src/scenes/shelf.ts")).toBe(true);
+    expect(isCaptureCandidate("src/scenes/shelf.ts")).toBe(true);
+  });
+
+  test("rejects vite prebundles, oblik internals, and node builtins", () => {
+    expect(isCaptureCandidate("node_modules/.vite/deps/dev-DEjxqSxT.js")).toBe(false);
+    expect(isCaptureCandidate("packages/oblik/src/eval/constructors.ts")).toBe(false);
+    expect(isCaptureCandidate("node:internal/modules/esm/loader")).toBe(false);
+  });
+});
 
 describe("isUserSourcePath", () => {
   test("accepts scene typescript paths", () => {
     expect(isUserSourcePath("apps/demo/src/scenes/shelf.ts")).toBe(true);
+    expect(isUserSourcePath("http://127.0.0.1:43127/src/scenes/shelf.ts")).toBe(true);
   });
 
   test("rejects vite prebundles and node_modules", () => {
@@ -41,22 +56,5 @@ describe("parseFrame", () => {
       column: 14,
       name: "mountingPlateLayout",
     });
-  });
-});
-
-describe("isUserSourcePath", () => {
-  test("accepts scene typescript paths", () => {
-    expect(isUserSourcePath("apps/demo/src/scenes/shelf.ts")).toBe(true);
-  });
-
-  test("rejects vite prebundles and node_modules", () => {
-    expect(isUserSourcePath("node_modules/.vite/deps/dev-DEjxqSxT.js")).toBe(false);
-    expect(isUserSourcePath("node_modules/oblik/src/index.ts")).toBe(false);
-    expect(isUserSourcePath(".vite/deps/chunk.ts")).toBe(false);
-  });
-
-  test("rejects oblik internals and node builtins", () => {
-    expect(isUserSourcePath("packages/oblik/src/eval/constructors.ts")).toBe(false);
-    expect(isUserSourcePath("node:internal/modules/esm/loader")).toBe(false);
   });
 });

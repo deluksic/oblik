@@ -1,7 +1,12 @@
 import type { TraceNode } from "../eval/context";
 import { invMatches } from "../eval/inv";
 import type { CallSite } from "../eval/stack";
-import { isUserSourcePath, sourceFileKey } from "../eval/stack";
+import {
+  isCaptureCandidate,
+  isUserSourcePath,
+  normalizeStackFile,
+  sourceFileKey,
+} from "../eval/stack";
 import type { MentionFile, MentionFn } from "../source/mention";
 import { normalizeSceneRelPath } from "../source/scene-path";
 
@@ -75,6 +80,16 @@ function frameWho(f: CallSite): string {
   const named = f.name?.trim();
   if (named) return named;
   return fileName(f.file).replace(/\.(scene\.)?tsx?$/, "");
+}
+
+/** Normalize raw capture-time stack frames for display and peek. */
+function presentStack(frames: readonly CallSite[], module?: string): CallSite[] {
+  return frames
+    .filter((f) => isCaptureCandidate(f.file))
+    .map((f) => ({
+      ...f,
+      file: normalizeSceneRelPath(normalizeStackFile(f.file), module),
+    }));
 }
 
 export function stackLabel(frames: readonly CallSite[]): string {
@@ -411,12 +426,7 @@ export function stackForNode(node: TraceNode): CallSite[] {
       ? { file: node.module, line: node.at.line, column: node.at.column }
       : undefined;
   const module = node.module?.replace(/^\/+/, "");
-  const fromStack = node.stack
-    .filter((f) => isUserSourcePath(f.file))
-    .map((f) => ({
-      ...f,
-      file: normalizeSceneRelPath(f.file, module),
-    }));
+  const fromStack = presentStack(node.stack, module);
   if (site) return pinConstructorSite(fromStack, site);
   return fromStack;
 }
@@ -442,12 +452,7 @@ function selectionCrumb(node: TraceNode): string {
 }
 
 export async function selectionDetailForNode(node: TraceNode): Promise<SelectionDetail> {
-  const runtime = node.stack
-    .filter((f) => isUserSourcePath(f.file))
-    .map((f) => ({
-      ...f,
-      file: normalizeSceneRelPath(f.file, node.module),
-    }));
+  const runtime = presentStack(node.stack, node.module);
   const mapped = await mapStack(runtime);
   const stack = pinConstructorSite(mapped, constructorSite(node));
   const cache = new Map<string, string>();
@@ -672,12 +677,7 @@ export async function selectionDetailForScope(opts: {
   }
 
   const base = await selectionDetailForNode(node);
-  const runtime = node.stack
-    .filter((f) => isUserSourcePath(f.file))
-    .map((f) => ({
-      ...f,
-      file: normalizeSceneRelPath(f.file, node.module),
-    }));
+  const runtime = presentStack(node.stack, node.module);
   const mapped = await mapStack(runtime);
   const stack = pinConstructorSite(mapped, constructorSite(node));
   let origin = base.origin;

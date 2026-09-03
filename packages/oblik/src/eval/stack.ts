@@ -15,28 +15,81 @@ export type CallSite = {
 
 const SKIP_NAME = new Set(["", "eval", "anonymous", "<anonymous>", "Module", "evaluate", "traced"]);
 
-/** Scene / user source paths we can peek on disk — not Vite prebundles or oblik internals. */
-export function isUserSourcePath(file: string): boolean {
-  const key = normalizeStackFile(file);
-  if (/(^|\/)node_modules(\/|$)/.test(key)) return false;
-  if (/(^|\/)\.vite(\/|$)/.test(key)) return false;
-  if (key.startsWith("node:")) return false;
-  if (/\/oblik\//.test(key)) return false;
-  return /\.(ts|tsx)$/.test(key);
+function slashForward(file: string): string {
+  if (!file.includes("\\")) return file;
+  return file.split("\\").join("/");
+}
+
+function stripQuery(file: string): string {
+  const q = file.indexOf("?");
+  return q >= 0 ? file.slice(0, q) : file;
+}
+
+function stripLeadingSlashes(file: string): string {
+  let i = 0;
+  while (i < file.length && file[i] === "/") i++;
+  return i > 0 ? file.slice(i) : file;
+}
+
+function stripPortPrefix(file: string): string {
+  const slash = file.indexOf("/");
+  if (slash <= 0) return file;
+  for (let i = 0; i < slash; i++) {
+    const c = file.charCodeAt(i);
+    if (c < 48 || c > 57) return file;
+  }
+  return file.slice(slash + 1);
 }
 
 /** Collapse a browser/Node stack filename to a repo or Vite-app path. */
 export function normalizeStackFile(file: string): string {
-  let f = file.replace(/\\/g, "/").replace(/\?.*$/, "");
-  f = f.replace(/^https?:\/\/[^/]+\//, "");
-  f = f.replace(/^file:\/\//, "");
-  f = f.replace(/^\/?@fs\/?/, "");
+  let f = stripQuery(slashForward(file));
+  const scheme = f.indexOf("://");
+  if (scheme >= 0) {
+    const pathStart = f.indexOf("/", scheme + 3);
+    f = pathStart >= 0 ? f.slice(pathStart + 1) : "";
+  }
+  if (f.startsWith("file://")) f = f.slice(7);
+  if (f.startsWith("/@fs/")) f = f.slice(5);
+  else if (f.startsWith("@fs/")) f = f.slice(4);
   const demo = f.indexOf("apps/demo/");
   if (demo >= 0) return f.slice(demo);
-  f = f.replace(/^\/+/, "");
-  // Browser stacks sometimes keep the listen port in front of `/src/…`.
-  f = f.replace(/^\d+\//, "");
-  return f;
+  f = stripLeadingSlashes(f);
+  return stripPortPrefix(f);
+}
+
+function hasTsExt(file: string): boolean {
+  const stem = stripQuery(file);
+  return stem.endsWith(".ts") || stem.endsWith(".tsx");
+}
+
+/** Cheap filter at capture time — raw V8 paths, no normalization. */
+export function isCaptureCandidate(file: string): boolean {
+  if (!file) return false;
+  if (file.includes("node_modules")) return false;
+  if (file.includes("/.vite/") || file.startsWith(".vite/")) return false;
+  if (file.includes("/oblik/") || file.includes("packages/oblik")) return false;
+  if (file.startsWith("node:")) return false;
+  return hasTsExt(file);
+}
+
+/** Scene / user source paths we can peek on disk — not Vite prebundles or oblik internals. */
+export function isUserSourcePath(file: string): boolean {
+  const key = normalizeStackFile(file);
+  if (key.includes("node_modules")) return false;
+  if (key.includes("/.vite/") || key.startsWith(".vite/")) return false;
+  if (key.startsWith("node:")) return false;
+  if (key.includes("/oblik/")) return false;
+  return key.endsWith(".ts") || key.endsWith(".tsx");
+}
+
+/** Repo-relative key for matching mention paths to raw stack filenames. */
+export function stackFileKey(file: string): string {
+  return sourceFileKey(normalizeStackFile(file));
+}
+
+export function normalizeCallSite(f: CallSite): CallSite {
+  return { ...f, file: normalizeStackFile(f.file) };
 }
 
 type V8CallSite = {
@@ -56,11 +109,10 @@ function callSiteFromParts(
   column: number,
   name?: string | null,
 ): CallSite | null {
-  const normalized = normalizeStackFile(file);
-  if (!isUserSourcePath(normalized)) return null;
+  if (!isCaptureCandidate(file)) return null;
   const who = name?.trim();
   return {
-    file: normalized,
+    file,
     line,
     column,
     ...(who && !SKIP_NAME.has(who) ? { name: who } : {}),
@@ -99,6 +151,7 @@ function dedupe(frames: CallSite[]): CallSite[] {
  * User frames at constructor time. V8 CallSites are generated positions (source
  * maps are only applied when stringify-ing the stack), so `/__map-stack` can
  * remap them through Vite’s transform. Firefox falls back to the string stack.
+ * Filenames stay raw until presentation or `assignInv` matching.
  */
 export function captureUserStack(): CallSite[] {
   const prev = ErrorWithStack.prepareStackTrace;

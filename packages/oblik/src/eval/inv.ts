@@ -1,6 +1,12 @@
 import type { MentionFile, MentionFn } from "../source/mention";
 import type { TraceInv, TraceNode } from "./context";
-import { isUserSourcePath, sourceFileKey, type CallSite } from "./stack";
+import {
+  isCaptureCandidate,
+  normalizeCallSite,
+  sourceFileKey,
+  stackFileKey,
+  type CallSite,
+} from "./stack";
 
 export type { TraceInv } from "./context";
 
@@ -12,13 +18,17 @@ function sameSourceFile(a: string, b: string): boolean {
   return sourceFileKey(a) === sourceFileKey(b);
 }
 
+function sameStackFile(a: string, b: string): boolean {
+  return stackFileKey(a) === stackFileKey(b);
+}
+
 function fnContaining(
   files: readonly MentionFile[],
   file: string | undefined,
   line: number | undefined,
 ): MentionFn | undefined {
   if (!file || line == null) return undefined;
-  const bundle = files.find((f) => sameSourceFile(f.file, file));
+  const bundle = files.find((f) => sameSourceFile(f.file, file) || sameStackFile(f.file, file));
   if (!bundle) return undefined;
   let best: MentionFn | undefined;
   for (const fn of bundle.functions) {
@@ -31,24 +41,24 @@ function fnContaining(
 function fnForNode(n: TraceNode, files: readonly MentionFile[]): MentionFn | undefined {
   const fromAnno = fnContaining(files, n.module, n.at?.line);
   if (fromAnno) return fromAnno;
-  const leaf = n.stack.find((f) => isUserSourcePath(f.file));
+  const leaf = n.stack.find((f) => isCaptureCandidate(f.file));
   return fnContaining(files, leaf?.file, leaf?.line);
 }
 
 function callerOf(n: TraceNode, fn: MentionFn): CallSite {
-  const frames = n.stack.filter((f) => isUserSourcePath(f.file));
+  const frames = n.stack.filter((f) => isCaptureCandidate(f.file));
   const inSpan = (f: CallSite) =>
-    sameSourceFile(f.file, fn.file) && f.line >= fn.startLine && f.line <= fn.endLine;
+    sameStackFile(f.file, fn.file) && f.line >= fn.startLine && f.line <= fn.endLine;
   const anyInSpan = frames.some(inSpan);
   for (const f of frames) {
     if (anyInSpan) {
       if (inSpan(f)) continue;
-    } else if (sameSourceFile(f.file, fn.file)) {
+    } else if (sameStackFile(f.file, fn.file)) {
       // Generated stacks may not land in the source span. Same-file frames are
       // still this function; the caller is the first frame in another file.
       continue;
     }
-    return f;
+    return normalizeCallSite(f);
   }
   return { file: "", line: 0, column: 0 };
 }
