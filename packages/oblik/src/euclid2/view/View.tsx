@@ -39,6 +39,7 @@ import {
   liftSelected,
   chromeSplitEqual,
   splitChrome,
+  sameList,
   type ChromeSplit,
 } from "./marks";
 import { NumberSliders } from "./NumberSliders";
@@ -240,21 +241,27 @@ export function Euclid2View(props: Euclid2ViewProps) {
     } else noteHover(e);
   }
 
-  const strokes = createMemo(() =>
-    props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"),
+  const strokes = createMemo(
+    () => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"),
+    { equals: sameList },
   );
   const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : null));
-  const fills = createMemo(() =>
-    chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value)),
+  const fills = createMemo(() => (chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value))), {
+    equals: sameList,
+  });
+  const ink = createMemo(
+    () => strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value)),
+    { equals: sameList },
   );
-  const ink = createMemo(() =>
-    strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value)),
+  const points = createMemo(
+    () => strokes().filter((n) => n.kind === "point" || isGlider(n.value)),
+    { equals: sameList },
   );
-  const points = createMemo(() => strokes().filter((n) => n.kind === "point" || isGlider(n.value)));
-  const handles = createMemo(() =>
-    strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+  const handles = createMemo(
+    () => strokes().filter((n) => n.editable && (n.kind === "point" || isGlider(n.value))),
+    { equals: sameList },
   );
-  const sliders = createMemo(() => sliderNodes(props.trace));
+  const sliders = createMemo(() => sliderNodes(props.trace), { equals: sameList });
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
   const eligibleCarriers = createMemo(() =>
     props.placing
@@ -293,8 +300,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
       ),
     { equals: chromeSplitEqual },
   );
-  const handleBand = createMemo(() =>
-    liftSelected(handles(), (n) => isSelected(n, props.selectedKey)),
+  const handleBand = createMemo(
+    () => liftSelected(handles(), (n) => isSelected(n, props.selectedKey)),
+    { equals: (a, b) => sameList(a.rest, b.rest) && sameList(a.lifted, b.lifted) },
   );
 
   return (
@@ -354,26 +362,26 @@ export function Euclid2View(props: Euclid2ViewProps) {
           size={size()}
           halos={drag.phase() !== "dragging"}
         />
-        <For each={handleBand().rest}>
+        <For each={handleBand().rest} keyed={(n) => traceKey(n)}>
           {(n) => (
             <Handle
-              node={n}
+              node={n()}
               size={size()}
               camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
+              hot={isHot(n(), props.hoverId, props.selectedKey)}
+              selected={isSelected(n(), props.selectedKey)}
               muted={chrome().mutePoints}
             />
           )}
         </For>
-        <For each={handleBand().lifted}>
+        <For each={handleBand().lifted} keyed={(n) => traceKey(n)}>
           {(n) => (
             <Handle
-              node={n}
+              node={n()}
               size={size()}
               camera={camera()}
-              hot={isHot(n, props.hoverId, props.selectedKey)}
-              selected={isSelected(n, props.selectedKey)}
+              hot={isHot(n(), props.hoverId, props.selectedKey)}
+              selected={isSelected(n(), props.selectedKey)}
               muted={chrome().mutePoints}
             />
           )}
@@ -397,20 +405,20 @@ function RegionChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={traceKey}>
       {(n, overlay) =>
         overlay ? (
           <RegionOutline
-            node={n}
-            hot={isHot(n, props.hoverId, props.selectedKey)}
-            selected={isSelected(n, props.selectedKey)}
+            node={n()}
+            hot={isHot(n(), props.hoverId, props.selectedKey)}
+            selected={isSelected(n(), props.selectedKey)}
             overlay
           />
         ) : (
           <RegionFill
-            node={n}
-            hot={isHot(n, props.hoverId, props.selectedKey)}
-            selected={isSelected(n, props.selectedKey)}
+            node={n()}
+            hot={isHot(n(), props.hoverId, props.selectedKey)}
+            selected={isSelected(n(), props.selectedKey)}
           />
         )
       }
@@ -428,13 +436,13 @@ function StrokeChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={traceKey}>
       {(n, overlay) => (
         <Stroke
-          node={n}
-          hot={isHot(n, props.hoverId, props.selectedKey)}
-          selected={isSelected(n, props.selectedKey)}
-          muted={props.muted(n)}
+          node={n()}
+          hot={isHot(n(), props.hoverId, props.selectedKey)}
+          selected={isSelected(n(), props.selectedKey)}
+          muted={props.muted(n())}
           camera={props.camera}
           size={props.size}
           overlay={overlay}
@@ -454,15 +462,15 @@ function PointChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={traceKey}>
       {(n, overlay) => (
         <PointMark
-          node={n}
+          node={n()}
           size={props.size}
           camera={props.camera}
-          hot={isHot(n, props.hoverId, props.selectedKey)}
-          selected={isSelected(n, props.selectedKey)}
-          muted={props.muted(n)}
+          hot={isHot(n(), props.hoverId, props.selectedKey)}
+          selected={isSelected(n(), props.selectedKey)}
+          muted={props.muted(n())}
           overlay={overlay}
         />
       )}

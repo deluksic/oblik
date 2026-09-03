@@ -28,7 +28,8 @@ export type ChromeSplit<T> = { rest: T[]; hover: T[]; lifted: T[] };
 
 export type ChromePass<T> = { items: T[]; overlay?: true };
 
-function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+/** True when both lists hold the same object identities in the same order. */
+export function sameList<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -37,7 +38,7 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 
 /** True when hover/select did not move any item between buckets. */
 export function chromeSplitEqual<T>(a: ChromeSplit<T>, b: ChromeSplit<T>): boolean {
-  return sameItems(a.rest, b.rest) && sameItems(a.hover, b.hover) && sameItems(a.lifted, b.lifted);
+  return sameList(a.rest, b.rest) && sameList(a.hover, b.hover) && sameList(a.lifted, b.lifted);
 }
 
 /** Idle, then hovered, then selected — hover/select paint draws after their overlay. */

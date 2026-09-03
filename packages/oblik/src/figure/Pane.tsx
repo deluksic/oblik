@@ -5,6 +5,7 @@ import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../e
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
+import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import { isPaint, type PaintValue } from "../eval/paint";
 import type { FigureScene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
@@ -112,6 +113,9 @@ export function FigurePane(props: FigurePaneProps) {
 
   const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
+  let prevTrace: TraceNode[] = [];
+  let prevScene: FigurePaneProps["scene"] | undefined;
+  let prevFile: string | undefined;
 
   const frameXywh = createMemo<FrameXywh | null>(() => {
     const local = editedFrame();
@@ -127,11 +131,18 @@ export function FigurePane(props: FigurePaneProps) {
   });
 
   const world = createMemo(() => {
+    if (prevScene !== props.scene || prevFile !== props.file) {
+      prevTrace = [];
+      prevScene = props.scene;
+      prevFile = props.file;
+    }
     const w = tryEvaluate(props.scene, {
       annotations: props.annotations,
       module: props.file,
     });
+    w.trace = reuseUnchangedTrace(prevTrace, w.trace);
     if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
+    prevTrace = w.trace;
     return w;
   });
 

@@ -5,6 +5,7 @@ import IconScaling from "~icons/lucide/scaling";
 
 import type { TraceNode } from "@/eval/context";
 import { paintStrokesFromTrace, type FigureStyle, type PaintStroke } from "@/eval/paint";
+import { reusePaintStrokes } from "@/eval/reuse-trace";
 import { isFillGeom } from "@/geom/csg2";
 import { isGlider } from "@/geom/gliders";
 
@@ -21,7 +22,7 @@ import { PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { mutedForScope, type Scope } from "../euclid2/tool";
 import { ChromeBand } from "../euclid2/view/ChromeBand";
 import { createDragHandler } from "../euclid2/view/createDragHandler";
-import { chromeSplitEqual, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
+import { chromeSplitEqual, sameList, splitChrome, type ChromeSplit } from "../euclid2/view/marks";
 import { applyDrag, panDrag, topHit } from "../euclid2/view/pointer";
 import { lookFromBrush, type BrushSettings } from "./chips";
 import {
@@ -74,6 +75,10 @@ function panePoint(e: PointerEvent, el: HTMLDivElement): { x: number; y: number 
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
+function paintStrokeKey(s: PaintStroke): string {
+  return `${traceKey(s.paint)}:${traceKey(s.geom)}`;
+}
+
 function isPointish(n: TraceNode): boolean {
   return n.value.kind === "point" || isGlider(n.value);
 }
@@ -86,6 +91,7 @@ export function FigureView(props: FigureViewProps) {
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
+  let prevPaintStrokes: PaintStroke[] = [];
 
   createEffect(
     () => paneEl(),
@@ -111,16 +117,38 @@ export function FigureView(props: FigureViewProps) {
     const r = page();
     return r ? pageScreenRect(r, camera(), size()) : null;
   });
-  const geom = createMemo(() => props.trace.filter(isDrawnGeom));
-  const strokes = createMemo(() => paintStrokesFromTrace(props.trace));
-  const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)));
-  const onionFills = createMemo(() => onionInk().filter((n) => isFillGeom(n.value)));
-  const onionEdges = createMemo(() => onionInk().filter((n) => !isFillGeom(n.value)));
-  const onionPts = createMemo(() => geom().filter(isPointish));
-  const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)));
-  const inkFills = createMemo(() => inkStrokes().filter((s) => isFillGeom(s.geom.value)));
-  const inkEdges = createMemo(() => inkStrokes().filter((s) => !isFillGeom(s.geom.value)));
-  const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)));
+  const geom = createMemo(() => props.trace.filter(isDrawnGeom), { equals: sameList });
+  const strokes = createMemo(() => {
+    const next = reusePaintStrokes(prevPaintStrokes, paintStrokesFromTrace(props.trace));
+    prevPaintStrokes = next;
+    return next;
+  }, { equals: sameList });
+  const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)), { equals: sameList });
+  const onionFills = createMemo(
+    () => onionInk().filter((n) => isFillGeom(n.value)),
+    { equals: sameList },
+  );
+  const onionEdges = createMemo(
+    () => onionInk().filter((n) => !isFillGeom(n.value)),
+    { equals: sameList },
+  );
+  const onionPts = createMemo(() => geom().filter(isPointish), { equals: sameList });
+  const inkStrokes = createMemo(
+    () => strokes().filter((s) => !isPointish(s.geom)),
+    { equals: sameList },
+  );
+  const inkFills = createMemo(
+    () => inkStrokes().filter((s) => isFillGeom(s.geom.value)),
+    { equals: sameList },
+  );
+  const inkEdges = createMemo(
+    () => inkStrokes().filter((s) => !isFillGeom(s.geom.value)),
+    { equals: sameList },
+  );
+  const inkPts = createMemo(
+    () => strokes().filter((s) => isPointish(s.geom)),
+    { equals: sameList },
+  );
   const paintSelected = (s: PaintStroke) => traceKey(s.paint) === props.selectedKey;
   const geomSelected = (n: TraceNode) => traceKey(n) === props.selectedKey;
   const paintHover = (s: PaintStroke) => traceKey(s.paint) === props.hoverKey && !paintSelected(s);
@@ -501,10 +529,10 @@ function InkStrokeChrome(props: {
   ghosting?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={paintStrokeKey}>
       {(s, overlay) => (
         <InkStroke
-          s={s}
+          s={s()}
           hoverKey={props.hoverKey}
           selectedKey={props.selectedKey}
           eraser={props.eraser}
@@ -532,10 +560,10 @@ function InkPointChrome(props: {
   ghosting?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={paintStrokeKey}>
       {(s, overlay) => (
         <InkPoint
-          s={s}
+          s={s()}
           hoverKey={props.hoverKey}
           selectedKey={props.selectedKey}
           eraser={props.eraser}
@@ -561,18 +589,18 @@ function OnionStrokeChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={traceKey}>
       {(n, overlay) => (
         <FigureStroke
-          node={n}
+          node={n()}
           look={ONION}
           onion={true}
-          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-          selected={traceKey(n) === props.selectedKey}
-          muted={!!props.scope && mutedForScope(n, props.scope)}
+          hot={traceKey(n()) === props.hoverKey || traceKey(n()) === props.selectedKey}
+          selected={traceKey(n()) === props.selectedKey}
+          muted={!!props.scope && mutedForScope(n(), props.scope)}
           camera={props.camera}
           size={props.size}
-          replaced={props.previewKey === traceKey(n)}
+          replaced={props.previewKey === traceKey(n())}
           overlay={overlay}
         />
       )}
@@ -590,17 +618,17 @@ function OnionPointChrome(props: {
   halos?: boolean;
 }) {
   return (
-    <ChromeBand band={props.band} halos={props.halos}>
+    <ChromeBand band={props.band} halos={props.halos} keyed={traceKey}>
       {(n, overlay) => (
         <FigurePoint
-          node={n}
+          node={n()}
           look={undefined}
           onion={true}
-          hot={traceKey(n) === props.hoverKey || traceKey(n) === props.selectedKey}
-          selected={traceKey(n) === props.selectedKey}
-          muted={!!props.scope && mutedForScope(n, props.scope)}
+          hot={traceKey(n()) === props.hoverKey || traceKey(n()) === props.selectedKey}
+          selected={traceKey(n()) === props.selectedKey}
+          muted={!!props.scope && mutedForScope(n(), props.scope)}
           camera={props.camera}
-          replaced={props.previewKey === traceKey(n)}
+          replaced={props.previewKey === traceKey(n())}
           overlay={overlay}
         />
       )}

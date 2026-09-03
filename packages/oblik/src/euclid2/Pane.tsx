@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
+import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
 import {
@@ -103,14 +104,24 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [writeError, setWriteError] = createSignal<string | null>(null);
 
   const mentions = createMemo(() => props.mentions ?? []);
+  let prevTrace: TraceNode[] = [];
+  let prevScene: Euclid2PaneProps["scene"] | undefined;
+  let prevFile: string | undefined;
 
   const world = createMemo(() => {
+    if (prevScene !== props.scene || prevFile !== props.file) {
+      prevTrace = [];
+      prevScene = props.scene;
+      prevFile = props.file;
+    }
     const w = tryEvaluate(props.scene, {
       draft: draft(),
       annotations: props.annotations,
       module: props.file,
     });
+    w.trace = reuseUnchangedTrace(prevTrace, w.trace);
     if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
+    prevTrace = w.trace;
     return w;
   });
 
