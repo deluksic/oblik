@@ -237,11 +237,9 @@ function InfiniteStroke(props: {
   );
 }
 
-function constructionFaceLayer(layer: ChromeLayer, selected: boolean, hot: boolean): FaceInk {
+function constructionFaceLayer(layer: ChromeLayer): FaceInk {
   if (layer.kind === "paint") {
-    return {
-      class: [styles.fill, { [styles.selected]: selected || hot }],
-    };
+    return { class: styles.fill };
   }
   return {
     class: layerClass(layer.kind, false, false),
@@ -265,10 +263,17 @@ export function RegionFill(props: { node: TraceNode; hot: boolean; selected: boo
       overlay={false}
       layers={layers()}
       uid={`e2-${traceKey(props.node)}`}
-      layer={(layer) => ({
-        ...constructionFaceLayer(layer, props.selected, props.hot),
-        "data-ink": layer.kind === "paint" ? traceKey(props.node) : undefined,
-      })}
+      layer={(layer) => {
+        const ink = constructionFaceLayer(layer);
+        return {
+          ...ink,
+          class:
+            layer.kind === "paint"
+              ? [styles.fill, { [styles.selected]: props.selected || props.hot }]
+              : ink.class,
+          "data-ink": layer.kind === "paint" ? traceKey(props.node) : undefined,
+        };
+      }}
     >
       <Show when={offsetStock()}>
         {(op) => (
@@ -299,7 +304,7 @@ export function RegionOutline(props: {
       overlay={props.overlay === true}
       layers={layers()}
       uid={`e2o-${traceKey(props.node)}`}
-      layer={(layer) => constructionFaceLayer(layer, props.selected, props.hot)}
+      layer={(layer) => constructionFaceLayer(layer)}
     />
   );
 }
