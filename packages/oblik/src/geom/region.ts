@@ -170,52 +170,71 @@ function asWalk(v: unknown): Loop | null {
   return null;
 }
 
-function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | null {
+type WalkCorner = { at: Vec2; r: number };
+type WalkCarrier = LineLike | Along;
+/** Parsed tape before projection. `vertices.length === carriers.length + 1`. */
+type ParsedWalk = { vertices: WalkCorner[]; carriers: WalkCarrier[] };
+
+function parseWalkTape(cycle: readonly unknown[]): ParsedWalk | null {
   if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return null;
   const n = cycle.length / 2;
-  const points: Vec2[] = [];
-  const radii: number[] = [];
-  const carriers: Array<{ geom: LineLike | Circle; k?: Branch }> = [];
+  const vertices: WalkCorner[] = [];
+  const carriers: WalkCarrier[] = [];
   for (let i = 0; i < n; i++) {
     const vtx = asVertex(cycle[i * 2]);
     if (!vtx) return null;
-    points.push(vtx.at);
-    radii.push(vtx.r);
+    vertices.push(vtx);
     const item = cycle[i * 2 + 1];
     if (isAlong(item)) {
       if (item.carrier.kind !== "circle") return null;
-      carriers.push({ geom: item.carrier, k: item.k < 0 ? -1 : 1 });
+      carriers.push({ kind: "along", carrier: item.carrier, k: item.k < 0 ? -1 : 1 });
       continue;
     }
     const line = asLineLike(item);
     if (line) {
-      carriers.push({ geom: line });
+      carriers.push(line);
       continue;
     }
     return null;
   }
+  const first = vertices[0]!;
+  vertices.push({ at: { x: first.at.x, y: first.at.y }, r: 0 });
+  return { vertices, carriers };
+}
+
+function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[] } | null {
+  const n = w.carriers.length;
+  if (w.vertices.length !== n + 1) return null;
   const edges: LoopEdge[] = [];
   for (let i = 0; i < n; i++) {
-    const a = points[i]!;
-    const b = points[(i + 1) % n]!;
-    const c = carriers[i]!;
-    if (c.geom.kind === "circle") {
-      if (c.k !== 1 && c.k !== -1) return null;
+    const a = w.vertices[i]!.at;
+    const b = w.vertices[i + 1]!.at;
+    const car = w.carriers[i]!;
+    if (isAlong(car)) {
+      const k = car.k < 0 ? -1 : 1;
+      if (k !== 1 && k !== -1) return null;
       edges.push({
-        a: projectOnCircle(c.geom, a),
-        b: projectOnCircle(c.geom, b),
-        carrier: c.geom,
-        k: c.k,
+        a: projectOnCircle(car.carrier, a),
+        b: projectOnCircle(car.carrier, b),
+        carrier: car.carrier,
+        k,
       });
     } else {
       edges.push({
-        a: projectOnLine(c.geom, a),
-        b: projectOnLine(c.geom, b),
-        carrier: c.geom,
+        a: projectOnLine(car, a),
+        b: projectOnLine(car, b),
+        carrier: car,
       });
     }
   }
+  const radii = w.vertices.slice(0, n).map((v) => v.r);
   return { edges, radii };
+}
+
+function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | null {
+  const parsed = parseWalkTape(cycle);
+  if (!parsed) return null;
+  return walkEdgesFromParsed(parsed);
 }
 
 function walkFromCycle(cycle: readonly unknown[]): LoopEdge[] | null {
