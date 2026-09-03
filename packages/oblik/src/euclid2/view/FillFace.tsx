@@ -1,7 +1,7 @@
-import { For, Show, type ParentProps } from "solid-js";
+import { For, Show, createMemo, type ParentProps } from "solid-js";
 
 import type { Csg2, Pick as GeomPick, Region } from "@/geom";
-import { fillPaint } from "@/geom/csg-draw";
+import { fillPaint, type DrawOp } from "@/geom/csg-draw";
 import { isPick } from "@/geom/csg2";
 import { evaluateRegions } from "@/geom/evaluate-regions";
 import { regionSvgPath } from "@/geom/region";
@@ -73,6 +73,29 @@ function holeInk(ink: FaceInk): FaceInk {
   return { ...ink, fill: "none" };
 }
 
+function CsgLayerOps(props: {
+  layer: ChromeLayer;
+  inkOf: (layer: ChromeLayer) => FaceInk;
+  stock: DrawOp;
+  holes: DrawOp[];
+  strokeHoles?: boolean;
+  mask: string;
+}) {
+  const ink = createMemo(() => props.inkOf(props.layer));
+  const ops = createMemo(() => (props.strokeHoles ? [props.stock, ...props.holes] : [props.stock]));
+  return (
+    <For each={ops()}>
+      {(op) => (
+        <RegionOp
+          op={op}
+          mask={props.mask}
+          {...attrs(op === props.stock ? ink() : holeInk(ink()))}
+        />
+      )}
+    </For>
+  );
+}
+
 /** Shared region / CSG fill + overlay halo. Hosts pass layer class and paint. */
 export function FillFace(props: ParentProps<FillFaceProps>) {
   const declared = () => declaredFill(props.value);
@@ -113,7 +136,6 @@ function DeclaredFace(props: FillFaceProps) {
 function CsgFace(props: ParentProps<FillFaceProps>) {
   const paint = () => fillPaint(props.value as Csg2 | GeomPick);
   const id = () => regionMaskId(props.uid);
-  const ops = () => [paint().stock, ...paint().holes];
   return (
     <Show when={!paint().empty}>
       {props.overlay ? (
@@ -137,20 +159,16 @@ function CsgFace(props: ParentProps<FillFaceProps>) {
                     <RegionOp op={paint().stock} mask={regionMaskUrl(id())} {...attrs(props.hit)} />
                   ) : null}
                   <For each={props.layers}>
-                    {(layer) => {
-                      const ink = props.layer(layer);
-                      return (
-                        <For each={props.strokeHoles ? ops() : [paint().stock]}>
-                          {(op) => (
-                            <RegionOp
-                              op={op}
-                              mask={regionMaskUrl(id())}
-                              {...attrs(op === paint().stock ? ink : holeInk(ink))}
-                            />
-                          )}
-                        </For>
-                      );
-                    }}
+                    {(layer) => (
+                      <CsgLayerOps
+                        layer={layer}
+                        inkOf={props.layer}
+                        stock={paint().stock}
+                        holes={paint().holes}
+                        strokeHoles={props.strokeHoles}
+                        mask={regionMaskUrl(id())}
+                      />
+                    )}
                   </For>
                 </>
               }
