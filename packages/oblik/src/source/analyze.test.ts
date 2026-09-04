@@ -51,6 +51,42 @@ describe("stamp", () => {
     expect(source).toBe(`point(1, 2, "o_0");\n`);
   });
 
+  test("puts the id on its own line in a multiline call with trailing comma", () => {
+    const raw = `const A = point(\n  1,\n  2,\n);\n`;
+    const { source, added } = stamp(raw, () => "o_0");
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`const A = point(\n  1,\n  2,\n  "o_0",\n);\n`);
+  });
+
+  test("multiline call without trailing comma adds one before the id", () => {
+    const raw = `const A = point(\n  1,\n  2\n);\n`;
+    const { source, added } = stamp(raw, () => "o_0");
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`const A = point(\n  1,\n  2,\n  "o_0"\n);\n`);
+  });
+
+  test("multiline call inside an indented block keeps the closing paren indent", () => {
+    const raw = `function f() {\n  const A = point(\n    1,\n    2,\n  );\n}\n`;
+    const { source, added } = stamp(raw, () => "o_0");
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(
+      `function f() {\n  const A = point(\n    1,\n    2,\n    "o_0",\n  );\n}\n`,
+    );
+  });
+
+  test("zero-argument multiline call gets an id line too", () => {
+    const raw = `const A = circle(\n);\n`;
+    const { source, added } = stamp(raw, () => "o_0");
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`const A = circle(\n  "o_0"\n);\n`);
+  });
+
+  test("single-line call with trailing comma does not double the comma", () => {
+    const { source, added } = stamp(`point(1, 2,);\n`, () => "o_0");
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`point(1, 2, "o_0");\n`);
+  });
+
   test("leaves existing ids", () => {
     const { source, added } = stamp(`point(1, 2, "o_keep");\n`);
     expect(added).toEqual([]);

@@ -46,8 +46,40 @@ export function stamp(
           const fresh = nextId();
           added.push(fresh);
           const insertAt = node.getEnd() - 1;
+          const last = node.arguments[node.arguments.length - 1];
           const needsComma = node.arguments.length > 0;
-          ms.appendLeft(insertAt, `${needsComma ? ", " : ""}"${fresh}"`);
+          const gapStart = last ? last.getEnd() : node.expression.getEnd() + 1;
+          const gap = source.slice(gapStart, insertAt);
+          const hasTrailingComma = gap.trimStart().startsWith(",");
+          if (gap.includes("\n")) {
+            // Multiline call: `)` sits on its own line, so appending before it
+            // would produce a stray `, "id")` or a doubled comma. Give the id
+            // its own argument line instead, indented like the last argument.
+            const anchor = last ?? node.expression;
+            const anchorStart = anchor.getStart(sf);
+            const anchorPrefix = source.slice(
+              source.lastIndexOf("\n", anchorStart) + 1,
+              anchorStart,
+            );
+            const base = anchorPrefix.match(/^[ \t]*/)![0];
+            const indent = last ? base : `${base}  `;
+            let closeWsStart = insertAt;
+            while (
+              closeWsStart > gapStart &&
+              (source[closeWsStart - 1] === " " || source[closeWsStart - 1] === "\t")
+            ) {
+              closeWsStart--;
+            }
+            ms.remove(gapStart, closeWsStart);
+            ms.appendLeft(
+              closeWsStart,
+              `${needsComma ? "," : ""}\n${indent}"${fresh}"${hasTrailingComma ? "," : ""}\n`,
+            );
+          } else if (hasTrailingComma) {
+            ms.appendLeft(insertAt, ` "${fresh}"`);
+          } else {
+            ms.appendLeft(insertAt, `${needsComma ? ", " : ""}"${fresh}"`);
+          }
         }
       }
     }
