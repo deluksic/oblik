@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "./context";
-import { reusePaintStrokes, reuseUnchangedTrace, sameDrawNode } from "./reuse-trace";
+import { carryTraceInv, reusePaintStrokes, reuseUnchangedTrace, sameDrawNode } from "./reuse-trace";
 
 function point(id: string, x: number, y = 0, occ = 0): TraceNode {
   return {
@@ -46,7 +46,11 @@ describe("reuseUnchangedTrace", () => {
       id: "o_p",
       occ: 0,
       kind: "paint",
-      value: { kind: "paint", targets: [{ id: "o_a", occ: 0 }], style: { kind: "style", stroke: "#000" } },
+      value: {
+        kind: "paint",
+        targets: [{ id: "o_a", occ: 0 }],
+        style: { kind: "style", stroke: "#000" },
+      },
       editable: false,
       stack: [],
     } as TraceNode;
@@ -54,5 +58,53 @@ describe("reuseUnchangedTrace", () => {
     const prev = [{ paint, geom, style }];
     const next = [{ paint, geom, style: { kind: "style" as const, stroke: "#000" } }];
     expect(reusePaintStrokes(prev, next)).toBe(prev);
+  });
+});
+
+describe("carryTraceInv", () => {
+  test("copies inv and stack onto a moved node from the previous tape", () => {
+    const prev = [
+      {
+        ...point("o_a", 1, 2),
+        inv: {
+          file: "scene.ts",
+          name: "build",
+          callerFile: "scene.ts",
+          callerLine: 4,
+          callerColumn: 1,
+          serial: 0,
+        },
+      },
+    ];
+    const next = [point("o_a", 9, 2)];
+    next[0]!.stack = [];
+    carryTraceInv(prev, next);
+    expect(next[0]!.inv).toEqual(prev[0]!.inv);
+    expect(next[0]!.stack).toBe(prev[0]!.stack);
+  });
+
+  test("does not overwrite an inv already stamped on the new node", () => {
+    const prev = [
+      {
+        ...point("o_a", 1, 2),
+        inv: {
+          file: "old.ts",
+          callerFile: "old.ts",
+          callerLine: 1,
+          callerColumn: 1,
+          serial: 0,
+        },
+      },
+    ];
+    const fresh = {
+      file: "new.ts",
+      callerFile: "new.ts",
+      callerLine: 2,
+      callerColumn: 1,
+      serial: 1,
+    };
+    const next = [{ ...point("o_a", 9, 2), inv: fresh }];
+    carryTraceInv(prev, next);
+    expect(next[0]!.inv).toEqual(fresh);
   });
 });

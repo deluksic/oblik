@@ -3,13 +3,14 @@ import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import { reuseUnchangedTrace } from "../eval/reuse-trace";
+import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
   type ScopePick,
+  type SelectionDetail,
 } from "../host/selection-detail";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import type { Annotation } from "../source/analyze";
@@ -102,6 +103,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [toolLock, setToolLock] = createSignal(false);
   const [writeError, setWriteError] = createSignal<string | null>(null);
+  const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
 
   const mentions = createMemo(() => props.mentions ?? []);
   const world = createMemo((prev: ReturnType<typeof tryEvaluate> | undefined) => {
@@ -109,9 +111,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       draft: draft(),
       annotations: props.annotations,
       module: props.file,
+      captureStack: !liveEdit(),
     });
     w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
-    if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
+    if (liveEdit()) carryTraceInv(prev?.trace, w.trace);
+    else if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
     return w;
   });
 
@@ -125,16 +129,20 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return world().trace.find((n) => traceKey(n) === key) ?? null;
   });
 
+  let frozenDetail: SelectionDetail | undefined;
   const selectionDetail = createMemo(async () => {
+    if (liveEdit()) return frozenDetail ?? emptyScopeDetail(focus());
     const node = selectedNode();
     const f = focus();
-    return selectionDetailForScope({
+    const detail = await selectionDetailForScope({
       node,
       focus: f,
       mentions: mentions(),
       print: node ? mentionPrint(scope(), node) : undefined,
       trace: world().trace,
     });
+    frozenDetail = detail;
+    return detail;
   });
 
   function applyStep(next: ToolStep | undefined) {
@@ -327,6 +335,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onPick={onPick}
           onDraft={mergeDraft}
           onCommit={(id, values) => void commit(id, values)}
+          onLiveEdit={setLiveEdit}
           onPlace={onPlace}
           onCursor={setPlace}
         />

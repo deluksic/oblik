@@ -141,6 +141,8 @@ function dedupe(frames: CallSite[]): CallSite[] {
  * remap them through Vite’s transform. Firefox falls back to the string stack.
  * Frames are stored verbatim; filtering and path cleanup happen at read time.
  */
+export const EMPTY_STACK: CallSite[] = [];
+
 export function captureUserStack(): CallSite[] {
   const prev = ErrorWithStack.prepareStackTrace;
   let structured: V8CallSite[] | undefined;

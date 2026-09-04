@@ -25,6 +25,7 @@ import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
 import { defineScene } from "./scene";
 import { siteOf } from "./site";
+import { EMPTY_STACK } from "./stack";
 
 function plate() {
   point(1, 2, "h");
@@ -357,7 +358,11 @@ describe("evaluate", () => {
         const b = point(2, 0, "b");
         const c = point(2, 2, "c");
         const d = point(0, 2, "d");
-        const stock = region([a, segment(a, b), b, segment(b, c), c, segment(c, d), d, segment(d, a)], [], "pr");
+        const stock = region(
+          [a, segment(a, b), b, segment(b, c), c, segment(c, d), d, segment(d, a)],
+          [],
+          "pr",
+        );
         const hole = circle(point(1, 1, "h"), 0.3);
         const face = csg2(diff(stock, [hole]), "face");
         return { stock, face };
@@ -461,6 +466,28 @@ describe("style and paint", () => {
     expect(first?.value.kind === "paint" ? first.value.targets : []).toHaveLength(
       first?.value.kind === "paint" ? 2 : 0,
     );
+  });
+});
+
+describe("captureStack", () => {
+  const scene = defineScene({
+    kind: "euclid2",
+    title: "t",
+    build() {
+      point(0, 0, "a");
+      return slider(0.5, { min: 0, max: 1 }, "s");
+    },
+  });
+
+  test("default eval captures constructor stacks", () => {
+    const { trace } = evaluate(scene);
+    expect(trace.every((n) => n.stack.length > 0)).toBe(true);
+  });
+
+  test("captureStack: false skips capture and stores the empty stack", () => {
+    const { trace } = evaluate(scene, { captureStack: false });
+    expect(trace.map((n) => n.stack)).toEqual([EMPTY_STACK, EMPTY_STACK]);
+    expect(trace.every((n) => n.stack === EMPTY_STACK)).toBe(true);
   });
 });
 

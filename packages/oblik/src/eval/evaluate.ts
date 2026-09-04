@@ -8,6 +8,11 @@ export type EvaluateOpts = {
   draft?: Draft;
   annotations?: Map<string, Annotation> | Record<string, Annotation>;
   module?: string;
+  /**
+   * Capture constructor stacks. Default true. Live drag preview sets this
+   * false; mouse-up re-evaluates with stacks for the sidebar.
+   */
+  captureStack?: boolean;
 };
 
 export type EvaluateResult = {
@@ -28,6 +33,7 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): EvaluateResult {
     annotations: asMap(opts.annotations),
     occ: new Map(),
     module: opts.module,
+    captureStack: opts.captureStack !== false,
   };
   const value = withEval(ctx, () => mod.build());
   return { value, trace: ctx.trace };

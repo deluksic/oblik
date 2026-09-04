@@ -71,6 +71,8 @@ export type Euclid2ViewProps = {
   onPick?: (hits: TraceNode[]) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
+  /** True while an edit drag is past the dead zone; false on release/cancel. */
+  onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | null) => void;
   scope?: Scope;
@@ -137,13 +139,23 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   function editSession(session: EditDrag): DragSession {
     let moved = false;
+    let live = false;
     return {
       onPointerMove(ev) {
         moved = true;
         const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
-        if (next.draft) props.onDraft(next.draft.id, next.draft.values);
+        if (next.draft) {
+          if (!live) {
+            live = true;
+            props.onLiveEdit?.(true);
+          }
+          props.onDraft(next.draft.id, next.draft.values);
+        }
       },
       onDone(ev) {
+        // Drop live-edit before commit so Solid batches one eval with stacks
+        // and the final draft; the sidebar unfreezes on that same tick.
+        if (live) props.onLiveEdit?.(false);
         if (!moved) {
           props.onPick?.([session.node]);
           return;
@@ -246,9 +258,12 @@ export function Euclid2View(props: Euclid2ViewProps) {
     { equals: sameList },
   );
   const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : null));
-  const fills = createMemo(() => (chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value))), {
-    equals: sameList,
-  });
+  const fills = createMemo(
+    () => (chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value))),
+    {
+      equals: sameList,
+    },
+  );
   const ink = createMemo(
     () => strokes().filter((n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value)),
     { equals: sameList },

@@ -42,6 +42,8 @@ export type EvalCtx = {
   annotations: Map<string, Annotation>;
   occ: Map<string, number>;
   module?: string;
+  /** When false, constructors skip `captureUserStack` (live drag preview). */
+  captureStack: boolean;
 };
 
 export type Traced<T> = T & { readonly [$node]: TraceNode };

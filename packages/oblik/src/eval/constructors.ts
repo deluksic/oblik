@@ -54,8 +54,7 @@ import {
   type StyleSpec,
 } from "./paint";
 import { $site, type SiteSpec } from "./site";
-import { captureUserStack } from "./stack";
-
+import { captureUserStack, EMPTY_STACK } from "./stack";
 
 const { abs, max, min, round, sqrt } = Math;
 function draftAt(id: string | undefined, i: number, fallback: number): number {
@@ -81,7 +80,7 @@ function traced<T extends TraceValue>(value: T, id: string | undefined): T {
     editable: anno?.editable === true,
     at: anno ? { line: anno.line, column: anno.column } : undefined,
     module: anno?.file ?? ctx.module,
-    stack: captureUserStack(),
+    stack: ctx.captureStack ? captureUserStack() : EMPTY_STACK,
   };
   ctx.trace.push(node);
   return brand(value, node);
@@ -159,7 +158,7 @@ export const line = mark(
   (a: Vec2, b: Vec2, id?: string): Line => {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const l = sqrt((dx) * (dx) + (dy) * (dy));
+    const l = sqrt(dx * dx + dy * dy);
     const direction = l < 1e-9 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
     return traced({ kind: "line", origin: a, direction }, id);
   },
@@ -345,7 +344,7 @@ function tracedSlider(
     editable: anno?.editable === true,
     at: anno ? { line: anno.line, column: anno.column } : undefined,
     module: anno?.file ?? ctx.module,
-    stack: captureUserStack(),
+    stack: ctx.captureStack ? captureUserStack() : EMPTY_STACK,
   };
   ctx.trace.push(node);
   return n;

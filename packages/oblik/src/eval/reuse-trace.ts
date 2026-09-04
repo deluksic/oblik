@@ -1,5 +1,5 @@
-import type { PaintStroke } from "./paint";
 import type { TraceNode } from "./context";
+import type { PaintStroke } from "./paint";
 
 function nodeKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
@@ -61,6 +61,26 @@ export function reuseUnchangedTrace(
   });
   if (reused === next.length && reused === prev.length) return prev as TraceNode[];
   return out;
+}
+
+/**
+ * Copy `inv` (and a non-empty stack) from the previous tape by id:occ.
+ * Live-drag evals skip `captureUserStack` and `assignInv`; moved nodes still
+ * need last-known provenance so scope chrome does not flicker.
+ */
+export function carryTraceInv(prev: readonly TraceNode[] | undefined, next: TraceNode[]): void {
+  if (!prev || prev.length === 0) return;
+  const prevByKey = new Map<string, TraceNode>();
+  for (const n of prev) {
+    const key = nodeKey(n);
+    if (!prevByKey.has(key)) prevByKey.set(key, n);
+  }
+  for (const n of next) {
+    const old = prevByKey.get(nodeKey(n));
+    if (!old) continue;
+    if (n.stack.length === 0 && old.stack.length > 0) n.stack = old.stack;
+    if (!n.inv && old.inv) n.inv = old.inv;
+  }
 }
 
 export function reusePaintStrokes(
