@@ -66,30 +66,35 @@ h6 {
 }
 
 :root {
-  --oblik-paper: oklch(0.174 0.013 270.6);
-  --oblik-raised: oklch(0.196 0.017 268.8);
-  --oblik-well: oklch(0.209 0.017 264.1);
-  --oblik-ink: oklch(0.864 0.02 90.6);
-  --oblik-text: oklch(0.931 0.014 88.7);
-  --oblik-muted: oklch(0.668 0.019 84.6);
-  --oblik-dim: oklch(0.526 0.017 84.6);
-  /* Warm grays go muddy on accent-tinted (selected/hover) surfaces; these are
-     the same lightness/chroma re-hued to the accent for use on those. */
-  --oblik-muted-cool: oklch(0.668 0.019 249.3);
-  --oblik-dim-cool: oklch(0.526 0.017 249.3);
-  --oblik-accent: oklch(0.592 0.124 249.3);
-  --oblik-hover: oklch(0.592 0.124 249.3);
-  --oblik-error: oklch(0.597 0.141 36.9);
-  --oblik-ghost: oklch(0.668 0.019 84.6);
+  /* Hue families — every token picks up its hue from one of these, so
+     re-tinting the theme is a three-number edit. Ink grays share the accent
+     hue: warm grays read muddy next to the blue accent and on accent washes. */
+  --oblik-hue-backdrop: 269;
+  --oblik-hue-ink: 249.3;
+  --oblik-hue-accent: 249.3;
+  --oblik-hue-error: 36.9;
+  --oblik-hue-cream: 69.8;
+
+  --oblik-paper: oklch(0.174 0.013 var(--oblik-hue-backdrop));
+  --oblik-raised: oklch(0.196 0.017 var(--oblik-hue-backdrop));
+  --oblik-well: oklch(0.209 0.017 var(--oblik-hue-backdrop));
+  --oblik-ink: oklch(0.864 0.02 var(--oblik-hue-ink));
+  --oblik-text: oklch(0.931 0.014 var(--oblik-hue-ink));
+  --oblik-muted: oklch(0.668 0.019 var(--oblik-hue-ink));
+  --oblik-dim: oklch(0.526 0.017 var(--oblik-hue-ink));
+  --oblik-accent: oklch(0.592 0.124 var(--oblik-hue-accent));
+  --oblik-hover: oklch(0.592 0.124 var(--oblik-hue-accent));
+  --oblik-error: oklch(0.597 0.141 var(--oblik-hue-error));
+  --oblik-ghost: oklch(0.668 0.019 var(--oblik-hue-ink));
   --oblik-knockout: var(--oblik-paper);
-  --oblik-cream: oklch(0.97 0.022 69.8);
+  --oblik-cream: oklch(0.97 0.022 var(--oblik-hue-cream));
   --oblik-selected-paint: var(--oblik-cream);
-  --oblik-line: oklch(0.311 0.03 268.6);
-  --oblik-grid: oklch(0.254 0.028 269.2);
-  --oblik-axis: oklch(0.378 0.037 270.2);
-  --oblik-panel: oklch(0.218 0.016 268.9);
-  --oblik-ln: oklch(0.47 0.014 79.7);
-  --oblik-code: oklch(0.818 0.019 89.4);
+  --oblik-line: oklch(0.311 0.03 var(--oblik-hue-backdrop));
+  --oblik-grid: oklch(0.254 0.028 var(--oblik-hue-backdrop));
+  --oblik-axis: oklch(0.378 0.037 var(--oblik-hue-backdrop));
+  --oblik-panel: oklch(0.218 0.016 var(--oblik-hue-backdrop));
+  --oblik-ln: oklch(0.47 0.014 var(--oblik-hue-ink));
+  --oblik-code: oklch(0.818 0.019 var(--oblik-hue-ink));
   --oblik-stroke: 1.5px;
   --oblik-stroke-selected: 2.25px;
   /* Hover/selection halo widths — docs/chrome.md */

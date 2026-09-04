@@ -89,7 +89,7 @@
 }
 
 .cmdHint {
-  color: var(--oblik-muted-cool);
+  color: var(--oblik-muted);
   font-size: 0.82rem;
 }
 

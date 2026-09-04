@@ -179,6 +179,10 @@
   color: var(--oblik-text);
 }
 
+.current .ln {
+  color: var(--oblik-muted);
+}
+
 .ln {
   grid-column: 1;
   text-align: right;
