@@ -1,0 +1,150 @@
+.wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 2rem 1.5rem;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  width: min(38rem, 100%);
+  max-height: 100%;
+  min-height: 0;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.logo {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--oblik-text);
+}
+
+.tag {
+  margin: 0;
+  color: var(--oblik-muted);
+  font-size: 0.9rem;
+}
+
+.count {
+  margin: 0.15rem 0 0;
+  color: var(--oblik-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.searchBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--oblik-dim);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  background: var(--oblik-well);
+  color: var(--oblik-text);
+  border: 1px solid var(--oblik-line);
+  border-radius: 9px;
+  font: inherit;
+  outline: none;
+}
+
+.search:focus {
+  border-color: var(--oblik-accent);
+}
+
+.search::placeholder {
+  color: var(--oblik-dim);
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rowWrap {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--oblik-line);
+  border-radius: 9px;
+  background: var(--oblik-raised);
+  color: var(--oblik-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s;
+}
+
+.row:hover:not(:disabled) {
+  border-color: var(--oblik-accent);
+}
+
+.row:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rowTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.rowMeta {
+  font-size: 0.72rem;
+  color: var(--oblik-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.rowError {
+  font-size: 0.78rem;
+  color: var(--oblik-error);
+}
+
+.empty {
+  margin: 0.75rem 0;
+  text-align: center;
+  color: var(--oblik-muted);
+  font-size: 0.85rem;
+}

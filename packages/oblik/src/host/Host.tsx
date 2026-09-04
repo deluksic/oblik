@@ -1,5 +1,14 @@
 import { render } from "@solidjs/web";
-import { createEffect, Errored, For, Loading, createMemo, createSignal, onCleanup } from "solid-js";
+import {
+  createEffect,
+  Errored,
+  For,
+  Loading,
+  createMemo,
+  createSignal,
+  onCleanup,
+  Show,
+} from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
 import type { FigureScene, Scene } from "../eval/scene";
@@ -13,10 +22,12 @@ import {
   type OblikSceneEntry,
 } from "../source/catalog";
 import type { MentionFile } from "../source/mention";
-import { Nav } from "./Nav";
-import { currentSceneId, openScene } from "./routing";
+import { currentSceneId, openScene, openWelcome } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 import { originFileLabel } from "./selection-detail";
+import { StoredSignalsProvider } from "./StoredSignalsContext";
+import { TitleBar } from "./TitleBar";
+import { Welcome } from "./Welcome";
 
 import "../theme.css";
 import styles from "./Host.module.css";
@@ -43,17 +54,27 @@ export type OblikMountOpts = {
   collisions?: DuplicateId[];
 };
 
-function pickSceneId(scenes: OblikSceneEntry[]): string {
+/**
+ * Resolve the scene to open on mount. `null` means welcome (no `?scene=`).
+ * A URL scene id wins when it exists; otherwise fall back to the first scene
+ * without a catalog error, or welcome when nothing is openable.
+ */
+function pickSceneId(scenes: OblikSceneEntry[]): string | null {
   const fromUrl = currentSceneId();
-  if (fromUrl && scenes.some((s) => s.id === fromUrl && !s.error)) return fromUrl;
-  const first = scenes.find((s) => !s.error);
-  if (!first) throw new Error("no scenes in catalog");
-  return first.id;
+  if (fromUrl) {
+    if (scenes.some((s) => s.id === fromUrl && !s.error)) return fromUrl;
+    return scenes.find((s) => !s.error)?.id ?? null;
+  }
+  return null;
 }
 
 export function mountOblik(opts: OblikMountOpts): OblikMount {
   const initialSceneId = pickSceneId(opts.scenes);
-  if (currentSceneId() !== initialSceneId) openScene(initialSceneId);
+  if (initialSceneId) {
+    if (currentSceneId() !== initialSceneId) openScene(initialSceneId);
+  } else if (currentSceneId() !== null) {
+    openWelcome();
+  }
 
   const [scenes, setScenes] = createSignal(opts.scenes);
   const [loaders, setLoaders] = createSignal(opts.loaders);
@@ -63,16 +84,18 @@ export function mountOblik(opts: OblikMountOpts): OblikMount {
 
   render(
     () => (
-      <Modal>
-        <Host
-          scenes={scenes()}
-          loaders={loaders()}
-          annotations={annotations()}
-          mentions={mentions()}
-          collisions={collisions()}
-          initialSceneId={initialSceneId}
-        />
-      </Modal>
+      <StoredSignalsProvider>
+        <Modal>
+          <Host
+            scenes={scenes()}
+            loaders={loaders()}
+            annotations={annotations()}
+            mentions={mentions()}
+            collisions={collisions()}
+            initialSceneId={initialSceneId}
+          />
+        </Modal>
+      </StoredSignalsProvider>
     ),
     opts.el,
   );
@@ -86,11 +109,16 @@ function Host(props: {
   annotations: AnnotationBundle;
   mentions: MentionBundle;
   collisions: DuplicateId[];
-  initialSceneId: string;
+  initialSceneId: string | null;
 }) {
-  const [sceneId, setSceneId] = createSignal(props.initialSceneId);
+  // Function-form initializer: reading `props` eagerly to seed a signal is not
+  // valid in Solid 2 (see docs/prototypes/6.md) — `() => props.x` reads it in
+  // a reactive scope and only resets if the value actually changes.
+  const [sceneId, setSceneId] = createSignal<string | null>(() => props.initialSceneId);
   const sceneCache = new Map<string, Scene>();
   const [sceneRev, setSceneRev] = createSignal(0);
+
+  const isWelcome = createMemo(() => sceneId() === null);
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
 
@@ -115,6 +143,9 @@ function Host(props: {
     return sceneMod.default;
   });
 
+  // NOTE (Solid 2): `pane`/`sceneKind` are only ever evaluated when a scene is
+  // open (the welcome `<Show>` short-circuits them). Branch identity on the
+  // stable `sceneKind` memo so a scene is not remounted when only props change.
   const scene = createMemo(() => loaded());
   const sceneKind = createMemo(() => scene().kind);
 
@@ -137,10 +168,7 @@ function Host(props: {
   createEffect(
     () => 1,
     () => {
-      const onPop = () => {
-        const id = currentSceneId();
-        if (id && id !== sceneId()) setSceneId(id);
-      };
+      const onPop = () => setSceneId(currentSceneId());
       window.addEventListener("popstate", onPop);
       return () => window.removeEventListener("popstate", onPop);
     },
@@ -151,10 +179,15 @@ function Host(props: {
     setSceneId(id);
   }
 
+  function goWelcome() {
+    openWelcome();
+    setSceneId(null);
+  }
+
   const pane = createMemo(() => {
     const kind = sceneKind();
     const file = paneFile();
-    if (file == null) return <p class={styles.err}>Unknown scene</p>;
+    if (file === null) return <p class={styles.err}>Unknown scene</p>;
     if (kind === "figure") {
       return (
         <FigurePane
@@ -181,14 +214,17 @@ function Host(props: {
   return (
     <div class={styles.shell}>
       <header class={styles.head}>
-        <div class={styles.headRow}>
-          <p class={styles.kicker}>oblik</p>
-          <Nav scenes={props.scenes} sceneId={sceneId()} onSelect={selectScene} />
-        </div>
-        <h1>{entry()?.title ?? "…"}</h1>
-        <Loading fallback={null}>
-          <p>{scene().hint}</p>
-        </Loading>
+        <TitleBar
+          scenes={props.scenes}
+          sceneId={sceneId()}
+          onSelectScene={selectScene}
+          onWelcome={goWelcome}
+        />
+        <Show when={!isWelcome()}>
+          <Loading fallback={null}>
+            <p>{scene().hint}</p>
+          </Loading>
+        </Show>
       </header>
       <For each={props.collisions}>
         {(dup) => (
@@ -210,9 +246,14 @@ function Host(props: {
         )}
       </For>
       <div class={styles.stage}>
-        <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
-          <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
-        </Errored>
+        <Show
+          when={!isWelcome()}
+          fallback={<Welcome scenes={props.scenes} onSelectScene={selectScene} />}
+        >
+          <Errored fallback={(err) => <p class={styles.err}>{String(err())}</p>}>
+            <Loading fallback={<p class={styles.muted}>Loading scene…</p>}>{pane()}</Loading>
+          </Errored>
+        </Show>
       </div>
     </div>
   );

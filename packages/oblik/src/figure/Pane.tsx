@@ -5,10 +5,11 @@ import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../e
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import { isPaint, type PaintValue } from "../eval/paint";
+import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
+import { ResizableSidebar } from "../host/ResizableSidebar";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -395,7 +396,7 @@ export function FigurePane(props: FigurePaneProps) {
           />
         </div>
       </div>
-      <div class={styles.sidebarSlot}>
+      <ResizableSidebar>
         <SelectionSidebar>
           <Show
             when={frameSelected() ? frameXywh() : null}
@@ -419,7 +420,7 @@ export function FigurePane(props: FigurePaneProps) {
             )}
           </Show>
         </SelectionSidebar>
-      </div>
+      </ResizableSidebar>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { assignInv, invMatches } from "../eval/inv";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
+import { ResizableSidebar } from "../host/ResizableSidebar";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -365,7 +366,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           }}
         />
       </div>
-      <div class={styles.sidebarSlot}>
+      <ResizableSidebar>
         <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
           <SelectionSidebar
             detail={selectionDetail()}
@@ -373,7 +374,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             onExpose={(bind) => void expose(bind)}
           />
         </Loading>
-      </div>
+      </ResizableSidebar>
     </div>
   );
 }

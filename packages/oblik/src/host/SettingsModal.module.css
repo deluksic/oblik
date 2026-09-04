@@ -1,0 +1,124 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: min(70vw, 420px);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--oblik-muted);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.rowLabel {
+  font-size: 0.9rem;
+  color: var(--oblik-text);
+}
+
+.version {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--oblik-accent);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--oblik-muted);
+  line-height: 1.45;
+}
+
+.resetBtn,
+.secondary,
+.danger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    border-color 0.14s;
+}
+
+.resetBtn {
+  color: var(--oblik-text);
+  background: var(--oblik-well);
+  border: 1px solid var(--oblik-line);
+}
+
+.resetBtn:hover {
+  border-color: var(--oblik-error);
+  color: var(--oblik-error);
+}
+
+.resetIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.armBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--oblik-error) 45%, var(--oblik-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--oblik-error) 8%, var(--oblik-raised));
+}
+
+.confirmNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--oblik-text);
+  line-height: 1.45;
+}
+
+.btnRow {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.secondary {
+  color: var(--oblik-text);
+  background: var(--oblik-well);
+  border: 1px solid var(--oblik-line);
+}
+
+.secondary:hover {
+  background: var(--oblik-raised);
+  border-color: var(--oblik-dim);
+}
+
+.danger {
+  color: var(--oblik-paper);
+  background: var(--oblik-error);
+  border: 1px solid var(--oblik-error);
+}
+
+.danger:hover {
+  background: color-mix(in srgb, var(--oblik-error) 86%, white);
+}

@@ -39,7 +39,7 @@ export function stamp(
         const fresh = nextId();
         added.push(fresh);
         const quote = source.charAt(last.getStart(sf)) === "'" ? "'" : '"';
-        ms.overwrite(last.getStart(sf), last.getEnd(sf), `${quote}${fresh}${quote}`);
+        ms.overwrite(last.getStart(sf), last.getEnd(), `${quote}${fresh}${quote}`);
       } else {
         const { id } = trailingId(node);
         if (!id) {
