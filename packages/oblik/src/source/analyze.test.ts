@@ -57,6 +57,27 @@ describe("stamp", () => {
     expect(source).toContain("o_keep");
   });
 
+  test("fills an empty trailing id instead of appending another arg", () => {
+    let n = 0;
+    const { source, added } = stamp(`point(1, 2, "");\n`, () => `o_${n++}`);
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`point(1, 2, "o_0");\n`);
+  });
+
+  test("fills empty single-quoted ids too", () => {
+    let n = 0;
+    const { source, added } = stamp(`point(1, 2, '');\n`, () => `o_${n++}`);
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`point(1, 2, 'o_0');\n`);
+  });
+
+  test("only fills the trailing arg, not nested empty strings", () => {
+    let n = 0;
+    const { source, added } = stamp(`style({ stroke: "" });\n`, () => `o_${n++}`);
+    expect(added).toEqual(["o_0"]);
+    expect(source).toBe(`style({ stroke: "" }, "o_0");\n`);
+  });
+
   test("stamps style and paint constructors", () => {
     let n = 0;
     const { source, added } = stamp(

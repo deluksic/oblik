@@ -32,13 +32,23 @@ export function stamp(
       ts.isIdentifier(node.expression) &&
       specs.has(node.expression.text)
     ) {
-      const { id } = trailingId(node);
-      if (!id) {
+      const last = node.arguments[node.arguments.length - 1];
+      if (last && ts.isStringLiteral(last) && last.text === "") {
+        // Copy-pasted leftover: the id slot still has its empty quotes. Fill
+        // them with a fresh id instead of appending a second trailing arg.
         const fresh = nextId();
         added.push(fresh);
-        const insertAt = node.getEnd() - 1;
-        const needsComma = node.arguments.length > 0;
-        ms.appendLeft(insertAt, `${needsComma ? ", " : ""}"${fresh}"`);
+        const quote = source.charAt(last.getStart(sf)) === "'" ? "'" : '"';
+        ms.overwrite(last.getStart(sf), last.getEnd(sf), `${quote}${fresh}${quote}`);
+      } else {
+        const { id } = trailingId(node);
+        if (!id) {
+          const fresh = nextId();
+          added.push(fresh);
+          const insertAt = node.getEnd() - 1;
+          const needsComma = node.arguments.length > 0;
+          ms.appendLeft(insertAt, `${needsComma ? ", " : ""}"${fresh}"`);
+        }
       }
     }
     ts.forEachChild(node, visit);
