@@ -5,7 +5,6 @@ import { inSlot, nameField, previewName, withBind } from "./draft";
 import { attachLengthHit, lengthRefName, numberField, resolveNumberExpr } from "./length";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
-
 const { max, sqrt } = Math;
 type SliderSession = Extract<ToolSession, { verb: "slider" }>;
 
@@ -38,7 +37,7 @@ const fields: Field<SliderSession>[] = [
 ];
 
 function measure(hit: PlaceHit): number {
-  return round(max(0.05, sqrt((hit.world.x) * (hit.world.x) + (hit.world.y) * (hit.world.y)) || 1));
+  return round(max(0.05, sqrt(hit.world.x * hit.world.x + hit.world.y * hit.world.y) || 1));
 }
 
 function optProp(raw: string, scope: Scope): Expr | undefined {
@@ -142,11 +141,11 @@ export const slider: Tool<SliderSession> = {
     const bind = previewName(session, slider.spec.prefix);
     const value = optSlot(session, "value", session.value, "<value>");
     const min = optSlot(session, "min", session.min, "<min>");
-    const max = optSlot(session, "max", session.max, "<max>");
+    const maxSlot = optSlot(session, "max", session.max, "<max>");
     const step = optSlot(session, "step", session.step, "<step>");
     const name = inSlot(session.focus === "name", bind);
     return {
-      line: `const ${name} = slider(${value}, { min: ${min}, max: ${max}, step: ${step} })`,
+      line: `const ${name} = slider(${value}, { min: ${min}, max: ${maxSlot}, step: ${step} })`,
       hint: slider.spec.hint,
     };
   },

@@ -148,21 +148,18 @@ function insertDestructure(content, members) {
   const bindings = moduleLevelBindings(content);
   const aliased = new Map();
   const plain = [];
-  for (const m of [...members].sort()) {
+  for (const m of [...members].toSorted()) {
     if (bindings.has(m)) aliased.set(m, `${m}Math`);
     else plain.push(m);
   }
-  const parts = [...plain, ...[...aliased.entries()].map(([k, v]) => `${k}: ${v}`)].sort();
+  const parts = [...plain, ...[...aliased.entries()].map(([k, v]) => `${k}: ${v}`)].toSorted();
   if (parts.length === 0) return content;
   const line = `const { ${parts.join(", ")} } = Math;\n`;
   if (hasMathDestructure(content)) {
-    return content.replace(
-      /const\s*\{([^}]+)\}\s*=\s*Math\s*;/,
-      () => line.trimEnd(),
-    );
+    return content.replace(/const\s*\{([^}]+)\}\s*=\s*Math\s*;/, () => line.trimEnd());
   }
 
-  const shebang = content.startsWith("#!") ? content.match(/^#!.*\n/)?.[0] ?? "" : "";
+  const shebang = content.startsWith("#!") ? (content.match(/^#!.*\n/)?.[0] ?? "") : "";
   const rest = content.slice(shebang.length);
   const importMatch = rest.match(/^(?:\s*import[\s\S]*?;\s*\n)+/);
   if (importMatch) {
@@ -174,7 +171,6 @@ function insertDestructure(content, members) {
 
 function replaceMathMembers(content, members) {
   const bindings = moduleLevelBindings(content);
-  const stripped = stripStringsAndComments(content);
   let out = content;
   for (const m of members) {
     if (m === "hypot") continue;

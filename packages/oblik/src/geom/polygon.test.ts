@@ -12,7 +12,6 @@ import { isCircleWalk } from "./region";
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
-
 const square = (): Vec2[] => [
   { x: 0, y: 0 },
   { x: 2, y: 0 },
@@ -21,6 +20,8 @@ const square = (): Vec2[] => [
 ];
 
 const seg = (a: Vec2, b: Vec2): Segment => ({ kind: "segment", a, b });
+
+const holeCircle = (x: number): Circle => ({ kind: "circle", center: { x, y: 1 }, radius: 0.55 });
 
 describe("polygonValue", () => {
   test("a plain boundary is a finite cheese with no holes", () => {
@@ -57,7 +58,13 @@ describe("polygonValue", () => {
   });
 
   test("fewer than three distinct points is an empty polygon", () => {
-    const p = polygonValue([{ x: 0, y: 0 }, { x: 1, y: 0 }], []);
+    const p = polygonValue(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      [],
+    );
     expect(p.boundary).toHaveLength(0);
     expect(isFinitePolygon(p)).toBe(false);
     expect(polygonContains(p, { x: 0.5, y: 0 })).toBe(false);
@@ -79,8 +86,7 @@ describe("polygonValue", () => {
   });
 
   test("overlapping holes are invalid", () => {
-    const circle = (x: number): Circle => ({ kind: "circle", center: { x, y: 1 }, radius: 0.55 });
-    const p = polygonValue(square(), [circle(0.9), circle(1.3)]);
+    const p = polygonValue(square(), [holeCircle(0.9), holeCircle(1.3)]);
     expect(p).toEqual(nanPolygon());
   });
 
@@ -97,20 +103,14 @@ describe("polygonValue", () => {
   });
 
   test("holes must not touch the boundary", () => {
-    const near = polygonValue(square(), [
-      { kind: "circle", center: { x: 1, y: 1 }, radius: 0.99 },
-    ]);
+    const near = polygonValue(square(), [{ kind: "circle", center: { x: 1, y: 1 }, radius: 0.99 }]);
     expect(isFinitePolygon(near)).toBe(true);
-    const grazing = polygonValue(square(), [
-      { kind: "circle", center: { x: 1, y: 1 }, radius: 1 },
-    ]);
+    const grazing = polygonValue(square(), [{ kind: "circle", center: { x: 1, y: 1 }, radius: 1 }]);
     expect(grazing).toEqual(nanPolygon());
   });
 
   test("polygonSvgPath is one even-odd path of boundary plus holes", () => {
-    const p = polygonValue(square(), [
-      { kind: "circle", center: { x: 1, y: 1 }, radius: 0.5 },
-    ]);
+    const p = polygonValue(square(), [{ kind: "circle", center: { x: 1, y: 1 }, radius: 0.5 }]);
     const d = polygonSvgPath(p);
     expect(d.startsWith("M 0 0 L 2 0 L 2 2 L 0 2 Z")).toBe(true);
     expect(d.match(/Z/g)).toHaveLength(2);

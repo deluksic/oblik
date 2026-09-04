@@ -47,6 +47,11 @@ function run(mod: Scene, files: string[], draft?: Map<string, number[]>) {
   return evaluate(mod, { annotations: mergeAnnotationBundle(bundle), draft });
 }
 
+/** Probe point r along +x from a centre (used by the gear face membership checks). */
+function probePoint(c: { x: number; y: number }, r: number): { x: number; y: number } {
+  return { x: c.x + r, y: c.y };
+}
+
 describe("migrated demo scenes", () => {
   test("shelf traces cellar via -shelf.distance and a dist() beam", () => {
     const { trace } = run(shelf, ["apps/demo/src/scenes/shelf.ts"]);
@@ -436,7 +441,14 @@ describe("migrated demo scenes", () => {
     const left = trace.find((n) => n.id === "o_sc_left");
     const right = trace.find((n) => n.id === "o_sc_right");
     const face = trace.find((n) => n.id === "o_sc_face");
-    if (!left || !right || !face || !isCsg2(left.value) || !isCsg2(right.value) || !isCsg2(face.value)) {
+    if (
+      !left ||
+      !right ||
+      !face ||
+      !isCsg2(left.value) ||
+      !isCsg2(right.value) ||
+      !isCsg2(face.value)
+    ) {
       throw new Error("missing half-plane slices");
     }
     expect(left.value.op).toBe("intersect");
@@ -605,7 +617,8 @@ describe("migrated demo scenes", () => {
     if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
     if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
     if (!face1 || !face2) throw new Error("missing face nodes");
-    if (!isPolygon(face1.value) || !isPolygon(face2.value)) throw new Error("faces are not polygons");
+    if (!isPolygon(face1.value) || !isPolygon(face2.value))
+      throw new Error("faces are not polygons");
     expect(isFinitePolygon(face1.value)).toBe(true);
     expect(isFinitePolygon(face2.value)).toBe(true);
     expect(face1.value.holes).toHaveLength(1);
@@ -617,15 +630,14 @@ describe("migrated demo scenes", () => {
     const r1 = pitch1.value.radius;
     const c2 = pitch2.value.center;
     const r2 = pitch2.value.radius;
-    const probe = (c: { x: number; y: number }, r: number) => ({ x: c.x + r, y: c.y });
     // Pinion: root disc is meat, inside the bore is not, past the tip is not.
-    expect(polygonContains(face1.value, probe(c1, r1 * 0.5))).toBe(true);
-    expect(polygonContains(face1.value, probe(c1, r1 * 0.2))).toBe(false);
-    expect(polygonContains(face1.value, probe(c1, r1 * 1.6))).toBe(false);
+    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
+    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
+    expect(polygonContains(face1.value, probePoint(c1, r1 * 1.6))).toBe(false);
     // Wheel: same three checks relative to the derived pitch.
-    expect(polygonContains(face2.value, probe(c2, r2 * 0.5))).toBe(true);
-    expect(polygonContains(face2.value, probe(c2, r2 * 0.2))).toBe(false);
-    expect(polygonContains(face2.value, probe(c2, r2 * 1.2))).toBe(false);
+    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
+    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
+    expect(polygonContains(face2.value, probePoint(c2, r2 * 1.2))).toBe(false);
   });
 
   test("gear recomputes finitely when teeth and pitch are drafted", () => {
@@ -647,17 +659,17 @@ describe("migrated demo scenes", () => {
     if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
     if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
     if (!face1 || !face2) throw new Error("missing face nodes");
-    if (!isPolygon(face1.value) || !isPolygon(face2.value)) throw new Error("faces are not polygons");
+    if (!isPolygon(face1.value) || !isPolygon(face2.value))
+      throw new Error("faces are not polygons");
     expect(isFinitePolygon(face1.value)).toBe(true);
     expect(isFinitePolygon(face2.value)).toBe(true);
     const c1 = pinion.value;
     const r1 = pitch1.value.radius;
     const c2 = pitch2.value.center;
     const r2 = pitch2.value.radius;
-    const probe = (c: { x: number; y: number }, r: number) => ({ x: c.x + r, y: c.y });
-    expect(polygonContains(face1.value, probe(c1, r1 * 0.5))).toBe(true);
-    expect(polygonContains(face1.value, probe(c1, r1 * 0.2))).toBe(false);
-    expect(polygonContains(face2.value, probe(c2, r2 * 0.5))).toBe(true);
-    expect(polygonContains(face2.value, probe(c2, r2 * 0.2))).toBe(false);
+    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
+    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
+    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
+    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
   });
 });
