@@ -15,4 +15,3 @@ The user may have the dev server running (`pnpm demo` → Vite on http://localho
 - **On GUI edits**: drag commits, slider moves, and insert/paint/frame/erase operations POST to `/__oblik-*` endpoints that patch the same files.
 
 So `apps/demo/src/scenes/*.ts` and `src/layout/*.ts` can change at any moment with no agent action. Do not treat an unexpected diff there as corruption or as your own work: check for a listener on port 43127 (`lsof -nP -iTCP:43127`) before diagnosing, and leave server-generated churn out of commits. Plugin code is read at server start — after a plugin change the user must restart `pnpm demo`, and a stale server (started before the change) keeps the old behavior.
-
