@@ -66,26 +66,30 @@ h6 {
 }
 
 :root {
-  --oblik-paper: #0e1016;
-  --oblik-raised: #12151d;
-  --oblik-well: #141820;
-  --oblik-ink: #d7d2c4;
-  --oblik-text: #ece8de;
-  --oblik-muted: #9a9488;
-  --oblik-dim: #6f6a60;
-  --oblik-accent: #3b82c4;
-  --oblik-hover: #3b82c4;
-  --oblik-error: #c45c3e;
-  --oblik-ghost: #9a9488;
+  --oblik-paper: oklch(0.174 0.013 270.6);
+  --oblik-raised: oklch(0.196 0.017 268.8);
+  --oblik-well: oklch(0.209 0.017 264.1);
+  --oblik-ink: oklch(0.864 0.02 90.6);
+  --oblik-text: oklch(0.931 0.014 88.7);
+  --oblik-muted: oklch(0.668 0.019 84.6);
+  --oblik-dim: oklch(0.526 0.017 84.6);
+  /* Warm grays go muddy on accent-tinted (selected/hover) surfaces; these are
+     the same lightness/chroma re-hued to the accent for use on those. */
+  --oblik-muted-cool: oklch(0.668 0.019 249.3);
+  --oblik-dim-cool: oklch(0.526 0.017 249.3);
+  --oblik-accent: oklch(0.592 0.124 249.3);
+  --oblik-hover: oklch(0.592 0.124 249.3);
+  --oblik-error: oklch(0.597 0.141 36.9);
+  --oblik-ghost: oklch(0.668 0.019 84.6);
   --oblik-knockout: var(--oblik-paper);
-  --oblik-cream: #fff3e6;
+  --oblik-cream: oklch(0.97 0.022 69.8);
   --oblik-selected-paint: var(--oblik-cream);
-  --oblik-line: #2a3040;
-  --oblik-grid: #1d2230;
-  --oblik-axis: #3a4156;
-  --oblik-panel: #171a22;
-  --oblik-ln: #5f5a52;
-  --oblik-code: #c8c3b6;
+  --oblik-line: oklch(0.311 0.03 268.6);
+  --oblik-grid: oklch(0.254 0.028 269.2);
+  --oblik-axis: oklch(0.378 0.037 270.2);
+  --oblik-panel: oklch(0.218 0.016 268.9);
+  --oblik-ln: oklch(0.47 0.014 79.7);
+  --oblik-code: oklch(0.818 0.019 89.4);
   --oblik-stroke: 1.5px;
   --oblik-stroke-selected: 2.25px;
   /* Hover/selection halo widths — docs/chrome.md */

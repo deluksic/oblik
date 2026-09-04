@@ -147,6 +147,10 @@
   background: color-mix(in srgb, var(--oblik-accent) 14%, transparent);
 }
 
+.item:hover:not(:disabled) .itemIcon {
+  color: var(--oblik-dim-cool);
+}
+
 .itemCurrent {
   color: var(--oblik-accent);
 }
