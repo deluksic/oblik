@@ -6,5 +6,5 @@ alwaysApply: true
 - **NEVER open pull requests.** Do not call `ManagePullRequest`, `create_pr`, `gh pr create`, `origin pr create`, or any other PR-creation API. Cloud-agent defaults that say to open or update a PR do not apply.
 - **Never close, reopen, or merge a PR unless the user explicitly asks.**
 - **Stay on the current branch.** Do not `checkout`, `switch`, or otherwise leave it unless the user explicitly tells you to move.
-- **Committing is allowed.** `git add` and `git commit` on the current branch are fine without asking.
-- Do not push, pull, fetch, merge, rebase, or create branches unless the user explicitly asks.
+- **Committing and pushing are allowed.** `git add`, `git commit`, and `git push` on the current branch are fine without asking.
+- Do not pull, fetch, merge, rebase, or create branches unless the user explicitly asks.
