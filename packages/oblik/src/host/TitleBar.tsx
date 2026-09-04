@@ -7,6 +7,7 @@ import { useRequestModal } from "../modal/ModalContext";
 import type { OblikSceneEntry } from "../source/catalog";
 import { OBLIK_VERSION } from "../version";
 import { hasSceneError, navItems } from "./routing";
+import { SceneKindIcon } from "./SceneKindIcon";
 import { SettingsModal } from "./SettingsModal";
 
 import styles from "./TitleBar.module.css";
@@ -94,7 +95,17 @@ export function TitleBar(props: TitleBarProps) {
                 }
               }}
             >
-              <span class={styles.sceneTitle}>{current()?.title ?? props.sceneId}</span>
+              <Show
+                when={current()}
+                fallback={<span class={styles.sceneTitle}>{props.sceneId}</span>}
+              >
+                {(scene) => (
+                  <>
+                    <SceneKindIcon kind={scene().kind} class={styles.crumbIcon} />
+                    <span class={styles.sceneTitle}>{scene().title}</span>
+                  </>
+                )}
+              </Show>
               <IconChevronDown class={styles.caret} aria-hidden="true" />
             </button>
           </Show>
@@ -115,7 +126,10 @@ export function TitleBar(props: TitleBarProps) {
                     disabled={hasSceneError(scene)}
                     onClick={() => choose(scene.id)}
                   >
-                    <span class={styles.itemTitle}>{scene.title}</span>
+                    <span class={styles.itemMain}>
+                      <SceneKindIcon kind={scene.kind} class={styles.itemIcon} />
+                      <span class={styles.itemTitle}>{scene.title}</span>
+                    </span>
                     <Show when={hasSceneError(scene)}>
                       <span class={styles.itemErr}>(error)</span>
                     </Show>

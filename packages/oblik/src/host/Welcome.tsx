@@ -3,6 +3,7 @@ import IconSearch from "~icons/lucide/search";
 
 import type { OblikSceneEntry } from "../source/catalog";
 import { hasSceneError, navItems } from "./routing";
+import { SceneKindIcon } from "./SceneKindIcon";
 
 import styles from "./Welcome.module.css";
 
@@ -61,17 +62,16 @@ export function Welcome(props: WelcomeProps) {
                     disabled={hasSceneError(scene)}
                     onClick={() => props.onSelectScene(scene.id)}
                   >
-                    <span class={styles.rowTitle}>{scene.title}</span>
-                    <Show
-                      when={hasSceneError(scene)}
-                      fallback={
-                        <span class={styles.rowMeta}>
-                          {scene.kind} · {scene.path}
-                        </span>
-                      }
-                    >
-                      <span class={styles.rowError}>{scene.error}</span>
-                    </Show>
+                    <SceneKindIcon kind={scene.kind} class={styles.rowIcon} />
+                    <span class={styles.rowBody}>
+                      <span class={styles.rowTitle}>{scene.title}</span>
+                      <Show
+                        when={hasSceneError(scene)}
+                        fallback={<span class={styles.rowMeta}>{scene.path}</span>}
+                      >
+                        <span class={styles.rowError}>{scene.error}</span>
+                      </Show>
+                    </span>
                   </button>
                 </li>
               )}

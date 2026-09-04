@@ -83,6 +83,13 @@
   white-space: nowrap;
 }
 
+.crumbIcon {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--oblik-dim);
+}
+
 .caret {
   flex: none;
   width: 0.85rem;
@@ -147,6 +154,20 @@
 .item:disabled {
   color: var(--oblik-dim);
   cursor: default;
+}
+
+.itemMain {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.itemIcon {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--oblik-dim);
 }
 
 .itemTitle {
