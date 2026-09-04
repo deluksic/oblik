@@ -2,13 +2,16 @@ import type { TraceNode } from "../eval/context";
 import type { Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
 import {
   distToCsg,
+  distToPolygon,
   distToRegion,
   isFillGeom,
   isFiniteCsg2,
   isFinitePick,
+  isFinitePolygon,
   isFiniteRegion,
   isCsg2,
   isPick,
+  isPolygon,
   isRegion,
 } from "../geom";
 import { gliderAt, isGlider } from "../geom/gliders";
@@ -84,6 +87,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "line") return Number.isFinite(v.origin.x);
   if (v.kind === "parallelLine") return Number.isFinite(v.distance);
   if (isRegion(v)) return isFiniteRegion(v);
+  if (isPolygon(v)) return isFinitePolygon(v);
   if (isCsg2(v)) return isFiniteCsg2(v);
   if (isPick(v)) return isFinitePick(v);
   if (isGlider(v)) return Number.isFinite(v.x) && Number.isFinite(v.y);
@@ -111,6 +115,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     return abs(dist(world, c.center) - abs(c.radius));
   }
   if (isRegion(v)) return distToRegion(v, world);
+  if (isPolygon(v)) return distToPolygon(v, world);
   if (isCsg2(v) || isPick(v)) return distToCsg(v, world);
   if (isGlider(v)) return dist(world, gliderAt(v));
   return Infinity;
@@ -145,7 +150,7 @@ function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
 function pickRank(n: TraceNode): number {
   if (n.value.kind === "point" || isGlider(n.value)) return 0;
   if (isCsg2(n.value) || isPick(n.value)) return 2;
-  if (isRegion(n.value)) return 3;
+  if (isRegion(n.value) || isPolygon(n.value)) return 3;
   return 1;
 }
 

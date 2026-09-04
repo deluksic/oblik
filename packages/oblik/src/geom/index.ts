@@ -3,6 +3,7 @@ export * from "./types";
 export * from "./ops";
 export * from "./gliders";
 export * from "./region";
+export * from "./polygon";
 export * from "./offset";
 export * from "./csg2";
 export * from "./csg-draw";

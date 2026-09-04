@@ -25,6 +25,7 @@ export const BIND_PREFIX: Record<string, string> = {
   pointOnCircle: "g",
   slider: "n",
   region: "rg",
+  polygon: "pg",
   roundOffset: "off",
   csg2: "csg",
   style: "sty",

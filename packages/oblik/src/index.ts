@@ -28,6 +28,7 @@ export {
   along,
   fillet,
   region,
+  polygon,
   roundOffset,
   leftOf,
   rightOf,

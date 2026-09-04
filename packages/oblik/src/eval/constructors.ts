@@ -22,6 +22,9 @@ import {
   nanPick,
   nanRegion,
   regionValue,
+  isFinitePolygon,
+  nanPolygon,
+  polygonValue,
   csg2Value,
   wrapCsg,
   offsetValue,
@@ -37,6 +40,7 @@ import {
   type LineLike,
   type ParallelLine,
   type Point,
+  type Polygon,
   type Region,
   type WalkInput,
   type Csg2,
@@ -115,6 +119,8 @@ function isFiniteValue(v: { kind: string }): boolean {
     }
     case "region":
       return isFiniteRegion(v as Region);
+    case "polygon":
+      return isFinitePolygon(v as Polygon);
     case "csg2":
       return isFiniteCsg2(v as Csg2);
     case "pick":
@@ -251,6 +257,19 @@ export const region = mark(
   (cycle: WalkInput, holes: readonly WalkInput[], id?: string): Region => {
     if (!Array.isArray(holes)) return traced(nanRegion(), id);
     return traced(regionValue(cycle, holes), id);
+  },
+  { dof: [] },
+);
+
+/**
+ * Computed-boundary cheese: a closed chain of sampled points plus hole loops.
+ * Holes are explicit — pass `[]` for none. Not a CSG operand; polygon has no
+ * carrier families, so CSG / offset / trim never see it.
+ */
+export const polygon = mark(
+  (boundary: readonly Vec2[], holes: readonly WalkInput[], id?: string): Polygon => {
+    if (!Array.isArray(holes)) return traced(nanPolygon(), id);
+    return traced(polygonValue(boundary, holes), id);
   },
   { dof: [] },
 );
@@ -398,6 +417,7 @@ export const constructors = {
   circleCircleIntersection,
   slider,
   region,
+  polygon,
   roundOffset,
   csg2,
   style,

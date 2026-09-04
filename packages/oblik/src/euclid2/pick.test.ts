@@ -106,6 +106,54 @@ describe("hitTest", () => {
   });
 });
 
+describe("polygon fills", () => {
+  const boundary = [
+    { x: 0, y: 0 },
+    { x: 4, y: 0 },
+    { x: 4, y: 4 },
+    { x: 0, y: 4 },
+  ];
+  const POLY = {
+    id: "o_pg",
+    occ: 0,
+    kind: "polygon",
+    value: { kind: "polygon", boundary, holes: [] },
+    bind: "gear",
+    editable: false,
+    stack: [{ file: "scene.ts", line: 20, column: 4 }],
+  } as TraceNode;
+  const BORE = {
+    ...POLY,
+    id: "o_pb",
+    value: {
+      kind: "polygon",
+      boundary,
+      holes: [{ kind: "circle", center: { x: 2, y: 2 }, radius: 0.5 }],
+    },
+  } as TraceNode;
+
+  test("picks a polygon face inside its fill", () => {
+    const hit = hitTest([POLY], { x: 2, y: 1 }, camera, size);
+    expect(hit?.id).toBe("o_pg");
+  });
+
+  test("a hole in the polygon is not inside the fill", () => {
+    const hit = hitTest([BORE], { x: 2, y: 2 }, camera, size);
+    expect(hit).toBeNull();
+  });
+
+  test("points and strokes win over a polygon fill", () => {
+    const onFace = {
+      ...A,
+      id: "o_p",
+      bind: "P",
+      value: { kind: "point", x: 2, y: 2.4 },
+    } as TraceNode;
+    const hits = hitsNear([POLY, onFace], { x: 2, y: 2.4 }, camera, size);
+    expect(hits[0]?.id).toBe("o_p");
+  });
+});
+
 describe("snapLineCarrier", () => {
   test("snaps to the nearest named line-like stroke", () => {
     const ground = {

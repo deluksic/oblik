@@ -163,7 +163,7 @@ function asCircleWalk(v: unknown): Circle | null {
   };
 }
 
-function asWalk(v: unknown): Loop | null {
+export function asWalk(v: unknown): Loop | null {
   const circle = asCircleWalk(v);
   if (circle) return circle;
   if (Array.isArray(v)) return walkFromCycle(v);
@@ -340,7 +340,7 @@ export function tessellateRegion(p: Region): Vec2[] {
   return poly;
 }
 
-function polyContains(poly: readonly Vec2[], q: Vec2): boolean {
+export function polyContains(poly: readonly Vec2[], q: Vec2): boolean {
   if (poly.length < 3 || !isFiniteVec(q)) return false;
   let n = 0;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -369,7 +369,7 @@ function pointOnPolyBoundary(poly: readonly Vec2[], q: Vec2): boolean {
   return false;
 }
 
-function polysTouch(a: readonly Vec2[], b: readonly Vec2[]): boolean {
+export function polysTouch(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   for (let i = 0, i0 = a.length - 1; i < a.length; i0 = i++) {
     const a0 = a[i0]!;
     const a1 = a[i]!;
@@ -386,7 +386,7 @@ function polysTouch(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   return false;
 }
 
-function polysInterfere(a: readonly Vec2[], b: readonly Vec2[]): boolean {
+export function polysInterfere(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   if (polysTouch(a, b)) return true;
   for (const q of a) {
     if (polyContains(b, q) || pointOnPolyBoundary(b, q)) return true;
@@ -426,7 +426,7 @@ function distToArc(e: LoopEdge, q: Vec2): number {
   return min(dist(q, e.a), dist(q, e.b));
 }
 
-function distToWalkBoundary(w: Loop, q: Vec2): number {
+export function distToWalkBoundary(w: Loop, q: Vec2): number {
   if (isCircleWalk(w)) return abs(dist(q, w.center) - abs(w.radius));
   let best = Infinity;
   for (const e of w) {

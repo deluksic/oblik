@@ -1,9 +1,10 @@
 import { For, Show, createMemo, type ParentProps } from "solid-js";
 
-import type { Csg2, Pick as GeomPick, Region } from "@/geom";
+import type { Csg2, Pick as GeomPick, Polygon, Region } from "@/geom";
 import { fillPaint, type DrawOp } from "@/geom/csg-draw";
 import { isPick } from "@/geom/csg2";
 import { evaluateRegions } from "@/geom/evaluate-regions";
+import { polygonSvgPath } from "@/geom/polygon";
 import { regionSvgPath } from "@/geom/region";
 
 import { chromeClipUrl, chromeOutsideClipId, type ChromeLayer } from "./chrome";
@@ -34,7 +35,7 @@ export type FaceInk = {
 };
 
 export type FillFaceProps = {
-  value: Region | Csg2 | GeomPick;
+  value: Region | Csg2 | GeomPick | Polygon;
   overlay: boolean;
   layers: ChromeLayer[];
   uid: string;
@@ -44,13 +45,19 @@ export type FillFaceProps = {
   strokeHoles?: boolean;
 };
 
-function declaredFill(v: Region | Csg2 | GeomPick): Region | null {
-  if (v.kind === "region") return v;
+type Declared = Region | Polygon;
+
+function declaredFill(v: Region | Csg2 | GeomPick | Polygon): Declared | null {
+  if (v.kind === "region" || v.kind === "polygon") return v;
   if (isPick(v)) {
     const islands = evaluateRegions(v);
     return islands.length === 1 ? islands[0]! : null;
   }
   return null;
+}
+
+function declaredPath(v: Declared): string {
+  return v.kind === "polygon" ? polygonSvgPath(v) : regionSvgPath(v);
 }
 
 function attrs(ink: FaceInk) {
@@ -106,8 +113,8 @@ export function FillFace(props: ParentProps<FillFaceProps>) {
   );
 }
 
-function DeclaredFace(props: ParentProps<FillFaceProps & { value: Region }>) {
-  const d = () => regionSvgPath(props.value);
+function DeclaredFace(props: ParentProps<FillFaceProps & { value: Declared }>) {
+  const d = () => declaredPath(props.value);
   const outsideId = () => chromeOutsideClipId(props.uid);
   return (
     <Show when={d()}>

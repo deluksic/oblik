@@ -10,6 +10,7 @@ import type {
   LineLike,
   Offset,
   Pick,
+  Polygon,
   Region,
 } from "./types";
 import { dist, isFiniteVec, type Vec2 } from "./vec";
@@ -44,8 +45,8 @@ export function offsetOfCsg(v: Csg2): Offset | null {
   return v.of.length === 1 && isOffset(o) ? o : null;
 }
 
-export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick {
-  return v.kind === "region" || v.kind === "csg2" || v.kind === "pick";
+export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick | Polygon {
+  return v.kind === "region" || v.kind === "polygon" || v.kind === "csg2" || v.kind === "pick";
 }
 
 export function leftOfValue(line: LineLike): HalfPlane {

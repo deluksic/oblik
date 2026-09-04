@@ -7,6 +7,7 @@ import { describe, expect, test } from "vitest";
 import arcade from "../../../../apps/demo/src/scenes/arcade.ts";
 import csgTree from "../../../../apps/demo/src/scenes/csg-tree.ts";
 import fillet from "../../../../apps/demo/src/scenes/fillet.ts";
+import gear from "../../../../apps/demo/src/scenes/gear.ts";
 import islands from "../../../../apps/demo/src/scenes/islands.ts";
 import mountingPlateGrid from "../../../../apps/demo/src/scenes/mounting-plate-grid.ts";
 import mountingPlate from "../../../../apps/demo/src/scenes/mounting-plate.ts";
@@ -24,6 +25,7 @@ import { csgPaint, fillPaint } from "../geom/csg-draw";
 import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
 import { evaluateRegions } from "../geom/evaluate-regions";
 import { compileOffsetBoundary } from "../geom/offset";
+import { isFinitePolygon, isPolygon, polygonContains } from "../geom/polygon";
 import { isCircleWalk, isFiniteRegion, regionContains, walkEdges } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
@@ -587,5 +589,75 @@ describe("migrated demo scenes", () => {
       const paint = csgPaint(hold.value);
       expect(paint.empty).toBe(false);
     }
+  });
+
+  test("gear is one polygon per gear with a circular bore hole", () => {
+    const files = ["apps/demo/src/scenes/gear.ts", "apps/demo/src/layout/gear.ts"];
+    const { trace } = run(gear, files);
+    const faces = trace.filter((n) => isPolygon(n.value));
+    expect(faces).toHaveLength(2);
+    const pinion = trace.find((n) => n.bind === "pinion");
+    const pitch1 = trace.find((n) => n.bind === "pitch1");
+    const pitch2 = trace.find((n) => n.bind === "pitch2c");
+    const face1 = trace.find((n) => n.bind === "face1");
+    const face2 = trace.find((n) => n.bind === "face2");
+    if (!pinion || pinion.value.kind !== "point") throw new Error("missing pinion");
+    if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
+    if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
+    if (!face1 || !face2) throw new Error("missing face nodes");
+    if (!isPolygon(face1.value) || !isPolygon(face2.value)) throw new Error("faces are not polygons");
+    expect(isFinitePolygon(face1.value)).toBe(true);
+    expect(isFinitePolygon(face2.value)).toBe(true);
+    expect(face1.value.holes).toHaveLength(1);
+    expect(face1.value.holes.every(isCircleWalk)).toBe(true);
+    expect(face2.value.holes).toHaveLength(1);
+    expect(face2.value.holes.every(isCircleWalk)).toBe(true);
+
+    const c1 = pinion.value;
+    const r1 = pitch1.value.radius;
+    const c2 = pitch2.value.center;
+    const r2 = pitch2.value.radius;
+    const probe = (c: { x: number; y: number }, r: number) => ({ x: c.x + r, y: c.y });
+    // Pinion: root disc is meat, inside the bore is not, past the tip is not.
+    expect(polygonContains(face1.value, probe(c1, r1 * 0.5))).toBe(true);
+    expect(polygonContains(face1.value, probe(c1, r1 * 0.2))).toBe(false);
+    expect(polygonContains(face1.value, probe(c1, r1 * 1.6))).toBe(false);
+    // Wheel: same three checks relative to the derived pitch.
+    expect(polygonContains(face2.value, probe(c2, r2 * 0.5))).toBe(true);
+    expect(polygonContains(face2.value, probe(c2, r2 * 0.2))).toBe(false);
+    expect(polygonContains(face2.value, probe(c2, r2 * 1.2))).toBe(false);
+  });
+
+  test("gear recomputes finitely when teeth and pitch are drafted", () => {
+    const files = ["apps/demo/src/scenes/gear.ts", "apps/demo/src/layout/gear.ts"];
+    const { trace } = run(
+      gear,
+      files,
+      new Map([
+        ["o_gear_z1", [24]],
+        ["o_gear_z2", [30]],
+      ]),
+    );
+    const pitch1 = trace.find((n) => n.bind === "pitch1");
+    const pitch2 = trace.find((n) => n.bind === "pitch2c");
+    const pinion = trace.find((n) => n.bind === "pinion");
+    const face1 = trace.find((n) => n.bind === "face1");
+    const face2 = trace.find((n) => n.bind === "face2");
+    if (!pinion || pinion.value.kind !== "point") throw new Error("missing pinion");
+    if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
+    if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
+    if (!face1 || !face2) throw new Error("missing face nodes");
+    if (!isPolygon(face1.value) || !isPolygon(face2.value)) throw new Error("faces are not polygons");
+    expect(isFinitePolygon(face1.value)).toBe(true);
+    expect(isFinitePolygon(face2.value)).toBe(true);
+    const c1 = pinion.value;
+    const r1 = pitch1.value.radius;
+    const c2 = pitch2.value.center;
+    const r2 = pitch2.value.radius;
+    const probe = (c: { x: number; y: number }, r: number) => ({ x: c.x + r, y: c.y });
+    expect(polygonContains(face1.value, probe(c1, r1 * 0.5))).toBe(true);
+    expect(polygonContains(face1.value, probe(c1, r1 * 0.2))).toBe(false);
+    expect(polygonContains(face2.value, probe(c2, r2 * 0.5))).toBe(true);
+    expect(polygonContains(face2.value, probe(c2, r2 * 0.2))).toBe(false);
   });
 });

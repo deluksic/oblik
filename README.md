@@ -11,7 +11,7 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`, `arcade`, `stock-cutters`, `stock-cutters-figure`, `islands`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`, `arcade`, `stock-cutters`, `stock-cutters-figure`, `islands`, `gear`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
 
 Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 
@@ -29,9 +29,10 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Arcade              | Pac-Man `diff(disk, [mouth])`; ghost `diff(union([head, tunic, scallops]), [eyes])`                                                                                                                  |
 | Stock-cutters       | CSG plate: `diff` / `intersect` / `pick` of stock, drills, stadium slot, half-planes                                                                                                                 |
 | Islands             | Playground for compiled `pick`: unmarked CSG, probe jumps islands. Disks, severed plate, filleted cheese                                                                                             |
+| Gear                | Involute pair from the paper scene: each gear is one `polygon(gearOutline(...), [bore])` — a computed sampled face with a circular bore hole. No CSG — polygon is not a CsgOperand |
 | Triangle            | three free points                                                                                                                                                                                    |
 
-Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`**, **`offsetLine({ mirror })`** (use `-x.distance`), **slider labels**, sdf2 / 3D. P7 shipped regions / fillets / planar CSG; P9 figure is paint, not `{ style }` on constructors.
+Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`** as stroke nodes (closed computed outlines fill via `polygon` — see gear), **`offsetLine({ mirror })`** (use `-x.distance`), **slider labels**, sdf2 / 3D. P7 shipped regions / fillets / planar CSG; P9 figure is paint, not `{ style }` on constructors.
 
 The P5 paper app is still here:
 

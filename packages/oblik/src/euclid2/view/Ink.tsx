@@ -1,7 +1,7 @@
 import { For, Show, createMemo } from "solid-js";
 
 import type { TraceNode } from "@/eval/context";
-import type { Circle, Csg2, Pick, Region, Segment } from "@/geom";
+import type { Circle, Csg2, Pick, Polygon, Region, Segment } from "@/geom";
 import { fillPaint } from "@/geom/csg-draw";
 import { isOffsetCsg, isCsg2 } from "@/geom/csg2";
 import { infiniteLineAxis } from "@/geom/ops";
@@ -258,7 +258,7 @@ export function RegionFill(props: { node: TraceNode; hot: boolean; selected: boo
   const layers = createMemo(() => layersOf(props.hot, props.selected, false), {
     equals: chromeLayersEqual,
   });
-  const value = () => props.node.value as Region | Csg2 | Pick;
+  const value = () => props.node.value as Region | Csg2 | Pick | Polygon;
   const offsetStock = createMemo(() => {
     const v = value();
     if (!isCsg2(v) || !isOffsetCsg(v)) return null;
@@ -309,7 +309,7 @@ export function RegionOutline(props: {
   });
   return (
     <FillFace
-      value={props.node.value as Region | Csg2 | Pick}
+      value={props.node.value as Region | Csg2 | Pick | Polygon}
       overlay={props.overlay === true}
       layers={layers()}
       uid={`e2o-${traceKey(props.node)}`}

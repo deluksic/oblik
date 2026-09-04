@@ -29,6 +29,16 @@ export type Loop = LoopEdge[] | Circle;
 export type Region = { kind: "region"; outer: Loop; holes: Loop[] };
 
 /**
+ * Computed-boundary face: a closed sampled chain of distinct points (closure
+ * implicit last→first) plus hole loops (full circles or carrier cycles).
+ * Not a `CsgOperand`: the boundary is a point chain, not spans on carrier
+ * families, so CSG / offset / trim machinery never sees a polygon. Interact
+ * with it through its own membership/fill; convert (tessellate) first if
+ * region-level operations are wanted.
+ */
+export type Polygon = { kind: "polygon"; boundary: Vec2[]; holes: Loop[] };
+
+/**
  * Unmarked half-space, like `along` / `fillet`. Side `1` is left of the directed
  * line (`signedDist >= 0`); `-1` is right.
  */
@@ -57,4 +67,14 @@ export type Pick = { kind: "pick"; of: CsgOperand; at: Vec2 };
 
 export type CsgOperand = Region | Circle | HalfPlane | Offset | Csg2 | Pick;
 
-export type Geom = Point | Segment | Line | Circle | ParallelLine | Glider | Region | Csg2 | Pick;
+export type Geom =
+  | Point
+  | Segment
+  | Line
+  | Circle
+  | ParallelLine
+  | Glider
+  | Region
+  | Polygon
+  | Csg2
+  | Pick;
