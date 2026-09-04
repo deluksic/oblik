@@ -9,13 +9,19 @@ packages/oblik/src/
   icons.d.ts              # ~icons/* ambient typing (unplugin-icons, Solid 2)
 
   host/                   # app chrome (Solid)
-    Host.tsx              # mountOblik(el, opts) → render(<Modal><Host/></Modal>);
-                          #   scene cache, sceneRev HMR signal, pane memo branches on kind
+    Host.tsx              # mountOblik(el, opts) → render(<StoredSignalsProvider><Modal><Host/></Modal></StoredSignalsProvider>);
+                          #   scene cache, sceneRev HMR signal, pane memo branches on kind;
+                          #   welcome stage (no ?scene=) vs scene stage
     Host.module.css
-    Nav.tsx               # scene picker
+    TitleBar.tsx          # oblik › scene breadcrumb, scene-switcher menu, muted version, settings gear
+    Welcome.tsx           # no-scene picker: searchable scene list with kind icons
+    SettingsModal.tsx     # about (version) + reset all local data (two-step confirm, stays open)
+    ResizableSidebar.tsx  # stored-width sidebar slot + drag sash (createDragHandler)
+    resizable.ts          # pure: SIDEBAR_* constants + clampSidebarWidth (node-testable)
+    StoredSignalsContext.tsx / stored-signals.ts   # Context registry of localStorage signals
     SelectionSidebar.tsx  # scope / selection detail (origin file, mentions)
     selection-detail.ts   # pure: scope pick → detail rows
-    routing.ts            # currentSceneId / openScene (URL ?scene=, pushState)
+    routing.ts            # currentSceneId / openScene / openWelcome (URL ?scene=, pushState)
     scene-hot.ts          # registerSceneHot — module HMR bridge into the pane cache
 
   euclid2/                # 2D construction scenes (Solid chrome + SVG view)
@@ -35,7 +41,8 @@ packages/oblik/src/
     FrameEditor.tsx, ExportModal.tsx
     frame.ts, chips.ts, export.ts, pick.ts, tools.ts   # pure logic colocated
 
-  modal/                  # Modal root + context
+  modal/                  # Modal host: Modal.tsx (native <dialog> layer, click-off dismiss),
+                          #   ModalContext.ts (useRequestModal), ModalTitleBar.tsx
   source/                 # Vite plugin (vite-plugin.ts) + catalog/analyze/stamp/hoist/insert/patch
   eval/, geom/            # pure TS — the tape model, region/polygon/CSG geometry (no Solid)
 ```
@@ -77,12 +84,12 @@ Space verbs are objects in `euclid2/tool.ts` + `tools/*`. Each verb owns click, 
 
 ## Drag / pointer glue
 
-`euclid2/view/pointer.ts` + `createDragHandler.ts` own pointer capture, hover, click-vs-drag, and per-handle drag sessions that call `onDraft` / `onCommit` (scene literal write-back on release). Camera NDC `viewBox` math lives in `camera.ts` — handles move by relative Δ.
+`euclid2/view/pointer.ts` + `createDragHandler.ts` own pointer capture, hover, click-vs-drag, and per-handle drag sessions that call `onDraft` / `onCommit` (scene literal write-back on release). Camera NDC `viewBox` math lives in `camera.ts` — handles move by relative Δ. Sashes reuse the same `createDragHandler`: record `startX`/`startWidth` in `drag.start(...)`, then persist `clampSidebarWidth(startW - (ev.clientX - startX))` on every move (`host/ResizableSidebar.tsx`).
 
 ## Testing
 
-- Pure logic colocated: `*.test.ts` next to the source (vitest, `environment: "node"` — see `packages/oblik/vitest.config.ts`).
-- View modules export pure helpers for tests (`view/Ink.test.tsx`, `view/marks.test.ts`, `view/chrome.test.ts`, `figure/Ink.test.ts`, `euclid2/pick.test.ts`, `geom/*.test.ts`).
+- Pure logic colocated: `*.test.ts` next to the source (vitest, `environment: "node"` — see `packages/oblik/vitest.config.ts`). The node env does **not** compile `.tsx`: keep tested logic in `.ts` modules (e.g. `host/stored-signals.ts` with a fake `StorageLike`, `host/resizable.ts`) and never import a `.tsx` component from a test.
+- View modules export pure helpers for tests (`figure/Ink.test.ts`, `figure/chips.test.ts`, `euclid2/pick.test.ts`, `geom/*.test.ts`, …).
 - `eval/demo-scenes.test.ts` imports and evaluates the real `apps/demo` scenes headlessly — scene edits can break these tests.
 - Conventions are enforced by `solid-conventions.test.ts` (no `onSettled`, no `node={…()!}`).
 
@@ -127,4 +134,5 @@ createEffect(
 ## Docs
 
 - Chrome/halo metrics: `docs/chrome.md` (repo root)
-- Learned-by-using notes (Tab, gliders, Solid 2 pane identity, HMR): `docs/prototypes/6.md` (repo root)
+- Solid 2 traps and codebase patterns live **in this skill** (SKILL.md "Reactivity" / "Lifecycle & DOM" + reference sections) — agent guidance belongs here, not in prototype docs.
+- `docs/prototypes/*.md` are prototype history and product decisions, not agent-facing notes.

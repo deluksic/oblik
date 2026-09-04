@@ -23,10 +23,14 @@ The whole UI is one package: `packages/oblik`. Solid chrome and panes are `.tsx`
 
 ```
 packages/oblik/src/
-  host/       mount + app chrome: Host.tsx (mountOblik), Nav, SelectionSidebar, routing, scene-hot
+  host/       mount + chrome: Host.tsx (mountOblik), TitleBar (oblik › scene breadcrumb +
+              scene-switcher menu + settings gear), Welcome (no-scene picker), SettingsModal,
+              ResizableSidebar, StoredSignalsContext (localStorage signals), SelectionSidebar,
+              routing, scene-hot
   euclid2/    Pane, Palette, view/* (View, Ink, FillFace, Hud, Grid, Ghost, chrome, sliderHud), tool + tools/*, pick, camera
   figure/     P9 paint scenes: Pane, View, Palette, Ink, BrushDock, FrameEditor, ExportModal, frame, chips, export, pick, tools
-  modal/      Modal root context (mountOblik wraps the app in <Modal>)
+  modal/      Modal host: Modal.tsx (native <dialog> layer, click-off dismiss), ModalContext
+              (useRequestModal), ModalTitleBar — mountOblik wraps the app in <Modal>
   source/     Vite plugin, catalog/analyze/stamp/hoist/insert/patch (editor — not UI)
   eval/, geom/  pure TS — never import Solid here
 ```
@@ -78,6 +82,14 @@ Static-only: `class={styles.nav}`.
 - **A memo that returns JSX owns child identity.** If it re-runs, children remount (camera / selection / local signals die). Branch on a **stable** derived value (e.g. `sceneKind` memo of `scene().kind`), then read the changing props in JSX (`scene={scene()}`) so they compile to getters on the _existing_ instance. Host.tsx's `pane` memo does exactly this.
 - **`<Loading>` / `<Errored>` do not remount** just because an async memo re-ran. Fallback only when the memo has no resolved value / throws.
 - Cross-pane handles are plain imperative mutation (`sceneCache`, `Map`s) driven by memo/effect; HMR bumps a `sceneRev` signal.
+
+### Solid 2 traps & codebase patterns (learned by using it)
+
+- **Seed signals from props with function-form `createSignal`.** `createSignal(props.x)` is invalid — props are only readable in a reactive scope. Use `createSignal(() => props.x)` (a writable memo: resets only when the source value changes) or `untrack(() => props.x)` for a genuine one-time read.
+- **`<Show when={…}>` render callbacks get an accessor, not the value.** `{(scene) => scene().title}` — the parameter must be called. (`<For>` items stay plain values.)
+- **Same `id` ⇒ same localStorage-backed signal.** `createStoredSignal(id, { defaultValue })` (`host/StoredSignalsContext.tsx`) resolves through the one registry owned by `StoredSignalsProvider`, which `mountOblik` wraps around the app, so any two callers with the same id share a signal; the first registration's `defaultValue`/options win. The registry + pure helpers and `resetAll` (clears storage, restores every registered default) live in `host/stored-signals.ts` — node-testable with a fake `StorageLike`.
+- **Header menus: swallow Escape on the capture phase.** Panes attach window `keydown` in the bubble phase first; a later `stopPropagation` cannot protect them. TitleBar's scene menu adds `window.addEventListener("keydown", fn, true)` while open (createEffect compute reads `menuOpen()`) and stops Escape so pane tool/selection handlers never see it.
+- **Sash/resize drags: reuse `createDragHandler`** (`euclid2/view/createDragHandler.ts`). Capture `startX`/`startWidth` at pointerdown; write each move: `width.set(clamp(startW - (ev.clientX - startX)))`. Precedent: `host/ResizableSidebar.tsx` (clamp + constants live in `host/resizable.ts`, a `.ts` module so tests can import them).
 
 ### `createEffect` (Solid 2)
 
@@ -131,7 +143,7 @@ createEffect(
 
 ## Testing
 
-- Vitest colocated next to source: `Component.test.ts(x)` in `packages/oblik/src`, run with `pnpm --filter oblik test`. Test environment is `node` — prefer testing pure helpers exported from view modules over mounting components.
+- Vitest colocated next to source (`*.test.ts`), run with `pnpm --filter oblik test`. Environment is `node` and does not compile `.tsx` — keep the logic under test in a `.ts` module (pure helpers, e.g. `host/stored-signals.ts` with a fake `StorageLike`); never import a `.tsx` component from a test.
 - Scene programs are exercised headlessly: `packages/oblik/src/eval/demo-scenes.test.ts` evaluates `apps/demo` scene modules.
 - `packages/oblik/src/solid-conventions.test.ts` greps the tree for banned patterns (e.g. `onSettled`, non-null-asserted live nodes).
 
