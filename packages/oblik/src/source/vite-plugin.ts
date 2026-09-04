@@ -377,18 +377,23 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       const map = analyze(src, file.replace(/\\/g, "/"));
       return `export default ${JSON.stringify(Object.fromEntries(map))};\n`;
     },
-    transform(code, id) {
+    transform(_code, id) {
       const file = id.split("?")[0] ?? id;
       if (isSceneLoadersModule(id)) {
         return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: null };
       }
       if (!isUserAppSource(appRoot, file)) return null;
+      // Pre-phase plugins (e.g. @solidjs/vite-plugin's enforce:"pre" pass)
+      // reprint modules, so `code` here is not the file as authored. Stamp
+      // and serve the canonical on-disk source; otherwise a missing-id
+      // write-back rewrites the file in the upstream formatter's style.
+      const abs = path.resolve(file);
+      const onDisk = fs.readFileSync(abs, "utf8");
       // Vite chains maps by source name — this must match the module Vite is serving
       // (`src/layout/foo.ts`), not a repo path (`apps/demo/src/layout/foo.ts`).
       const viteSource = path.relative(appRoot, file).replace(/\\/g, "/");
-      const { source, added, map } = stamp(code, freshSiteId, viteSource);
+      const { source, added, map } = stamp(onDisk, freshSiteId, viteSource);
       if (added.length === 0) return null;
-      const abs = path.resolve(file);
       void enqueue(abs, () => fs.writeFileSync(abs, source));
       return { code: source, map };
     },
