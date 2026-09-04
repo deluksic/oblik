@@ -481,7 +481,11 @@ describe("captureStack", () => {
 
   test("default eval captures constructor stacks", () => {
     const { trace } = evaluate(scene);
+    const explicit = evaluate(scene, { captureStack: true }).trace;
     expect(trace.every((n) => n.stack.length > 0)).toBe(true);
+    // Full V8 walk — not a thinned helper-only slice.
+    expect(trace[0]!.stack.length).toBeGreaterThan(3);
+    expect(explicit.map((n) => n.stack.length)).toEqual(trace.map((n) => n.stack.length));
   });
 
   test("captureStack: false skips capture and stores the empty stack", () => {
