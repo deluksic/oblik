@@ -1,8 +1,47 @@
-# Design programs, viewed in scenes
+# oblik
 
-TypeScript libraries stay pure. **Scenes** attach constructors (`point`, `circle`, `parallelLine`) and a view. Dragging a handle updates the preview every frame and **writes the scene file only when you release**.
+A code-first design tool, written in TypeScript. You write a program; the program *is* the design. Editing happens in both directions: you type in the editor, you drag on the canvas, and both write to the same source file. Git is the history. There is no sidecar state.
 
-Docs: [docs/README.md](./docs/README.md). Current charter: [Prototype 9](./docs/prototypes/9.md) (figure — paint and style). P8 mention is shipped. P7 Loop / Region / Csg2 is the running tape.
+This is an experiment, not a product. It exists because existing design tools are silos — CAD, jewelry, and slicer apps each do one job well and talk to each other poorly — and because we wanted a tool where the design is ordinary code: functions, loops, imports, tests, reviewed in diffs.
+
+## What it's for
+
+One program, many views. A design program is pure TypeScript — geometry in, geometry out, no UI. **Scenes** attach a view and interactive inputs to that program:
+
+- **2D sketch** (`kind: "construction"`) — parametric construction with draggable points, sliders, and geometric solvers. For designing parts.
+- **Figure** (`kind: "figure"`) — the same helpers, painted with ink and styled for publication. For blog-post diagrams and illustrations.
+- Future scene types (3D, SDF, slicing, maps) would be more views of the same programs, not new tools.
+
+The point of the experiment: if a scene is just a lens over a program, adding a new way to *look* at designs should not mean forking the design.
+
+## How it works
+
+A library stays pure. A scene file declares the interactive bits — points, sliders, offsets — and everything else is computed:
+
+```ts
+// scene — interactive inputs
+const A = point(3, 4);                       // draggable
+const r = circle(A, 2).radius;               // slider
+const t = pointOnSegment(seg, 0.3);          // glider
+
+// library — plain math, importable, testable
+export const shape = ringProfile({ inner: r, seam: t, origin: A });
+```
+
+Drag a handle and the preview updates every frame; when you release, the literal in the scene file is rewritten. Undo is the editor. The canvas knows what you're pointing at (down to the source line that created it) so scenes can bind widgets to real geometry instead of guessing.
+
+Editing on the canvas is **declared, not inferred**: only constructors like `point`, `circle`, `parallelLine`, `slider` expose handles. A stray `3` in a library file is never magically draggable — degrees of freedom live where you put them.
+
+## Status
+
+Prototype-driven: each prototype gets a short charter, a build, and a postmortem that shapes the next one ([docs](./docs/README.md)).
+
+- **P6** — the current runtime: one `oblik` package, Solid + SVG, tape-based evaluation, draft-mode editing. Shipped.
+- **P7** — regions, fillets, planar CSG (`diff` / `union` / `intersect` / `pick` / `roundOffset`). Shipped.
+- **P8** — name scoping: insert/snap know which identifiers are legal where you're focused. Shipped.
+- **P9** — figure scenes: paint ink, Brush/Eraser, construction onion. In progress. Export is later.
+
+Still missing from the old P5 feature set: vectors, polylines/arcs as stroke nodes, mirrored offsets, slider labels, sdf2, 3D. The [horizon](./docs/intent.md#horizon) is two unrelated scene types consuming one library through a shared artifact/pick protocol — if that loop works, domain tools (supports, layout, slicing) become extensions instead of products.
 
 ## Run
 
@@ -11,34 +50,12 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) — **oblik-demo**, the P6 runtime (one `oblik` package, Solid + SVG, `defineScene` / `evaluate` / draft). Scene picker: `?scene=shelf` (default), `pie`, `fillet`, `triangle`, `shared-loop`, `truss`, `mounting-plate`, `mounting-plate-grid`, `nested-circles`, `plate-figure`, `arcade`, `stock-cutters`, `stock-cutters-figure`, `islands`, `gear`. Drag a handle; release writes the scene file. Figure scenes: click ink to inspect, hold Shift for construction, Space for Brush / Eraser. Export is later.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Pick a scene with `?scene=` (`shelf`, `pie`, `fillet`, `truss`, `mounting-plate`, `plate-figure`, `arcade`, `stock-cutters`, `gear`, … — full list in `apps/demo/src`). Drag a handle; release writes the scene file. In figure scenes, click ink to inspect, hold Shift for construction, Space toggles Brush/Eraser.
 
-Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
+## Repo layout
 
-| Scene               | What it exercises                                                                                                                                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shelf               | `parallelLine`, `-shelf.distance` cellar, lamp glider, `dist` beam, `circleLineIntersection`                                                                                                         |
-| Shared loop         | `for` + one radius id (`occ`), `signedDist` offset, `dist` circle                                                                                                                                    |
-| Truss               | `pointOnSegment` gliders, shared `.radius` for posts/roof (two segments, not a polyline)                                                                                                             |
-| Mounting plate      | Parent binds `const plate = mountingPlateLayout()`. Cheese `region(..., [drill, h1, h2, h3])`. Snap `plate.drill` from `build`; dive to insert in the layout file; Add to return for a private local |
-| Mounting plate grid | 3×2 `for` of the same helper. Dive one plate; siblings mute. Serial is once-id `occ`, not a second document                                                                                          |
-| Nested circles      | Two-level helpers (`nestedCircles` → `petal`). Parent draws nested geometry; the inner bead is not referable there                                                                                   |
-| Plate figure        | P9: same `mountingPlateLayout()`. Cream paper, page `frame`; Brush dock for stroke/fill/width/dash. Outline not returned stays onioned                                                               |
-| Pie                 | Three sectors on one circle; `roundOffset(region([...], []), -gap)` opens the cuts                                                                                                                   |
-| Fillet              | Gallery of `fillet(A, r)` cases: opposite corners, all-round + inset, adjacent overlap, L-notch, sector rim/tip, flat origin, clockwise                                                              |
-| Arcade              | Pac-Man `diff(disk, [mouth])`; ghost `diff(union([head, tunic, scallops]), [eyes])`                                                                                                                  |
-| Stock-cutters       | CSG plate: `diff` / `intersect` / `pick` of stock, drills, stadium slot, half-planes                                                                                                                 |
-| Islands             | Playground for compiled `pick`: unmarked CSG, probe jumps islands. Disks, severed plate, filleted cheese                                                                                             |
-| Gear                | Involute pair from the paper scene: each gear is one `polygon(gearOutline(...), [bore])` — a computed sampled face with a circular bore hole. No CSG — polygon is not a CsgOperand                   |
-| Triangle            | three free points                                                                                                                                                                                    |
-
-Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`** as stroke nodes (closed computed outlines fill via `polygon` — see gear), **`offsetLine({ mirror })`** (use `-x.distance`), **slider labels**, sdf2 / 3D. P7 shipped regions / fillets / planar CSG; P9 figure is paint, not `{ style }` on constructors.
-
-## P6 slice
-
-- Scene module: `export default defineScene({ kind, title, camera?, build })`.
-- Trailing call arg is the uuid: `circle(A, 2.5, "o_ab12")`.
-- `draft` is an override until the new module’s `build()` has run.
-- Space inserts Point / Circle / Line / Segment / Parallel / Perpendicular / Slider / Region / Round offset / Fillet via `Expr` (snap from the tape). Each verb owns click, ghost, preview, Tab fields, and Enter. Pane only routes keys — there is no `session.ts`. Type a number to lock a length or axis; Tab names the bind. Length slots reuse sliders and fields (`reach.radius`, `-shelf.distance`); a named point or crossing in that slot writes `dist` / `signedDist` instead. Gliders are Point-only (other tools consume them, they do not create them). Region is point → carrier → point until close; circles write `along(c, k)`; the insert is `region([...], [], id)`. Round offset is a region, then a length (`reach.radius`, `shelf.distance`, a slider, or a click). Fillet is a region corner, then a length; it patches `fillet(A, r)` into that vertex of the existing `region([...], [], id)` (no new `const`). Snap and insert print names legal in the **focused function + invocation** (P8). Select is scope; other invocations mute. Add to return writes a shorthand field on a helper’s object-literal `return` — it does not remove one.
-- Euclid2 camera is a group transform over aspect-correct NDC `viewBox` (y-up via `scale(1,-1)`). Handles move by relative Δ. Click selects; drag commits and leaves the current pick alone.
-- What we learned by using it (Tab, gliders vs `.distance`, Solid 2 pane identity, scene-loader HMR): [Prototype 6](./docs/prototypes/6.md#learned-from-using-it).
+```
+packages/oblik    the library: constructors, tape, views, shell
+apps/demo         scene programs — the actual usage ground
+docs/             intent, prototypes, postmortems
+```
