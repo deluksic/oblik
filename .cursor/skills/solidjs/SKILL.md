@@ -86,6 +86,7 @@ Static-only: `class={styles.nav}`.
 ### Solid 2 traps & codebase patterns (learned by using it)
 
 - **Seed signals from props with function-form `createSignal`.** `createSignal(props.x)` is invalid — props are only readable in a reactive scope. Use `createSignal(() => props.x)` (a writable memo: resets only when the source value changes) or `untrack(() => props.x)` for a genuine one-time read.
+- **`<For>` keying mode changes what items are (Solid 2).** No `keyed`/`keyed={true}`: item is the raw row value (index is an accessor). `keyed={false}` and `keyed={fn}`: item is an **accessor** — call it (`item()`). ChromeBand's render-prop forwards the accessor; that is intended.
 - **`<Show when={…}>` render callbacks get an accessor, not the value.** `{(scene) => scene().title}` — the parameter must be called. (`<For>` items stay plain values.)
 - **Same `id` ⇒ same localStorage-backed signal.** `createStoredSignal(id, { defaultValue })` (`host/StoredSignalsContext.tsx`) resolves through the one registry owned by `StoredSignalsProvider`, which `mountOblik` wraps around the app, so any two callers with the same id share a signal; the first registration's `defaultValue`/options win. The registry + pure helpers and `resetAll` (clears storage, restores every registered default) live in `host/stored-signals.ts` — node-testable with a fake `StorageLike`.
 - **Header menus: swallow Escape on the capture phase.** Panes attach window `keydown` in the bubble phase first; a later `stopPropagation` cannot protect them. TitleBar's scene menu adds `window.addEventListener("keydown", fn, true)` while open (createEffect compute reads `menuOpen()`) and stops Escape so pane tool/selection handlers never see it.
@@ -146,6 +147,15 @@ createEffect(
 - Vitest colocated next to source (`*.test.ts`), run with `pnpm --filter oblik test`. Environment is `node` and does not compile `.tsx` — keep the logic under test in a `.ts` module (pure helpers, e.g. `host/stored-signals.ts` with a fake `StorageLike`); never import a `.tsx` component from a test.
 - Scene programs are exercised headlessly: `packages/oblik/src/eval/demo-scenes.test.ts` evaluates `apps/demo` scene modules.
 - `packages/oblik/src/solid-conventions.test.ts` greps the tree for banned patterns (e.g. `onSettled`, non-null-asserted live nodes).
+
+## Linting (`pnpm lint`, oxlint)
+
+- `eslint-plugin-solid` runs through oxlint's JS-plugin bridge (`jsPlugins` in `oxlint.config.ts`) with its Solid-2 **`v2`** rule set, minus the SolidStart-only server rules. This is what catches e.g. reading `props` into a body-level `const Comp = cond ? A : B` and stale captures.
+- **`solid/prefer-show` is intentionally OFF**: JSX ternaries are allowed — they give TS narrowing that `<Show when>` function children (accessors) do not.
+- **Strict equality only**: `eslint/eqeqeq` `["error","always"]` — no `== null` nullish idiom. Absence checks are `=== undefined` / `!== undefined` or optional chaining.
+- **No `null` in this codebase** (`unicorn/no-null`): absence is `undefined`, never introduce `null` in our types or data (`T | undefined`, `?? undefined`, optional fields). Platform/DOM/library values that genuinely arrive as `null` (DOM events, `localStorage`, V8/Vite/trace-mapping types) are handled normally at the boundary and converted to `undefined` immediately — one-line adapters (`getItem(key) ?? undefined`) or `typeof` guards, never stored.
+- JSX conditional children never use `: null` — use `<Show>` or `: undefined`.
+- Rule fires on a deliberate pattern? Add `// oxlint-disable-next-line <rule>` on the line **directly above** the offending code (explain on a preceding comment line — the directive must be the last comment before the code), or wrap with `/* oxlint-disable <rule> -- reason */` … `/* oxlint-enable <rule> */`. Keep disables rare and reasoned.
 
 ## Checklist
 

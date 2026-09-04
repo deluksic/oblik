@@ -134,5 +134,5 @@ createEffect(
 ## Docs
 
 - Chrome/halo metrics: `docs/chrome.md` (repo root)
-- Solid 2 traps and codebase patterns live **in this skill** (SKILL.md "Reactivity" / "Lifecycle & DOM" + reference sections) — agent guidance belongs here, not in prototype docs.
+- Solid 2 traps and codebase patterns live **in this skill** (SKILL.md "Reactivity" / "Lifecycle & DOM" / "Linting" + reference sections) — agent guidance belongs here, not in prototype docs.
 - `docs/prototypes/*.md` are prototype history and product decisions, not agent-facing notes.
