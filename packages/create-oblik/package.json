@@ -1,0 +1,13 @@
+{
+  "name": "create-oblik",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "create-oblik": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ]
+}

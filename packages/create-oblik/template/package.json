@@ -1,0 +1,22 @@
+{
+  "name": "oblik-figures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 43127 --strictPort",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "oblik": "github:deluksic/oblik#path:packages/oblik",
+    "solid-js": "2.0.0-rc.0",
+    "@solidjs/web": "2.0.0-rc.0"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.128",
+    "@solidjs/vite-plugin": "3.0.0-next.31",
+    "typescript": "~6.0.2",
+    "unplugin-icons": "^23.0.1",
+    "vite": "^8.2.0"
+  }
+}

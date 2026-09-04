@@ -7,10 +7,18 @@
     ".": "./src/index.ts",
     "./host": "./src/host/index.ts",
     "./euclid2": "./src/euclid2/index.ts",
-    "./plugin": "./src/source/vite-plugin.ts"
+    "./plugin": {
+      "types": "./src/source/vite-plugin.ts",
+      "default": "./dist/plugin.js"
+    }
   },
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "test": "vitest run",
+    "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
@@ -24,6 +32,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.128",
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
     "unplugin-icons": "^23.0.1",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"
