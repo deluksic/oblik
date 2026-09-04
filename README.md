@@ -29,18 +29,10 @@ Migrated from P5 euclid2 (construction graphs only — no fill, SDF, or 3D):
 | Arcade              | Pac-Man `diff(disk, [mouth])`; ghost `diff(union([head, tunic, scallops]), [eyes])`                                                                                                                  |
 | Stock-cutters       | CSG plate: `diff` / `intersect` / `pick` of stock, drills, stadium slot, half-planes                                                                                                                 |
 | Islands             | Playground for compiled `pick`: unmarked CSG, probe jumps islands. Disks, severed plate, filleted cheese                                                                                             |
-| Gear                | Involute pair from the paper scene: each gear is one `polygon(gearOutline(...), [bore])` — a computed sampled face with a circular bore hole. No CSG — polygon is not a CsgOperand |
+| Gear                | Involute pair from the paper scene: each gear is one `polygon(gearOutline(...), [bore])` — a computed sampled face with a circular bore hole. No CSG — polygon is not a CsgOperand                   |
 | Triangle            | three free points                                                                                                                                                                                    |
 
 Still missing vs P5 2D (not migrated): **`vector`**, **`polyline` / `arc`** as stroke nodes (closed computed outlines fill via `polygon` — see gear), **`offsetLine({ mirror })`** (use `-x.distance`), **slider labels**, sdf2 / 3D. P7 shipped regions / fillets / planar CSG; P9 figure is paint, not `{ style }` on constructors.
-
-The P5 paper app is still here:
-
-```sh
-pnpm dev
-```
-
-Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `apps/paper/src/scenes/<id>.scene.ts`.
 
 ## P6 slice
 
@@ -50,5 +42,3 @@ Opens [http://127.0.0.1:43117](http://127.0.0.1:43117). **New scene** writes `ap
 - Space inserts Point / Circle / Line / Segment / Parallel / Perpendicular / Slider / Region / Round offset / Fillet via `Expr` (snap from the tape). Each verb owns click, ghost, preview, Tab fields, and Enter. Pane only routes keys — there is no `session.ts`. Type a number to lock a length or axis; Tab names the bind. Length slots reuse sliders and fields (`reach.radius`, `-shelf.distance`); a named point or crossing in that slot writes `dist` / `signedDist` instead. Gliders are Point-only (other tools consume them, they do not create them). Region is point → carrier → point until close; circles write `along(c, k)`; the insert is `region([...], [], id)`. Round offset is a region, then a length (`reach.radius`, `shelf.distance`, a slider, or a click). Fillet is a region corner, then a length; it patches `fillet(A, r)` into that vertex of the existing `region([...], [], id)` (no new `const`). Snap and insert print names legal in the **focused function + invocation** (P8). Select is scope; other invocations mute. Add to return writes a shorthand field on a helper’s object-literal `return` — it does not remove one.
 - Euclid2 camera is a group transform over aspect-correct NDC `viewBox` (y-up via `scale(1,-1)`). Handles move by relative Δ. Click selects; drag commits and leaves the current pick alone.
 - What we learned by using it (Tab, gliders vs `.distance`, Solid 2 pane identity, scene-loader HMR): [Prototype 6](./docs/prototypes/6.md#learned-from-using-it).
-
-P5 paper notes (catalog, Space, layouts): [docs/scenes.md](./docs/scenes.md).

@@ -5,7 +5,7 @@ import solid from "@solidjs/vite-plugin";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
 
-// Config is loaded by Node; package exports to .ts are not. Same pattern as apps/paper.
+// Config is loaded by Node; package exports to .ts are not.
 import { oblikPlugin } from "../../packages/oblik/src/source/vite-plugin.ts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));

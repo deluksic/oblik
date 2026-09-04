@@ -1,11 +1,9 @@
 # Docs
 
 - [Intent](./intent.md) — programs, pure libraries, declared editors
-- [Layout](./layout.md) — packages, import rules, identity, widget write-back
-- [Scenes](./scenes.md) — catalog, layouts, marks, Space palette
 - [Chrome](./chrome.md) — hover and selection halos (construction + figure)
-- [euclid2 graph](./euclid2-graph.md) — 2D constructors, annotator, potential vs actual
-- [euclid2 worked example](./euclid2-worked.md) — shelf / reach / beam; where the graph fails intent
+- [euclid2 graph](./euclid2-graph.md) — P5-era history: 2D constructors, annotator, potential vs actual
+- [euclid2 worked example](./euclid2-worked.md) — P5-era history: shelf / reach / beam; where the graph fails intent
 
 Prototypes (charter + what we learned):
 

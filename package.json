@@ -4,10 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @design-scenes/paper dev",
     "demo": "pnpm --filter oblik-demo dev",
     "build": "pnpm -r --if-present build",
-    "preview": "pnpm --filter @design-scenes/paper preview",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "typecheck": "pnpm -r typecheck",
