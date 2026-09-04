@@ -37,6 +37,8 @@ export type ModalProps = {
  * Each request renders a native `<dialog>` on the top layer, so it always sits
  * above the rest of the app without z-index juggling. `respond(value)` resolves
  * the promise and dismisses that dialog; pressing Escape responds `undefined`.
+ * Pressing down on the backdrop (outside the dialog box) also responds
+ * `undefined`, unless the request sets `dismissOnClickOff: false`.
  */
 export function Modal(props: ParentProps<ModalProps>) {
   const [instances, setInstances] = createSignal<ModalInstance[]>([]);
@@ -95,6 +97,23 @@ function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknow
       onCancel={(e) => {
         e.preventDefault();
         props.onDismiss(undefined);
+      }}
+      onPointerDown={(e) => {
+        // Click-off dismissal: a press outside this dialog's box (the native
+        // backdrop) responds `undefined`. Backdrop presses are dispatched to
+        // the `<dialog>`, so the box is tested by coordinates — presses on the
+        // dialog's own padding or scrollbar stay inside and are ignored.
+        // Dismissing at pointerdown (not click) means a press that starts
+        // inside the content can never count as click-off on release.
+        if (e.button !== 0) return;
+        if (props.instance.config.dismissOnClickOff === false) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const inside =
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom;
+        if (!inside) props.onDismiss(undefined);
       }}
     >
       <Content respond={props.onDismiss} />

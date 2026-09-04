@@ -97,6 +97,13 @@
   line-height: 1.45;
 }
 
+.clearedNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--oblik-accent);
+  line-height: 1.45;
+}
+
 .btnRow {
   display: flex;
   gap: 0.6rem;

@@ -14,10 +14,12 @@ export type SettingsModalProps = {
 export function SettingsModal(props: SettingsModalProps) {
   const { resetAll } = useStoredSignals();
   const [armed, setArmed] = createSignal(false);
+  const [cleared, setCleared] = createSignal(false);
 
   function confirmReset() {
     resetAll();
-    props.respond();
+    setArmed(false);
+    setCleared(true);
   }
 
   return (
@@ -38,27 +40,36 @@ export function SettingsModal(props: SettingsModalProps) {
           Settings such as the sidebar width are persisted in this browser's localStorage.
         </p>
         <Show
-          when={!armed()}
+          when={!cleared()}
           fallback={
-            <div class={styles.armBox}>
-              <p class={styles.confirmNote}>
-                Clear every key on this origin and restore defaults? This cannot be undone.
-              </p>
-              <div class={styles.btnRow}>
-                <button type="button" class={styles.secondary} onClick={() => setArmed(false)}>
-                  Cancel
-                </button>
-                <button type="button" class={styles.danger} onClick={confirmReset}>
-                  Clear all local data
-                </button>
-              </div>
-            </div>
+            <p class={styles.clearedNote} role="status">
+              All local data cleared — defaults restored.
+            </p>
           }
         >
-          <button type="button" class={styles.resetBtn} onClick={() => setArmed(true)}>
-            <IconTrash class={styles.resetIcon} aria-hidden="true" />
-            Reset all local data
-          </button>
+          <Show
+            when={!armed()}
+            fallback={
+              <div class={styles.armBox}>
+                <p class={styles.confirmNote}>
+                  Clear every key on this origin and restore defaults? This cannot be undone.
+                </p>
+                <div class={styles.btnRow}>
+                  <button type="button" class={styles.secondary} onClick={() => setArmed(false)}>
+                    Cancel
+                  </button>
+                  <button type="button" class={styles.danger} onClick={confirmReset}>
+                    Clear all local data
+                  </button>
+                </div>
+              </div>
+            }
+          >
+            <button type="button" class={styles.resetBtn} onClick={() => setArmed(true)}>
+              <IconTrash class={styles.resetIcon} aria-hidden="true" />
+              Reset all local data
+            </button>
+          </Show>
         </Show>
       </section>
     </div>

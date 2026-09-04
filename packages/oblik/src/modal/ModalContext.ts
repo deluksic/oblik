@@ -4,6 +4,13 @@ import type { Component } from "solid-js";
 export type ModalConfig<T> = {
   /** Optional extra class applied to the `<dialog>`. */
   class?: string;
+  /**
+   * Dismiss the modal (`respond(undefined)`) when the user presses down outside
+   * its content — on the backdrop or the `<dialog>`'s own chrome. Defaults to
+   * `true`; set `false` to require an explicit action (close button, Escape,
+   * or a content button) to dismiss.
+   */
+  dismissOnClickOff?: boolean;
   /** Renders the modal body. Call `respond(value)` to close and resolve the promise. */
   content: Component<{ respond: (value: T) => void }>;
 };
