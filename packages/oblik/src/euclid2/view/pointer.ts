@@ -18,7 +18,6 @@ import {
 import { enrichHit, type PlaceHit, type Scope, type ToolSession } from "../tool";
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
-
 const { max, round: mathRound, sqrt } = Math;
 export type Drag =
   | {
@@ -124,7 +123,7 @@ export function round(n: number): number {
 
 export function worldOf(
   e: PointerEvent,
-  el: HTMLDivElement | null,
+  el: HTMLDivElement | undefined,
   camera: Camera2,
   size: PaneSize,
 ): { x: number; y: number } {
@@ -166,7 +165,9 @@ export function radiusDrag(
     node,
     startR: c.radius,
     origin: c.center,
-    grabDist: sqrt((w.x - c.center.x) * (w.x - c.center.x) + (w.y - c.center.y) * (w.y - c.center.y)),
+    grabDist: sqrt(
+      (w.x - c.center.x) * (w.x - c.center.x) + (w.y - c.center.y) * (w.y - c.center.y),
+    ),
     downX: e.clientX,
     downY: e.clientY,
     moved: false,
@@ -206,7 +207,7 @@ export function gliderDrag(
   node: TraceNode,
   w: { x: number; y: number },
   e: PointerEvent,
-): Extract<Drag, { kind: "gliderSegment" | "gliderLine" | "gliderCircle" }> | null {
+): Extract<Drag, { kind: "gliderSegment" | "gliderLine" | "gliderCircle" }> | undefined {
   const g = node.value as Glider;
   if (g.kind === "gliderSegment") {
     return {
@@ -249,19 +250,19 @@ export function gliderDrag(
       moved: false,
     };
   }
-  return null;
+  return undefined;
 }
 
 export function offsetDrag(
   node: TraceNode,
   w: { x: number; y: number },
   e: PointerEvent,
-): Extract<Drag, { kind: "offset" }> | null {
-  if (!isCsg2(node.value) || !isOffsetCsg(node.value)) return null;
+): Extract<Drag, { kind: "offset" }> | undefined {
+  if (!isCsg2(node.value) || !isOffsetCsg(node.value)) return undefined;
   const off = offsetOfCsg(node.value);
-  if (!off || !isOffset(off)) return null;
+  if (!off || !isOffset(off)) return undefined;
   const grabSdf = offsetSourceSdf(off, w);
-  if (!Number.isFinite(grabSdf)) return null;
+  if (!Number.isFinite(grabSdf)) return undefined;
   return {
     kind: "offset",
     id: node.id,
@@ -276,18 +277,18 @@ export function offsetDrag(
 
 export function editDragOf(
   e: PointerEvent,
-  el: HTMLDivElement | null,
+  el: HTMLDivElement | undefined,
   hit: TraceNode,
   camera: Camera2,
   size: PaneSize,
-): EditDrag | null {
+): EditDrag | undefined {
   const w = worldOf(e, el, camera, size);
   if (hit.value.kind === "point") return pointDrag(hit, w, e);
   if (isGlider(hit.value)) return gliderDrag(hit, w, e);
   if (hit.value.kind === "circle") return radiusDrag(hit, w, e);
   if (hit.value.kind === "parallelLine") return parallelDrag(hit, w, e);
   if (isCsg2(hit.value) && isOffsetCsg(hit.value)) return offsetDrag(hit, w, e);
-  return null;
+  return undefined;
 }
 
 export function sliderDrag(node: TraceNode, e: PointerEvent): Extract<Drag, { kind: "slider" }> {
@@ -317,11 +318,11 @@ export function panDrag(e: PointerEvent, camera: Camera2): Extract<Drag, { kind:
 
 export function placeFromEvent(
   e: PointerEvent,
-  el: HTMLDivElement | null,
+  el: HTMLDivElement | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: TraceNode[],
-  tool?: ToolSession | null,
+  tool?: ToolSession | undefined,
   filter?: SnapFilter,
   scope?: Scope,
 ): PlaceHit {
@@ -356,7 +357,7 @@ export function placeFromEvent(
     if (id) {
       const found = nodeByTraceAttr(trace, id);
       const allowed = found && (!filter?.keys || filter.keys.has(traceKey(found)));
-      const g = found && allowed ? gliderOnTraceNode(found, w, filter?.print?.(found)) : null;
+      const g = found && allowed ? gliderOnTraceNode(found, w, filter?.print?.(found)) : undefined;
       if (g) point = g;
     }
   }
@@ -395,7 +396,8 @@ export function placeFromEvent(
     camera,
     size,
     screen,
-    target: t,
+    // DOM types `t` as `EventTarget | null`; platform null → undefined at the edge.
+    target: t ?? undefined,
     keys: filter?.keys,
     print: filter?.print,
     scope,
@@ -406,7 +408,7 @@ export function placeFromEvent(
 export function applyDrag(
   drag: Drag,
   e: PointerEvent,
-  el: HTMLDivElement | null,
+  el: HTMLDivElement | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: readonly TraceNode[] = [],
@@ -456,13 +458,15 @@ export function applyDrag(
     return { draft: { id: drag.id, values: [round(ux), round(uy)] } };
   }
   if (drag.kind === "offset") {
-    const stock = isCsg2(drag.node.value) ? offsetOfCsg(drag.node.value) : null;
+    const stock = isCsg2(drag.node.value) ? offsetOfCsg(drag.node.value) : undefined;
     if (!stock || !isOffset(stock)) return {};
     const sdf = offsetSourceSdf(stock, w);
     if (!Number.isFinite(sdf)) return {};
     return { draft: { id: drag.id, values: [round(drag.startD + (sdf - drag.grabSdf))] } };
   }
-  const now = sqrt((w.x - drag.origin.x) * (w.x - drag.origin.x) + (w.y - drag.origin.y) * (w.y - drag.origin.y));
+  const now = sqrt(
+    (w.x - drag.origin.x) * (w.x - drag.origin.x) + (w.y - drag.origin.y) * (w.y - drag.origin.y),
+  );
   return {
     draft: { id: drag.id, values: [round(max(0.05, drag.startR + (now - drag.grabDist)))] },
   };
@@ -476,7 +480,7 @@ export function dragMoved(drag: Drag, e: PointerEvent): boolean {
 
 export function topHit(
   e: PointerEvent,
-  el: HTMLDivElement | null,
+  el: HTMLDivElement | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: TraceNode[],

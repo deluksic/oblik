@@ -13,8 +13,8 @@ describe("frameRect", () => {
   });
 
   test("omits empty frames", () => {
-    expect(frameRect(undefined, { x: 0, y: 0 })).toBeNull();
-    expect(frameRect({ width: 0, height: 4 }, { x: 0, y: 0 })).toBeNull();
+    expect(frameRect(undefined, { x: 0, y: 0 })).toBeUndefined();
+    expect(frameRect({ width: 0, height: 4 }, { x: 0, y: 0 })).toBeUndefined();
   });
 });
 

@@ -11,7 +11,7 @@ export function isDrawnGeom(n: TraceNode): boolean {
 /** Shift+brush may only target geom this scope can name. */
 export function brushAddHits(geoms: readonly TraceNode[], scope?: Scope): TraceNode[] {
   if (!scope) return [];
-  return geoms.filter((n) => isDrawnGeom(n) && mentionExpr(scope, n) != null);
+  return geoms.filter((n) => isDrawnGeom(n) && mentionExpr(scope, n) !== undefined);
 }
 
 /** Map construction hits to covering paint nodes, topmost first. */

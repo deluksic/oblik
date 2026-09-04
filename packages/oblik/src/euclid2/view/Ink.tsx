@@ -24,7 +24,6 @@ import { RegionOp } from "./RegionInk";
 
 import styles from "./View.module.css";
 
-
 const { abs, max, sqrt } = Math;
 function inkClass(editable: boolean, muted = false, selected = false, hot = false) {
   const white = selected || hot;
@@ -86,7 +85,7 @@ export function Stroke(props: {
           overlay={props.overlay === true}
           layers={layers()}
         />
-      ) : null}
+      ) : undefined}
       {kind() === "line" || kind() === "parallelLine" ? (
         <InfiniteStroke
           node={props.node}
@@ -98,7 +97,7 @@ export function Stroke(props: {
           camera={props.camera}
           size={props.size}
         />
-      ) : null}
+      ) : undefined}
       {kind() === "circle" ? (
         <CircleStroke
           node={props.node}
@@ -108,7 +107,7 @@ export function Stroke(props: {
           overlay={props.overlay === true}
           layers={layers()}
         />
-      ) : null}
+      ) : undefined}
     </>
   );
 }
@@ -124,7 +123,7 @@ function SegmentStroke(props: {
   const s = () => props.node.value as Segment;
   return (
     <>
-      {props.overlay ? null : (
+      {props.overlay ? undefined : (
         <line
           class={styles.hit}
           data-ink={traceKey(props.node)}
@@ -162,7 +161,7 @@ function CircleStroke(props: {
   const c = () => props.node.value as Circle;
   return (
     <>
-      {props.overlay ? null : (
+      {props.overlay ? undefined : (
         <circle
           class={styles.hit}
           data-ink={traceKey(props.node)}
@@ -205,7 +204,7 @@ function InfiniteStroke(props: {
 }) {
   const ends = createMemo(() => {
     const axis = infiniteLineAxis(props.node?.value);
-    if (!axis) return null;
+    if (!axis) return undefined;
     return infiniteClip(axis.origin, axis.dir, props.camera, props.size);
   });
   const editable = () => props.node?.value.kind === "parallelLine" && !!props.node.editable;
@@ -213,7 +212,7 @@ function InfiniteStroke(props: {
     <Show when={ends()}>
       {(e) => (
         <>
-          {props.overlay ? null : (
+          {props.overlay ? undefined : (
             <line
               class={styles.hit}
               data-ink={traceKey(props.node)}
@@ -261,7 +260,7 @@ export function RegionFill(props: { node: TraceNode; hot: boolean; selected: boo
   const value = () => props.node.value as Region | Csg2 | Pick | Polygon;
   const offsetStock = createMemo(() => {
     const v = value();
-    if (!isCsg2(v) || !isOffsetCsg(v)) return null;
+    if (!isCsg2(v) || !isOffsetCsg(v)) return undefined;
     return fillPaint(v).stock;
   });
   return (
@@ -337,8 +336,8 @@ export function RegionGhost(props: { ghost: Extract<Ghost, { kind: "region" }>; 
   });
   const arrow = createMemo(() => {
     const a = props.ghost.arrow;
-    if (!a) return null;
-    const n = sqrt((a.tx) * (a.tx) + (a.ty) * (a.ty)) || 1;
+    if (!a) return undefined;
+    const n = sqrt(a.tx * a.tx + a.ty * a.ty) || 1;
     const ux = a.tx / n;
     const uy = a.ty / n;
     const scale = max(8, props.camera.scale);
@@ -359,8 +358,8 @@ export function RegionGhost(props: { ghost: Extract<Ghost, { kind: "region" }>; 
   });
   return (
     <g pointer-events="none">
-      {fill() ? <path class={styles.ghostFill} d={fill()} /> : null}
-      {chain() ? <path class={styles.ghost} d={chain()} fill="none" /> : null}
+      {fill() ? <path class={styles.ghostFill} d={fill()} /> : undefined}
+      {chain() ? <path class={styles.ghost} d={chain()} fill="none" /> : undefined}
       {arrow() ? (
         <>
           <line
@@ -375,7 +374,7 @@ export function RegionGhost(props: { ghost: Extract<Ghost, { kind: "region" }>; 
             points={`${arrow()!.tip.x},${arrow()!.tip.y} ${arrow()!.left.x},${arrow()!.left.y} ${arrow()!.right.x},${arrow()!.right.y}`}
           />
         </>
-      ) : null}
+      ) : undefined}
     </g>
   );
 }

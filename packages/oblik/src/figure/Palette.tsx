@@ -7,7 +7,6 @@ import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./too
 
 import styles from "./Palette.module.css";
 
-
 const { max, min } = Math;
 function toolIcon(id: FigureToolId) {
   switch (id) {
@@ -37,7 +36,7 @@ export function FigurePalette(props: FigurePaletteProps) {
 }
 
 function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void }) {
-  const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
+  const [inputEl, setInputEl] = createSignal<HTMLInputElement | undefined>(undefined);
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
   const items = () => filterFigureTools(query());
@@ -80,7 +79,7 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
   );
 
   return (
-    <div class={styles.picker} onPointerDown={props.onClose}>
+    <div class={styles.picker} onPointerDown={() => props.onClose()}>
       <div
         class={styles.panel}
         role="dialog"

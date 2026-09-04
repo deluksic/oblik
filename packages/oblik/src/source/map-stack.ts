@@ -8,7 +8,6 @@ import {
 } from "@jridgewell/trace-mapping";
 import type { ViteDevServer } from "vite";
 
-
 const { max } = Math;
 export type StackLoc = {
   file: string;
@@ -40,15 +39,15 @@ export function viteUrlForRepoFile(
   return `/@fs${fromWorkspace.startsWith("/") ? fromWorkspace : `/${fromWorkspace}`}`;
 }
 
-export function sourceMapFromCode(code: string): EncodedSourceMap | null {
+export function sourceMapFromCode(code: string): EncodedSourceMap | undefined {
   const m = code.match(
     /[#@] sourceMappingURL=data:application\/json(?:;charset=utf-8)?;base64,(\S+)/,
   );
-  if (!m?.[1]) return null;
+  if (!m?.[1]) return undefined;
   try {
     return JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as EncodedSourceMap;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -56,21 +55,23 @@ export function originalFromMap(
   map: EncodedSourceMap | TraceMap,
   generatedLine: number,
   generatedColumn: number,
-): { line: number; column: number } | null {
+): { line: number; column: number } | undefined {
   const tracer = map instanceof TraceMap ? map : new TraceMap(map);
   const orig = originalPositionFor(tracer, {
     line: generatedLine,
     column: max(0, generatedColumn - 1),
     bias: GREATEST_LOWER_BOUND,
   });
-  if (orig.line == null || orig.column == null) return null;
+  // trace-mapping types positions `number | null`; validate without the
+  // platform null token.
+  if (typeof orig.line !== "number" || typeof orig.column !== "number") return undefined;
   return { line: orig.line, column: orig.column + 1 };
 }
 
 function mapFromTransform(result: {
   code: string;
-  map?: EncodedSourceMap | string | { mappings: string; version?: number } | null;
-}): EncodedSourceMap | null {
+  map?: EncodedSourceMap | string | { mappings: string; version?: number } | undefined;
+}): EncodedSourceMap | undefined {
   const raw = result.map;
   if (raw && typeof raw === "string") {
     try {
@@ -112,7 +113,7 @@ export async function remapStackFrames(
   workspaceRoot: string,
   appRoot: string,
 ): Promise<StackLoc[]> {
-  const tracers = new Map<string, TraceMap | null>();
+  const tracers = new Map<string, TraceMap | undefined>();
   const out: StackLoc[] = [];
   for (const frame of frames) {
     const url = viteUrlForRepoFile(frame.file, workspaceRoot, appRoot);
@@ -120,10 +121,13 @@ export async function remapStackFrames(
     if (tracer === undefined) {
       try {
         const transformed = await server.transformRequest(url);
-        const map = transformed ? mapFromTransform(transformed) : null;
-        tracer = map ? new TraceMap(map) : null;
+        // Vite types `transformResult.map` with `| null`; platform null → undefined.
+        const map = transformed
+          ? mapFromTransform({ code: transformed.code, map: transformed.map ?? undefined })
+          : undefined;
+        tracer = map ? new TraceMap(map) : undefined;
       } catch {
-        tracer = null;
+        tracer = undefined;
       }
       tracers.set(url, tracer);
     }

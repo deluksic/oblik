@@ -165,7 +165,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             const abs = resolveUnder(workspaceRoot, patch.file);
             const src = fs.readFileSync(abs, "utf8");
             const patched = patchLiterals(src, patch.id, patch.values);
-            if (patched == null) {
+            if (patched === undefined) {
               json(res, 400, { ok: false, error: "could not patch id" });
               return;
             }
@@ -265,7 +265,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
             const patched = patchFrame(src, job.frame);
-            if (patched == null) {
+            if (patched === undefined) {
               json(res, 400, { ok: false, error: "could not patch frame" });
               return;
             }
@@ -380,9 +380,9 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
     transform(_code, id) {
       const file = id.split("?")[0] ?? id;
       if (isSceneLoadersModule(id)) {
-        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: null };
+        return { code: sceneLoadersModule(sceneGlobKeys(sceneDir)), map: undefined };
       }
-      if (!isUserAppSource(appRoot, file)) return null;
+      if (!isUserAppSource(appRoot, file)) return undefined;
       // Pre-phase plugins (e.g. @solidjs/vite-plugin's enforce:"pre" pass)
       // reprint modules, so `code` here is not the file as authored. Stamp
       // and serve the canonical on-disk source; otherwise a missing-id
@@ -393,7 +393,7 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       // (`src/layout/foo.ts`), not a repo path (`apps/demo/src/layout/foo.ts`).
       const viteSource = path.relative(appRoot, file).replace(/\\/g, "/");
       const { source, added, map } = stamp(onDisk, freshSiteId, viteSource);
-      if (added.length === 0) return null;
+      if (added.length === 0) return undefined;
       void enqueue(abs, () => fs.writeFileSync(abs, source));
       return { code: source, map };
     },

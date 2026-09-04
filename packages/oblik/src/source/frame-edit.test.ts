@@ -15,7 +15,7 @@ describe("patchFrame", () => {
       `});`,
     ].join("\n");
     const out = patchFrame(src, { x: 1, y: -0.5, width: 6, height: 5 });
-    expect(out).not.toBeNull();
+    expect(out).not.toBeUndefined();
     expect(out).toContain("frame: { width: 6, height: 5, x: 1, y: -0.5 }");
     // camera untouched
     expect(out).toContain("camera: { x: 2, y: 1.6, scale: 72 }");
@@ -39,8 +39,8 @@ describe("patchFrame", () => {
     expect(out).toContain("x: 1.23");
   });
 
-  test("returns null when there is no frame property", () => {
+  test("returns undefined when there is no frame property", () => {
     const src = `export default defineScene({ kind: "figure", title: "t", build() {} });`;
-    expect(patchFrame(src, { x: 0, y: 0, width: 1, height: 1 })).toBeNull();
+    expect(patchFrame(src, { x: 0, y: 0, width: 1, height: 1 })).toBeUndefined();
   });
 });

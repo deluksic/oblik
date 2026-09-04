@@ -18,6 +18,9 @@ export function Welcome(props: WelcomeProps) {
   const scenes = createMemo(() => navItems(props.scenes));
 
   const shown = createMemo(() => {
+    // q is a memo-local snapshot consumed synchronously by the filter below;
+    // this memo re-runs on query change.
+    // oxlint-disable-next-line solid/reactivity
     const q = query().trim().toLowerCase();
     if (!q) return scenes();
     return scenes().filter(

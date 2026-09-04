@@ -30,7 +30,7 @@ export function isStyle(value: unknown): value is FigureStyle {
 export function isLook(value: unknown): value is FigureStyle | StyleSpec {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const kind = (value as { kind?: unknown }).kind;
-  return kind == null || kind === "style";
+  return kind === undefined || kind === "style";
 }
 
 export function lookOf(value: unknown): FigureStyle {
@@ -146,11 +146,11 @@ export function cloneStyle(spec: Omit<FigureStyle, "kind"> | FigureStyle): Figur
   const { stroke, fill, width, point } = spec;
   return {
     kind: "style",
-    ...(stroke != null ? { stroke } : {}),
-    ...(fill != null ? { fill } : {}),
-    ...(width != null ? { width } : {}),
+    ...(stroke !== undefined ? { stroke } : {}),
+    ...(fill !== undefined ? { fill } : {}),
+    ...(width !== undefined ? { width } : {}),
     ...(dash ? { dash } : {}),
-    ...(point != null ? { point } : {}),
+    ...(point !== undefined ? { point } : {}),
   };
 }
 

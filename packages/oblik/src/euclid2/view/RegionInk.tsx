@@ -1,6 +1,13 @@
 import { For, Show, type ParentProps } from "solid-js";
 
-import { csgTreeSvg, paintSvgPath, REGION_MASK, type CsgDraw, type CsgPaint, type DrawOp } from "@/geom/csg-draw";
+import {
+  csgTreeSvg,
+  paintSvgPath,
+  REGION_MASK,
+  type CsgDraw,
+  type CsgPaint,
+  type DrawOp,
+} from "@/geom/csg-draw";
 
 import { chromeClipUrl, layerStrokeWidth, type ChromeLayer } from "./chrome";
 import { ChromeOutsideClip } from "./ChromeClip";
@@ -23,21 +30,26 @@ export function RegionMaskDefs(props: { paint: CsgPaint; id: string }) {
   const box = () => props.paint.box;
   const w = () => box().maxX - box().minX;
   const h = () => box().maxY - box().minY;
-  const frame = () => ({
-    x: box().minX,
-    y: box().minY,
-    width: w(),
-    height: h(),
-  });
   return (
     <defs>
-      <mask id={`${props.id}-m`} maskUnits="userSpaceOnUse" {...frame()}>
-        <rect {...frame()} fill={REGION_MASK.fill.canvas} />
+      <mask
+        id={`${props.id}-m`}
+        maskUnits="userSpaceOnUse"
+        x={box().minX}
+        y={box().minY}
+        width={w()}
+        height={h()}
+      >
+        <rect
+          x={box().minX}
+          y={box().minY}
+          width={w()}
+          height={h()}
+          fill={REGION_MASK.fill.canvas}
+        />
         <Show
           when={props.paint.tree}
-          fallback={
-            <RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />
-          }
+          fallback={<RegionOp op={props.paint.stock} fill={REGION_MASK.fill.stock} stroke="none" />}
         >
           {(tree) => <CsgTreeInk node={tree()} uid={`${props.id}-t`} box={props.paint.box} />}
         </Show>
@@ -86,29 +98,49 @@ export function RegionOp(props: {
   "data-role"?: string;
   "clip-path"?: string;
 }) {
-  const rest = () => ({
-    fill: props.fill,
-    stroke: props.stroke,
-    mask: props.mask,
-    class: props.class,
-    opacity: props.opacity,
-    "stroke-width": props["stroke-width"],
-    "stroke-dasharray": props["stroke-dasharray"],
-    "stroke-linecap": props["stroke-linecap"],
-    "stroke-linejoin": props["stroke-linejoin"],
-    "vector-effect": props["vector-effect"],
-    "data-ink": props["data-ink"],
-    "data-role": props["data-role"],
-    "clip-path": props["clip-path"],
-  });
   return (
     <Show
       when={props.op.kind === "circle" ? props.op : undefined}
       fallback={
-        <path d={props.op.kind === "path" ? props.op.d : ""} fill-rule="evenodd" {...rest()} />
+        <path
+          d={props.op.kind === "path" ? props.op.d : ""}
+          fill-rule="evenodd"
+          fill={props.fill}
+          stroke={props.stroke}
+          mask={props.mask}
+          class={props.class}
+          opacity={props.opacity}
+          stroke-width={props["stroke-width"]}
+          stroke-dasharray={props["stroke-dasharray"]}
+          stroke-linecap={props["stroke-linecap"]}
+          stroke-linejoin={props["stroke-linejoin"]}
+          vector-effect={props["vector-effect"]}
+          data-ink={props["data-ink"]}
+          data-role={props["data-role"]}
+          clip-path={props["clip-path"]}
+        />
       }
     >
-      {(c) => <circle cx={c().cx} cy={c().cy} r={c().r} {...rest()} />}
+      {(c) => (
+        <circle
+          cx={c().cx}
+          cy={c().cy}
+          r={c().r}
+          fill={props.fill}
+          stroke={props.stroke}
+          mask={props.mask}
+          class={props.class}
+          opacity={props.opacity}
+          stroke-width={props["stroke-width"]}
+          stroke-dasharray={props["stroke-dasharray"]}
+          stroke-linecap={props["stroke-linecap"]}
+          stroke-linejoin={props["stroke-linejoin"]}
+          vector-effect={props["vector-effect"]}
+          data-ink={props["data-ink"]}
+          data-role={props["data-role"]}
+          clip-path={props["clip-path"]}
+        />
+      )}
     </Show>
   );
 }
@@ -117,7 +149,10 @@ function CsgTreeInk(props: { node: CsgDraw; uid: string; box: CsgPaint["box"] })
   const bits = () => csgTreeSvg(props.node, props.uid, props.box);
   return (
     <>
+      {/* innerHTML is our own generated CSG markup (csgTreeSvg), not user input. */}
+      {/* oxlint-disable-next-line solid/no-innerhtml */}
       <g innerHTML={bits().defs} />
+      {/* oxlint-disable-next-line solid/no-innerhtml */}
       <g innerHTML={bits().body} />
     </>
   );
@@ -162,16 +197,6 @@ export function RegionHalo(props: {
 }) {
   const d = () => paintSvgPath(props.paint);
   const outsideId = () => `${props.id}-out`;
-  const stroke = (layer: ChromeLayer) => ({
-    class: props.class(layer),
-    opacity: props.opacity?.(layer) ?? layer.opacity,
-    "data-role": props.layerRole?.(layer),
-    fill: "none" as const,
-    "stroke-width": layerStrokeWidth(layer),
-    "stroke-linecap": "round" as const,
-    "stroke-linejoin": "round" as const,
-    "vector-effect": "non-scaling-stroke" as const,
-  });
   return (
     <Show when={!props.paint.tree && d()}>
       <ChromeOutsideClip id={outsideId()} d={d()} />
@@ -182,7 +207,14 @@ export function RegionHalo(props: {
               d={d()}
               fill-rule="evenodd"
               clip-path={chromeClipUrl(outsideId())}
-              {...stroke(layer)}
+              class={props.class(layer)}
+              opacity={props.opacity?.(layer) ?? layer.opacity}
+              data-role={props.layerRole?.(layer)}
+              fill="none"
+              stroke-width={layerStrokeWidth(layer)}
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              vector-effect="non-scaling-stroke"
             />
           )}
         </For>

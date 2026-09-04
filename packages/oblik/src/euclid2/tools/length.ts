@@ -10,7 +10,6 @@ import { parseNum } from "./draft";
 import { toolScope } from "./scope";
 import type { Field, PlaceCtx, PlaceHit, Scope, ToolSession } from "./types";
 
-
 const { abs, max } = Math;
 export type LengthDraft = { typed: string; lengthPick?: Expr };
 
@@ -38,60 +37,64 @@ export function memberExpr(object: string, field: ProductField): Expr {
   return member(parsePath(object), field);
 }
 
-export function lengthRefName(expr: Expr): string | null {
-  return expr.kind === "ref" ? expr.name : null;
+export function lengthRefName(expr: Expr): string | undefined {
+  return expr.kind === "ref" ? expr.name : undefined;
 }
 
-function objectKey(expr: Expr): string | null {
+function objectKey(expr: Expr): string | undefined {
   if (expr.kind === "ref") return expr.name;
   if (expr.kind === "member") return printExpr(expr);
-  return null;
+  return undefined;
 }
 
-export function fieldValue(scope: Scope, object: string, field: string): number | null {
+export function fieldValue(scope: Scope, object: string, field: string): number | undefined {
   if (field === "radius") {
     const c = scope.circles[object];
-    return c ? abs(c.geom.radius) : null;
+    return c ? abs(c.geom.radius) : undefined;
   }
   const carrier = scope.carriers[object];
   if (field === "distance" && carrier?.geom.kind === "parallelLine") {
     return (carrier.geom as ParallelLine).distance;
   }
-  return null;
+  return undefined;
 }
 
-export function evalLengthExpr(expr: Expr, scope: Scope): number | null {
+export function evalLengthExpr(expr: Expr, scope: Scope): number | undefined {
   if (expr.kind === "num") return expr.value;
-  if (expr.kind === "ref") return scope.lengths[expr.name] ?? null;
+  if (expr.kind === "ref") return scope.lengths[expr.name] ?? undefined;
   if (expr.kind === "member") {
     const key = objectKey(expr.object);
-    return key ? fieldValue(scope, key, expr.field) : null;
+    return key ? fieldValue(scope, key, expr.field) : undefined;
   }
   if (expr.kind === "neg") {
     const v = evalLengthExpr(expr.expr, scope);
-    return v == null ? null : -v;
+    return v === undefined ? undefined : -v;
   }
-  return null;
+  return undefined;
 }
 
-function parseMember(rest: string, scope: Scope): Expr | null {
+function parseMember(rest: string, scope: Scope): Expr | undefined {
   const dot = rest.lastIndexOf(".");
-  if (dot <= 0) return null;
+  if (dot <= 0) return undefined;
   const object = rest.slice(0, dot);
   const field = rest.slice(dot + 1);
   if (field === "radius" && scope.circles[object]) return memberExpr(object, "radius");
   if (field === "distance" && scope.carriers[object]?.geom.kind === "parallelLine") {
     return memberExpr(object, "distance");
   }
-  return null;
+  return undefined;
 }
 
-export function parseLengthTyped(raw: string, scope: Scope, opts?: { min?: number }): Expr | null {
+export function parseLengthTyped(
+  raw: string,
+  scope: Scope,
+  opts?: { min?: number },
+): Expr | undefined {
   const t = raw.trim();
-  if (t === "" || t === "-") return null;
+  if (t === "" || t === "-") return undefined;
   const n = parseNum(t);
-  if (n != null) {
-    const v = opts?.min != null ? max(opts.min, n) : n;
+  if (n !== undefined) {
+    const v = opts?.min !== undefined ? max(opts.min, n) : n;
     return { kind: "num", value: round(v) };
   }
   let neg = false;
@@ -99,21 +102,21 @@ export function parseLengthTyped(raw: string, scope: Scope, opts?: { min?: numbe
   if (rest.startsWith("-")) {
     neg = true;
     rest = rest.slice(1).trim();
-    if (rest === "") return null;
+    if (rest === "") return undefined;
   }
   const parsedMember = parseMember(rest, scope);
   if (parsedMember) return wrapLengthNeg(parsedMember, neg);
-  if (scope.lengths[rest] != null) {
+  if (scope.lengths[rest] !== undefined) {
     return wrapLengthNeg({ kind: "ref", name: rest }, neg);
   }
-  return null;
+  return undefined;
 }
 
 export function resolveLengthExpr(
   session: LengthDraft,
   scope: Scope,
   opts?: { min?: number },
-): Expr | null {
+): Expr | undefined {
   if (session.lengthPick) return session.lengthPick;
   return parseLengthTyped(session.typed, scope, opts);
 }
@@ -122,7 +125,7 @@ export function lengthValue(session: LengthDraft, scope: Scope, fallback: number
   const expr = resolveLengthExpr(session, scope);
   if (expr) {
     const v = evalLengthExpr(expr, scope);
-    if (v != null) return v;
+    if (v !== undefined) return v;
   }
   return fallback;
 }
@@ -135,24 +138,24 @@ export function lengthLabel(session: LengthDraft, scope: Scope, fallback: string
   return session.typed.trim() || fallback;
 }
 
-export function resolveNumberExpr(raw: string, scope: Scope, fallback?: number): Expr | null {
+export function resolveNumberExpr(raw: string, scope: Scope, fallback?: number): Expr | undefined {
   const parsed = parseLengthTyped(raw, scope);
   if (parsed) return parsed;
-  if (fallback != null) return { kind: "num", value: round(fallback) };
-  return null;
+  if (fallback !== undefined) return { kind: "num", value: round(fallback) };
+  return undefined;
 }
 
 export function numberValue(raw: string, scope: Scope, fallback: number): number {
   const parsed = parseLengthTyped(raw, scope);
   if (parsed) {
     const v = evalLengthExpr(parsed, scope);
-    if (v != null) return v;
+    if (v !== undefined) return v;
   }
   return fallback;
 }
 
 export function hasNumberBinding(raw: string, scope: Scope): boolean {
-  return parseLengthTyped(raw, scope) != null;
+  return parseLengthTyped(raw, scope) !== undefined;
 }
 
 export type LengthPickField = ProductField;
@@ -161,9 +164,9 @@ function lengthFromNode(
   node: TraceNode,
   field: LengthPickField,
   print?: string,
-): { expr: Expr; value: number } | null {
+): { expr: Expr; value: number } | undefined {
   const name = print ?? node.bind;
-  if (!name) return null;
+  if (!name) return undefined;
   if (field === "radius" && node.value.kind === "circle") {
     const c = node.value as Circle;
     return { expr: memberExpr(name, "radius"), value: abs(c.radius) };
@@ -172,7 +175,7 @@ function lengthFromNode(
     const pl = node.value as ParallelLine;
     return { expr: memberExpr(name, "distance"), value: pl.distance };
   }
-  return null;
+  return undefined;
 }
 
 function nearestLengthPick(
@@ -183,7 +186,7 @@ function nearestLengthPick(
   accept: readonly LengthPickField[],
   print?: (n: TraceNode) => string | undefined,
   keys?: ReadonlySet<string>,
-): { expr: Expr; value: number } | null {
+): { expr: Expr; value: number } | undefined {
   for (const n of hitsNear(trace, world, camera, size)) {
     if (keys && !keys.has(`${n.id}:${n.occ}`)) continue;
     for (const field of accept) {
@@ -191,7 +194,7 @@ function nearestLengthPick(
       if (pick) return pick;
     }
   }
-  return null;
+  return undefined;
 }
 
 function lengthPickFromNode(
@@ -200,7 +203,7 @@ function lengthPickFromNode(
   pending: boolean,
   scope: Scope,
   print?: string,
-): PlaceHit["length"] | null {
+): PlaceHit["length"] | undefined {
   for (const field of accept) {
     const pick = lengthFromNode(node, field, print);
     if (!pick) continue;
@@ -208,10 +211,10 @@ function lengthPickFromNode(
     const value = evalLengthExpr(expr, scope) ?? (pending ? -pick.value : pick.value);
     return { expr, value };
   }
-  return null;
+  return undefined;
 }
 
-function isDomElement(t: EventTarget | null | undefined): t is Element {
+function isDomElement(t: EventTarget | undefined): t is Element {
   return typeof Element !== "undefined" && t instanceof Element;
 }
 
@@ -269,28 +272,28 @@ export function attachLengthHit(
   return hit;
 }
 
-export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string | null {
-  if (!hit.length) return null;
+export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string | undefined {
+  if (!hit.length) return undefined;
   const e = hit.length.expr;
   if (e.kind === "member") {
     const name = rootRef(e);
     return name
-      ? (nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? null)
-      : null;
+      ? (nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? undefined)
+      : undefined;
   }
   if (e.kind === "neg" && e.expr.kind === "member") {
     const name = rootRef(e.expr);
     return name
-      ? (nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? null)
-      : null;
+      ? (nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? undefined)
+      : undefined;
   }
   if (e.kind === "ref") {
-    return nodeByPrint(trace, e.name)?.id ?? null;
+    return nodeByPrint(trace, e.name)?.id ?? undefined;
   }
   if (e.kind === "neg" && e.expr.kind === "ref") {
-    return nodeByPrint(trace, e.expr.name)?.id ?? null;
+    return nodeByPrint(trace, e.expr.name)?.id ?? undefined;
   }
-  return null;
+  return undefined;
 }
 
 export function numberField<S extends ToolSession>(

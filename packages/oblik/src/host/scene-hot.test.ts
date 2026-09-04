@@ -17,6 +17,6 @@ describe("applyHotScenes", () => {
     onHot.mockClear();
     applyHotScenes(["./scenes/shelf.ts", "./scenes/ring.ts"], [undefined, { default: RING }]);
     expect(onHot).toHaveBeenCalledWith("./scenes/ring.ts", RING);
-    registerSceneHot(null);
+    registerSceneHot(undefined);
   });
 });

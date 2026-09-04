@@ -3,10 +3,12 @@ import type { Accessor } from "solid-js";
 
 /**
  * Minimal Storage-shaped interface. Kept optional (`clear?`) so tests can pass
- * plain objects; the real DOM `localStorage` satisfies it fully.
+ * plain objects. Null-free: the DOM `localStorage` is adapted to it in
+ * `defaultStorage` (its `getItem` returns `string | null` — mapped to
+ * `undefined` there, per the no-null policy).
  */
 export type StorageLike = {
-  getItem(key: string): string | null;
+  getItem(key: string): string | undefined;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
   clear?(): void;
@@ -23,7 +25,7 @@ export type StoredSignalOptions<T> = {
   /** Value used when nothing is stored yet; also what `resetAll` restores. */
   defaultValue: T;
   /** Where the value persists. Defaults to `globalThis.localStorage` when available. */
-  storage?: StorageLike | null;
+  storage?: StorageLike | undefined;
   /** Serialize a value for storage. Defaults to `JSON.stringify`. */
   stringify?: (value: T) => string;
   /** Parse a stored string. Defaults to `JSON.parse`. */
@@ -32,12 +34,21 @@ export type StoredSignalOptions<T> = {
 
 type Entry = StoredSignal<unknown> & { reset: () => void };
 
-export function defaultStorage(): StorageLike | null {
-  if (typeof globalThis === "undefined") return null;
-  return (globalThis as { localStorage?: StorageLike }).localStorage ?? null;
+export function defaultStorage(): StorageLike | undefined {
+  if (typeof globalThis === "undefined") return undefined;
+  const ls = (globalThis as { localStorage?: Storage }).localStorage;
+  if (!ls) return undefined;
+  // DOM `localStorage.getItem` returns `string | null` at runtime; map the
+  // platform null to undefined so our StorageLike stays null-free.
+  return {
+    getItem: (key) => ls.getItem(key) ?? undefined,
+    setItem: (key, value) => ls.setItem(key, value),
+    removeItem: (key) => ls.removeItem(key),
+    clear: () => ls.clear(),
+  };
 }
 
-function storageOf(opts: { storage?: StorageLike | null }): StorageLike | null {
+function storageOf(opts: { storage?: StorageLike | undefined }): StorageLike | undefined {
   return opts.storage !== undefined ? opts.storage : defaultStorage();
 }
 
@@ -46,7 +57,7 @@ export function readStored<T>(key: string, opts: StoredSignalOptions<T>): T {
   if (!storage) return opts.defaultValue;
   try {
     const raw = storage.getItem(key);
-    if (raw === null) return opts.defaultValue;
+    if (raw === undefined) return opts.defaultValue;
     const parse = opts.parse ?? ((serialized: string) => JSON.parse(serialized) as T);
     return parse(raw);
   } catch {
@@ -65,7 +76,7 @@ export function writeStored<T>(key: string, value: T, opts: StoredSignalOptions<
   }
 }
 
-export function removeStored(key: string, opts: { storage?: StorageLike | null }): void {
+export function removeStored(key: string, opts: { storage?: StorageLike | undefined }): void {
   const storage = storageOf(opts);
   if (!storage) return;
   try {
@@ -90,7 +101,7 @@ export type StoredRegistry = {
  * Context layer (`StoredSignalsContext.tsx`) wraps one of these per app mount so
  * "same id ⇒ same signal" holds across the component tree.
  */
-export function createStoredRegistry(storage?: StorageLike | null): StoredRegistry {
+export function createStoredRegistry(storage?: StorageLike | undefined): StoredRegistry {
   const persistStorage = storage ?? defaultStorage();
   const entries = new Map<string, Entry>();
 
@@ -110,7 +121,7 @@ export function createStoredRegistry(storage?: StorageLike | null): StoredRegist
       write(latest);
     };
     const reset = (): void => {
-      removeStored(id, { storage: resolved.storage ?? null });
+      removeStored(id, { storage: resolved.storage ?? undefined });
       latest = opts.defaultValue;
       write(opts.defaultValue);
     };

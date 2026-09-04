@@ -1,7 +1,6 @@
 import type { Branch, Circle, Line, LineLike, ParallelLine } from "./types";
 import { add, cross2, dist, dot, isFiniteVec, mul, norm, perp, sub, vec, type Vec2 } from "./vec";
 
-
 const { abs, max, sqrt } = Math;
 export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   if (g.kind === "line") return { origin: g.origin, dir: g.direction };
@@ -9,24 +8,24 @@ export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   return { origin: g.a, dir: norm(sub(g.b, g.a)) };
 }
 
-/** Axis of an infinite line, or `null` when `g` is missing or not line-like. */
+/** Axis of an infinite line, or `undefined` when `g` is missing or not line-like. */
 export function infiniteLineAxis(
-  g: { kind: string; origin?: Vec2; direction?: Vec2; line?: Line } | null | undefined,
-): { origin: Vec2; dir: Vec2 } | null {
-  if (g == null) return null;
+  g: { kind: string; origin?: Vec2; direction?: Vec2; line?: Line } | undefined,
+): { origin: Vec2; dir: Vec2 } | undefined {
+  if (g === undefined) return undefined;
   if (g.kind === "parallelLine") {
     const origin = g.line?.origin;
     const dir = g.line?.direction;
-    if (!origin || !dir) return null;
+    if (!origin || !dir) return undefined;
     return { origin, dir };
   }
   if (g.kind === "line") {
     const origin = g.origin;
     const dir = g.direction;
-    if (!origin || !dir) return null;
+    if (!origin || !dir) return undefined;
     return { origin, dir };
   }
-  return null;
+  return undefined;
 }
 
 export function signedDist(p: Vec2, geom: LineLike): number {
@@ -79,7 +78,7 @@ export function circleCircleIntersectionValue(a: Circle, b: Circle, k: Branch): 
   if (!isFiniteVec(a.center) || !isFiniteVec(b.center)) return vec(Number.NaN, Number.NaN);
   if (!Number.isFinite(a.radius) || !Number.isFinite(b.radius)) return vec(Number.NaN, Number.NaN);
   const dvec = sub(b.center, a.center);
-  const d = sqrt((dvec.x) * (dvec.x) + (dvec.y) * (dvec.y));
+  const d = sqrt(dvec.x * dvec.x + dvec.y * dvec.y);
   if (d < 1e-12) return vec(Number.NaN, Number.NaN);
   const aa = (a.radius * a.radius - b.radius * b.radius + d * d) / (2 * d);
   const h2 = a.radius * a.radius - aa * aa;

@@ -83,7 +83,9 @@ export function listAnnotationSites(source: string, file = "scene.ts"): Annotati
           const pos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
           const editable = spec.dof.length > 0 && spec.dof.every((i) => isNumeric(args[i]));
           const literals = editable
-            ? spec.dof.map((i) => numericValue(args[i]!)).filter((n): n is number => n != null)
+            ? spec.dof
+                .map((i) => numericValue(args[i]!))
+                .filter((n): n is number => n !== undefined)
             : undefined;
           const bind = bindName(node);
           out.push({

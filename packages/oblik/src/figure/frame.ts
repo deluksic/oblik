@@ -1,6 +1,5 @@
 import { worldToScreen, type Camera2, type PaneSize } from "../euclid2/camera";
 
-
 const { abs, max, min } = Math;
 export type FigureFrame = { width: number; height: number; x?: number; y?: number };
 
@@ -45,9 +44,9 @@ export function frameResized(
 export function frameRect(
   frame: FigureFrame | undefined,
   look: { x: number; y: number } | undefined,
-): FrameRect | null {
-  if (!frame || !(frame.width > 0) || !(frame.height > 0)) return null;
-  if (frame.x != null && frame.y != null) {
+): FrameRect | undefined {
+  if (!frame || !(frame.width > 0) || !(frame.height > 0)) return undefined;
+  if (frame.x !== undefined && frame.y !== undefined) {
     return { x: frame.x, y: frame.y, w: frame.width, h: frame.height };
   }
   const cx = look?.x ?? frame.width / 2;

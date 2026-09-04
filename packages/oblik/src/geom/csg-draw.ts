@@ -14,7 +14,6 @@ import { regionSvgPath } from "./region";
 import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
 import { lerp, type Vec2 } from "./vec";
 
-
 const { abs, max, round } = Math;
 export type DrawOp =
   | { kind: "path"; d: string }
@@ -69,13 +68,13 @@ function padAabb(box: Aabb, pad: number): Aabb {
   };
 }
 
-function asSolid(op: CsgOperand): Region | Circle | null {
-  return op.kind === "region" || op.kind === "circle" ? op : null;
+function asSolid(op: CsgOperand): Region | Circle | undefined {
+  return op.kind === "region" || op.kind === "circle" ? op : undefined;
 }
 
 /** Paint-only: extra island outers ride as evenodd subpaths. Membership is SDF. */
-function packOffsetIslands(islands: Region[]): Region | null {
-  if (islands.length === 0) return null;
+function packOffsetIslands(islands: Region[]): Region | undefined {
+  if (islands.length === 0) return undefined;
   if (islands.length === 1) return islands[0]!;
   const extra: Region["holes"] = [...islands[0]!.holes];
   for (let i = 1; i < islands.length; i++) {
@@ -84,7 +83,7 @@ function packOffsetIslands(islands: Region[]): Region | null {
   return { kind: "region", outer: islands[0]!.outer, holes: extra };
 }
 
-function compileOffsetStock(op: Offset): Region | Circle | null {
+function compileOffsetStock(op: Offset): Region | Circle | undefined {
   return packOffsetIslands(compileOffsetBoundary(op));
 }
 
@@ -96,7 +95,7 @@ function unwrapUnary(op: CsgOperand): CsgOperand {
   return node;
 }
 
-export function flattenCsg(op: CsgOperand): FlattenedCsg | null {
+export function flattenCsg(op: CsgOperand): FlattenedCsg | undefined {
   let node: CsgOperand = unwrapUnary(op);
   const keep: HalfPlane[] = [];
   while (node.kind === "csg2" && node.op === "intersect") {
@@ -106,26 +105,26 @@ export function flattenCsg(op: CsgOperand): FlattenedCsg | null {
       if (u.kind === "halfPlane") keep.push(u);
       else rest.push(u);
     }
-    if (rest.length !== 1) return null;
+    if (rest.length !== 1) return undefined;
     node = unwrapUnary(rest[0]!);
   }
   const subtract: (Region | Circle)[] = [];
   while (node.kind === "csg2" && node.op === "diff") {
-    if (node.of.length < 1) return null;
+    if (node.of.length < 1) return undefined;
     for (let i = 1; i < node.of.length; i++) {
       const cut = unwrapUnary(node.of[i]!);
-      const solid = asSolid(cut) ?? (cut.kind === "offset" ? compileOffsetStock(cut) : null);
-      if (!solid) return null;
+      const solid = asSolid(cut) ?? (cut.kind === "offset" ? compileOffsetStock(cut) : undefined);
+      if (!solid) return undefined;
       subtract.push(solid);
     }
     node = unwrapUnary(node.of[0]!);
   }
   if (node.kind === "offset") {
     const compiled = compileOffsetStock(node);
-    if (!compiled) return null;
+    if (!compiled) return undefined;
     node = compiled;
   }
-  if (node.kind !== "region" && node.kind !== "circle") return null;
+  if (node.kind !== "region" && node.kind !== "circle") return undefined;
   return { stock: node, subtract, keep };
 }
 
@@ -191,40 +190,40 @@ function keepClipPath(keeps: readonly HalfPlane[], box: Aabb): string | undefine
   return polyPath(poly);
 }
 
-function drawOf(op: CsgOperand, box: Aabb): CsgDraw | null {
+function drawOf(op: CsgOperand, box: Aabb): CsgDraw | undefined {
   const node = unwrapUnary(op);
   if (node.kind === "region" || node.kind === "circle") return { kind: "solid", op: drawOp(node) };
   if (node.kind === "offset") {
     const compiled = compileOffsetStock(node);
-    if (!compiled) return null;
+    if (!compiled) return undefined;
     return { kind: "solid", op: drawOp(compiled) };
   }
   if (node.kind === "halfPlane") {
     const d = keepClipPath([node], box);
-    if (!d) return null;
+    if (!d) return undefined;
     return { kind: "clip", d, kid: { kind: "solid", op: { kind: "path", d } } };
   }
   if (node.kind === "pick") {
     const d = islandsSvgPath(evaluateRegions(node));
-    if (!d) return null;
+    if (!d) return undefined;
     return { kind: "solid", op: { kind: "path", d } };
   }
-  if (node.kind !== "csg2") return null;
+  if (node.kind !== "csg2") return undefined;
   const kids: CsgDraw[] = [];
   for (const child of node.of) {
     const d = drawOf(child, box);
-    if (!d) return null;
+    if (!d) return undefined;
     kids.push(d);
   }
-  if (kids.length === 0) return null;
+  if (kids.length === 0) return undefined;
   if (node.op === "union") return kids.length === 1 ? kids[0]! : { kind: "union", kids };
   if (node.op === "intersect") return kids.length === 1 ? kids[0]! : { kind: "intersect", kids };
   return { kind: "diff", stock: kids[0]!, cut: kids.slice(1) };
 }
 
-function paintBox(op: CsgOperand): Aabb | null {
+function paintBox(op: CsgOperand): Aabb | undefined {
   const box = op.kind === "csg2" ? csgAabb(op) : operandAabb(op);
-  if (!box) return null;
+  if (!box) return undefined;
   const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
   return padAabb(box, span * 0.08);
 }
@@ -243,7 +242,9 @@ function drawOpPath(op: DrawOp): string {
 /** One even-odd path for fill, mask, and halo — outer plus holes as subpaths. */
 export function paintSvgPath(paint: CsgPaint): string {
   if (paint.empty || paint.tree) return "";
-  return [drawOpPath(paint.stock), ...paint.holes.map(drawOpPath)].filter((d) => d.length > 0).join(" ");
+  return [drawOpPath(paint.stock), ...paint.holes.map(drawOpPath)]
+    .filter((d) => d.length > 0)
+    .join(" ");
 }
 
 function mergePaintHoles(paint: CsgPaint): CsgPaint {

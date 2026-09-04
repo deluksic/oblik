@@ -25,7 +25,7 @@ describe("layoutSliders", () => {
 describe("hitSlider", () => {
   test("hits inside the panel", () => {
     expect(hitSlider({ x: 20, y: 20 }, [SLIDER])?.id).toBe("o_sl");
-    expect(hitSlider({ x: 400, y: 400 }, [SLIDER])).toBeNull();
+    expect(hitSlider({ x: 400, y: 400 }, [SLIDER])).toBeUndefined();
   });
 });
 

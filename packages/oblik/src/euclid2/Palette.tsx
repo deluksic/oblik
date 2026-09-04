@@ -4,11 +4,10 @@ import { filterTools, type Preview, type ToolId, type ToolSpec } from "./tool";
 
 import styles from "./Palette.module.css";
 
-
 const { max, min } = Math;
 export type PaletteProps = {
   picker: boolean;
-  prompt: Preview | null;
+  prompt: Preview | undefined;
   onPick: (id: ToolId) => void;
   onClosePicker: () => void;
   onDraft?: (raw: string) => void;
@@ -42,7 +41,7 @@ function Prompt(props: {
   onTab?: (dir: 1 | -1) => void;
   onCommit?: () => void;
 }) {
-  const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
+  const [inputEl, setInputEl] = createSignal<HTMLInputElement | undefined>(undefined);
 
   createEffect(
     () => [inputEl(), props.preview.draft?.id ?? ""] as const,
@@ -69,7 +68,7 @@ function Prompt(props: {
         class={[styles.prompt, { [styles.promptInvalid]: props.preview.draft?.invalid === true }]}
       >
         <Show
-          when={props.preview.draft && props.preview.before != null}
+          when={props.preview.draft && props.preview.before !== undefined}
           fallback={<p class={styles.preview}>{props.preview.line}</p>}
         >
           <p class={[styles.preview, styles.hasSlot]}>
@@ -111,7 +110,7 @@ function Prompt(props: {
 }
 
 function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
-  const [inputEl, setInputEl] = createSignal<HTMLInputElement | null>(null);
+  const [inputEl, setInputEl] = createSignal<HTMLInputElement | undefined>(undefined);
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
   const items = () => {
@@ -157,7 +156,7 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
   );
 
   return (
-    <div class={styles.picker} onPointerDown={props.onClose}>
+    <div class={styles.picker} onPointerDown={() => props.onClose()}>
       <div
         class={styles.panel}
         role="dialog"

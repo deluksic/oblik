@@ -55,7 +55,7 @@ function distExpr(session: OffsetSession, hit: PlaceHit, scope: Scope) {
   return { kind: "num" as const, value: round(distAt(hit, faceOf(session, scope)!.geom)) };
 }
 
-function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null): string {
+function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | undefined): string {
   if (session.faceRef.trim()) return session.faceRef.trim();
   const face = faceOf(session, scope);
   if (face) return printExpr(face.expr);
@@ -66,7 +66,7 @@ function faceLabel(session: OffsetSession, scope: Scope, place: PlaceHit | null)
 function offsetGhost(face: Region, d: number) {
   const islands = roundOffsetValue(face, d);
   const loops = islands.map((p) => p.outer);
-  if (loops.length === 0) return null;
+  if (loops.length === 0) return undefined;
   const edges = loops.flatMap(walkEdges);
   return { kind: "region" as const, edges, loops };
 }
@@ -93,7 +93,7 @@ export const roundOffset: Tool<OffsetSession> = {
   },
   hover(session, hit, trace, scope) {
     if (!faceOf(session, scope ?? scopeFromTrace(trace))) {
-      if (!hit.region) return null;
+      if (!hit.region) return undefined;
       return hoverBind(trace, hit.region.bind);
     }
     return lengthHover(hit, trace);
@@ -111,7 +111,7 @@ export const roundOffset: Tool<OffsetSession> = {
         },
       };
     }
-    if (hit.length && resolveLengthExpr(session, scope) == null) {
+    if (hit.length && resolveLengthExpr(session, scope) === undefined) {
       return {
         insert: withBind(session, {
           from: "roundOffset",
@@ -130,7 +130,7 @@ export const roundOffset: Tool<OffsetSession> = {
     const face = faceOf(session, scope);
     if (!face) {
       if (session.focus !== "face") return { session: { ...session, focus: "face" } };
-      return null;
+      return undefined;
     }
     const bound = resolveLengthExpr(session, scope);
     if (bound) {
@@ -138,19 +138,19 @@ export const roundOffset: Tool<OffsetSession> = {
     }
     if (session.focus === "name") return { session: { ...session, focus: "typed" } };
     if (session.focus === "face") return { session: { ...session, focus: "typed" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const face = faceOf(session, scope);
-    if (!face) return null;
-    if (resolveLengthExpr(session, scope) != null) {
+    if (!face) return undefined;
+    if (resolveLengthExpr(session, scope) !== undefined) {
       const fallback = place?.length?.value ?? 0;
       return offsetGhost(face.geom, lengthValue(session, scope, fallback));
     }
     if (place?.length) {
       return offsetGhost(face.geom, lengthValue(session, scope, place.length.value));
     }
-    if (!place) return null;
+    if (!place) return undefined;
     return offsetGhost(face.geom, distAt(place, face.geom));
   },
   preview(session, place, scope): Preview {
@@ -169,7 +169,7 @@ export const roundOffset: Tool<OffsetSession> = {
           : spec.hint,
       };
     }
-    if (place?.length && resolveLengthExpr(session, scope) == null) {
+    if (place?.length && resolveLengthExpr(session, scope) === undefined) {
       return {
         line: previewCall(
           "roundOffset",

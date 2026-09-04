@@ -126,13 +126,13 @@ export function clickTool(session: ToolSession, hit: PlaceHit, scope: ScopeInput
   return next;
 }
 
-export function ghostOf(session: ToolSession, place: PlaceHit | null, scope: ScopeInput = []) {
+export function ghostOf(session: ToolSession, place: PlaceHit | undefined, scope: ScopeInput = []) {
   return of(session).ghost(session as never, place, scopeOf(scope));
 }
 
 export function previewOf(
   session: ToolSession,
-  place: PlaceHit | null = null,
+  place: PlaceHit | undefined = undefined,
   scope: ScopeInput = [],
 ) {
   const tool = of(session);
@@ -154,7 +154,7 @@ export function typeTool(session: ToolSession, raw: string): ToolSession {
 export function keyTool(
   session: ToolSession,
   e: ToolKey,
-  place: PlaceHit | null = null,
+  place: PlaceHit | undefined = undefined,
   scope: ScopeInput = [],
 ) {
   const out = keySession(of(session), session as never, e, place, scopeOf(scope));
@@ -164,7 +164,7 @@ export function keyTool(
 
 export function commitTool(
   session: ToolSession,
-  place: PlaceHit | null = null,
+  place: PlaceHit | undefined = undefined,
   scope: ScopeInput = [],
 ) {
   const sc = scopeOf(scope);
@@ -182,8 +182,8 @@ export function hoverTool(
   hit: PlaceHit,
   trace: readonly TraceNode[],
   scope?: Scope,
-): string | null {
-  return of(session).hover?.(session as never, hit, trace, scope) ?? null;
+): string | undefined {
+  return of(session).hover?.(session as never, hit, trace, scope) ?? undefined;
 }
 
 const CHROME_OFF = {
@@ -193,7 +193,7 @@ const CHROME_OFF = {
   hideSnap: false,
 };
 
-export function toolChrome(session: ToolSession | null | undefined) {
+export function toolChrome(session: ToolSession | undefined) {
   if (!session) return CHROME_OFF;
   const c = of(session).chrome?.(session as never);
   return {

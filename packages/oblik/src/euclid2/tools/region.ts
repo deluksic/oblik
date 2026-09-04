@@ -10,7 +10,6 @@ import { dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, previewCall } fr
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
-
 const { max, sqrt } = Math;
 type RegionSession = Extract<ToolSession, { verb: "region" }>;
 type CycleCarrier = RegionSession["carriers"][number];
@@ -42,26 +41,26 @@ function sameVertex(a: Expr, b: Expr): boolean {
   return printExpr(a) === printExpr(b);
 }
 
-function vertexOf(hit: PlaceHit, scope: Scope): Placed | null {
+function vertexOf(hit: PlaceHit, scope: Scope): Placed | undefined {
   if (hit.point.kind === "ref") {
     return scope.points[hit.point.bind] ?? { expr: parsePath(hit.point.bind), at: hit.point.at };
   }
   if (isCrossing(hit.point)) return { expr: exprOfPlace(hit.point), at: hit.point.at };
-  return null;
+  return undefined;
 }
 
 function placeFromVertex(
   v: Placed,
   trace: readonly { occ: number; bind?: string; id: string }[],
   filter?: SnapFilter,
-): PlacePoint | null {
+): PlacePoint | undefined {
   const e = v.expr;
   if (e.kind === "ref" || e.kind === "member") {
     const print = printExpr(e);
     const node = nodeByPrint(trace, print, filter);
     return { kind: "ref", bind: print, id: node?.id ?? print, at: v.at };
   }
-  if (e.kind !== "call") return null;
+  if (e.kind !== "call") return undefined;
   const refs = e.args
     .filter((a): a is Extract<Expr, { kind: "ref" }> => a.kind === "ref")
     .map((a) => a.name);
@@ -71,13 +70,13 @@ function placeFromVertex(
   if (e.name === "lineIntersection" && refs[0] && refs[1]) {
     return { kind: "lineIntersection", a: refs[0], b: refs[1], at: v.at };
   }
-  if (e.name === "circleLineIntersection" && refs[0] && refs[1] && k != null) {
+  if (e.name === "circleLineIntersection" && refs[0] && refs[1] && k !== undefined) {
     return { kind: "circleLineIntersection", circle: refs[0], line: refs[1], k, at: v.at };
   }
-  if (e.name === "circleCircleIntersection" && refs[0] && refs[1] && k != null) {
+  if (e.name === "circleCircleIntersection" && refs[0] && refs[1] && k !== undefined) {
     return { kind: "circleCircleIntersection", a: refs[0], b: refs[1], k, at: v.at };
   }
-  return null;
+  return undefined;
 }
 
 function carrierExpr(c: CycleCarrier): Expr {
@@ -148,7 +147,7 @@ function arrowAt(
   if (carrier.kind === "circle") {
     const at = projectOnCircle(carrier, from);
     const radial = { x: at.x - carrier.center.x, y: at.y - carrier.center.y };
-    const len = sqrt((radial.x) * (radial.x) + (radial.y) * (radial.y)) || 1;
+    const len = sqrt(radial.x * radial.x + radial.y * radial.y) || 1;
     const u = { x: radial.x / len, y: radial.y / len };
     const kk = k ?? hoverK(carrier, from, world);
     const tx = kk === 1 ? -u.y : u.y;
@@ -163,17 +162,17 @@ function arrowAt(
   return { at, tx: dir.x * sign, ty: dir.y * sign };
 }
 
-/** Named strokes through the current vertex, or `null` when not picking a carrier. */
+/** Named strokes through the current vertex, or `undefined` when not picking a carrier. */
 export function regionEligibleCarriers(
-  session: ToolSession | null | undefined,
+  session: ToolSession | undefined,
   trace: readonly TraceNode[],
   camera: Camera2,
   filter?: SnapFilter,
-): ReadonlySet<string> | null {
-  if (!session || session.verb !== "region") return null;
-  if (!needCarrier(session)) return null;
+): ReadonlySet<string> | undefined {
+  if (!session || session.verb !== "region") return undefined;
+  if (!needCarrier(session)) return undefined;
   const from = session.vertices[session.vertices.length - 1];
-  if (!from) return null;
+  if (!from) return undefined;
   return namedStrokesThrough(trace, from.at, camera, undefined, filter);
 }
 
@@ -248,15 +247,15 @@ export const region: Tool<RegionSession> = {
     const next: CycleCarrier = {
       expr: exprOfPrint(hit.carrier.bind),
       geom: hit.carrier.geom,
-      ...(k != null ? { k } : {}),
+      ...(k !== undefined ? { k } : {}),
     };
     return { session: { ...session, carriers: [...session.carriers, next], focus: "cycle" } };
   },
   commit(session) {
     if (session.focus === "cycle") return { session: { ...session, focus: "name" } };
-    return null;
+    return undefined;
   },
-  ghost(session, place): Ghost | null {
+  ghost(session, place): Ghost | undefined {
     const edges: LoopEdge[] = [];
     for (let i = 0; i < session.carriers.length; i++) {
       const a = session.vertices[i];
@@ -285,7 +284,7 @@ export const region: Tool<RegionSession> = {
     if (edges.length === 0 && !hover && session.vertices[0]) {
       return { kind: "point", at: session.vertices[0].at };
     }
-    if (edges.length === 0 && !hover) return null;
+    if (edges.length === 0 && !hover) return undefined;
     return { kind: "region", edges, hover, arrow };
   },
   preview(session, place, scope): Preview {

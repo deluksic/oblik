@@ -65,7 +65,7 @@ function draftAt(id: string | undefined, i: number, fallback: number): number {
   if (!id) return fallback;
   const row = currentEval()?.draft.get(id);
   const v = row?.[i];
-  return v != null && Number.isFinite(v) ? v : fallback;
+  return v !== undefined && Number.isFinite(v) ? v : fallback;
 }
 
 function traced<T extends TraceValue>(value: T, id: string | undefined): T {

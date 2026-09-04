@@ -53,7 +53,7 @@ function throughOf(session: PerpSession, scope: Scope) {
   return resolvePoint(session.throughRef, session.through, scope);
 }
 
-function carrierLabel(session: PerpSession, scope: Scope, place: PlaceHit | null): string {
+function carrierLabel(session: PerpSession, scope: Scope, place: PlaceHit | undefined): string {
   if (session.carrierRef.trim()) return session.carrierRef.trim();
   const c = carrierOf(session, scope);
   if (c) return printExpr(c.expr);
@@ -61,7 +61,7 @@ function carrierLabel(session: PerpSession, scope: Scope, place: PlaceHit | null
   return "line";
 }
 
-function throughLabel(session: PerpSession, scope: Scope, place: PlaceHit | null): string {
+function throughLabel(session: PerpSession, scope: Scope, place: PlaceHit | undefined): string {
   if (session.throughRef.trim()) return session.throughRef.trim();
   const t = throughOf(session, scope);
   if (t) return printExpr(t.expr);
@@ -111,7 +111,7 @@ export const perpendicularLine: Tool<PerpSession> = {
   },
   hover(session, hit, trace, scope) {
     if (!carrierOf(session, scope ?? scopeFromTrace(trace))) {
-      if (!hit.carrier) return null;
+      if (!hit.carrier) return undefined;
       return hoverBind(trace, hit.carrier.bind);
     }
     return hoverPlace(hit.point, trace);
@@ -141,7 +141,7 @@ export const perpendicularLine: Tool<PerpSession> = {
     const through = throughOf(session, scope);
     if (!carrier) {
       if (session.focus !== "carrier") return { session: { ...session, focus: "carrier" } };
-      return null;
+      return undefined;
     }
     if (through) {
       return {
@@ -153,14 +153,14 @@ export const perpendicularLine: Tool<PerpSession> = {
     }
     if (session.focus === "name") return { session: { ...session, focus: "through" } };
     if (session.focus === "carrier") return { session: { ...session, focus: "through" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const carrier = carrierOf(session, scope);
-    if (!carrier) return null;
+    if (!carrier) return undefined;
     const through = throughOf(session, scope);
     const at = through?.at ?? place?.point.at;
-    if (!at) return null;
+    if (!at) return undefined;
     return perpGhostLine(carrier.geom, at);
   },
   preview(session, place, scope): Preview {
@@ -192,7 +192,7 @@ export const perpendicularLine: Tool<PerpSession> = {
         hint: "Enter to insert. Tab to name it.",
       };
     }
-    const p = place?.point ?? null;
+    const p = place?.point ?? undefined;
     if (p && isPinnedPoint(p) && !session.throughRef.trim()) {
       return {
         line: previewCall(

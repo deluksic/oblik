@@ -35,7 +35,7 @@ describe("resolveSceneFileAbs", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "oblik-"));
     const sceneDir = path.join(root, "apps/demo/src/scenes");
     fs.mkdirSync(sceneDir, { recursive: true });
-    fs.writeFileSync(path.join(sceneDir, "shelf.ts"), "export default null;\n");
+    fs.writeFileSync(path.join(sceneDir, "shelf.ts"), "export default undefined;\n");
     const abs = resolveSceneFileAbs(root, sceneDir, "src/scenes/shelf.ts");
     expect(abs).toBe(path.join(sceneDir, "shelf.ts"));
   });

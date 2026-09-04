@@ -71,7 +71,7 @@ describe("applyDrag", () => {
     const next = applyDrag(
       drag,
       { clientX: 148, clientY: 100 } as PointerEvent,
-      null,
+      undefined,
       camera,
       size,
     );

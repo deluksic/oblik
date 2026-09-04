@@ -2,7 +2,6 @@ import type { TraceNode } from "@/eval/context";
 
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
-
 const { max, min, round } = Math;
 const MARGIN = 12;
 const PANEL_W = 200;
@@ -60,7 +59,7 @@ export function layoutSliders(nodes: readonly TraceNode[]): SliderLayout[] {
 export function hitSlider(
   screen: { x: number; y: number },
   nodes: readonly TraceNode[],
-): TraceNode | null {
+): TraceNode | undefined {
   const layouts = layoutSliders(nodes);
   for (let i = layouts.length - 1; i >= 0; i--) {
     const L = layouts[i];
@@ -70,7 +69,7 @@ export function hitSlider(
       return L.node;
     }
   }
-  return null;
+  return undefined;
 }
 
 export function sliderValueFromPointer(

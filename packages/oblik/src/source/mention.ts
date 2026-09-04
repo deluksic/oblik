@@ -420,7 +420,7 @@ export function analyzeMentions(source: string, file = "scene.ts"): MentionFile 
       bindToId,
       return: analyzeReturn(node, bindToId, specs),
       calls: callsInFn(node, sf, specs),
-      hasBlock: body != null,
+      hasBlock: body !== undefined,
     };
   });
 

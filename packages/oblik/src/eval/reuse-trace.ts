@@ -17,7 +17,7 @@ export function sameDrawNode(a: TraceNode, b: TraceNode): boolean {
 export function sameDrawValue(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
-  if (a == null || b == null) return a === b;
+  if (a === undefined || b === undefined) return a === b;
   if (typeof a !== "object") return Object.is(a, b);
   if (Array.isArray(a)) {
     if (!Array.isArray(b) || a.length !== b.length) return false;

@@ -68,7 +68,7 @@ export function PointMark(props: {
           />
         )}
       </For>
-      {props.overlay || !props.node.bind ? null : (
+      {props.overlay || !props.node.bind ? undefined : (
         <text
           class={[styles.label, { [styles.muted]: !!props.muted && !props.hot && !props.selected }]}
           x={pos().x + 10}

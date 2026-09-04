@@ -3,7 +3,6 @@ import * as ts from "typescript";
 
 import { siteSpecs, trailingId } from "./analyze";
 
-
 const { round } = Math;
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -25,7 +24,7 @@ export function formatNum(n: number): string {
   return String(q);
 }
 
-export function patchLiterals(source: string, id: string, values: number[]): string | null {
+export function patchLiterals(source: string, id: string, values: number[]): string | undefined {
   const specs = siteSpecs();
   const sf = parse(source);
   let target: ts.CallExpression | undefined;
@@ -41,15 +40,15 @@ export function patchLiterals(source: string, id: string, values: number[]): str
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  if (!target || !ts.isIdentifier(target.expression)) return null;
+  if (!target || !ts.isIdentifier(target.expression)) return undefined;
   const spec = specs.get(target.expression.text);
-  if (!spec || spec.dof.length === 0) return null;
+  if (!spec || spec.dof.length === 0) return undefined;
   const { args } = trailingId(target);
-  if (values.length !== spec.dof.length) return null;
+  if (values.length !== spec.dof.length) return undefined;
   const ms = new MagicString(source);
   for (let i = 0; i < spec.dof.length; i++) {
     const arg = args[spec.dof[i]!];
-    if (!arg || !isNumeric(arg)) return null;
+    if (!arg || !isNumeric(arg)) return undefined;
     ms.overwrite(arg.getStart(sf), arg.getEnd(), formatNum(values[i]!));
   }
   return ms.toString();

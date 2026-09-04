@@ -11,7 +11,7 @@ function label(
   ref: string,
   placed: Placed | undefined,
   fallback: string,
-  place: PlaceHit | null,
+  place: PlaceHit | undefined,
 ): string {
   if (ref.trim()) return ref.trim();
   if (placed) return printExpr(placed.expr);
@@ -74,7 +74,7 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
       ) {
         return { session: { ...session, focus: a ? "b" : "a" } };
       }
-      return null;
+      return undefined;
     },
     ghost(session, place, scope) {
       const cursor = place?.point.at;
@@ -83,7 +83,7 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
       if (a && b) return { kind: spec.id as "line" | "segment", a: a.at, b: b.at };
       if (!cursor) {
         if (a) return { kind: "point", at: a.at };
-        return null;
+        return undefined;
       }
       if (!a) return { kind: "point", at: cursor };
       return { kind: spec.id as "line" | "segment", a: a.at, b: cursor };
@@ -92,10 +92,13 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
       const bind = previewName(session, spec.prefix);
       const a = resolvePoint(session.aRef, session.a, scope);
       const b = resolvePoint(session.bRef, session.b, scope);
-      const aTok = inSlot(session.focus === "a", label(session.aRef, a, "a", !a ? place : null));
+      const aTok = inSlot(
+        session.focus === "a",
+        label(session.aRef, a, "a", !a ? place : undefined),
+      );
       const bTok = inSlot(
         session.focus === "b",
-        label(session.bRef, b, "b", a && !b ? place : null),
+        label(session.bRef, b, "b", a && !b ? place : undefined),
       );
       const name = inSlot(session.focus === "name", bind);
       if (a && b) {
@@ -112,7 +115,7 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
         };
       }
       if (a) {
-        const p = place?.point ?? null;
+        const p = place?.point ?? undefined;
         if (p && isPinnedPoint(p) && !session.bRef.trim()) {
           return {
             line: previewCall(
@@ -137,7 +140,7 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
           hint: "Type a point name or click a named point or crossing. Tab to name it.",
         };
       }
-      const p = place?.point ?? null;
+      const p = place?.point ?? undefined;
       if (p && isPinnedPoint(p) && !session.aRef.trim()) {
         return {
           line: previewCall(

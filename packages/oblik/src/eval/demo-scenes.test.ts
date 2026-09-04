@@ -90,7 +90,7 @@ describe("migrated demo scenes", () => {
     ]);
     const insets = trace.filter((n) => n.kind === "parallelLine");
     expect(insets).toHaveLength(4);
-    const d0 = insets[0]?.value.kind === "parallelLine" ? insets[0].value.distance : null;
+    const d0 = insets[0]?.value.kind === "parallelLine" ? insets[0].value.distance : undefined;
     expect(insets.every((n) => n.value.kind === "parallelLine" && n.value.distance === d0)).toBe(
       true,
     );
@@ -142,7 +142,7 @@ describe("migrated demo scenes", () => {
     const sqInset = trace.find((n) => n.bind === "sqInset");
     expect(sqInset?.kind).toBe("csg2");
     expect(sqInset?.editable).toBe(true);
-    const sqStock = sqInset && isCsg2(sqInset.value) ? offsetOfCsg(sqInset.value) : null;
+    const sqStock = sqInset && isCsg2(sqInset.value) ? offsetOfCsg(sqInset.value) : undefined;
     expect(sqStock?.kind).toBe("offset");
     expect(sqStock?.kind === "offset" ? sqStock.d : 0).toBeCloseTo(-0.22);
 
@@ -206,7 +206,7 @@ describe("migrated demo scenes", () => {
       ]),
     );
     const pulled = drafted.trace.find((n) => n.id === "o_ro_sqi");
-    const pulledStock = pulled && isCsg2(pulled.value) ? offsetOfCsg(pulled.value) : null;
+    const pulledStock = pulled && isCsg2(pulled.value) ? offsetOfCsg(pulled.value) : undefined;
     expect(pulledStock?.kind === "offset" ? pulledStock.d : 0).toBeCloseTo(-0.4);
     const splitBone = drafted.trace.find((n) => n.id === "o_ro_bone");
     if (!splitBone || !isCsg2(splitBone.value)) throw new Error("missing split bone");
@@ -243,7 +243,7 @@ describe("migrated demo scenes", () => {
     const one = trace.find((n) => n.bind === "one");
     expect(one?.kind).toBe("csg2");
     expect(one?.editable).toBe(false);
-    const stock = one && isCsg2(one.value) ? offsetOfCsg(one.value) : null;
+    const stock = one && isCsg2(one.value) ? offsetOfCsg(one.value) : undefined;
     expect(stock?.kind).toBe("offset");
     expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
   });
@@ -350,7 +350,7 @@ describe("migrated demo scenes", () => {
     const inset = trace.find((n) => n.bind === "inset");
     expect(inset?.kind).toBe("csg2");
     expect(inset?.editable).toBe(true);
-    const insetStock = inset && isCsg2(inset.value) ? offsetOfCsg(inset.value) : null;
+    const insetStock = inset && isCsg2(inset.value) ? offsetOfCsg(inset.value) : undefined;
     expect(insetStock?.kind).toBe("offset");
     expect(insetStock?.kind === "offset" ? insetStock.d : 0).toBeCloseTo(-0.12);
   });

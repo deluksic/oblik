@@ -1,11 +1,6 @@
 import type { MentionFile, MentionFn } from "../source/mention";
 import type { TraceInv, TraceNode } from "./context";
-import {
-  normalizeCallSite,
-  normalizeStackFile,
-  sourceFileKey,
-  type CallSite,
-} from "./stack";
+import { normalizeCallSite, normalizeStackFile, sourceFileKey, type CallSite } from "./stack";
 
 export type { TraceInv } from "./context";
 
@@ -50,7 +45,8 @@ function normalizedPath(norm: Map<string, string>, file: string): string {
 
 function bundleFor(ctx: InvCtx, file: string): MentionFile | undefined {
   return (
-    ctx.index.bySourceKey.get(sourceFileKey(file)) ?? ctx.index.byStackKey.get(stackKey(ctx.norm, file))
+    ctx.index.bySourceKey.get(sourceFileKey(file)) ??
+    ctx.index.byStackKey.get(stackKey(ctx.norm, file))
   );
 }
 
@@ -59,7 +55,7 @@ function fnContaining(
   file: string | undefined,
   line: number | undefined,
 ): MentionFn | undefined {
-  if (!file || line == null) return undefined;
+  if (!file || line === undefined) return undefined;
   const bundle = bundleFor(ctx, file);
   if (!bundle) return undefined;
   let best: MentionFn | undefined;
@@ -237,10 +233,13 @@ export function invMatches(
   const inv = n.inv;
   if (!inv) return false;
   if (sourceFileKey(inv.file) !== sourceFileKey(focus.file)) return false;
-  if (focus.name != null && inv.name !== focus.name) return false;
-  if (focus.serial != null && inv.serial !== focus.serial) return false;
-  if (focus.callerFile != null && sourceFileKey(inv.callerFile) !== sourceFileKey(focus.callerFile))
+  if (focus.name !== undefined && inv.name !== focus.name) return false;
+  if (focus.serial !== undefined && inv.serial !== focus.serial) return false;
+  if (
+    focus.callerFile !== undefined &&
+    sourceFileKey(inv.callerFile) !== sourceFileKey(focus.callerFile)
+  )
     return false;
-  if (focus.callerLine != null && inv.callerLine !== focus.callerLine) return false;
+  if (focus.callerLine !== undefined && inv.callerLine !== focus.callerLine) return false;
   return true;
 }

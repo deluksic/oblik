@@ -88,8 +88,8 @@ function parentFocus(
   return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
 }
 
-function focusFromNode(n: TraceNode): ScopeFocus | null {
-  if (!n.inv) return null;
+function focusFromNode(n: TraceNode): ScopeFocus | undefined {
+  if (!n.inv) return undefined;
   return {
     file: n.inv.file,
     name: n.inv.name,
@@ -102,24 +102,28 @@ function focusFromNode(n: TraceNode): ScopeFocus | null {
 export function FigurePane(props: FigurePaneProps) {
   const [picker, setPicker] = createSignal(() => (props.file, false));
   // Paint HMR replaces `scene`; keep Brush/Eraser until Esc or a different file.
-  const [tool, setTool] = createSignal<FigureToolId | null>(() => (props.file, null));
+  const [tool, setTool] = createSignal<FigureToolId | undefined>(() => (props.file, undefined));
   const [brush, setBrush] = createSignal<BrushSettings>(() => (props.file, { ...DEFAULT_BRUSH }));
   const [shift, setShift] = createSignal(false);
-  const [hoverKey, setHoverKey] = createSignal<string | null>(() => (props.scene, null));
-  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
+  const [hoverKey, setHoverKey] = createSignal<string | undefined>(() => (props.scene, undefined));
+  const [selectedKey, setSelectedKey] = createSignal<string | undefined>(
+    () => (props.file, undefined),
+  );
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
-  const [writeError, setWriteError] = createSignal<string | null>(null);
+  const [writeError, setWriteError] = createSignal<string | undefined>(undefined);
   const [frameSelected, setFrameSelected] = createSignal(() => (props.file, false));
-  const [editedFrame, setEditedFrame] = createSignal<FrameXywh | null>(() => (props.scene, null));
+  const [editedFrame, setEditedFrame] = createSignal<FrameXywh | undefined>(
+    () => (props.scene, undefined),
+  );
 
   const requestModal = useRequestModal();
   const mentions = createMemo(() => props.mentions ?? []);
 
-  const frameXywh = createMemo<FrameXywh | null>(() => {
+  const frameXywh = createMemo<FrameXywh | undefined>(() => {
     const local = editedFrame();
     if (local) return local;
     const r = frameRect(props.scene.frame, props.scene.camera);
-    return r ? { x: r.x, y: r.y, width: r.w, height: r.h } : null;
+    return r ? { x: r.x, y: r.y, width: r.w, height: r.h } : undefined;
   });
   const liveFrame = createMemo(() => {
     const local = editedFrame();
@@ -143,9 +147,10 @@ export function FigurePane(props: FigurePaneProps) {
   );
 
   const selectedNode = createMemo(() => {
+    // oxlint-disable-next-line solid/reactivity -- memo-local snapshot, used synchronously.
     const key = selectedKey();
-    if (!key) return null;
-    return world().trace.find((n) => traceKey(n) === key) ?? null;
+    if (!key) return undefined;
+    return world().trace.find((n) => traceKey(n) === key) ?? undefined;
   });
 
   const selectionDetail = createMemo(async () => {
@@ -184,9 +189,9 @@ export function FigurePane(props: FigurePaneProps) {
           if (picker()) setPicker(false);
           else if (frameSelected()) setFrameSelected(false);
           else if (tool()) {
-            setTool(null);
-            setWriteError(null);
-          } else if (selectedKey()) setSelectedKey(null);
+            setTool(undefined);
+            setWriteError(undefined);
+          } else if (selectedKey()) setSelectedKey(undefined);
           else setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
           return;
         }
@@ -219,11 +224,11 @@ export function FigurePane(props: FigurePaneProps) {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+      const errBody = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
       setWriteError(errBody?.error ?? `${url} failed (${res.status})`);
       return false;
     }
-    setWriteError(null);
+    setWriteError(undefined);
     return true;
   }
 
@@ -267,7 +272,7 @@ export function FigurePane(props: FigurePaneProps) {
   async function erasePaint(paint: TraceNode) {
     const file = paint.module ?? focus().file;
     const ok = await postJson("/__oblik-erase", { file, id: paint.id });
-    if (ok && selectedKey() === traceKey(paint)) setSelectedKey(null);
+    if (ok && selectedKey() === traceKey(paint)) setSelectedKey(undefined);
   }
 
   async function expose(bind: string) {
@@ -279,7 +284,7 @@ export function FigurePane(props: FigurePaneProps) {
   function onPick(hits: TraceNode[]) {
     const n = hits[0];
     setFrameSelected(false);
-    setSelectedKey(n ? traceKey(n) : null);
+    setSelectedKey(n ? traceKey(n) : undefined);
     if (n) {
       const next = focusFromNode(n);
       if (next) setFocus(next);
@@ -287,7 +292,7 @@ export function FigurePane(props: FigurePaneProps) {
   }
 
   function onPickFrame() {
-    setSelectedKey(null);
+    setSelectedKey(undefined);
     setFrameSelected(true);
   }
 
@@ -324,14 +329,14 @@ export function FigurePane(props: FigurePaneProps) {
       file: props.file,
     });
     void requestModal({
-      content: ({ respond }) => (
+      content: (m) => (
         <ExportModal
           svg={result.svg}
           width={result.width}
           height={result.height}
           filename={result.filename}
           empty={result.empty}
-          respond={respond}
+          respond={m.respond}
         />
       ),
     });
@@ -385,7 +390,7 @@ export function FigurePane(props: FigurePaneProps) {
             picker={picker()}
             onPick={(id) => {
               setPicker(false);
-              setWriteError(null);
+              setWriteError(undefined);
               if (id === "export") {
                 openExport();
                 return;
@@ -399,7 +404,7 @@ export function FigurePane(props: FigurePaneProps) {
       <ResizableSidebar>
         <SelectionSidebar>
           <Show
-            when={frameSelected() ? frameXywh() : null}
+            when={frameSelected() ? frameXywh() : undefined}
             fallback={
               <Loading fallback={<SelectionInspector detail={emptyScopeDetail(focus())} />}>
                 <SelectionInspector

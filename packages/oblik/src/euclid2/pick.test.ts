@@ -42,7 +42,7 @@ describe("snapBoundPoint", () => {
   test("ignores unbound and far points", () => {
     const far: TraceNode = { ...A, bind: "B", value: { kind: "point", x: 9, y: 9 } };
     const anon: TraceNode = { ...A, bind: undefined, id: "o_z" };
-    expect(snapBoundPoint([far, anon], { x: 0, y: 0 }, 0.3)).toBeNull();
+    expect(snapBoundPoint([far, anon], { x: 0, y: 0 }, 0.3)).toBeUndefined();
   });
 
   test("keys restrict snap and print the mention", () => {
@@ -58,7 +58,7 @@ describe("snapBoundPoint", () => {
       print: (n) => (n.id === "o_a" ? "plate.origin" : n.bind),
     });
     expect(s).toMatchObject({ bind: "plate.origin", id: "o_a" });
-    expect(snapBoundPoint([hidden], { x: 0.05, y: 0 }, 0.3, { keys })).toBeNull();
+    expect(snapBoundPoint([hidden], { x: 0.05, y: 0 }, 0.3, { keys })).toBeUndefined();
   });
 });
 
@@ -139,7 +139,7 @@ describe("polygon fills", () => {
 
   test("a hole in the polygon is not inside the fill", () => {
     const hit = hitTest([BORE], { x: 2, y: 2 }, camera, size);
-    expect(hit).toBeNull();
+    expect(hit).toBeUndefined();
   });
 
   test("points and strokes win over a polygon fill", () => {
@@ -294,7 +294,7 @@ describe("region pick", () => {
 
   test("snapStrokeCarrier ignores a nearby stroke that misses the vertex", () => {
     const throughA = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size, { through: Pa });
-    expect(throughA).toBeNull();
+    expect(throughA).toBeUndefined();
     const onAb = snapStrokeCarrier([AB, BC], { x: 2, y: 0.02 }, camera, size, { through: Pa });
     expect(onAb?.bind).toBe("ab");
     const onBc = snapStrokeCarrier([AB, BC], { x: 2, y: 1.5 }, camera, size);
@@ -305,7 +305,7 @@ describe("region pick", () => {
     expect(snapRegion([FACE, A], { x: 1, y: 1 }, camera, size)?.bind).toBe("face");
     expect(snapRegion([FACE, A], { x: 1, y: 1 }, camera, size)?.id).toBe("o_pr");
     expect(snapRegion([FACE, A], { x: 0, y: 0 }, camera, size)?.bind).toBe("face");
-    expect(snapRegion([A], { x: 1, y: 1 }, camera, size)).toBeNull();
+    expect(snapRegion([A], { x: 1, y: 1 }, camera, size)).toBeUndefined();
   });
 
   test("overlapping csg fills: last on the tape wins", () => {

@@ -18,7 +18,6 @@ import {
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import { snapBoundPoint, snapEligible, snapPrint, type SnapFilter, type Vec2 } from "./pick";
 
-
 const { abs, max } = Math;
 export type GliderPlace =
   | { kind: "pointOnSegment"; bind: string; id?: string; t: number; at: Vec2 }
@@ -73,7 +72,7 @@ export function isPinnedPoint(p: PlacePoint): boolean {
 
 export type PlaceOpts = { allowGliders?: boolean } & SnapFilter;
 
-export function placeAllowsGliders(tool?: { verb: string } | null): boolean {
+export function placeAllowsGliders(tool?: { verb: string } | undefined): boolean {
   return tool?.verb === "point";
 }
 
@@ -106,7 +105,7 @@ export function resolvePlacePoint(
     }
     return best.point;
   }
-  const glider = opts.allowGliders ? nearestGlider(trace, world, gliderMaxDist, filter) : null;
+  const glider = opts.allowGliders ? nearestGlider(trace, world, gliderMaxDist, filter) : undefined;
   if (glider) return glider.point;
   return { kind: "free", at: { x: world.x, y: world.y } };
 }
@@ -122,10 +121,10 @@ function boundOf(
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
 const CIRCLE = new Set(["circle"]);
 
-function asLineLike(n: TraceNode): LineLike | null {
+function asLineLike(n: TraceNode): LineLike | undefined {
   const v = n.value;
   if (v.kind === "line" || v.kind === "segment" || v.kind === "parallelLine") return v;
-  return null;
+  return undefined;
 }
 
 const ON_SPAN = 1e-9;
@@ -148,8 +147,8 @@ function nearestGlider(
   world: Vec2,
   maxDist: number,
   filter?: SnapFilter,
-): { point: GliderPlace; d: number } | null {
-  let best: { point: GliderPlace; d: number } | null = null;
+): { point: GliderPlace; d: number } | undefined {
+  let best: { point: GliderPlace; d: number } | undefined = undefined;
   for (const n of boundOf(trace, LINE_LIKE, filter)) {
     const geom = asLineLike(n);
     if (!geom) continue;
@@ -190,12 +189,16 @@ function gliderOnLine(bind: string, id: string, geom: LineLike, world: Vec2): Gl
 }
 
 /** Project `world` onto a named line, segment, circle, or parallel offset. */
-export function gliderOnTraceNode(n: TraceNode, world: Vec2, print?: string): GliderPlace | null {
+export function gliderOnTraceNode(
+  n: TraceNode,
+  world: Vec2,
+  print?: string,
+): GliderPlace | undefined {
   const bind = print ?? n.bind;
-  if (!bind) return null;
+  if (!bind) return undefined;
   const geom = asLineLike(n);
   if (geom) return gliderOnLine(bind, n.id, geom, world);
-  if (n.value.kind !== "circle") return null;
+  if (n.value.kind !== "circle") return undefined;
   const circle = n.value as Circle;
   const { ux, uy } = circleUnitAt(circle, world);
   const g = pointOnCircleValue(circle, ux, uy);
@@ -207,9 +210,9 @@ function nearestLineLine(
   world: Vec2,
   maxDist: number,
   filter?: SnapFilter,
-): { point: PlacePoint; d: number } | null {
+): { point: PlacePoint; d: number } | undefined {
   const likes = boundOf(trace, LINE_LIKE, filter);
-  let best: { point: PlacePoint; d: number } | null = null;
+  let best: { point: PlacePoint; d: number } | undefined = undefined;
   for (let i = 0; i < likes.length; i++) {
     const a = likes[i]!;
     const la = asLineLike(a);
@@ -240,10 +243,10 @@ function nearestCircleLine(
   world: Vec2,
   maxDist: number,
   filter?: SnapFilter,
-): { point: PlacePoint; d: number } | null {
+): { point: PlacePoint; d: number } | undefined {
   const circs = boundOf(trace, CIRCLE, filter);
   const likes = boundOf(trace, LINE_LIKE, filter);
-  let best: { point: PlacePoint; d: number } | null = null;
+  let best: { point: PlacePoint; d: number } | undefined = undefined;
   for (const c of circs) {
     if (c.value.kind !== "circle") continue;
     const circle = c.value as Circle;
@@ -280,9 +283,9 @@ function nearestCircleCircle(
   world: Vec2,
   maxDist: number,
   filter?: SnapFilter,
-): { point: PlacePoint; d: number } | null {
+): { point: PlacePoint; d: number } | undefined {
   const circs = boundOf(trace, CIRCLE, filter);
-  let best: { point: PlacePoint; d: number } | null = null;
+  let best: { point: PlacePoint; d: number } | undefined = undefined;
   for (let i = 0; i < circs.length; i++) {
     const a = circs[i]!;
     if (a.value.kind !== "circle") continue;

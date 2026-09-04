@@ -1,6 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
 
-
 const { sqrt } = Math;
 export type DragSession = {
   onPointerMove?: (event: PointerEvent) => void;
@@ -34,7 +33,12 @@ function pastDeadZone(
   to: { clientX: number; clientY: number },
   radius: number,
 ): boolean {
-  return sqrt((to.clientX - from.clientX) * (to.clientX - from.clientX) + (to.clientY - from.clientY) * (to.clientY - from.clientY)) >= radius;
+  return (
+    sqrt(
+      (to.clientX - from.clientX) * (to.clientX - from.clientX) +
+        (to.clientY - from.clientY) * (to.clientY - from.clientY),
+    ) >= radius
+  );
 }
 
 function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {
@@ -50,14 +54,18 @@ function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {
   return both.signal;
 }
 
-function canCapture(target: EventTarget | null | undefined): target is Element {
+function canCapture(target: EventTarget | undefined): target is Element {
   return !!target && typeof (target as Element).setPointerCapture === "function";
 }
 
-function captureTarget(event: PointerEvent): Element | null {
-  if (canCapture(event.currentTarget)) return event.currentTarget;
-  if (canCapture(event.target)) return event.target;
-  return null;
+function captureTarget(event: PointerEvent): Element | undefined {
+  // DOM event targets are typed `EventTarget | null`; map the platform `null`
+  // to `undefined` at the boundary.
+  const current = event.currentTarget ?? undefined;
+  if (canCapture(current)) return current;
+  const direct = event.target ?? undefined;
+  if (canCapture(direct)) return direct;
+  return undefined;
 }
 
 /**

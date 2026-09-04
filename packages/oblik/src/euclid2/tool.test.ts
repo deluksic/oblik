@@ -19,7 +19,6 @@ import {
 } from "./tool";
 import { regionEligibleCarriers } from "./tools/region";
 
-
 const { sqrt } = Math;
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
@@ -662,7 +661,7 @@ describe("clickTool", () => {
     });
     if (!("session" in mid)) throw new Error("expected session");
     const typed = typeTool(mid.session, "-shelf.distance");
-    expect(commitTool(typed, null, scope)).toEqual({
+    expect(commitTool(typed, undefined, scope)).toEqual({
       insert: {
         from: "parallelLine",
         args: [
@@ -890,7 +889,7 @@ describe("clickTool", () => {
     });
     if (!("session" in mid)) throw new Error("expected session");
     const typed = typeTool(mid.session, "P");
-    expect(commitTool(typed, null, scope)).toEqual({
+    expect(commitTool(typed, undefined, scope)).toEqual({
       insert: {
         from: "perpendicularLine",
         args: [
@@ -1017,7 +1016,7 @@ describe("ghostOf", () => {
         { verb: "parallelLine", focus: "name", typed: "", name: "", carrierRef: "" },
         { world: { x: 1, y: 0 }, point: free(1, 0), carrier: { bind: "ground", geom: ground } },
       ),
-    ).toBeNull();
+    ).toBeUndefined();
   });
 
   test("parallel line distance snaps to a named point for the ghost", () => {
@@ -1480,7 +1479,7 @@ describe("region tool", () => {
   test("hides existing fills for the whole region session", () => {
     expect(toolChrome(startTool("region")).hideFills).toBe(true);
     expect(toolChrome(startTool("line")).hideFills).toBe(false);
-    expect(toolChrome(null).hideFills).toBe(false);
+    expect(toolChrome(undefined).hideFills).toBe(false);
   });
 
   test("ghost arrow sits on the carrier at the vertex, pointing along it", () => {
@@ -1729,14 +1728,14 @@ describe("fillet tool", () => {
   test("typed radius commits on Enter and preview has no new const", () => {
     const mid = clickTool(startTool("fillet"), faceHit, scope);
     if (!("session" in mid)) throw new Error("expected session");
-    expect(commitTool(typeTool(mid.session, "0.2"), null, scope)).toEqual({
+    expect(commitTool(typeTool(mid.session, "0.2"), undefined, scope)).toEqual({
       insert: {
         from: "fillet",
         args: [{ kind: "num", value: 0.2 }],
         patchVertex: { id: "o_fil_mix", index: 2 },
       },
     });
-    const preview = previewOf(mid.session, null, scope);
+    const preview = previewOf(mid.session, undefined, scope);
     expect(preview.line).toContain("region([");
     expect(preview.line).toContain("fillet(");
     expect(preview.line).not.toMatch(/^const /);

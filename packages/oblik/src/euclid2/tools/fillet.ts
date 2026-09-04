@@ -13,7 +13,6 @@ import {
 } from "./length";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
-
 const { max } = Math;
 type FilletSession = Extract<ToolSession, { verb: "fillet" }>;
 
@@ -22,7 +21,7 @@ const fields: Field<FilletSession>[] = [lengthField("<radius>")];
 function closestCorner(geom: Region, world: { x: number; y: number }) {
   const corners = regionCorners(geom);
   let best = corners[0];
-  if (!best) return null;
+  if (!best) return undefined;
   let bestD = dist(world, best.at);
   for (const c of corners) {
     const d = dist(world, c.at);
@@ -37,7 +36,7 @@ function closestCorner(geom: Region, world: { x: number; y: number }) {
 function cornerOf(hit: PlaceHit, geom: Region) {
   if (hit.corner) return hit.corner;
   const c = closestCorner(geom, hit.world);
-  return c ? { index: c.index, at: c.at } : null;
+  return c ? { index: c.index, at: c.at } : undefined;
 }
 
 function faceGeom(session: FilletSession, scope: Scope): Region | undefined {
@@ -47,7 +46,7 @@ function faceGeom(session: FilletSession, scope: Scope): Region | undefined {
 }
 
 function vertexOf(session: FilletSession) {
-  if (session.vertex == null || !session.at || !session.faceId) return null;
+  if (session.vertex === undefined || !session.at || !session.faceId) return undefined;
   return { index: session.vertex, at: session.at, id: session.faceId };
 }
 
@@ -58,7 +57,7 @@ function exprAtCorner(at: { x: number; y: number }, hit: PlaceHit, scope: Scope)
   }
 }
 
-function vertexLabel(session: FilletSession, scope: Scope, place: PlaceHit | null): string {
+function vertexLabel(session: FilletSession, scope: Scope, place: PlaceHit | undefined): string {
   if (session.vertexExpr) return printExpr(session.vertexExpr);
   const p = place?.point;
   if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
@@ -92,8 +91,8 @@ function radiusExpr(session: FilletSession, hit: PlaceHit, scope: Scope): Expr {
   return { kind: "num", value: round(radiusAt(session, hit)) };
 }
 
-function radiusNumber(session: FilletSession, place: PlaceHit | null, scope: Scope): number {
-  if (resolveLengthExpr(session, scope, { min: 0 }) != null) {
+function radiusNumber(session: FilletSession, place: PlaceHit | undefined, scope: Scope): number {
+  if (resolveLengthExpr(session, scope, { min: 0 }) !== undefined) {
     const fallback = place?.length?.value ?? 0;
     return max(0, lengthValue(session, scope, fallback));
   }
@@ -153,7 +152,7 @@ export const fillet: Tool<FilletSession> = {
   },
   hover(session, hit, trace) {
     if (!vertexOf(session)) {
-      if (!hit.region) return null;
+      if (!hit.region) return undefined;
       return hoverBind(trace, hit.region.bind);
     }
     return lengthHover(hit, trace);
@@ -193,12 +192,12 @@ export const fillet: Tool<FilletSession> = {
   commit(session, _place, scope) {
     if (!vertexOf(session)) {
       if (session.focus !== "corner") return { session: { ...session, focus: "corner" } };
-      return null;
+      return undefined;
     }
     const bound = resolveLengthExpr(session, scope, { min: 0 });
     if (bound) return patchJob(session, bound);
     if (session.focus === "corner") return { session: { ...session, focus: "typed" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const vertex = vertexOf(session);
@@ -207,12 +206,12 @@ export const fillet: Tool<FilletSession> = {
       const at =
         place?.corner?.at ??
         (place?.region ? closestCorner(place.region.geom, place.world)?.at : undefined);
-      return at ? { kind: "corner" as const, at } : null;
+      return at ? { kind: "corner" as const, at } : undefined;
     }
-    if (!geom) return null;
+    if (!geom) return undefined;
     const r = radiusNumber(session, place, scope);
     const out = filletAtVertex(geom, vertex.index, r);
-    if (!isFiniteRegion(out)) return null;
+    if (!isFiniteRegion(out)) return undefined;
     return { kind: "region", edges: walkEdges(out.outer) };
   },
   preview(session, place, scope): Preview {
@@ -227,7 +226,11 @@ export const fillet: Tool<FilletSession> = {
         hint: place?.corner ? `Click to fillet this corner. Tab for radius.` : spec.hint,
       };
     }
-    if (place?.length && place.length.value >= 0 && resolveLengthExpr(session, scope) == null) {
+    if (
+      place?.length &&
+      place.length.value >= 0 &&
+      resolveLengthExpr(session, scope) === undefined
+    ) {
       const r = printExpr(place.length.expr);
       return {
         line: `region([…, fillet(${vTok}, ${r}), …], [])`,
@@ -239,7 +242,7 @@ export const fillet: Tool<FilletSession> = {
       isPinnedPoint(place.point) &&
       session.vertexExpr &&
       !sameRef(session.vertexExpr, place.point) &&
-      resolveLengthExpr(session, scope) == null
+      resolveLengthExpr(session, scope) === undefined
     ) {
       const r = `dist(${printExpr(session.vertexExpr)}, ${printExpr(exprOfPlace(place.point))})`;
       return {

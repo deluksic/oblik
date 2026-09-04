@@ -49,7 +49,7 @@ function pointerEvent(partial: {
   clientX?: number;
   clientY?: number;
   pointerId?: number;
-  currentTarget?: EventTarget | null;
+  currentTarget?: EventTarget | undefined;
 }): PointerEvent {
   let prevented = false;
   const captured: number[] = [];

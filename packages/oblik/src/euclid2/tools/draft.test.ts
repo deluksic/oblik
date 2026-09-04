@@ -111,14 +111,14 @@ describe("keyTool", () => {
     s = tabTool(s, -1);
     s = typeChars(s, "1bad");
     expect(keyTool(s, { key: "Enter" })).toBeUndefined();
-    expect(keyTool(s, { key: "Enter" }, null, ["ok"])).toBeUndefined();
+    expect(keyTool(s, { key: "Enter" }, undefined, ["ok"])).toBeUndefined();
   });
 
   test("duplicate bind refuses Enter", () => {
     let s = startTool("line");
     s = tabTool(tabTool(s));
     s = typeChars(s, "ground");
-    expect(keyTool(s, { key: "Enter" }, null, ["ground"])).toBeUndefined();
+    expect(keyTool(s, { key: "Enter" }, undefined, ["ground"])).toBeUndefined();
   });
 
   test("circle tabs center → typed → name", () => {
@@ -133,7 +133,7 @@ describe("keyTool", () => {
     let s = typeChars(startTool("circle"), "A");
     s = tabTool(s);
     s = typeChars(s, "2.5");
-    expect(keyTool(s, { key: "Enter" }, null, scope)).toEqual({
+    expect(keyTool(s, { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
         from: "circle",
         args: [
@@ -146,12 +146,12 @@ describe("keyTool", () => {
 
   test("circle unknown point ident is invalid and refuses Enter", () => {
     const s = typeChars(startTool("circle"), "Z");
-    expect(previewOf(s, null, pointScope({ bind: "A", x: 0, y: 0 })).draft).toMatchObject({
+    expect(previewOf(s, undefined, pointScope({ bind: "A", x: 0, y: 0 })).draft).toMatchObject({
       id: "center",
       invalid: true,
     });
     expect(
-      keyTool(s, { key: "Enter" }, null, pointScope({ bind: "A", x: 0, y: 0 })),
+      keyTool(s, { key: "Enter" }, undefined, pointScope({ bind: "A", x: 0, y: 0 })),
     ).toBeUndefined();
   });
 
@@ -227,7 +227,7 @@ describe("keyTool", () => {
       lengths: { reach: 2.5 },
     };
     const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
-    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, null, scope)).toEqual({
+    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
         from: "circle",
         args: [
@@ -242,7 +242,7 @@ describe("keyTool", () => {
     const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
     const bad = typeTool(mid, "nope");
     expect(
-      previewOf(bad, null, {
+      previewOf(bad, undefined, {
         used: ["A"],
         points: { A: { expr: { kind: "ref", name: "A" }, at: { x: 0, y: 0 } } },
         carriers: {},
@@ -265,7 +265,7 @@ describe("keyTool", () => {
     let s = typeChars(startTool("line"), "A");
     s = tabTool(s);
     s = typeChars(s, "P");
-    expect(keyTool(s, { key: "Enter" }, null, scope)).toEqual({
+    expect(keyTool(s, { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
         from: "line",
         args: [
@@ -321,7 +321,7 @@ describe("keyTool", () => {
         carrier: { bind: "ground", geom: ground },
       }),
     );
-    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, null, scope)).toEqual({
+    expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
         from: "parallelLine",
         args: [
@@ -343,7 +343,7 @@ describe("keyTool", () => {
     };
     const mid = typeChars(startTool("point"), "reach");
     const y = tabTool(mid);
-    expect(keyTool(typeChars(y, "reach"), { key: "Enter" }, null, scope)).toEqual({
+    expect(keyTool(typeChars(y, "reach"), { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
         from: "point",
         args: [
@@ -366,7 +366,7 @@ describe("keyTool", () => {
     );
     expect(mid).toMatchObject({ verb: "perpendicularLine", focus: "through" });
     expect(
-      keyTool(typeChars(mid, "P"), { key: "Enter" }, null, {
+      keyTool(typeChars(mid, "P"), { key: "Enter" }, undefined, {
         ...scope,
         carriers: { ground: { expr: { kind: "ref", name: "ground" }, geom: ground } },
       }),

@@ -14,7 +14,6 @@ import {
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
-
 const { PI, cos, sin } = Math;
 const A = { x: 2, y: 0 };
 const B = { x: 0, y: 2 };
@@ -31,7 +30,7 @@ function closed(pts: readonly Vec2[], radii: readonly (number | undefined)[] = [
     const a = pts[i]!;
     const b = pts[(i + 1) % pts.length]!;
     const r = radii[i];
-    cycle.push(r != null ? filletValue(a, r) : a, seg(a, b));
+    cycle.push(r !== undefined ? filletValue(a, r) : a, seg(a, b));
   }
   return regionValue(cycle, []);
 }

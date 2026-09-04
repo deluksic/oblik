@@ -50,14 +50,14 @@ function isNumericInit(expr: ts.Expression): boolean {
 /**
  * Rewrite the `frame` object literal of a figure scene's default export,
  * overwriting existing numeric `x`/`y`/`width`/`height` and inserting any that
- * are missing. Returns null when there is no patchable `frame` literal.
+ * are missing. Returns undefined when there is no patchable `frame` literal.
  */
-export function patchFrame(source: string, values: FrameValues): string | null {
+export function patchFrame(source: string, values: FrameValues): string | undefined {
   const sf = parse(source);
   const obj = defaultExportObject(sf);
-  if (!obj) return null;
+  if (!obj) return undefined;
   const frameProp = findProp(obj, "frame");
-  if (!frameProp || !ts.isObjectLiteralExpression(frameProp.initializer)) return null;
+  if (!frameProp || !ts.isObjectLiteralExpression(frameProp.initializer)) return undefined;
   const frame = frameProp.initializer;
 
   const ms = new MagicString(source);
@@ -69,7 +69,7 @@ export function patchFrame(source: string, values: FrameValues): string | null {
       missing.push(`${key}: ${text}`);
       continue;
     }
-    if (!isNumericInit(prop.initializer)) return null;
+    if (!isNumericInit(prop.initializer)) return undefined;
     ms.overwrite(prop.initializer.getStart(sf), prop.initializer.getEnd(), text);
   }
 

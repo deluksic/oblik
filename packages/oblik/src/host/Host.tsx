@@ -55,24 +55,24 @@ export type OblikMountOpts = {
 };
 
 /**
- * Resolve the scene to open on mount. `null` means welcome (no `?scene=`).
+ * Resolve the scene to open on mount. `undefined` means welcome (no `?scene=`).
  * A URL scene id wins when it exists; otherwise fall back to the first scene
  * without a catalog error, or welcome when nothing is openable.
  */
-function pickSceneId(scenes: OblikSceneEntry[]): string | null {
+function pickSceneId(scenes: OblikSceneEntry[]): string | undefined {
   const fromUrl = currentSceneId();
   if (fromUrl) {
     if (scenes.some((s) => s.id === fromUrl && !s.error)) return fromUrl;
-    return scenes.find((s) => !s.error)?.id ?? null;
+    return scenes.find((s) => !s.error)?.id ?? undefined;
   }
-  return null;
+  return undefined;
 }
 
 export function mountOblik(opts: OblikMountOpts): OblikMount {
   const initialSceneId = pickSceneId(opts.scenes);
   if (initialSceneId) {
     if (currentSceneId() !== initialSceneId) openScene(initialSceneId);
-  } else if (currentSceneId() !== null) {
+  } else if (currentSceneId() !== undefined) {
     openWelcome();
   }
 
@@ -109,18 +109,18 @@ function Host(props: {
   annotations: AnnotationBundle;
   mentions: MentionBundle;
   collisions: DuplicateId[];
-  initialSceneId: string | null;
+  initialSceneId: string | undefined;
 }) {
   // Function-form initializer: reading `props` eagerly to seed a signal is not
   // valid in Solid 2 (see docs/prototypes/6.md) — `() => props.x` reads it in
   // a reactive scope and only resets if the value actually changes.
-  const [sceneId, setSceneId] = createSignal<string | null>(() => props.initialSceneId);
+  const [sceneId, setSceneId] = createSignal<string | undefined>(() => props.initialSceneId);
   const sceneCache = new Map<string, Scene>();
   const [sceneRev, setSceneRev] = createSignal(0);
 
-  const isWelcome = createMemo(() => sceneId() === null);
+  const isWelcome = createMemo(() => sceneId() === undefined);
 
-  const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? null);
+  const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? undefined);
 
   const loaded = createMemo(async () => {
     sceneRev();
@@ -150,7 +150,7 @@ function Host(props: {
   const sceneKind = createMemo(() => scene().kind);
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
-  const paneFile = createMemo(() => entry()?.path ?? null);
+  const paneFile = createMemo(() => entry()?.path ?? undefined);
 
   createEffect(
     () => true,
@@ -161,7 +161,7 @@ function Host(props: {
           setSceneRev((r) => r + 1);
         },
       });
-      return () => registerSceneHot(null);
+      return () => registerSceneHot(undefined);
     },
   );
 
@@ -181,13 +181,13 @@ function Host(props: {
 
   function goWelcome() {
     openWelcome();
-    setSceneId(null);
+    setSceneId(undefined);
   }
 
   const pane = createMemo(() => {
     const kind = sceneKind();
     const file = paneFile();
-    if (file === null) return <p class={styles.err}>Unknown scene</p>;
+    if (file === undefined) return <p class={styles.err}>Unknown scene</p>;
     if (kind === "figure") {
       return (
         <FigurePane
@@ -221,7 +221,7 @@ function Host(props: {
           onWelcome={goWelcome}
         />
         <Show when={!isWelcome()}>
-          <Loading fallback={null}>
+          <Loading fallback={undefined}>
             <p>{scene().hint}</p>
           </Loading>
         </Show>

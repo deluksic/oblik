@@ -13,7 +13,6 @@ import {
 import type { Loop, Polygon } from "./types";
 import { dist, distToSegment, isFiniteVec, type Vec2 } from "./vec";
 
-
 const EPS = 1e-9;
 
 export function isPolygon(v: { kind: string }): v is Polygon {
@@ -27,22 +26,22 @@ export function nanPolygon(): Polygon {
 /**
  * Copy `pts` into a distinct ordered boundary. Consecutive duplicates and a
  * trailing repeat of the first point (an explicitly closed ring) are dropped;
- * closure is implicit last→first. `null` when fewer than three points remain.
+ * closure is implicit last→first. `undefined` when fewer than three points remain.
  */
-export function normalizeBoundary(pts: readonly Vec2[]): Vec2[] | null {
-  if (!Array.isArray(pts)) return null;
+export function normalizeBoundary(pts: readonly Vec2[]): Vec2[] | undefined {
+  if (!Array.isArray(pts)) return undefined;
   const out: Vec2[] = [];
   for (const p of pts) {
-    if (!p || typeof p !== "object") return null;
+    if (!p || typeof p !== "object") return undefined;
     const { x, y } = p as Vec2;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
     const next = { x, y };
     const prev = out[out.length - 1];
     if (prev && dist(prev, next) < EPS) continue;
     out.push(next);
   }
   if (out.length >= 4 && dist(out[0]!, out[out.length - 1]!) < EPS) out.pop();
-  return out.length >= 3 ? out : null;
+  return out.length >= 3 ? out : undefined;
 }
 
 export function isFinitePolygon(p: Polygon): boolean {
@@ -75,11 +74,11 @@ export function polygonTopologyOk(p: Polygon): boolean {
 }
 
 /** Parse holes with region walk semantics (full circle or carrier cycle). */
-function asHoles(holes: readonly WalkInput[]): Loop[] | null {
+function asHoles(holes: readonly WalkInput[]): Loop[] | undefined {
   const out: Loop[] = [];
   for (const hole of holes) {
     const parsed = asWalk(hole);
-    if (!parsed) return null;
+    if (!parsed) return undefined;
     out.push(parsed);
   }
   return out;

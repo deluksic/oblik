@@ -18,15 +18,14 @@ import {
 import type { Circle, Csg2, CsgOp, CsgOperand, HalfPlane, Loop, LoopEdge, Region } from "./types";
 import { add, dist, isFiniteVec, mul, norm, perp, type Vec2 } from "./vec";
 
-
 const { abs, max, min } = Math;
 const EDGE_MIN = 1e-6;
 /** Cheap reject: |sdf(mid)| above this is not a boundary candidate. */
 const COARSE = 1e-3;
 
-function circleRegion(c: Circle): Region | null {
+function circleRegion(c: Circle): Region | undefined {
   if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EDGE_MIN) {
-    return null;
+    return undefined;
   }
   return {
     kind: "region",
@@ -73,8 +72,8 @@ export function islandsSvgPath(islands: readonly Region[]): string {
     .join(" ");
 }
 
-export function islandsAabb(islands: readonly Region[]): Aabb | null {
-  let box: Aabb | null = null;
+export function islandsAabb(islands: readonly Region[]): Aabb | undefined {
+  let box: Aabb | undefined = undefined;
   for (const r of islands) {
     const b = operandAabb(r);
     if (!b) continue;
@@ -233,8 +232,8 @@ function expandBox(a: Aabb, b: Aabb): Aabb {
   };
 }
 
-function islandsBox(islands: readonly Region[]): Aabb | null {
-  let box: Aabb | null = null;
+function islandsBox(islands: readonly Region[]): Aabb | undefined {
+  let box: Aabb | undefined = undefined;
   for (const r of islands) {
     const b = operandAabb(r);
     if (!b) continue;
@@ -254,10 +253,10 @@ function onSeg(a: Vec2, b: Vec2, p: Vec2): boolean {
 }
 
 /** Line span covering a padded AABB so a half-plane can join the arrangement. */
-function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | null {
+function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | undefined {
   const { origin, dir } = lineBasis(h.line);
   const n = norm(dir);
-  if (!isFiniteVec(n) || !isFiniteVec(origin)) return null;
+  if (!isFiniteVec(n) || !isFiniteVec(origin)) return undefined;
   const pad = max(box.maxX - box.minX, box.maxY - box.minY, 1) * 0.08;
   const minX = box.minX - pad;
   const minY = box.minY - pad;
@@ -288,7 +287,7 @@ function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | null {
     if (hits.some((q) => dist(q, p) < 1e-8)) continue;
     hits.push(p);
   }
-  if (hits.length < 2) return null;
+  if (hits.length < 2) return undefined;
   hits.sort((p, q) => {
     const tp = (p.x - origin.x) * n.x + (p.y - origin.y) * n.y;
     const tq = (q.x - origin.x) * n.x + (q.y - origin.y) * n.y;
@@ -296,7 +295,7 @@ function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | null {
   });
   const a = hits[0]!;
   const b = hits[hits.length - 1]!;
-  if (dist(a, b) < EDGE_MIN) return null;
+  if (dist(a, b) < EDGE_MIN) return undefined;
   return { a, b, carrier: h.line };
 }
 

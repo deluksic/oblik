@@ -81,10 +81,10 @@ export function normalizeCallSite(f: CallSite): CallSite {
 }
 
 type V8CallSite = {
-  getFileName?: () => string | null | undefined;
-  getLineNumber?: () => number | null | undefined;
-  getColumnNumber?: () => number | null | undefined;
-  getFunctionName?: () => string | null | undefined;
+  getFileName?: () => string | undefined;
+  getLineNumber?: () => number | undefined;
+  getColumnNumber?: () => number | undefined;
+  getFunctionName?: () => string | undefined;
 };
 
 const ErrorWithStack = Error as typeof Error & {
@@ -95,9 +95,9 @@ function callSiteFromParts(
   file: string,
   line: number,
   column: number,
-  name?: string | null,
-): CallSite | null {
-  if (!file || line == null || column == null) return null;
+  name?: string | undefined,
+): CallSite | undefined {
+  if (!file || line === undefined || column === undefined) return undefined;
   const who = name?.trim();
   return {
     file,
@@ -107,19 +107,19 @@ function callSiteFromParts(
   };
 }
 
-export function parseFrame(raw: string): CallSite | null {
+export function parseFrame(raw: string): CallSite | undefined {
   const line = raw.replace(/\.(tsx?|jsx?|mjs)\?[^:]*:/, ".$1:");
   const m = line.match(/(?:https?:\/\/[^/]+\/)?([^:\s)]+\.(?:ts|tsx|js|mjs)):(\d+):(\d+)/);
-  if (!m?.[1] || !m[2] || !m[3]) return null;
+  if (!m?.[1] || !m[2] || !m[3]) return undefined;
   const nameMatch = raw.match(/^\s*at\s+(?:async\s+)?([^\s(/]+)/);
   return callSiteFromParts(m[1], Number(m[2]), Number(m[3]), nameMatch?.[1]);
 }
 
-function fromV8(site: V8CallSite): CallSite | null {
+function fromV8(site: V8CallSite): CallSite | undefined {
   const file = site.getFileName?.();
   const line = site.getLineNumber?.();
   const column = site.getColumnNumber?.();
-  if (!file || line == null || column == null) return null;
+  if (!file || line === undefined || column === undefined) return undefined;
   return callSiteFromParts(file, line, column, site.getFunctionName?.());
 }
 
@@ -148,7 +148,10 @@ export function captureUserStack(): CallSite[] {
   let structured: V8CallSite[] | undefined;
   try {
     ErrorWithStack.prepareStackTrace = (_err, sites) => {
-      structured = sites;
+      // Node types the callback with its own `CallSite` (methods return
+      // `string | null`); ours are structurally the same minus the platform
+      // null, so cast across the boundary.
+      structured = sites as unknown as V8CallSite[];
       return "";
     };
     const err = new Error();
@@ -158,7 +161,7 @@ export function captureUserStack(): CallSite[] {
   } finally {
     ErrorWithStack.prepareStackTrace = prev;
   }
-  const fromSites = structured?.map(fromV8).filter((f): f is CallSite => f != null) ?? [];
+  const fromSites = structured?.map(fromV8).filter((f): f is CallSite => f !== undefined) ?? [];
   if (fromSites.length > 0) return dedupe(fromSites);
 
   const err = new Error();

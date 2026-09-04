@@ -1,17 +1,17 @@
 import { type ChromeMetrics, DEFAULT_CHROME_METRICS } from "./chrome";
 
-function cssLengthPx(style: CSSStyleDeclaration, prop: string): number | null {
+function cssLengthPx(style: CSSStyleDeclaration, prop: string): number | undefined {
   const raw = style.getPropertyValue(prop).trim();
-  if (!raw) return null;
+  if (!raw) return undefined;
   const px = Number.parseFloat(raw);
-  return Number.isFinite(px) ? px : null;
+  return Number.isFinite(px) ? px : undefined;
 }
 
-function cssNumber(style: CSSStyleDeclaration, prop: string): number | null {
+function cssNumber(style: CSSStyleDeclaration, prop: string): number | undefined {
   const raw = style.getPropertyValue(prop).trim();
-  if (!raw) return null;
+  if (!raw) return undefined;
   const n = Number.parseFloat(raw);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /** Theme tokens for hover/select chrome. See docs/chrome.md. */

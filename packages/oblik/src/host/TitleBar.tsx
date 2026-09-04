@@ -14,8 +14,8 @@ import styles from "./TitleBar.module.css";
 
 export type TitleBarProps = {
   scenes: OblikSceneEntry[];
-  /** Current scene id, or `null` on the welcome screen. */
-  sceneId: string | null;
+  /** Current scene id, or `undefined` on the welcome screen. */
+  sceneId: string | undefined;
   onSelectScene: (id: string) => void;
   onWelcome: () => void;
 };
@@ -25,7 +25,9 @@ export function TitleBar(props: TitleBarProps) {
   const requestModal = useRequestModal();
 
   const current = createMemo(() =>
-    props.sceneId === null ? null : (props.scenes.find((s) => s.id === props.sceneId) ?? null),
+    props.sceneId === undefined
+      ? undefined
+      : (props.scenes.find((s) => s.id === props.sceneId) ?? undefined),
   );
 
   // Close the scene menu on Escape from the capture phase so the panes'
@@ -61,20 +63,20 @@ export function TitleBar(props: TitleBarProps) {
 
   function openSettings() {
     void requestModal({
-      content: ({ respond }) => <SettingsModal respond={respond} />,
+      content: (m) => <SettingsModal respond={m.respond} />,
     });
   }
 
   return (
     <div class={styles.bar}>
       <div class={styles.crumbs}>
-        <button type="button" class={styles.brand} onClick={props.onWelcome}>
+        <button type="button" class={styles.brand} onClick={() => props.onWelcome()}>
           oblik
         </button>
         <IconChevronRight class={styles.sep} aria-hidden="true" />
         <div class={styles.sceneWrap}>
           <Show
-            when={props.sceneId !== null}
+            when={props.sceneId !== undefined}
             fallback={<span class={styles.welcomeCrumb}>Welcome</span>}
           >
             <button

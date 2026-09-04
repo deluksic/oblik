@@ -4,9 +4,9 @@ export type SceneHotHandler = {
   onHot: (key: string, scene: Scene) => void;
 };
 
-let handler: SceneHotHandler | null = null;
+let handler: SceneHotHandler | undefined = undefined;
 
-export function registerSceneHot(next: SceneHotHandler | null): void {
+export function registerSceneHot(next: SceneHotHandler | undefined): void {
   handler = next;
 }
 

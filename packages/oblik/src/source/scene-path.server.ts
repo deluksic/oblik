@@ -18,11 +18,11 @@ export function resolveSceneFileAbs(workspaceRoot: string, sceneDir: string, rel
   throw new Error(`ENOENT: no such file or directory, open '${path.resolve(workspaceRoot, key)}'`);
 }
 
-function safeResolveUnder(root: string, rel: string): string | null {
+function safeResolveUnder(root: string, rel: string): string | undefined {
   try {
     return resolveUnder(root, rel);
   } catch {
-    return null;
+    return undefined;
   }
 }
 

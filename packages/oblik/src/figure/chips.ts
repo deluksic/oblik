@@ -1,7 +1,6 @@
 import { cloneStyle, type FigureStyle } from "../eval/paint";
 import type { Expr } from "../source/expr";
 
-
 const { round } = Math;
 export const STROKE_COLORS = ["#1c1917", "#c23b22", "#2b7a3e", "#1f5fa8", "#d97706"] as const;
 
@@ -70,8 +69,8 @@ export const BRUSH_LOOK: FigureStyle = figureStyleFromBrush(DEFAULT_BRUSH, false
 export function lookExpr(s: FigureStyle): Expr {
   const props: Record<string, Expr> = {};
   if (s.stroke) props.stroke = { kind: "str", value: s.stroke };
-  if (s.fill != null) props.fill = { kind: "str", value: s.fill };
-  if (s.width != null) props.width = { kind: "num", value: s.width };
+  if (s.fill !== undefined) props.fill = { kind: "str", value: s.fill };
+  if (s.width !== undefined) props.width = { kind: "num", value: s.width };
   if (s.dash) props.dash = { kind: "array", items: s.dash.map((n) => ({ kind: "num", value: n })) };
   if (s.point) props.point = { kind: "str", value: s.point };
   return { kind: "props", props };

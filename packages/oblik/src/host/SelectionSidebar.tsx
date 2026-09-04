@@ -114,7 +114,7 @@ export function SidebarExpose(props: { note: ExposeNote; onExpose?: (bind: strin
         >
           Add to return
         </button>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
@@ -145,24 +145,25 @@ function OriginFrameBox(props: { frame: OriginFrame; onPickScope?: (pick: ScopeP
 }
 
 function OriginLine(props: { row: OriginDisplayLine }) {
-  if (props.row.kind === "ellipsis") {
-    return (
-      <div class={styles.gapRow}>
-        <span class={styles.ln} />
-        <span class={styles.tx}>...</span>
-      </div>
-    );
-  }
   return (
-    <div
-      class={{
-        [styles.codeRow]: props.row.kind === "code",
-        [styles.headerRow]: props.row.kind === "header",
-        [styles.current]: !!props.row.current,
-      }}
-    >
-      <span class={styles.ln}>{props.row.line}</span>
-      <span class={styles.tx}>{props.row.text || " "}</span>
-    </div>
+    <>
+      {props.row.kind === "ellipsis" ? (
+        <div class={styles.gapRow}>
+          <span class={styles.ln} />
+          <span class={styles.tx}>...</span>
+        </div>
+      ) : (
+        <div
+          class={{
+            [styles.codeRow]: props.row.kind === "code",
+            [styles.headerRow]: props.row.kind === "header",
+            [styles.current]: !!props.row.current,
+          }}
+        >
+          <span class={styles.ln}>{props.row.line}</span>
+          <span class={styles.tx}>{props.row.text || " "}</span>
+        </div>
+      )}
+    </>
   );
 }

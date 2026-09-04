@@ -38,6 +38,6 @@ test("reads an inline sourceMappingURL", () => {
   const b64 = Buffer.from(JSON.stringify(map)).toString("base64");
   const code = `${ms.toString()}\n//# sourceMappingURL=data:application/json;base64,${b64}\n`;
   const parsed = sourceMapFromCode(code);
-  expect(parsed).not.toBeNull();
+  expect(parsed).not.toBeUndefined();
   expect(originalFromMap(parsed!, 2, 14)?.line).toBe(1);
 });

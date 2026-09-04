@@ -15,7 +15,6 @@ import {
   type Vec2,
 } from "./vec";
 
-
 const { PI, abs, atan2, ceil, cos, max, min, sin } = Math;
 const EPS = 1e-9;
 
@@ -69,8 +68,7 @@ function isFiniteEdge(e: LoopEdge): boolean {
   if (!isFiniteVec(e.a) || !isFiniteVec(e.b)) return false;
   if (e.carrier.kind === "circle") {
     const c = e.carrier;
-    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EPS)
-      return false;
+    if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EPS) return false;
     if (e.k !== 1 && e.k !== -1) return false;
     return dist(e.a, e.b) > EPS;
   }
@@ -78,8 +76,8 @@ function isFiniteEdge(e: LoopEdge): boolean {
   return isFiniteVec(origin) && isFiniteVec(dir) && dist(e.a, e.b) > EPS;
 }
 
-function asVec2(v: unknown): Vec2 | null {
-  if (!v || typeof v !== "object") return null;
+function asVec2(v: unknown): Vec2 | undefined {
+  if (!v || typeof v !== "object") return undefined;
   const p = v as { x?: unknown; y?: unknown; kind?: string };
   if (
     p.kind === "along" ||
@@ -89,17 +87,17 @@ function asVec2(v: unknown): Vec2 | null {
     p.kind === "segment" ||
     p.kind === "parallelLine"
   ) {
-    return null;
+    return undefined;
   }
   if (typeof p.x === "number" && typeof p.y === "number") return { x: p.x, y: p.y };
-  return null;
+  return undefined;
 }
 
-function asLineLike(v: unknown): LineLike | null {
-  if (!v || typeof v !== "object") return null;
+function asLineLike(v: unknown): LineLike | undefined {
+  if (!v || typeof v !== "object") return undefined;
   const g = v as { kind?: string };
   if (g.kind === "line" || g.kind === "segment" || g.kind === "parallelLine") return v as LineLike;
-  return null;
+  return undefined;
 }
 
 export function projectOnLine(geom: LineLike, p: Vec2): Vec2 {
@@ -135,26 +133,26 @@ export function circleDelta(c: Circle, a: Vec2, b: Vec2, k: Branch): number {
   return delta;
 }
 
-function asVertex(v: unknown): { at: Vec2; r: number } | null {
+function asVertex(v: unknown): { at: Vec2; r: number } | undefined {
   if (isFillet(v)) {
-    if (!Number.isFinite(v.r) || v.r < 0) return null;
+    if (!Number.isFinite(v.r) || v.r < 0) return undefined;
     const at = asVec2(v.at);
-    if (!at || !isFiniteVec(at)) return null;
+    if (!at || !isFiniteVec(at)) return undefined;
     return { at, r: v.r };
   }
   const at = asVec2(v);
-  if (!at || !isFiniteVec(at)) return null;
+  if (!at || !isFiniteVec(at)) return undefined;
   return { at, r: 0 };
 }
 
 export type WalkInput = Circle | readonly unknown[];
 
-function asCircleWalk(v: unknown): Circle | null {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+function asCircleWalk(v: unknown): Circle | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
   const c = v as { kind?: string; center?: Vec2; radius?: unknown };
-  if (c.kind !== "circle" || !c.center || !isFiniteVec(c.center)) return null;
+  if (c.kind !== "circle" || !c.center || !isFiniteVec(c.center)) return undefined;
   if (typeof c.radius !== "number" || !Number.isFinite(c.radius) || abs(c.radius) < EPS) {
-    return null;
+    return undefined;
   }
   return {
     kind: "circle",
@@ -163,11 +161,11 @@ function asCircleWalk(v: unknown): Circle | null {
   };
 }
 
-export function asWalk(v: unknown): Loop | null {
+export function asWalk(v: unknown): Loop | undefined {
   const circle = asCircleWalk(v);
   if (circle) return circle;
   if (Array.isArray(v)) return walkFromCycle(v);
-  return null;
+  return undefined;
 }
 
 type WalkCorner = { at: Vec2; r: number };
@@ -175,18 +173,18 @@ type WalkCarrier = LineLike | Along;
 /** Parsed tape before projection. `vertices.length === carriers.length + 1`. */
 type ParsedWalk = { vertices: WalkCorner[]; carriers: WalkCarrier[] };
 
-function parseWalkTape(cycle: readonly unknown[]): ParsedWalk | null {
-  if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return null;
+function parseWalkTape(cycle: readonly unknown[]): ParsedWalk | undefined {
+  if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return undefined;
   const n = cycle.length / 2;
   const vertices: WalkCorner[] = [];
   const carriers: WalkCarrier[] = [];
   for (let i = 0; i < n; i++) {
     const vtx = asVertex(cycle[i * 2]);
-    if (!vtx) return null;
+    if (!vtx) return undefined;
     vertices.push(vtx);
     const item = cycle[i * 2 + 1];
     if (isAlong(item)) {
-      if (item.carrier.kind !== "circle") return null;
+      if (item.carrier.kind !== "circle") return undefined;
       carriers.push({ kind: "along", carrier: item.carrier, k: item.k < 0 ? -1 : 1 });
       continue;
     }
@@ -195,16 +193,16 @@ function parseWalkTape(cycle: readonly unknown[]): ParsedWalk | null {
       carriers.push(line);
       continue;
     }
-    return null;
+    return undefined;
   }
   const first = vertices[0]!;
   vertices.push({ at: { x: first.at.x, y: first.at.y }, r: 0 });
   return { vertices, carriers };
 }
 
-function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[] } | null {
+function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[] } | undefined {
   const n = w.carriers.length;
-  if (w.vertices.length !== n + 1) return null;
+  if (w.vertices.length !== n + 1) return undefined;
   const edges: LoopEdge[] = [];
   for (let i = 0; i < n; i++) {
     const a = w.vertices[i]!.at;
@@ -212,7 +210,7 @@ function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[
     const car = w.carriers[i]!;
     if (isAlong(car)) {
       const k = car.k < 0 ? -1 : 1;
-      if (k !== 1 && k !== -1) return null;
+      if (k !== 1 && k !== -1) return undefined;
       edges.push({
         a: projectOnCircle(car.carrier, a),
         b: projectOnCircle(car.carrier, b),
@@ -231,21 +229,21 @@ function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[
   return { edges, radii };
 }
 
-function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | null {
+function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | undefined {
   const parsed = parseWalkTape(cycle);
-  if (!parsed) return null;
+  if (!parsed) return undefined;
   return walkEdgesFromParsed(parsed);
 }
 
-function walkFromCycle(cycle: readonly unknown[]): LoopEdge[] | null {
+function walkFromCycle(cycle: readonly unknown[]): LoopEdge[] | undefined {
   const parsed = parseWalk(cycle);
-  if (!parsed) return null;
+  if (!parsed) return undefined;
   const sharp: Region = { kind: "region", outer: parsed.edges, holes: [] };
-  if (!isFiniteRegion(sharp)) return null;
+  if (!isFiniteRegion(sharp)) return undefined;
   const filleted = filletVertices(sharp, parsed.radii);
-  if (!isFiniteRegion(filleted)) return null;
+  if (!isFiniteRegion(filleted)) return undefined;
   const edges = walkEdges(filleted.outer);
-  return edges.length >= 2 ? edges : null;
+  return edges.length >= 2 ? edges : undefined;
 }
 
 /**

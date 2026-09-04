@@ -29,7 +29,7 @@ describe("solid conventions", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("does not pass live nodes with non-null assertions", () => {
+  test("does not pass live nodes with non-undefined assertions", () => {
     const offenders: string[] = [];
     for (const file of walk(root)) {
       if (!file.endsWith(".tsx")) continue;

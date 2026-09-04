@@ -114,11 +114,11 @@ export const point: Tool<PointSession> = {
     if (xExpr && yExpr)
       return { insert: withBind(session, { from: "point", args: [xExpr, yExpr] }) };
     if (session.focus === "name") return { session: { ...session, focus: "x" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const at = place?.point.at;
-    if (!at) return null;
+    if (!at) return undefined;
     return {
       kind: "point",
       at: {
@@ -129,7 +129,7 @@ export const point: Tool<PointSession> = {
   },
   preview(session, place, scope): Preview {
     const spec = point.spec;
-    const p = place?.point ?? null;
+    const p = place?.point ?? undefined;
     const bind = previewName(session, spec.prefix);
     if (
       p?.kind === "ref" &&

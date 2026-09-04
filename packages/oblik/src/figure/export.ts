@@ -9,7 +9,6 @@ import type { Csg2, Pick } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
-
 const { abs, max, min, round } = Math;
 export type FigureExportOptions = {
   trace: readonly TraceNode[];
@@ -50,7 +49,7 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 /** Clip an infinite line (origin + direction) to a rectangle. Liang–Barsky. */
-function clipInfiniteLine(origin: Vec2, dir: Vec2, rect: Rect): [Vec2, Vec2] | null {
+function clipInfiniteLine(origin: Vec2, dir: Vec2, rect: Rect): [Vec2, Vec2] | undefined {
   const x0 = rect.x;
   const y0 = rect.y;
   const x1 = rect.x + rect.w;
@@ -61,21 +60,21 @@ function clipInfiniteLine(origin: Vec2, dir: Vec2, rect: Rect): [Vec2, Vec2] | n
   let tMax = Infinity;
   for (let i = 0; i < 4; i++) {
     if (p[i] === 0) {
-      if (q[i] < 0) return null;
+      if (q[i] < 0) return undefined;
       continue;
     }
     const t = q[i] / p[i];
     if (p[i] < 0) tMin = max(tMin, t);
     else tMax = min(tMax, t);
   }
-  if (tMin > tMax || !Number.isFinite(tMin) || !Number.isFinite(tMax)) return null;
+  if (tMin > tMax || !Number.isFinite(tMin) || !Number.isFinite(tMax)) return undefined;
   return [
     { x: origin.x + tMin * dir.x, y: origin.y + tMin * dir.y },
     { x: origin.x + tMax * dir.x, y: origin.y + tMax * dir.y },
   ];
 }
 
-function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
+function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | undefined {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -118,7 +117,7 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | null {
       }
     } else if (isGlider(v)) inc(v.x, v.y);
   }
-  return has ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null;
+  return has ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : undefined;
 }
 
 function exportBounds(strokes: readonly PaintStroke[], opts: FigureExportOptions): Rect {
@@ -219,7 +218,7 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
   if (v.kind === "csg2" || v.kind === "pick") {
     return regionToSvg(v, s.style, `${s.geom.id}-${s.geom.occ}`);
   }
-  const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : null;
+  const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : undefined;
   if (point) {
     const mark = s.style.point ?? "dot";
     if (mark === "none") return "";

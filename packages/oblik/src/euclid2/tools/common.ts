@@ -5,7 +5,6 @@ import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
-
 const { round: mathRound, sqrt } = Math;
 export { isConstructed, isGliderPlace, isPinnedPoint };
 
@@ -89,23 +88,23 @@ export function sameRef(center: Expr, p: PlacePoint): boolean {
   return printExpr(center) === p.bind;
 }
 
-export function constructedInsert(p: PlacePoint): InsertJob | null {
-  if (!isConstructed(p)) return null;
+export function constructedInsert(p: PlacePoint): InsertJob | undefined {
+  if (!isConstructed(p)) return undefined;
   const e = exprOfPlace(p);
-  if (e.kind !== "call") return null;
+  if (e.kind !== "call") return undefined;
   return { from: p.kind, args: e.args };
 }
 
 export function hoverPlace(
   p: PlacePoint,
   trace: readonly { occ: number; bind?: string; id: string }[],
-): string | null {
+): string | undefined {
   if (p.kind === "ref") return p.id;
   if (isGliderPlace(p)) return p.id ?? hoverBind(trace, p.bind);
   if (p.kind === "lineIntersection") return hoverBind(trace, p.a);
   if (p.kind === "circleLineIntersection") return hoverBind(trace, p.circle);
   if (p.kind === "circleCircleIntersection") return hoverBind(trace, p.a);
-  return null;
+  return undefined;
 }
 
 export function previewCall(
@@ -131,8 +130,8 @@ export function hoverBind(
   trace: readonly { occ: number; bind?: string; id: string }[],
   bind: string,
   filter?: SnapFilter,
-): string | null {
-  return nodeByPrint(trace, bind, filter)?.id ?? null;
+): string | undefined {
+  return nodeByPrint(trace, bind, filter)?.id ?? undefined;
 }
 
 export function dist(a: Vec2, b: Vec2): number {

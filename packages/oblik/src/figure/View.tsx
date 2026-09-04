@@ -48,25 +48,25 @@ export type FigureViewProps = {
   initialCamera?: Camera2;
   paper?: "cream" | "white";
   frame?: FigureFrame;
-  tool?: FigureToolId | null;
+  tool?: FigureToolId | undefined;
   shift?: boolean;
   brush: BrushSettings;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   frameSelected?: boolean;
   onFrameDraft?: (next: FrameXywh) => void;
   onFrameCommit?: (next: FrameXywh) => void;
   scope?: Scope;
   onShift?: (on: boolean) => void;
-  onHoverKey?: (key: string | null) => void;
+  onHoverKey?: (key: string | undefined) => void;
   onPick?: (hits: TraceNode[]) => void;
   onToolHit?: (node: TraceNode) => void;
   onPickFrame?: () => void;
 };
 
-function readPaneSize(el: Element): PaneSize | null {
+function readPaneSize(el: Element): PaneSize | undefined {
   const r = el.getBoundingClientRect();
-  if (r.width < 8 || r.height < 8) return null;
+  if (r.width < 8 || r.height < 8) return undefined;
   return { w: r.width, h: r.height };
 }
 
@@ -84,13 +84,13 @@ function isPointish(n: TraceNode): boolean {
 }
 
 export function FigureView(props: FigureViewProps) {
-  const [paneEl, setPaneEl] = createSignal<HTMLDivElement | null>(null);
+  const [paneEl, setPaneEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const initialCameraMemo = createMemo(() => props.initialCamera, {
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   const [camera, setCamera] = createSignal<Camera2>(() => initialCameraMemo() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
-  const [previewGeom, setPreviewGeom] = createSignal<TraceNode | null>(null);
+  const [previewGeom, setPreviewGeom] = createSignal<TraceNode | undefined>(undefined);
 
   createEffect(
     () => paneEl(),
@@ -114,39 +114,34 @@ export function FigureView(props: FigureViewProps) {
   const page = createMemo(() => frameRect(props.frame, initialCameraMemo()));
   const pageBox = createMemo(() => {
     const r = page();
-    return r ? pageScreenRect(r, camera(), size()) : null;
+    return r ? pageScreenRect(r, camera(), size()) : undefined;
   });
   const geom = createMemo(() => props.trace.filter(isDrawnGeom), { equals: sameList });
   const strokes = createMemo(
-    (prev: PaintStroke[] | undefined) => reusePaintStrokes(prev, paintStrokesFromTrace(props.trace)),
+    (prev: PaintStroke[] | undefined) =>
+      reusePaintStrokes(prev, paintStrokesFromTrace(props.trace)),
     { equals: sameList },
   );
   const onionInk = createMemo(() => geom().filter((n) => !isPointish(n)), { equals: sameList });
-  const onionFills = createMemo(
-    () => onionInk().filter((n) => isFillGeom(n.value)),
-    { equals: sameList },
-  );
-  const onionEdges = createMemo(
-    () => onionInk().filter((n) => !isFillGeom(n.value)),
-    { equals: sameList },
-  );
+  const onionFills = createMemo(() => onionInk().filter((n) => isFillGeom(n.value)), {
+    equals: sameList,
+  });
+  const onionEdges = createMemo(() => onionInk().filter((n) => !isFillGeom(n.value)), {
+    equals: sameList,
+  });
   const onionPts = createMemo(() => geom().filter(isPointish), { equals: sameList });
-  const inkStrokes = createMemo(
-    () => strokes().filter((s) => !isPointish(s.geom)),
-    { equals: sameList },
-  );
-  const inkFills = createMemo(
-    () => inkStrokes().filter((s) => isFillGeom(s.geom.value)),
-    { equals: sameList },
-  );
-  const inkEdges = createMemo(
-    () => inkStrokes().filter((s) => !isFillGeom(s.geom.value)),
-    { equals: sameList },
-  );
-  const inkPts = createMemo(
-    () => strokes().filter((s) => isPointish(s.geom)),
-    { equals: sameList },
-  );
+  const inkStrokes = createMemo(() => strokes().filter((s) => !isPointish(s.geom)), {
+    equals: sameList,
+  });
+  const inkFills = createMemo(() => inkStrokes().filter((s) => isFillGeom(s.geom.value)), {
+    equals: sameList,
+  });
+  const inkEdges = createMemo(() => inkStrokes().filter((s) => !isFillGeom(s.geom.value)), {
+    equals: sameList,
+  });
+  const inkPts = createMemo(() => strokes().filter((s) => isPointish(s.geom)), {
+    equals: sameList,
+  });
   const paintSelected = (s: PaintStroke) => traceKey(s.paint) === props.selectedKey;
   const geomSelected = (n: TraceNode) => traceKey(n) === props.selectedKey;
   const paintHover = (s: PaintStroke) => traceKey(s.paint) === props.hoverKey && !paintSelected(s);
@@ -169,9 +164,9 @@ export function FigureView(props: FigureViewProps) {
   const onionPtBand = createMemo(() => splitChrome(onionPts(), geomSelected, geomHover), {
     equals: chromeSplitEqual,
   });
-  const frameXywh = createMemo<FrameXywh | null>(() => {
+  const frameXywh = createMemo<FrameXywh | undefined>(() => {
     const r = page();
-    if (!r) return null;
+    if (!r) return undefined;
     return { x: r.x, y: r.y, width: r.w, height: r.h };
   });
 
@@ -181,14 +176,15 @@ export function FigureView(props: FigureViewProps) {
 
   const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
+  // oxlint-disable-next-line solid/reactivity -- drag.start factory executes at pointerdown as the gesture's event handler; snapshots are intentional.
   const startPan = drag.start((e, hits: TraceNode[]) => {
-    const start = panDrag(e, camera());
-    const pick = hits.length > 0 ? hits : null;
+    const initialStart = panDrag(e, camera());
+    const pick = hits.length > 0 ? hits : undefined;
     let moved = false;
     return {
       onPointerMove(ev) {
         moved = true;
-        const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
+        const next = applyDrag(initialStart, ev, paneEl(), camera(), size(), props.trace);
         if (next.camera) setCamera(next.camera);
       },
       onDone() {
@@ -198,15 +194,16 @@ export function FigureView(props: FigureViewProps) {
   });
 
   const onFrameMove = drag.start(
+    // oxlint-disable-next-line solid/reactivity -- drag.start factory executes at pointerdown as the gesture's event handler; snapshots are intentional.
     (e) => {
-      const el = paneEl();
-      const start = frameXywh();
-      if (!el || !start) return;
-      const world0 = worldAt(e, el);
-      let last = start;
+      const initialEl = paneEl();
+      const initialStart = frameXywh();
+      if (!initialEl || !initialStart) return;
+      const initialWorld = worldAt(e, initialEl);
+      let last = initialStart;
       return {
         onPointerMove(ev) {
-          last = frameMoved(start, world0, worldAt(ev, el));
+          last = frameMoved(initialStart, initialWorld, worldAt(ev, initialEl));
           props.onFrameDraft?.(last);
         },
         onDone() {
@@ -218,15 +215,16 @@ export function FigureView(props: FigureViewProps) {
   );
 
   const onFrameResize = drag.start(
+    // oxlint-disable-next-line solid/reactivity -- drag.start factory executes at pointerdown as the gesture's event handler; snapshots are intentional.
     (_e) => {
-      const el = paneEl();
-      const start = frameXywh();
-      if (!el || !start) return;
-      const anchor = { x: start.x, y: start.y };
-      let last = start;
+      const initialEl = paneEl();
+      const initialStart = frameXywh();
+      if (!initialEl || !initialStart) return;
+      const anchor = { x: initialStart.x, y: initialStart.y };
+      let last = initialStart;
       return {
         onPointerMove(ev) {
-          last = frameResized(anchor, worldAt(ev, el));
+          last = frameResized(anchor, worldAt(ev, initialEl));
           props.onFrameDraft?.(last);
         },
         onDone() {
@@ -252,9 +250,9 @@ export function FigureView(props: FigureViewProps) {
   }
 
   const previewKey = createMemo(() => {
-    if (props.tool !== "brush") return null;
+    if (props.tool !== "brush") return undefined;
     const n = previewGeom();
-    return n ? traceKey(n) : null;
+    return n ? traceKey(n) : undefined;
   });
 
   function hitsOf(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
@@ -286,15 +284,15 @@ export function FigureView(props: FigureViewProps) {
     const el = paneEl();
     if (!el) return;
     const hits = hitsOf(e, el);
-    const hit = hits[0] ?? null;
-    props.onHoverKey?.(hit ? traceKey(hit) : null);
+    const hit = hits[0] ?? undefined;
+    props.onHoverKey?.(hit ? traceKey(hit) : undefined);
     if (props.tool === "brush" && props.shift && hit && isDrawnGeom(hit)) setPreviewGeom(hit);
     else if (props.tool === "brush" && !props.shift && hit?.value.kind === "paint") {
       const g = paintStrokesFromTrace(props.trace).find(
         (s) => s.paint === hit || traceKey(s.paint) === traceKey(hit),
       )?.geom;
-      setPreviewGeom(g ?? null);
-    } else setPreviewGeom(null);
+      setPreviewGeom(g ?? undefined);
+    } else setPreviewGeom(undefined);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -320,8 +318,8 @@ export function FigureView(props: FigureViewProps) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerLeave={() => {
-          props.onHoverKey?.(null);
-          setPreviewGeom(null);
+          props.onHoverKey?.(undefined);
+          setPreviewGeom(undefined);
         }}
       >
         <Show when={pageBox()}>
@@ -516,8 +514,8 @@ function FrameHandle(props: { rect: FrameRect; selected: boolean }) {
 
 function InkStrokeChrome(props: {
   band: ChromeSplit<PaintStroke>;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   eraser?: boolean;
   replacePreview?: boolean;
   scope?: Scope;
@@ -548,8 +546,8 @@ function InkStrokeChrome(props: {
 
 function InkPointChrome(props: {
   band: ChromeSplit<PaintStroke>;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   eraser?: boolean;
   replacePreview?: boolean;
   scope?: Scope;
@@ -578,12 +576,12 @@ function InkPointChrome(props: {
 
 function OnionStrokeChrome(props: {
   band: ChromeSplit<TraceNode>;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   scope?: Scope;
   camera: Camera2;
   size: PaneSize;
-  previewKey: string | null;
+  previewKey: string | undefined;
   halos?: boolean;
 }) {
   return (
@@ -608,11 +606,11 @@ function OnionStrokeChrome(props: {
 
 function OnionPointChrome(props: {
   band: ChromeSplit<TraceNode>;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   scope?: Scope;
   camera: Camera2;
-  previewKey: string | null;
+  previewKey: string | undefined;
   halos?: boolean;
 }) {
   return (
@@ -636,8 +634,8 @@ function OnionPointChrome(props: {
 
 function InkStroke(props: {
   s: PaintStroke;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   eraser?: boolean;
   replacePreview?: boolean;
   scope?: Scope;
@@ -669,8 +667,8 @@ function InkStroke(props: {
 
 function InkPoint(props: {
   s: PaintStroke;
-  hoverKey?: string | null;
-  selectedKey?: string | null;
+  hoverKey?: string | undefined;
+  selectedKey?: string | undefined;
   eraser?: boolean;
   replacePreview?: boolean;
   scope?: Scope;

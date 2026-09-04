@@ -7,7 +7,6 @@ import type { Ghost } from "../tool";
 
 import styles from "./View.module.css";
 
-
 const { abs, sqrt } = Math;
 const GHOST_POINT_R = 4;
 const CORNER_R = 5;
@@ -30,24 +29,26 @@ function screenEnds(
 }
 
 export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
-  const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : null));
-  const corner = createMemo(() => (props.ghost.kind === "corner" ? props.ghost.at : null));
-  const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : null));
-  const line = createMemo(() => (props.ghost.kind === "line" ? props.ghost : null));
-  const segment = createMemo(() => (props.ghost.kind === "segment" ? props.ghost : null));
-  const parallel = createMemo(() => (props.ghost.kind === "parallelLine" ? props.ghost : null));
+  const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : undefined));
+  const corner = createMemo(() => (props.ghost.kind === "corner" ? props.ghost.at : undefined));
+  const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : undefined));
+  const line = createMemo(() => (props.ghost.kind === "line" ? props.ghost : undefined));
+  const segment = createMemo(() => (props.ghost.kind === "segment" ? props.ghost : undefined));
+  const parallel = createMemo(() =>
+    props.ghost.kind === "parallelLine" ? props.ghost : undefined,
+  );
   const lineEnds = createMemo(() => {
     const g = line();
-    if (!g) return null;
+    if (!g) return undefined;
     const dx = g.b.x - g.a.x;
     const dy = g.b.y - g.a.y;
-    const len = sqrt((dx) * (dx) + (dy) * (dy));
+    const len = sqrt(dx * dx + dy * dy);
     const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
     return screenEnds(infiniteClip(g.a, dir, props.camera, props.size), props.camera, props.size);
   });
   const parallelEnds = createMemo(() => {
     const g = parallel();
-    if (!g) return null;
+    if (!g) return undefined;
     const pl = parallelLineValue(g.geom, g.distance);
     return screenEnds(
       infiniteClip(pl.line.origin, pl.line.direction, props.camera, props.size),
@@ -57,15 +58,15 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
   });
   const pointPos = createMemo(() => {
     const p = point();
-    return p ? screenOf(p, props.camera, props.size) : null;
+    return p ? screenOf(p, props.camera, props.size) : undefined;
   });
   const cornerPos = createMemo(() => {
     const p = corner();
-    return p ? screenOf(p, props.camera, props.size) : null;
+    return p ? screenOf(p, props.camera, props.size) : undefined;
   });
   const circlePos = createMemo(() => {
     const c = circle();
-    if (!c) return null;
+    if (!c) return undefined;
     return {
       center: screenOf(c.center, props.camera, props.size),
       r: abs(c.radius) * props.camera.scale,
@@ -73,7 +74,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
   });
   const segmentEnds = createMemo(() => {
     const s = segment();
-    if (!s) return null;
+    if (!s) return undefined;
     return screenEnds({ a: s.a, b: s.b }, props.camera, props.size);
   });
   return (
@@ -88,10 +89,10 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
           />
           <circle class={styles.ghostCorner} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_R} />
         </>
-      ) : null}
+      ) : undefined}
       {pointPos() ? (
         <circle class={styles.ghostPoint} cx={pointPos()!.x} cy={pointPos()!.y} r={GHOST_POINT_R} />
-      ) : null}
+      ) : undefined}
       {circlePos() ? (
         <>
           <circle
@@ -108,7 +109,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
             vector-effect="non-scaling-stroke"
           />
         </>
-      ) : null}
+      ) : undefined}
       {lineEnds() ? (
         <line
           class={styles.ghost}
@@ -118,7 +119,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
           y2={lineEnds()!.b.y}
           vector-effect="non-scaling-stroke"
         />
-      ) : null}
+      ) : undefined}
       {segmentEnds() ? (
         <line
           class={styles.ghost}
@@ -128,7 +129,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
           y2={segmentEnds()!.b.y}
           vector-effect="non-scaling-stroke"
         />
-      ) : null}
+      ) : undefined}
       {parallelEnds() ? (
         <line
           class={styles.ghost}
@@ -138,7 +139,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
           y2={parallelEnds()!.b.y}
           vector-effect="non-scaling-stroke"
         />
-      ) : null}
+      ) : undefined}
     </g>
   );
 }

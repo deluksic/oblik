@@ -49,13 +49,13 @@ function fnLabel(
 
 function fnBlock(
   node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
-): ts.Block | null {
+): ts.Block | undefined {
   if (node.body && ts.isBlock(node.body)) return node.body;
-  return null;
+  return undefined;
 }
 
-function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | null {
-  let body: ts.Block | null = null;
+function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | undefined {
+  let body: ts.Block | undefined = undefined;
   const visit = (node: ts.Node) => {
     if (body) return;
     if (isFnLike(node) && fnLabel(node) === name) {
@@ -71,7 +71,7 @@ function findNamedFnBody(sf: ts.SourceFile, name: string): ts.Block | null {
   return body;
 }
 
-function findFnBody(sf: ts.SourceFile, dest?: string): ts.Block | null {
+function findFnBody(sf: ts.SourceFile, dest?: string): ts.Block | undefined {
   return findNamedFnBody(sf, dest?.trim() || "build");
 }
 

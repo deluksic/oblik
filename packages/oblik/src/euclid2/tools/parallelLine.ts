@@ -76,7 +76,7 @@ function distExpr(
   return { kind: "num" as const, value: round(distAt(hit, carrier.geom)) };
 }
 
-function carrierLabel(session: ParallelSession, scope: Scope, place: PlaceHit | null): string {
+function carrierLabel(session: ParallelSession, scope: Scope, place: PlaceHit | undefined): string {
   if (session.carrierRef.trim()) return session.carrierRef.trim();
   const c = carrierOf(session, scope);
   if (c) return printExpr(c.expr);
@@ -113,7 +113,7 @@ export const parallelLine: Tool<ParallelSession> = {
   },
   hover(session, hit, trace, scope) {
     if (!carrierOf(session, scope ?? scopeFromTrace(trace))) {
-      if (!hit.carrier) return null;
+      if (!hit.carrier) return undefined;
       return hoverBind(trace, hit.carrier.bind);
     }
     return lengthHover(hit, trace) ?? hoverPlace(hit.point, trace);
@@ -131,7 +131,11 @@ export const parallelLine: Tool<ParallelSession> = {
         },
       };
     }
-    if (hit.length && resolveLengthExpr(session, scope) == null && !isPinnedPoint(hit.point)) {
+    if (
+      hit.length &&
+      resolveLengthExpr(session, scope) === undefined &&
+      !isPinnedPoint(hit.point)
+    ) {
       return {
         insert: withBind(session, {
           from: "parallelLine",
@@ -150,7 +154,7 @@ export const parallelLine: Tool<ParallelSession> = {
     const carrier = carrierOf(session, scope);
     if (!carrier) {
       if (session.focus !== "carrier") return { session: { ...session, focus: "carrier" } };
-      return null;
+      return undefined;
     }
     const bound = resolveLengthExpr(session, scope);
     if (bound) {
@@ -158,12 +162,12 @@ export const parallelLine: Tool<ParallelSession> = {
     }
     if (session.focus === "name") return { session: { ...session, focus: "typed" } };
     if (session.focus === "carrier") return { session: { ...session, focus: "typed" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const carrier = carrierOf(session, scope);
-    if (!carrier) return null;
-    if (resolveLengthExpr(session, scope) != null) {
+    if (!carrier) return undefined;
+    if (resolveLengthExpr(session, scope) !== undefined) {
       const fallback = place?.length?.value ?? 0;
       return {
         kind: "parallelLine",
@@ -181,13 +185,13 @@ export const parallelLine: Tool<ParallelSession> = {
         distance: lengthValue(session, scope, place.length.value),
       };
     }
-    if (!place) return null;
+    if (!place) return undefined;
     return { kind: "parallelLine", geom: carrier.geom, distance: distAt(place, carrier.geom) };
   },
   preview(session, place, scope): Preview {
     const spec = parallelLine.spec;
     const bind = previewName(session, spec.prefix);
-    const p = place?.point ?? null;
+    const p = place?.point ?? undefined;
     const name = inSlot(session.focus === "name", bind);
     const gTok = inSlot(session.focus === "carrier", carrierLabel(session, scope, place));
     const dLabel = lengthLabel(session, scope, "distance");
@@ -201,7 +205,7 @@ export const parallelLine: Tool<ParallelSession> = {
           : spec.hint,
       };
     }
-    if (p && isPinnedPoint(p) && resolveLengthExpr(session, scope) == null) {
+    if (p && isPinnedPoint(p) && resolveLengthExpr(session, scope) === undefined) {
       return {
         line: previewCall(
           "parallelLine",
@@ -214,7 +218,7 @@ export const parallelLine: Tool<ParallelSession> = {
         hint: "Click a point to pin signedDist(), or type a distance. Tab to name it.",
       };
     }
-    if (place?.length && resolveLengthExpr(session, scope) == null) {
+    if (place?.length && resolveLengthExpr(session, scope) === undefined) {
       return {
         line: previewCall(
           "parallelLine",

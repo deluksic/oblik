@@ -132,10 +132,10 @@ export const slider: Tool<SliderSession> = {
     if (bound) return insertValue(session, bound, scope);
     if (place) return insertValue(session, { kind: "num", value: measure(place) }, scope);
     if (session.focus !== "value") return { session: { ...session, focus: "value" } };
-    return null;
+    return undefined;
   },
   ghost() {
-    return null;
+    return undefined;
   },
   preview(session): Preview {
     const bind = previewName(session, slider.spec.prefix);

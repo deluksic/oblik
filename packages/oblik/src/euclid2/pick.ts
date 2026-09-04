@@ -19,7 +19,6 @@ import { lineBasis } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
-
 const { abs, max, sqrt } = Math;
 export type Vec2 = { x: number; y: number };
 
@@ -59,7 +58,7 @@ export function parseTraceAttr(attr: string): { id: string; occ?: number } {
 
 export function nodeByTraceAttr(trace: readonly TraceNode[], attr: string): TraceNode | undefined {
   const p = parseTraceAttr(attr);
-  if (p.occ != null) return trace.find((n) => n.id === p.id && n.occ === p.occ);
+  if (p.occ !== undefined) return trace.find((n) => n.id === p.id && n.occ === p.occ);
   return trace.find((n) => n.id === p.id);
 }
 
@@ -127,8 +126,8 @@ export function snapBoundPoint(
   world: Vec2,
   maxDist: number,
   filter?: SnapFilter,
-): SnapPoint | null {
-  let best: { snap: SnapPoint; d: number } | null = null;
+): SnapPoint | undefined {
+  let best: { snap: SnapPoint; d: number } | undefined = undefined;
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
     if (n.value.kind !== "point" && !isGlider(n.value)) continue;
@@ -139,7 +138,7 @@ export function snapBoundPoint(
     if (d > maxDist) continue;
     if (!best || d < best.d) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d };
   }
-  return best?.snap ?? null;
+  return best?.snap ?? undefined;
 }
 
 function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
@@ -186,8 +185,8 @@ export function hitTest(
   world: Vec2,
   camera: Camera2,
   size: PaneSize,
-): TraceNode | null {
-  return hitsNear(trace, world, camera, size)[0] ?? null;
+): TraceNode | undefined {
+  return hitsNear(trace, world, camera, size)[0] ?? undefined;
 }
 
 export const PICK_CLICK_PX = 4;
@@ -206,8 +205,8 @@ export function snapLineCarrier(
   _size: PaneSize,
   maxPx = GEOM_PX,
   filter?: SnapFilter,
-): { bind: string; geom: LineLike } | null {
-  let best: { bind: string; geom: LineLike; d: number } | null = null;
+): { bind: string; geom: LineLike } | undefined {
+  let best: { bind: string; geom: LineLike; d: number } | undefined = undefined;
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
     if (!LINE_LIKE.has(n.value.kind)) continue;
@@ -215,7 +214,7 @@ export function snapLineCarrier(
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike, d };
   }
-  return best ? { bind: best.bind, geom: best.geom } : null;
+  return best ? { bind: best.bind, geom: best.geom } : undefined;
 }
 
 /** Nearest named region under the pointer (ignores points and strokes). Inside a fill always wins. */
@@ -226,15 +225,17 @@ export function snapRegion(
   _size: PaneSize,
   maxPx = GEOM_PX,
   filter?: SnapFilter,
-): { bind: string; geom: Region; id: string } | null {
-  let best: {
-    bind: string;
-    geom: Region;
-    id: string;
-    inside: boolean;
-    d: number;
-    i: number;
-  } | null = null;
+): { bind: string; geom: Region; id: string } | undefined {
+  let best:
+    | {
+        bind: string;
+        geom: Region;
+        id: string;
+        inside: boolean;
+        d: number;
+        i: number;
+      }
+    | undefined = undefined;
   let i = 0;
   for (const n of trace) {
     const idx = i++;
@@ -252,7 +253,7 @@ export function snapRegion(
       best = { bind: snapPrint(n, filter), geom: n.value, id: n.id, inside, d, i: idx };
     }
   }
-  return best ? { bind: best.bind, geom: best.geom, id: best.id } : null;
+  return best ? { bind: best.bind, geom: best.geom, id: best.id } : undefined;
 }
 
 const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);
@@ -290,10 +291,10 @@ export function snapStrokeCarrier(
   camera: Camera2,
   _size: PaneSize,
   opts?: { maxPx?: number; through?: Vec2; filter?: SnapFilter },
-): StrokeCarrier | null {
+): StrokeCarrier | undefined {
   const maxPx = opts?.maxPx ?? GEOM_PX;
   const filter = opts?.filter;
-  let best: { bind: string; geom: LineLike | Circle; d: number } | null = null;
+  let best: { bind: string; geom: LineLike | Circle; d: number } | undefined = undefined;
   for (const n of trace) {
     if (!isNamedStroke(n, filter)) continue;
     if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
@@ -302,5 +303,5 @@ export function snapStrokeCarrier(
     if (!best || d < best.d)
       best = { bind: snapPrint(n, filter), geom: n.value as LineLike | Circle, d };
   }
-  return best ? { bind: best.bind, geom: best.geom } : null;
+  return best ? { bind: best.bind, geom: best.geom } : undefined;
 }

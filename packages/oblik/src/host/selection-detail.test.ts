@@ -356,7 +356,7 @@ export default defineScene({
     }) as typeof fetch;
     try {
       const detail = await selectionDetailForScope({
-        node: null,
+        node: undefined,
         focus: { file, name: "build", serial: 0 },
         mentions,
       });
@@ -411,7 +411,7 @@ export default defineScene({
     }) as typeof fetch;
     try {
       const detail = await selectionDetailForScope({
-        node: null,
+        node: undefined,
         focus: {
           file: helperFile,
           name: "mountingPlateLayout",
@@ -475,7 +475,7 @@ export default defineScene({
     }) as typeof fetch;
     try {
       const detail = await selectionDetailForScope({
-        node: null,
+        node: undefined,
         focus: {
           file: helperFile,
           name: "mountingPlateLayout",

@@ -10,7 +10,6 @@ import {
 import type { Circle, Line, ParallelLine } from "./types";
 import { dot, perp } from "./vec";
 
-
 const { sqrt } = Math;
 const a: Circle = { kind: "circle", center: { x: 0, y: 0 }, radius: 2 };
 const b: Circle = { kind: "circle", center: { x: 2, y: 0 }, radius: 2 };
@@ -30,16 +29,16 @@ describe("infiniteLineAxis", () => {
     });
   });
 
-  test("returns null for other kinds and missing fields", () => {
-    expect(infiniteLineAxis(undefined)).toBeNull();
+  test("returns undefined for other kinds and missing fields", () => {
+    expect(infiniteLineAxis(undefined)).toBeUndefined();
     expect(
       infiniteLineAxis({ kind: "circle", center: { x: 0, y: 0 }, radius: 1 } as never),
-    ).toBeNull();
+    ).toBeUndefined();
     expect(
       infiniteLineAxis({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } as never),
-    ).toBeNull();
-    expect(infiniteLineAxis({ kind: "parallelLine" })).toBeNull();
-    expect(infiniteLineAxis({ kind: "line" })).toBeNull();
+    ).toBeUndefined();
+    expect(infiniteLineAxis({ kind: "parallelLine" })).toBeUndefined();
+    expect(infiniteLineAxis({ kind: "line" })).toBeUndefined();
   });
 });
 

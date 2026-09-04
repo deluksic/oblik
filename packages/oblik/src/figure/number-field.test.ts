@@ -11,16 +11,16 @@ describe("parseLiveNum", () => {
   });
 
   test("rejects incomplete or non-numeric drafts", () => {
-    expect(parseLiveNum("")).toBeNull();
-    expect(parseLiveNum("-")).toBeNull();
-    expect(parseLiveNum(".")).toBeNull();
-    expect(parseLiveNum("-.")).toBeNull();
-    expect(parseLiveNum("1.2.3")).toBeNull();
-    expect(parseLiveNum("nope")).toBeNull();
+    expect(parseLiveNum("")).toBeUndefined();
+    expect(parseLiveNum("-")).toBeUndefined();
+    expect(parseLiveNum(".")).toBeUndefined();
+    expect(parseLiveNum("-.")).toBeUndefined();
+    expect(parseLiveNum("1.2.3")).toBeUndefined();
+    expect(parseLiveNum("nope")).toBeUndefined();
   });
 
   test("enforces min", () => {
-    expect(parseLiveNum("-0.1", { min: 0 })).toBeNull();
+    expect(parseLiveNum("-0.1", { min: 0 })).toBeUndefined();
     expect(parseLiveNum("0", { min: 0 })).toBe(0);
   });
 });

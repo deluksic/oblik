@@ -83,8 +83,8 @@ function parentFocus(
   return { file: fn.file, name: fn.name, serial: parentNode?.inv?.serial ?? 0 };
 }
 
-function focusFromNode(n: TraceNode): ScopeFocus | null {
-  if (!n.inv) return null;
+function focusFromNode(n: TraceNode): ScopeFocus | undefined {
+  if (!n.inv) return undefined;
   return {
     file: n.inv.file,
     name: n.inv.name,
@@ -97,13 +97,15 @@ function focusFromNode(n: TraceNode): ScopeFocus | null {
 export function Euclid2Pane(props: Euclid2PaneProps) {
   const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
   const [picker, setPicker] = createSignal(() => (props.scene, false));
-  const [tool, setTool] = createSignal<ToolSession | null>(() => (props.scene, null));
-  const [place, setPlace] = createSignal<PlaceHit | null>(() => (props.scene, null));
-  const [hoverId, setHoverId] = createSignal<string | null>(() => (props.scene, null));
-  const [selectedKey, setSelectedKey] = createSignal<string | null>(() => (props.file, null));
+  const [tool, setTool] = createSignal<ToolSession | undefined>(() => (props.scene, undefined));
+  const [place, setPlace] = createSignal<PlaceHit | undefined>(() => (props.scene, undefined));
+  const [hoverId, setHoverId] = createSignal<string | undefined>(() => (props.scene, undefined));
+  const [selectedKey, setSelectedKey] = createSignal<string | undefined>(
+    () => (props.file, undefined),
+  );
   const [focus, setFocus] = createSignal<ScopeFocus>(() => (props.file, entryFocus(props.file)));
   const [toolLock, setToolLock] = createSignal(false);
-  const [writeError, setWriteError] = createSignal<string | null>(null);
+  const [writeError, setWriteError] = createSignal<string | undefined>(undefined);
   const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
 
   const mentions = createMemo(() => props.mentions ?? []);
@@ -125,9 +127,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   );
 
   const selectedNode = createMemo(() => {
+    // key is a memo-local snapshot used synchronously; the memo re-runs on change.
+    // oxlint-disable-next-line solid/reactivity
     const key = selectedKey();
-    if (!key) return null;
-    return world().trace.find((n) => traceKey(n) === key) ?? null;
+    if (!key) return undefined;
+    return world().trace.find((n) => traceKey(n) === key) ?? undefined;
   });
 
   let frozenDetail: SelectionDetail | undefined;
@@ -172,14 +176,14 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           e.preventDefault();
           if (picker()) setPicker(false);
           else if (tool()) {
-            setTool(null);
-            setPlace(null);
-            setWriteError(null);
+            setTool(undefined);
+            setPlace(undefined);
+            setWriteError(undefined);
             if (toolLock()) {
               setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
               setToolLock(false);
             }
-          } else if (selectedKey()) setSelectedKey(null);
+          } else if (selectedKey()) setSelectedKey(undefined);
           else setFocus(parentFocus(focus(), entryFocus(props.file), world().trace, mentions()));
           return;
         }
@@ -232,11 +236,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       body: JSON.stringify({ file, id, target: "literal", values }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
       setWriteError(body?.error ?? `patch failed (${res.status})`);
       return;
     }
-    setWriteError(null);
+    setWriteError(undefined);
   }
 
   async function insert(job: {
@@ -252,13 +256,13 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       body: JSON.stringify({ file: dest.file, dest: dest.name, ...job }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
       setWriteError(body?.error ?? `insert failed (${res.status})`);
       return;
     }
-    setWriteError(null);
-    setTool(null);
-    setPlace(null);
+    setWriteError(undefined);
+    setTool(undefined);
+    setPlace(undefined);
     setToolLock(false);
   }
 
@@ -271,11 +275,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       body: JSON.stringify({ file: dest.file, dest: dest.name, bind }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
       setWriteError(body?.error ?? `expose failed (${res.status})`);
       return;
     }
-    setWriteError(null);
+    setWriteError(undefined);
   }
 
   function onPlace(hit: PlaceHit) {
@@ -289,7 +293,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   function onPick(hits: TraceNode[]) {
     const n = hits[0];
-    setSelectedKey(n ? traceKey(n) : null);
+    setSelectedKey(n ? traceKey(n) : undefined);
     if (!tool() && n) {
       const next = focusFromNode(n);
       if (next) setFocus(next);
@@ -300,11 +304,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const ghost = createMemo(() => {
     const t = tool();
     const p = place();
-    return t ? ghostOf(t, p, scope()) : null;
+    return t ? ghostOf(t, p, scope()) : undefined;
   });
   const prompt = createMemo(() => {
     const t = tool();
-    if (!t) return null;
+    if (!t) return undefined;
     return previewOf(t, place(), scope());
   });
   const status = createMemo(() => {
@@ -325,7 +329,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         <Euclid2View
           trace={world().trace}
           initialCamera={props.scene.camera}
-          placing={tool() != null}
+          placing={tool() !== undefined}
           ghost={ghost()}
           place={place()}
           toolSession={tool()}
@@ -345,8 +349,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           prompt={prompt()}
           onPick={(id: ToolId) => {
             setPicker(false);
-            setPlace(null);
-            setWriteError(null);
+            setPlace(undefined);
+            setWriteError(undefined);
             setToolLock(true);
             setTool(startTool(id));
           }}

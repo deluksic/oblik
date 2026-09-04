@@ -21,7 +21,7 @@ export function NumberField(props: NumberFieldProps) {
   function applyRaw(raw: string) {
     setText(raw);
     const n = parseLiveNum(raw, { min: props.min });
-    if (n == null) {
+    if (n === undefined) {
       setInvalid(true);
       return;
     }

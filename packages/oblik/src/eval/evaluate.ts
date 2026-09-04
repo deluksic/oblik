@@ -43,11 +43,11 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): EvaluateResult {
 export function tryEvaluate(
   mod: Scene,
   opts: EvaluateOpts = {},
-): EvaluateResult & { error: string | null } {
+): EvaluateResult & { error: string | undefined } {
   try {
-    return { ...evaluate(mod, opts), error: null };
+    return { ...evaluate(mod, opts), error: undefined };
   } catch (err) {
-    return { value: null, trace: [], error: err instanceof Error ? err.message : String(err) };
+    return { value: undefined, trace: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
 

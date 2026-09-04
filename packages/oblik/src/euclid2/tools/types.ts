@@ -89,7 +89,7 @@ export type PlaceCtx = {
   camera: Camera2;
   size: PaneSize;
   screen?: { x: number; y: number };
-  target?: EventTarget | null;
+  target?: EventTarget | undefined;
   /** Mentionable tape keys (`id:occ`). When set, snap only those nodes. */
   keys?: ReadonlySet<string>;
   print?: (n: TraceNode) => string | undefined;
@@ -250,15 +250,15 @@ export type Tool<S extends ToolSession = ToolSession> = {
   spec: ToolSpec;
   start(): S;
   click(session: S, hit: PlaceHit, scope: Scope): ToolStep;
-  ghost(session: S, place: PlaceHit | null, scope: Scope): Ghost | null;
-  preview(session: S, place: PlaceHit | null, scope: Scope): Preview;
+  ghost(session: S, place: PlaceHit | undefined, scope: Scope): Ghost | undefined;
+  preview(session: S, place: PlaceHit | undefined, scope: Scope): Preview;
   fields?: readonly Field<S>[];
   focus?(session: S): string;
   setFocus?(session: S, id: string): S;
-  /** Enter. `null` means the key was not a commit (stay in session). */
-  commit?(session: S, place: PlaceHit | null, scope: Scope): ToolStep | null;
+  /** Enter. `undefined` means the key was not a commit (stay in session). */
+  commit?(session: S, place: PlaceHit | undefined, scope: Scope): ToolStep | undefined;
   hit?(session: S, hit: PlaceHit, ctx: PlaceCtx): PlaceHit;
-  hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[], scope?: Scope): string | null;
+  hover?(session: S, hit: PlaceHit, trace: readonly TraceNode[], scope?: Scope): string | undefined;
   /** If set, Tab uses this instead of cycling fields. */
   tab?(session: S, dir: 1 | -1): S;
   /** Dim construction chrome while this verb is live. */

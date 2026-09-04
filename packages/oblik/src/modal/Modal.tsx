@@ -80,7 +80,7 @@ export function Modal(props: ParentProps<ModalProps>) {
 }
 
 function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknown) => void }) {
-  const [el, setEl] = createSignal<HTMLDialogElement | null>(null);
+  const [el, setEl] = createSignal<HTMLDialogElement | undefined>(undefined);
 
   createEffect(
     () => el(),
@@ -89,6 +89,9 @@ function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknow
     },
   );
 
+  // Each row of the instances For is keyed by instance identity, so
+  // instance.config.content is stable for this dialog's life; capture once.
+  // oxlint-disable-next-line solid/reactivity
   const Content = props.instance.config.content;
   return (
     <dialog

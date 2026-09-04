@@ -14,7 +14,6 @@ import type {
   ToolStep,
 } from "./types";
 
-
 const { max } = Math;
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
@@ -26,37 +25,37 @@ export function parseNum(raw: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function identError(raw: string, usedNames: readonly string[] = []): string | null {
+export function identError(raw: string, usedNames: readonly string[] = []): string | undefined {
   const t = raw.trim();
-  if (t === "") return null;
+  if (t === "") return undefined;
   if (!IDENT.test(t)) return "Name must be an identifier.";
   if (usedNames.includes(t)) return `bind ${t} is already used`;
-  return null;
+  return undefined;
 }
 
-export function numError(raw: string): string | null {
+export function numError(raw: string): string | undefined {
   const t = raw.trim();
-  if (t === "") return null;
-  if (parseNum(t) == null) return "Not a number.";
-  return null;
+  if (t === "") return undefined;
+  if (parseNum(t) === undefined) return "Not a number.";
+  return undefined;
 }
 
-export function refError(raw: string, names: readonly string[], label: string): string | null {
+export function refError(raw: string, names: readonly string[], label: string): string | undefined {
   const t = raw.trim();
-  if (t === "") return null;
+  if (t === "") return undefined;
   if (!PATH.test(t)) return "Name must be an identifier or path.";
   if (names.length > 0 && !names.includes(t)) return `No ${label} named ${t}.`;
-  return null;
+  return undefined;
 }
 
-export function lengthError(raw: string, scope: Scope): string | null {
+export function lengthError(raw: string, scope: Scope): string | undefined {
   const t = raw.trim();
-  if (t === "" || t === "-") return null;
-  if (parseNum(t) != null) return null;
+  if (t === "" || t === "-") return undefined;
+  if (parseNum(t) !== undefined) return undefined;
   let rest = t;
   if (rest.startsWith("-")) {
     rest = rest.slice(1).trim();
-    if (rest === "") return null;
+    if (rest === "") return undefined;
   }
   const dot = rest.lastIndexOf(".");
   if (dot > 0) {
@@ -64,12 +63,12 @@ export function lengthError(raw: string, scope: Scope): string | null {
     const field = rest.slice(dot + 1);
     if (field === "radius") {
       if (!scope.circles[object]) return `No circle named ${object}.`;
-      return null;
+      return undefined;
     }
     if (field === "distance") {
       if (scope.carriers[object]?.geom.kind !== "parallelLine")
         return `No parallel line named ${object}.`;
-      return null;
+      return undefined;
     }
   }
   return refError(raw, Object.keys(scope.lengths), "slider");
@@ -79,7 +78,7 @@ export function fieldError<S extends ToolSession>(
   field: Field<S>,
   session: S,
   scope: Scope,
-): string | null {
+): string | undefined {
   const raw = field.get(session);
   if (field.kind === "length") return lengthError(raw, scope);
   if (field.kind === "number") return numError(raw);
@@ -98,8 +97,10 @@ export function firstInvalid<S extends ToolSession>(
   tool: Tool<S>,
   session: S,
   scope: Scope,
-): Field<S> | null {
-  return openFields(tool, session).find((f) => fieldError(f, session, scope) != null) ?? null;
+): Field<S> | undefined {
+  return (
+    openFields(tool, session).find((f) => fieldError(f, session, scope) !== undefined) ?? undefined
+  );
 }
 
 export function namedBind(name: string | undefined): string | undefined {
@@ -199,28 +200,31 @@ export function refField<S extends ToolSession>(
   return { id, kind: "ref", placeholder, looks, open: () => true, get, set };
 }
 
-export function editValue(value: string, kind: FieldKind, key: string): string | null {
+export function editValue(value: string, kind: FieldKind, key: string): string | undefined {
   if (key === "Backspace") return value.slice(0, -1);
   if (key === "Delete") return "";
-  if (key.length !== 1) return null;
-  if (kind === "ident" || kind === "ref") return /[A-Za-z0-9_]/.test(key) ? value + key : null;
+  if (key.length !== 1) return undefined;
+  if (kind === "ident" || kind === "ref") return /[A-Za-z0-9_]/.test(key) ? value + key : undefined;
   if (kind === "length") {
     if (key === "-" && value === "") return "-";
     if (key === "." || /[0-9A-Za-z_]/.test(key)) return value + key;
-    return null;
+    return undefined;
   }
   if (key === "-" && value === "") return "-";
   if (/[0-9.]/.test(key)) return value + key;
-  return null;
+  return undefined;
 }
 
 export function openFields<S extends ToolSession>(tool: Tool<S>, session: S): Field<S>[] {
   return (tool.fields ?? []).filter((f) => f.open(session));
 }
 
-export function focusedField<S extends ToolSession>(tool: Tool<S>, session: S): Field<S> | null {
+export function focusedField<S extends ToolSession>(
+  tool: Tool<S>,
+  session: S,
+): Field<S> | undefined {
   const open = openFields(tool, session);
-  if (open.length === 0) return null;
+  if (open.length === 0) return undefined;
   const id = tool.focus?.(session) ?? open[0]!.id;
   return open.find((f) => f.id === id) ?? open[0]!;
 }
@@ -229,9 +233,9 @@ export function focusedDraft<S extends ToolSession>(
   tool: Tool<S>,
   session: S,
   scope: Scope,
-): Draft | null {
+): Draft | undefined {
   const field = focusedField(tool, session);
-  if (!field) return null;
+  if (!field) return undefined;
   const value = field.get(session);
   const error = fieldError(field, session, scope);
   return {
@@ -239,7 +243,7 @@ export function focusedDraft<S extends ToolSession>(
     kind: field.kind,
     value,
     placeholder: field.placeholder,
-    invalid: error != null,
+    invalid: error !== undefined,
     error: error ?? undefined,
   };
 }
@@ -265,7 +269,7 @@ export function keySession<S extends ToolSession>(
   tool: Tool<S>,
   session: S,
   e: ToolKey,
-  place: import("./types").PlaceHit | null,
+  place: import("./types").PlaceHit | undefined,
   scope: Scope | readonly string[] = [],
 ): KeyOutcome {
   const sc = scopeOf(scope);
@@ -284,7 +288,7 @@ export function keySession<S extends ToolSession>(
   const field = focusedField(tool, session);
   if (!field) return { ignore: true };
   const next = editValue(field.get(session), field.kind, e.key);
-  if (next == null) return { ignore: true };
+  if (next === undefined) return { ignore: true };
   return { session: field.set(session, next) };
 }
 
@@ -306,10 +310,10 @@ export function unmarkSlot(line: string): string {
 
 export type SlotParts = { before: string; token: string; after: string };
 
-export function splitSlot(line: string): SlotParts | null {
+export function splitSlot(line: string): SlotParts | undefined {
   const i = line.indexOf(SLOT_OPEN);
   const j = line.indexOf(SLOT_CLOSE);
-  if (i < 0 || j < 0 || j < i) return null;
+  if (i < 0 || j < 0 || j < i) return undefined;
   return {
     before: unmarkSlot(line.slice(0, i)),
     token: line.slice(i + SLOT_OPEN.length, j),
@@ -317,7 +321,7 @@ export function splitSlot(line: string): SlotParts | null {
   };
 }
 
-export function withSlot(preview: { line: string; hint: string }, draft: Draft | null) {
+export function withSlot(preview: { line: string; hint: string }, draft: Draft | undefined) {
   const parts = splitSlot(preview.line);
   return {
     line: unmarkSlot(preview.line),

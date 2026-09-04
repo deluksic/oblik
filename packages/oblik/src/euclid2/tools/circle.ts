@@ -30,7 +30,6 @@ import {
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
-
 const { max } = Math;
 type CircleSession = Extract<ToolSession, { verb: "circle" }>;
 
@@ -64,7 +63,7 @@ function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope
   return { kind: "num" as const, value: round(r) };
 }
 
-function centerLabel(session: CircleSession, scope: Scope, place: PlaceHit | null): string {
+function centerLabel(session: CircleSession, scope: Scope, place: PlaceHit | undefined): string {
   const t = session.centerRef.trim();
   if (t) return t;
   const placed = centerOf(session, scope);
@@ -106,7 +105,11 @@ export const circle: Tool<CircleSession> = {
         },
       };
     }
-    if (hit.length && resolveLengthExpr(session, scope) == null && !isPinnedPoint(hit.point)) {
+    if (
+      hit.length &&
+      resolveLengthExpr(session, scope) === undefined &&
+      !isPinnedPoint(hit.point)
+    ) {
       return {
         insert: withBind(session, {
           from: "circle",
@@ -125,7 +128,7 @@ export const circle: Tool<CircleSession> = {
     const center = centerOf(session, scope);
     if (!center) {
       if (session.focus !== "center") return { session: { ...session, focus: "center" } };
-      return null;
+      return undefined;
     }
     const bound = resolveLengthExpr(session, scope, { min: 0.05 });
     if (bound) {
@@ -133,15 +136,15 @@ export const circle: Tool<CircleSession> = {
     }
     if (session.focus === "name") return { session: { ...session, focus: "typed" } };
     if (session.focus === "center") return { session: { ...session, focus: "typed" } };
-    return null;
+    return undefined;
   },
   ghost(session, place, scope) {
     const center = centerOf(session, scope);
     if (!center) {
       const at = place?.point.at;
-      return at ? { kind: "point", at } : null;
+      return at ? { kind: "point", at } : undefined;
     }
-    if (resolveLengthExpr(session, scope) != null) {
+    if (resolveLengthExpr(session, scope) !== undefined) {
       const fallback = place?.length?.value ?? 0.05;
       return {
         kind: "circle",
@@ -173,7 +176,7 @@ export const circle: Tool<CircleSession> = {
   preview(session, place, scope): Preview {
     const spec = circle.spec;
     const bind = previewName(session, spec.prefix);
-    const p = place?.point ?? null;
+    const p = place?.point ?? undefined;
     const r = lengthLabel(session, scope, "radius");
     const name = inSlot(session.focus === "name", bind);
     const radius = inSlot(session.focus === "typed", r);
@@ -198,7 +201,7 @@ export const circle: Tool<CircleSession> = {
       p &&
       isPinnedPoint(p) &&
       !sameRef(center.expr, p) &&
-      resolveLengthExpr(session, scope) == null
+      resolveLengthExpr(session, scope) === undefined
     ) {
       return {
         line: previewCall(
@@ -211,7 +214,7 @@ export const circle: Tool<CircleSession> = {
         hint: "Click to pin the radius to that distance. Tab to name it.",
       };
     }
-    if (place?.length && resolveLengthExpr(session, scope) == null) {
+    if (place?.length && resolveLengthExpr(session, scope) === undefined) {
       return {
         line: previewCall(
           "circle",

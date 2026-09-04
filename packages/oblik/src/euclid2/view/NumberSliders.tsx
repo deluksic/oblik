@@ -10,23 +10,21 @@ import styles from "./View.module.css";
 
 export function NumberSliders(props: {
   nodes: readonly TraceNode[];
-  hotId: string | null | undefined;
-  selectedKey: string | null | undefined;
+  hotId: string | undefined;
+  selectedKey: string | undefined;
 }) {
   const layouts = createMemo(() => layoutSliders(props.nodes));
   return (
     <For each={layouts()} keyed={(L) => traceKey(L.node)}>
-      {(L) => (
-        <SliderMark layout={L()} hotId={props.hotId} selectedKey={props.selectedKey} />
-      )}
+      {(L) => <SliderMark layout={L()} hotId={props.hotId} selectedKey={props.selectedKey} />}
     </For>
   );
 }
 
 function SliderMark(props: {
   layout: SliderLayout;
-  hotId: string | null | undefined;
-  selectedKey: string | null | undefined;
+  hotId: string | undefined;
+  selectedKey: string | undefined;
 }) {
   const node = () => props.layout.node;
   const slider = () => node().value as SliderValue;
@@ -61,7 +59,12 @@ function SliderMark(props: {
         height={6}
         rx={3}
       />
-      <circle class={styles.sliderKnob} cx={props.layout.knobX - props.layout.panel.x} cy={35} r={7} />
+      <circle
+        class={styles.sliderKnob}
+        cx={props.layout.knobX - props.layout.panel.x}
+        cy={35}
+        r={7}
+      />
     </g>
   );
 }

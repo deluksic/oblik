@@ -10,7 +10,6 @@ import {
 import type { MentionFile, MentionFn } from "../source/mention";
 import { normalizeSceneRelPath } from "../source/scene-path";
 
-
 const { abs, max, min, round } = Math;
 export type OriginCodeLine = {
   kind: "code";
@@ -122,7 +121,7 @@ export function findFunctionHeaderRow(
   rows: readonly string[],
   line: number,
   name?: string,
-): number | null {
+): number | undefined {
   const target = min(max(line - 1, 0), max(0, rows.length - 1));
   for (let n = target; n >= 0; n--) {
     if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
@@ -132,7 +131,7 @@ export function findFunctionHeaderRow(
       if (rowLooksLikeFunctionHeader(rows[n] ?? "", name)) return n;
     }
   }
-  return null;
+  return undefined;
 }
 
 function rowLooksLikeFunctionHeader(text: string, name?: string): boolean {
@@ -260,14 +259,14 @@ export function buildOriginFrameLines(
   const rows = text.split("\n");
   const headerIdx = findFunctionHeaderRow(rows, line, name);
   let target = min(max(line - 1, 0), max(0, rows.length - 1));
-  const pinOnHeader = headerIdx != null && isClosingBraceLine(rows[target] ?? "");
+  const pinOnHeader = headerIdx !== undefined && isClosingBraceLine(rows[target] ?? "");
   if (pinOnHeader) target = headerIdx;
-  const bodyStart = headerIdx != null ? headerIdx + 1 : 0;
+  const bodyStart = headerIdx !== undefined ? headerIdx + 1 : 0;
   const from = max(bodyStart, target - 1);
   const to = min(rows.length, max(from, target) + 2);
   const out: OriginDisplayLine[] = [];
 
-  if (headerIdx != null) {
+  if (headerIdx !== undefined) {
     out.push({
       kind: "header",
       line: headerIdx + 1,
@@ -278,7 +277,7 @@ export function buildOriginFrameLines(
   }
 
   for (let n = from; n < to; n++) {
-    if (headerIdx != null && n === headerIdx) continue;
+    if (headerIdx !== undefined && n === headerIdx) continue;
     out.push({ kind: "code", line: n + 1, text: rows[n] ?? "", current: n === target });
   }
 
@@ -297,13 +296,13 @@ export function functionSourceSpan(
   const rows = text.split("\n");
   const hint = opts.startLine ?? opts.endLine ?? 1;
   let headerIdx = findFunctionHeaderRow(rows, hint, opts.name);
-  if (headerIdx == null && opts.endLine != null && opts.endLine !== hint) {
+  if (headerIdx === undefined && opts.endLine !== undefined && opts.endLine !== hint) {
     headerIdx = findFunctionHeaderRow(rows, opts.endLine, opts.name);
   }
-  if (headerIdx == null) {
+  if (headerIdx === undefined) {
     if (
-      opts.startLine != null &&
-      opts.endLine != null &&
+      opts.startLine !== undefined &&
+      opts.endLine !== undefined &&
       opts.endLine >= opts.startLine &&
       !isClosingBraceLine(rows[opts.startLine - 1] ?? "")
     ) {
@@ -312,7 +311,7 @@ export function functionSourceSpan(
     return { startLine: hint, endLine: hint };
   }
   const startLine = headerIdx + 1;
-  if (opts.endLine != null && opts.endLine >= startLine) {
+  if (opts.endLine !== undefined && opts.endLine >= startLine) {
     return { startLine, endLine: opts.endLine };
   }
   return { startLine, endLine: scanFunctionEnd(rows, headerIdx) };
@@ -351,7 +350,7 @@ export async function peekFile(
   ];
   for (const key of keys) {
     const cached = cache.get(key);
-    if (cached != null) return cached;
+    if (cached !== undefined) return cached;
   }
   let lastErr: Error | undefined;
   for (const key of keys) {
@@ -484,7 +483,7 @@ function fnAtLine(
 function sameFocus(a: ScopePick, b: ScopePick): boolean {
   if (sourceFileKey(a.file) !== sourceFileKey(b.file)) return false;
   if ((a.name ?? "") !== (b.name ?? "")) return false;
-  if (a.serial != null && b.serial != null && a.serial !== b.serial) return false;
+  if (a.serial !== undefined && b.serial !== undefined && a.serial !== b.serial) return false;
   return true;
 }
 
@@ -504,11 +503,12 @@ function callerFromMentions(
     }
   }
   if (hits.length === 0) return undefined;
-  if (focus.callerLine != null) {
+  if (focus.callerLine !== undefined) {
     const hit = hits.find(
       (h) =>
         h.line === focus.callerLine &&
-        (focus.callerFile == null || sourceFileKey(h.file) === sourceFileKey(focus.callerFile)),
+        (focus.callerFile === undefined ||
+          sourceFileKey(h.file) === sourceFileKey(focus.callerFile)),
     );
     if (hit) return hit;
   }
@@ -622,7 +622,7 @@ export function emptyScopeDetail(focus: ScopePick): SelectionDetail {
 }
 
 export async function selectionDetailForScope(opts: {
-  node: TraceNode | null;
+  node: TraceNode | undefined;
   focus: ScopePick;
   mentions: readonly MentionFile[];
   print?: string;

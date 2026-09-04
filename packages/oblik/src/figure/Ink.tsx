@@ -21,7 +21,6 @@ import type { Csg2, Pick, Region } from "../geom/types";
 
 import styles from "./View.module.css";
 
-
 const { abs, max } = Math;
 const ONION: FigureStyle = { kind: "style", stroke: "#8a8478", width: 1.05 };
 
@@ -72,8 +71,8 @@ type StrokeProps = {
   erase?: boolean;
 };
 
-/** `node` is `TraceNode | null` because Solid compiles JSX props as getters — a live preview can go null mid-update. */
-export function FigureStroke(props: { node: TraceNode | null } & StrokeProps) {
+/** `node` is `TraceNode | undefined` because Solid compiles JSX props as getters — a live preview can go undefined mid-update. */
+export function FigureStroke(props: { node: TraceNode | undefined } & StrokeProps) {
   return (
     <Show when={props.node} keyed>
       {(node) => (
@@ -164,7 +163,7 @@ function StrokeInk(props: { node: TraceNode } & StrokeProps) {
 }
 
 function layerOpacity(layer: ChromeLayer, onion: boolean, onionPaint = 0.4): number | undefined {
-  if (layer.opacity != null) return layer.opacity;
+  if (layer.opacity !== undefined) return layer.opacity;
   if (onion && layer.kind === "paint") return onionPaint;
   return undefined;
 }
@@ -190,14 +189,14 @@ function Seg(props: {
 }) {
   const s = createMemo(() => {
     const v = props.node?.value;
-    return v?.kind === "segment" ? v : null;
+    return v?.kind === "segment" ? v : undefined;
   });
   const look = () => (props.onion ? ONION : props.look);
   return (
     <Show when={s()}>
       {(seg) => (
         <>
-          {props.overlay ? null : (
+          {props.overlay ? undefined : (
             <line
               data-role="hit"
               class={styles.hit}
@@ -243,14 +242,14 @@ function Circ(props: {
 }) {
   const c = createMemo(() => {
     const v = props.node?.value;
-    return v?.kind === "circle" ? v : null;
+    return v?.kind === "circle" ? v : undefined;
   });
   const look = () => (props.onion ? ONION : props.look);
   return (
     <Show when={c()}>
       {(circ) => (
         <>
-          {props.overlay ? null : (
+          {props.overlay ? undefined : (
             <circle
               data-role="hit"
               class={styles.hit}
@@ -295,7 +294,7 @@ function Inf(props: {
 }) {
   const ends = createMemo(() => {
     const axis = infiniteLineAxis(props.node?.value);
-    if (!axis) return null;
+    if (!axis) return undefined;
     return infiniteClip(axis.origin, axis.dir, props.camera, props.size);
   });
   const look = () => (props.onion ? ONION : props.look);
@@ -303,7 +302,7 @@ function Inf(props: {
     <Show when={ends()}>
       {(e) => (
         <>
-          {props.overlay ? null : (
+          {props.overlay ? undefined : (
             <line
               data-role="hit"
               class={styles.hit}
@@ -395,8 +394,8 @@ type PointProps = {
   erase?: boolean;
 };
 
-/** Same live-getter contract as `FigureStroke`: `node` may go null while Brush preview unmounts. */
-export function FigurePoint(props: { node: TraceNode | null } & PointProps) {
+/** Same live-getter contract as `FigureStroke`: `node` may go undefined while Brush preview unmounts. */
+export function FigurePoint(props: { node: TraceNode | undefined } & PointProps) {
   return (
     <Show when={props.node} keyed>
       {(node) => (
@@ -454,9 +453,9 @@ function PointInk(props: { node: TraceNode } & PointProps) {
         [styles.erase]: props.erase === true,
       }}
     >
-      {mark() === "none" && !props.onion ? null : (
+      {mark() === "none" && !props.onion ? undefined : (
         <>
-          {props.overlay ? null : (
+          {props.overlay ? undefined : (
             <circle
               data-role="hit"
               class={styles.hitFill}

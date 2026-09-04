@@ -76,7 +76,7 @@ describe("isGrabbable", () => {
     expect(isGrabbable(SEG)).toBe(false);
     expect(isGrabbable({ ...A, editable: false })).toBe(false);
     expect(isGrabbable({ ...OFFSET_REGION, editable: false })).toBe(false);
-    expect(isGrabbable(null)).toBe(false);
+    expect(isGrabbable(undefined)).toBe(false);
   });
 });
 
@@ -191,13 +191,13 @@ describe("hoverNode", () => {
     expect(hoverNode([SEG, CIRCLE, A], "o_r")?.kind).toBe("circle");
     expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_r"))).toBe(true);
     expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_s"))).toBe(false);
-    expect(hoverNode([A], null)).toBeNull();
+    expect(hoverNode([A], undefined)).toBeUndefined();
   });
 
   test("hot highlight uses the same id", () => {
-    expect(isHot(A, "o_a", null)).toBe(true);
-    expect(isHot(CIRCLE, "o_a", null)).toBe(false);
-    expect(isHover(A, "o_a", null)).toBe(true);
+    expect(isHot(A, "o_a", undefined)).toBe(true);
+    expect(isHot(CIRCLE, "o_a", undefined)).toBe(false);
+    expect(isHover(A, "o_a", undefined)).toBe(true);
     expect(isHover(A, "o_a", "o_a:0")).toBe(false);
     expect(isSelected(A, "o_a:0")).toBe(true);
   });

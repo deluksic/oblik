@@ -311,7 +311,7 @@ describe("evaluate", () => {
     const off = trace.find((n) => n.id === "off");
     expect(off?.kind).toBe("csg2");
     expect(off?.editable).toBe(true);
-    const stock = off && isCsg2(off.value) ? offsetOfCsg(off.value) : null;
+    const stock = off && isCsg2(off.value) ? offsetOfCsg(off.value) : undefined;
     expect(stock?.kind).toBe("offset");
     expect(stock?.kind === "offset" ? stock.d : 0).toBeCloseTo(-0.12);
     const drafted = evaluate(scene, {
@@ -319,7 +319,7 @@ describe("evaluate", () => {
       draft: new Map([["off", [-0.5]]]),
     }).trace.find((n) => n.id === "off");
     expect(drafted?.kind).toBe("csg2");
-    const draftedStock = drafted && isCsg2(drafted.value) ? offsetOfCsg(drafted.value) : null;
+    const draftedStock = drafted && isCsg2(drafted.value) ? offsetOfCsg(drafted.value) : undefined;
     expect(draftedStock?.kind).toBe("offset");
     expect(draftedStock?.kind === "offset" ? draftedStock.d : 0).toBeCloseTo(-0.5);
   });

@@ -36,7 +36,6 @@ import {
   type Vec2,
 } from "./vec";
 
-
 const { PI, abs, atan2, max, min, round } = Math;
 const EPS = 1e-9;
 /** World-space hair for ray inclusion; same order as the fillet radius compare. */
@@ -121,13 +120,13 @@ function inwardNormal(e: LoopEdge, p: Vec2, w: 1 | -1): Vec2 {
   return mul(perp(walkTangentAt(e, p)), w);
 }
 
-function offsetCarrier(e: LoopEdge, d: number, w: 1 | -1): LineLike | Circle | null {
+function offsetCarrier(e: LoopEdge, d: number, w: 1 | -1): LineLike | Circle | undefined {
   const mid = edgeMid(e);
   const n = inwardNormal(e, mid, w);
   if (e.carrier.kind === "circle") {
     const u = unitRadial(e.carrier, mid);
     const r2 = abs(e.carrier.radius) + d * dot(n, u);
-    if (!(r2 > EPS)) return null;
+    if (!(r2 > EPS)) return undefined;
     return { kind: "circle", center: e.carrier.center, radius: r2 };
   }
   const { dir } = lineBasis(e.carrier);
@@ -165,8 +164,8 @@ function carrierHits(a: LineLike | Circle, b: LineLike | Circle): Vec2[] {
   return [];
 }
 
-function closestHit(hits: readonly Vec2[], hint: Vec2): Vec2 | null {
-  let best: Vec2 | null = null;
+function closestHit(hits: readonly Vec2[], hint: Vec2): Vec2 | undefined {
+  let best: Vec2 | undefined = undefined;
   let bestD = Infinity;
   for (const p of hits) {
     if (!isFiniteVec(p)) continue;
@@ -192,13 +191,19 @@ function miterHint(prev: LoopEdge, next: LoopEdge, v: Vec2, d: number, w: 1 | -1
  * When the vertex is flat (collinear radii, a 180° sector) the normals
  * agree and this is `v + n d` — intersecting the offset lines is singular.
  */
-function lineMiter(prev: LoopEdge, next: LoopEdge, v: Vec2, d: number, w: 1 | -1): Vec2 | null {
+function lineMiter(
+  prev: LoopEdge,
+  next: LoopEdge,
+  v: Vec2,
+  d: number,
+  w: 1 | -1,
+): Vec2 | undefined {
   const nIn = inwardNormal(prev, prev.b, w);
   const nOut = inwardNormal(next, next.a, w);
   const denom = 1 + dot(nIn, nOut);
-  if (abs(denom) < 1e-12) return null;
+  if (abs(denom) < 1e-12) return undefined;
   const p = add(v, mul(add(nIn, nOut), d / denom));
-  return isFiniteVec(p) ? p : null;
+  return isFiniteVec(p) ? p : undefined;
 }
 
 function onOffsetCarrier(c: LineLike | Circle, p: Vec2): boolean {
@@ -217,7 +222,7 @@ function miterJoin(
   w: 1 | -1,
   offPrev: LineLike | Circle,
   offNext: LineLike | Circle,
-): Vec2 | null {
+): Vec2 | undefined {
   if (prev.carrier.kind !== "circle" && next.carrier.kind !== "circle") {
     return lineMiter(prev, next, v, d, w);
   }
@@ -227,19 +232,19 @@ function miterJoin(
   // Two arcs of one circle (a circular hole) share an offset carrier, so
   // pairwise hits are empty. The join is the offset of the shared vertex.
   if (onOffsetCarrier(offPrev, hint) && onOffsetCarrier(offNext, hint)) return hint;
-  return null;
+  return undefined;
 }
 
 function len2(p: Vec2): number {
   return p.x * p.x + p.y * p.y;
 }
 
-function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): LoopEdge | null {
+function edgeFrom(carrier: LineLike | Circle, a: Vec2, b: Vec2, k?: Branch): LoopEdge | undefined {
   const aa = projectOnCarrier(carrier, a);
   const bb = projectOnCarrier(carrier, b);
-  if (!isFiniteVec(aa) || !isFiniteVec(bb) || dist(aa, bb) < EPS) return null;
+  if (!isFiniteVec(aa) || !isFiniteVec(bb) || dist(aa, bb) < EPS) return undefined;
   if (carrier.kind === "circle") {
-    if (k !== 1 && k !== -1) return null;
+    if (k !== 1 && k !== -1) return undefined;
     return { a: aa, b: bb, carrier, k };
   }
   return { a: aa, b: bb, carrier };
@@ -302,7 +307,7 @@ function vertexJoin(
   w: 1 | -1,
   offPrev: LineLike | Circle,
   offNext: LineLike | Circle,
-): Join | null {
+): Join | undefined {
   const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
   const convex = w * turn > EPS;
   const concave = w * turn < -EPS;
@@ -310,43 +315,47 @@ function vertexJoin(
   if (gap) {
     const start = offsetPoint(prev, prev.b, inward, w);
     const end = offsetPoint(next, next.a, inward, w);
-    if (!isFiniteVec(start) || !isFiniteVec(end) || dist(start, v) < EPS) return null;
+    if (!isFiniteVec(start) || !isFiniteVec(end) || dist(start, v) < EPS) return undefined;
     if (dist(start, end) < EPS) return { kind: "miter", p: start };
     const carrier: Circle = { kind: "circle", center: v, radius: abs(inward) };
     return { kind: "arc", start, end, carrier, k: alongK(carrier, start, end) };
   }
   const hit = miterJoin(prev, next, v, inward, w, offPrev, offNext);
-  if (!hit) return null;
+  if (!hit) return undefined;
   return { kind: "miter", p: hit };
 }
 
 /**
  * Untrimmed parallel + vertex joins of one walk. Reverse spans are still
  * emitted (the envelope trim drops them). A missed join or fewer than two
- * surviving edges → `null`. `strict` aborts on reverse (the local remnant).
+ * surviving edges → `undefined`. `strict` aborts on reverse (the local remnant).
  */
-function offsetCircleWalk(c: Circle, distance: number): Circle | null {
+function offsetCircleWalk(c: Circle, distance: number): Circle | undefined {
   const r = abs(c.radius) + distance;
-  if (!(r > EPS)) return null;
+  if (!(r > EPS)) return undefined;
   return { kind: "circle", center: { x: c.center.x, y: c.center.y }, radius: r };
 }
 
 /**
  * Untrimmed parallel + vertex joins of one walk. Reverse spans are still
  * emitted (the envelope trim drops them). A missed join or fewer than two
- * surviving edges → `null`. `strict` aborts on reverse (the local remnant).
+ * surviving edges → `undefined`. `strict` aborts on reverse (the local remnant).
  */
-function rawOffsetWalk(edges: LoopEdge[], distance: number, strict: boolean): LoopEdge[] | null {
+function rawOffsetWalk(
+  edges: LoopEdge[],
+  distance: number,
+  strict: boolean,
+): LoopEdge[] | undefined {
   const inward = -distance;
   const w = windingOf(edges);
-  if (w === 0) return null;
+  if (w === 0) return undefined;
   const n = edges.length;
-  const off: Array<LineLike | Circle | null> = [];
+  const off: Array<LineLike | Circle | undefined> = [];
   for (const e of edges) off.push(offsetCarrier(e, inward, w));
   const kept: number[] = [];
   for (let i = 0; i < n; i++) if (off[i]) kept.push(i);
   const m = kept.length;
-  if (m < 2) return null;
+  if (m < 2) return undefined;
   const joins: Join[] = [];
   for (let ki = 0; ki < m; ki++) {
     const iPrev = kept[(ki + m - 1) % m]!;
@@ -358,12 +367,12 @@ function rawOffsetWalk(edges: LoopEdge[], distance: number, strict: boolean): Lo
     const adjacent = i === (iPrev + 1) % n;
     if (adjacent) {
       const j = vertexJoin(prev, next, next.a, inward, w, offPrev, offNext);
-      if (!j) return null;
+      if (!j) return undefined;
       joins.push(j);
       continue;
     }
     const hit = closestHit(carrierHits(offPrev, offNext), lerp(prev.b, next.a, 0.5));
-    if (!hit) return null;
+    if (!hit) return undefined;
     joins.push({ kind: "miter", p: hit });
   }
   const out: LoopEdge[] = [];
@@ -375,28 +384,28 @@ function rawOffsetWalk(edges: LoopEdge[], distance: number, strict: boolean): Lo
     const end = j1.kind === "miter" ? j1.p : j1.start;
     const src = edges[i]!;
     const forward = originalForward(src, start, end);
-    if (strict && !forward) return null;
+    if (strict && !forward) return undefined;
     let branch = src.carrier.kind === "circle" ? src.k : undefined;
     if (!forward && off[i]!.kind === "circle") branch = alongK(off[i] as Circle, start, end);
     const e = edgeFrom(off[i]!, start, end, branch);
     if (!e) {
-      if (strict) return null;
+      if (strict) return undefined;
     } else {
       out.push(e);
     }
     if (j1.kind === "arc") {
       const join = edgeFrom(j1.carrier, j1.start, j1.end, j1.k);
       if (!join) {
-        if (strict) return null;
+        if (strict) return undefined;
       } else {
         out.push(join);
       }
     }
   }
-  return out.length >= 2 ? out : null;
+  return out.length >= 2 ? out : undefined;
 }
 
-function offsetWalk(w: Loop, distance: number, strict: boolean): Loop | null {
+function offsetWalk(w: Loop, distance: number, strict: boolean): Loop | undefined {
   if (isCircleWalk(w)) return offsetCircleWalk(w, distance);
   return rawOffsetWalk(w, distance, strict);
 }
@@ -417,20 +426,20 @@ function edgesOf(w: Loop): LoopEdge[] {
   return isCircleWalk(w) ? circleAsEdges(w) : w;
 }
 
-function loopAsCircle(w: Loop): Circle | null {
+function loopAsCircle(w: Loop): Circle | undefined {
   if (isCircleWalk(w)) return w;
-  if (w.length < 2) return null;
+  if (w.length < 2) return undefined;
   const c0 = w[0]!.carrier;
-  if (c0.kind !== "circle") return null;
+  if (c0.kind !== "circle") return undefined;
   let span = 0;
   for (const e of w) {
-    if (e.carrier.kind !== "circle") return null;
-    if (dist(e.carrier.center, c0.center) > 1e-6) return null;
-    if (abs(abs(e.carrier.radius) - abs(c0.radius)) > 1e-6) return null;
-    if (e.k !== 1 && e.k !== -1) return null;
+    if (e.carrier.kind !== "circle") return undefined;
+    if (dist(e.carrier.center, c0.center) > 1e-6) return undefined;
+    if (abs(abs(e.carrier.radius) - abs(c0.radius)) > 1e-6) return undefined;
+    if (e.k !== 1 && e.k !== -1) return undefined;
     span += abs(circleDelta(e.carrier, e.a, e.b, e.k));
   }
-  if (abs(span - 2 * PI) > 1e-3) return null;
+  if (abs(span - 2 * PI) > 1e-3) return undefined;
   return {
     kind: "circle",
     center: { x: c0.center.x, y: c0.center.y },
@@ -576,9 +585,7 @@ function sameLineCarrier(a: LoopEdge, b: LoopEdge): boolean {
   const lb = lineBasis(b.carrier);
   const da = norm(la.dir);
   const db = norm(lb.dir);
-  return (
-    abs(cross2(da, db)) <= 1e-6 && abs(cross2(da, sub(lb.origin, la.origin))) <= 1e-6
-  );
+  return abs(cross2(da, db)) <= 1e-6 && abs(cross2(da, sub(lb.origin, la.origin))) <= 1e-6;
 }
 
 function sameCircleCarrier(a: LoopEdge, b: LoopEdge): boolean {
@@ -657,13 +664,13 @@ export function walkFragments(frags: readonly LoopEdge[]): Loop[] {
   }
   const used = new Uint8Array(frags.length);
   const tried = new Uint8Array(frags.length);
-  const pickNext = (fi: number, arrivingAtB: boolean, startFi: number): Inc | null => {
+  const pickNext = (fi: number, arrivingAtB: boolean, startFi: number): Inc | undefined => {
     const e = frags[fi]!;
     const v = arrivingAtB ? e.b : e.a;
     const opts = at.get(vertKey(v));
-    if (!opts || opts.length < 2) return null;
+    if (!opts || opts.length < 2) return undefined;
     const incoming = arriveDir(e, arrivingAtB);
-    let best: Inc | null = null;
+    let best: Inc | undefined = undefined;
     let bestAng = Infinity;
     for (const o of opts) {
       if (o.fi === fi) continue;
@@ -873,22 +880,22 @@ function filletJoin(
   v: Vec2,
   r: number,
   w: 1 | -1,
-): FilletJoin | "sharp" | null {
+): FilletJoin | "sharp" | undefined {
   const turn = cross2(walkTangentAt(prev, prev.b), walkTangentAt(next, next.a));
   if (abs(turn) <= EPS) return "sharp";
   const into = w * turn < -EPS ? -r : r;
   const offPrev = offsetCarrier(prev, into, w);
   const offNext = offsetCarrier(next, into, w);
-  if (!offPrev || !offNext) return null;
+  if (!offPrev || !offNext) return undefined;
   const c = miterJoin(prev, next, v, into, w, offPrev, offNext);
-  if (!c) return null;
+  if (!c) return undefined;
   const t0 = projectOnCarrier(prev.carrier, c);
   const t1 = projectOnCarrier(next.carrier, c);
-  if (!isFiniteVec(t0) || !isFiniteVec(t1) || dist(t0, t1) < EPS) return null;
-  if (!originalForward(prev, prev.a, t0) || !originalForward(prev, t0, v)) return null;
-  if (!originalForward(next, v, t1) || !originalForward(next, t1, next.b)) return null;
+  if (!isFiniteVec(t0) || !isFiniteVec(t1) || dist(t0, t1) < EPS) return undefined;
+  if (!originalForward(prev, prev.a, t0) || !originalForward(prev, t0, v)) return undefined;
+  if (!originalForward(next, v, t1) || !originalForward(next, t1, next.b)) return undefined;
   const radius = dist(c, t0);
-  if (!(radius > EPS) || abs(radius - dist(c, t1)) > 1e-6) return null;
+  if (!(radius > EPS) || abs(radius - dist(c, t1)) > 1e-6) return undefined;
   const carrier: Circle = { kind: "circle", center: c, radius };
   return { t0, t1, carrier, k: alongK(carrier, t0, t1) };
 }
@@ -910,11 +917,11 @@ export function filletVertices(p: Region, radii: readonly number[]): Region {
   if (radii.every((r) => !(r > EPS))) return p;
   const w = winding(p);
   if (w === 0) return nanRegion();
-  const joins: Array<FilletJoin | null> = [];
+  const joins: Array<FilletJoin | undefined> = [];
   for (let i = 0; i < n; i++) {
     const r = radii[i]!;
     if (!(r > EPS)) {
-      joins.push(null);
+      joins.push(undefined);
       continue;
     }
     if (!Number.isFinite(r)) return nanRegion();
@@ -922,7 +929,7 @@ export function filletVertices(p: Region, radii: readonly number[]): Region {
     const next = srcWalk[i]!;
     const join = filletJoin(prev, next, next.a, r, w);
     if (join === "sharp") {
-      joins.push(null);
+      joins.push(undefined);
       continue;
     }
     if (!join) return nanRegion();

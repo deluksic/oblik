@@ -15,7 +15,7 @@ function fakeStorage(initial: Record<string, string> = {}): FakeStorage {
   return {
     data,
     getItem(key) {
-      return data.get(key) ?? null;
+      return data.get(key) ?? undefined;
     },
     setItem(key, value) {
       data.set(key, value);
@@ -68,9 +68,9 @@ describe("readStored / writeStored / removeStored", () => {
     expect(storage.data.has("n")).toBe(false);
   });
 
-  test("no storage (null) keeps signals in-memory without throwing", () => {
-    writeStored("n", 1, { ...num, storage: null });
-    expect(readStored("n", { ...num, storage: null })).toBe(0);
+  test("no storage (undefined) keeps signals in-memory without throwing", () => {
+    writeStored("n", 1, { ...num, storage: undefined });
+    expect(readStored("n", { ...num, storage: undefined })).toBe(0);
   });
 });
 

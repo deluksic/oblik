@@ -15,7 +15,6 @@ import type {
 } from "./types";
 import { dist, isFiniteVec, type Vec2 } from "./vec";
 
-
 const { abs, max, min } = Math;
 export type Aabb = { minX: number; minY: number; maxX: number; maxY: number };
 
@@ -40,9 +39,9 @@ export function isOffsetCsg(v: Csg2): boolean {
   return v.of.length === 1 && isOffset(v.of[0]);
 }
 
-export function offsetOfCsg(v: Csg2): Offset | null {
+export function offsetOfCsg(v: Csg2): Offset | undefined {
   const o = v.of[0];
-  return v.of.length === 1 && isOffset(o) ? o : null;
+  return v.of.length === 1 && isOffset(o) ? o : undefined;
 }
 
 export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick | Polygon {
@@ -94,8 +93,8 @@ export function isFinitePick(p: Pick): boolean {
   return isFiniteOperand(p.of) && isFiniteVec(p.at);
 }
 
-export function asOperand(v: unknown): CsgOperand | null {
-  if (!v || typeof v !== "object") return null;
+export function asOperand(v: unknown): CsgOperand | undefined {
+  if (!v || typeof v !== "object") return undefined;
   const k = (v as { kind?: string }).kind;
   if (
     k === "region" ||
@@ -106,14 +105,14 @@ export function asOperand(v: unknown): CsgOperand | null {
     k === "pick"
   )
     return v as CsgOperand;
-  return null;
+  return undefined;
 }
 
-function asOperands(values: readonly unknown[]): CsgOperand[] | null {
+function asOperands(values: readonly unknown[]): CsgOperand[] | undefined {
   const out: CsgOperand[] = [];
   for (const item of values) {
     const op = asOperand(item);
-    if (!op) return null;
+    if (!op) return undefined;
     out.push(op);
   }
   return out;
@@ -200,12 +199,12 @@ function expand(a: Aabb, b: Aabb): Aabb {
   };
 }
 
-function intersectAabb(a: Aabb, b: Aabb): Aabb | null {
+function intersectAabb(a: Aabb, b: Aabb): Aabb | undefined {
   const minX = max(a.minX, b.minX);
   const minY = max(a.minY, b.minY);
   const maxX = min(a.maxX, b.maxX);
   const maxY = min(a.maxY, b.maxY);
-  if (maxX < minX || maxY < minY) return null;
+  if (maxX < minX || maxY < minY) return undefined;
   return { minX, minY, maxX, maxY };
 }
 
@@ -219,9 +218,9 @@ function circleAabb(c: Circle): Aabb {
   };
 }
 
-function regionAabb(p: Region): Aabb | null {
+function regionAabb(p: Region): Aabb | undefined {
   const poly = tessellateRegion(p);
-  if (poly.length === 0) return null;
+  if (poly.length === 0) return undefined;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -232,17 +231,17 @@ function regionAabb(p: Region): Aabb | null {
     maxX = max(maxX, q.x);
     maxY = max(maxY, q.y);
   }
-  if (!Number.isFinite(minX)) return null;
+  if (!Number.isFinite(minX)) return undefined;
   return { minX, minY, maxX, maxY };
 }
 
-export function operandAabb(op: CsgOperand): Aabb | null {
-  if (op.kind === "halfPlane") return null;
-  if (op.kind === "circle") return isFiniteCircle(op) ? circleAabb(op) : null;
-  if (op.kind === "region") return isFiniteRegion(op) ? regionAabb(op) : null;
+export function operandAabb(op: CsgOperand): Aabb | undefined {
+  if (op.kind === "halfPlane") return undefined;
+  if (op.kind === "circle") return isFiniteCircle(op) ? circleAabb(op) : undefined;
+  if (op.kind === "region") return isFiniteRegion(op) ? regionAabb(op) : undefined;
   if (op.kind === "offset") {
     const inner = operandAabb(op.of);
-    if (!inner) return null;
+    if (!inner) return undefined;
     const pad = abs(op.d);
     return {
       minX: inner.minX - pad,
@@ -255,18 +254,18 @@ export function operandAabb(op: CsgOperand): Aabb | null {
   return csgAabb(op);
 }
 
-export function csgAabb(r: Csg2): Aabb | null {
+export function csgAabb(r: Csg2): Aabb | undefined {
   if (r.op === "intersect") {
-    let box: Aabb | null = null;
+    let box: Aabb | undefined = undefined;
     for (const op of r.of) {
       const b = operandAabb(op);
       if (!b) continue;
       box = box ? intersectAabb(box, b) : b;
-      if (!box) return null;
+      if (!box) return undefined;
     }
     return box;
   }
-  let box: Aabb | null = null;
+  let box: Aabb | undefined = undefined;
   for (const op of r.of) {
     const b = operandAabb(op);
     if (!b) continue;
@@ -275,13 +274,13 @@ export function csgAabb(r: Csg2): Aabb | null {
   return box;
 }
 
-export function fillAabb(v: Region | Csg2 | Pick): Aabb | null {
+export function fillAabb(v: Region | Csg2 | Pick): Aabb | undefined {
   if (v.kind === "region") return regionAabb(v);
   if (v.kind === "pick") return operandAabb(v);
   return csgAabb(v);
 }
 
-export function islandAabb(p: Pick): Aabb | null {
+export function islandAabb(p: Pick): Aabb | undefined {
   return islandsAabb(evaluateRegions(p));
 }
 

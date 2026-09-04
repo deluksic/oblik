@@ -6,20 +6,20 @@ import { traceKey } from "../pick";
 
 export function isHot(
   node: TraceNode,
-  hoverId: string | null | undefined,
-  selectedKey: string | null | undefined,
+  hoverId: string | undefined,
+  selectedKey: string | undefined,
 ): boolean {
   return hoverId === node.id || traceKey(node) === selectedKey;
 }
 
-export function isSelected(node: TraceNode, selectedKey: string | null | undefined): boolean {
+export function isSelected(node: TraceNode, selectedKey: string | undefined): boolean {
   return traceKey(node) === selectedKey;
 }
 
 export function isHover(
   node: TraceNode,
-  hoverId: string | null | undefined,
-  selectedKey: string | null | undefined,
+  hoverId: string | undefined,
+  selectedKey: string | undefined,
 ): boolean {
   return isHot(node, hoverId, selectedKey) && !isSelected(node, selectedKey);
 }
@@ -85,7 +85,7 @@ export function liftSelected<T>(
   return { rest, lifted };
 }
 
-export function isGrabbable(node: TraceNode | null | undefined): boolean {
+export function isGrabbable(node: TraceNode | undefined): boolean {
   if (!node?.editable) return false;
   if (
     node.kind === "point" ||
@@ -100,8 +100,8 @@ export function isGrabbable(node: TraceNode | null | undefined): boolean {
 
 export function hoverNode(
   trace: readonly TraceNode[],
-  hoverId: string | null | undefined,
-): TraceNode | null {
-  if (!hoverId) return null;
-  return trace.find((n) => n.id === hoverId) ?? null;
+  hoverId: string | undefined,
+): TraceNode | undefined {
+  if (!hoverId) return undefined;
+  return trace.find((n) => n.id === hoverId) ?? undefined;
 }

@@ -62,25 +62,25 @@ export type Euclid2ViewProps = {
   trace: TraceNode[];
   initialCamera?: Camera2;
   placing?: boolean;
-  ghost?: Ghost | null;
-  place?: PlaceHit | null;
-  toolSession?: ToolSession | null;
-  hoverId?: string | null;
-  selectedKey?: string | null;
-  onHoverId?: (id: string | null) => void;
+  ghost?: Ghost | undefined;
+  place?: PlaceHit | undefined;
+  toolSession?: ToolSession | undefined;
+  hoverId?: string | undefined;
+  selectedKey?: string | undefined;
+  onHoverId?: (id: string | undefined) => void;
   onPick?: (hits: TraceNode[]) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
   /** True while an edit drag is past the dead zone; false on release/cancel. */
   onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
-  onCursor?: (hit: PlaceHit | null) => void;
+  onCursor?: (hit: PlaceHit | undefined) => void;
   scope?: Scope;
 };
 
-function readPaneSize(el: Element): PaneSize | null {
+function readPaneSize(el: Element): PaneSize | undefined {
   const r = el.getBoundingClientRect();
-  if (r.width < 8 || r.height < 8) return null;
+  if (r.width < 8 || r.height < 8) return undefined;
   return { w: r.width, h: r.height };
 }
 
@@ -90,7 +90,7 @@ function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number }
 }
 
 export function Euclid2View(props: Euclid2ViewProps) {
-  const [paneEl, setPaneEl] = createSignal<HTMLDivElement | null>(null);
+  const [paneEl, setPaneEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const initialCameraMemo = createMemo(() => props.initialCamera, {
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
@@ -169,14 +169,15 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   const startEdit = drag.start((_e, session: EditDrag) => editSession(session));
 
+  // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
   const startPan = drag.start((e, hits: TraceNode[]) => {
-    const start = panDrag(e, camera());
-    const pick = hits.length > 0 ? hits : null;
+    const initialStart = panDrag(e, camera());
+    const pick = hits.length > 0 ? hits : undefined;
     let moved = false;
     return {
       onPointerMove(ev) {
         moved = true;
-        const next = applyDrag(start, ev, paneEl(), camera(), size(), props.trace);
+        const next = applyDrag(initialStart, ev, paneEl(), camera(), size(), props.trace);
         if (next.camera) setCamera(next.camera);
       },
       onDone() {
@@ -231,7 +232,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       return;
     }
     const hit = topHit(e, el, camera(), size(), props.trace)[0];
-    props.onHoverId?.(hit?.id ?? null);
+    props.onHoverId?.(hit?.id ?? undefined);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -249,7 +250,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
       );
       props.onCursor?.(hit);
       const session = props.toolSession;
-      props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : null);
+      props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : undefined);
     } else noteHover(e);
   }
 
@@ -257,7 +258,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
     () => props.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider"),
     { equals: sameList },
   );
-  const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : null));
+  const chrome = createMemo(() => toolChrome(props.placing ? props.toolSession : undefined));
   const fills = createMemo(
     () => (chrome().hideFills ? [] : strokes().filter((n) => isFillGeom(n.value))),
     {
@@ -286,7 +287,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
           camera(),
           props.scope ? snapFilterOf(props.scope) : undefined,
         )
-      : null,
+      : undefined,
   );
   const fillBand = createMemo(
     () =>
@@ -335,8 +336,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => {
-        props.onHoverId?.(null);
-        props.onCursor?.(null);
+        props.onHoverId?.(undefined);
+        props.onCursor?.(undefined);
       }}
     >
       <svg class={styles.world} viewBox={vb()}>
@@ -354,8 +355,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
             selectedKey={props.selectedKey}
             muted={(n) =>
               chrome().muteStrokes ||
-              (eligibleCarriers() != null &&
-                !(n.bind != null && eligibleCarriers()!.has(n.bind))) ||
+              (eligibleCarriers() !== undefined &&
+                !(n.bind !== undefined && eligibleCarriers()!.has(n.bind))) ||
               (!!props.scope && mutedForScope(n, props.scope))
             }
             camera={camera()}
@@ -364,7 +365,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
           />
           {props.ghost?.kind === "region" ? (
             <RegionGhost ghost={props.ghost} camera={camera()} />
-          ) : null}
+          ) : undefined}
         </g>
       </svg>
       <svg class={styles.hud} viewBox={`0 0 ${size().w} ${size().h}`} preserveAspectRatio="none">
@@ -403,10 +404,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
         </For>
         {props.placing && !chrome().hideSnap && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
-        ) : null}
+        ) : undefined}
         {props.ghost && props.ghost.kind !== "region" ? (
           <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
-        ) : null}
+        ) : undefined}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
     </div>
@@ -415,8 +416,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
 function RegionChrome(props: {
   band: ChromeSplit<TraceNode>;
-  hoverId?: string | null;
-  selectedKey?: string | null;
+  hoverId?: string | undefined;
+  selectedKey?: string | undefined;
   halos?: boolean;
 }) {
   return (
@@ -443,8 +444,8 @@ function RegionChrome(props: {
 
 function StrokeChrome(props: {
   band: ChromeSplit<TraceNode>;
-  hoverId?: string | null;
-  selectedKey?: string | null;
+  hoverId?: string | undefined;
+  selectedKey?: string | undefined;
   muted: (n: TraceNode) => boolean;
   camera: Camera2;
   size: PaneSize;
@@ -469,8 +470,8 @@ function StrokeChrome(props: {
 
 function PointChrome(props: {
   band: ChromeSplit<TraceNode>;
-  hoverId?: string | null;
-  selectedKey?: string | null;
+  hoverId?: string | undefined;
+  selectedKey?: string | undefined;
   muted: (n: TraceNode) => boolean;
   camera: Camera2;
   size: PaneSize;
