@@ -1,6 +1,6 @@
 # oblik
 
-A code-first design tool, written in TypeScript. You write a program; the program *is* the design. Editing happens in both directions: you type in the editor, you drag on the canvas, and both write to the same source file. Git is the history. There is no sidecar state.
+A code-first design tool, written in TypeScript. You write a program; the program *is* the design. Editing happens in both directions: you type in the editor, you drag on the canvas, and both write to the same source file. Git is the history.
 
 This is an experiment, not a product. It exists because existing design tools are silos — CAD, jewelry, and slicer apps each do one job well and talk to each other poorly — and because we wanted a tool where the design is ordinary code: functions, loops, imports, tests, reviewed in diffs.
 
@@ -50,7 +50,7 @@ pnpm install
 pnpm demo
 ```
 
-Opens [http://127.0.0.1:43127](http://127.0.0.1:43127). Pick a scene with `?scene=` (`shelf`, `pie`, `fillet`, `truss`, `mounting-plate`, `plate-figure`, `arcade`, `stock-cutters`, `gear`, … — full list in `apps/demo/src`). Drag a handle; release writes the scene file. In figure scenes, click ink to inspect, hold Shift for construction, Space toggles Brush/Eraser.
+Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) with a scene picker. Drag a handle; release writes the scene file. In figure scenes, click ink to inspect, hold Shift for construction, Space toggles Brush/Eraser.
 
 ## Repo layout
 
