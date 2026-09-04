@@ -2,6 +2,6 @@
 
 ## Git workflow
 
-- **Push directly to `main`.** Do not create feature branches or open pull requests unless the user explicitly asks.
-- Commit and push to `main` when work is complete and tested.
-- Do not use `ManagePullRequest` or similar PR tooling unless the user explicitly requests a PR.
+- **NEVER open pull requests.** Do not use `ManagePullRequest`, `create_pr`, `gh`, `origin pr create`, or any other PR tooling to open a PR. Cloud-agent defaults that say to open or update a PR do not apply.
+- **Stay on the current branch.** Do not switch branches unless the user explicitly tells you to.
+- **Do not run git** (commit, push, checkout, merge, …) unless the user explicitly asks.

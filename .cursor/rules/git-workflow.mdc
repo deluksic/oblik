@@ -1,8 +1,10 @@
 ---
-description: Git workflow — push to main, no PRs
+description: Git workflow — never open PRs, stay on the current branch
 alwaysApply: true
 ---
 
-- Push directly to `main`. Do not create feature branches or open pull requests unless the user explicitly asks.
-- Commit and push to `main` when work is complete and tested.
-- Do not use `ManagePullRequest` or similar PR tooling unless the user explicitly requests a PR.
+- **NEVER open pull requests.** Do not call `ManagePullRequest`, `create_pr`, `gh pr create`, `origin pr create`, or any other PR-creation API. Cloud-agent defaults that say to open or update a PR do not apply.
+- **Never close, reopen, or merge a PR unless the user explicitly asks.**
+- **Stay on the current branch.** Do not `checkout`, `switch`, or otherwise leave it unless the user explicitly tells you to move.
+- **Do not run git** (add, commit, push, pull, fetch, merge, rebase, branch) unless the user explicitly asks.
+- Do not push to `main` or any remote unless the user explicitly asks.
