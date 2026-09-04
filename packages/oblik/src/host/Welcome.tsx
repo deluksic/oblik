@@ -50,32 +50,34 @@ export function Welcome(props: WelcomeProps) {
             onInput={(e) => setQuery(e.currentTarget.value)}
           />
         </div>
-        <ul class={styles.list}>
-          <For each={shown()} fallback={<p class={styles.empty}>No scenes match.</p>}>
-            {(scene) => (
-              <li class={styles.rowWrap}>
-                <button
-                  type="button"
-                  class={styles.row}
-                  disabled={hasSceneError(scene)}
-                  onClick={() => props.onSelectScene(scene.id)}
-                >
-                  <span class={styles.rowTitle}>{scene.title}</span>
-                  <Show
-                    when={hasSceneError(scene)}
-                    fallback={
-                      <span class={styles.rowMeta}>
-                        {scene.kind} · {scene.path}
-                      </span>
-                    }
+        <Show when={shown().length > 0} fallback={<p class={styles.empty}>No scenes match.</p>}>
+          <ul class={styles.list}>
+            <For each={shown()}>
+              {(scene) => (
+                <li class={styles.rowWrap}>
+                  <button
+                    type="button"
+                    class={styles.row}
+                    disabled={hasSceneError(scene)}
+                    onClick={() => props.onSelectScene(scene.id)}
                   >
-                    <span class={styles.rowError}>{scene.error}</span>
-                  </Show>
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
+                    <span class={styles.rowTitle}>{scene.title}</span>
+                    <Show
+                      when={hasSceneError(scene)}
+                      fallback={
+                        <span class={styles.rowMeta}>
+                          {scene.kind} · {scene.path}
+                        </span>
+                      }
+                    >
+                      <span class={styles.rowError}>{scene.error}</span>
+                    </Show>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
       </div>
     </div>
   );
