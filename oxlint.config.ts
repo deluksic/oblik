@@ -6,6 +6,11 @@ export default defineConfig({
     correctness: "error",
     suspicious: "error",
   },
+  ignorePatterns: [
+    // Scene files are written by the oblik editor (and AI) — do not lint them at all.
+    "**/scenes/**",
+    "**/*.scene.ts",
+  ],
   env: {
     browser: true,
     node: true,
@@ -49,13 +54,9 @@ export default defineConfig({
       },
     },
     {
-      // Scene files keep named `const` bindings for interactive editing even when
-      // not yet referenced in the rest of the scene.
-      files: [
-        "apps/**/scenes/**/*",
-        "apps/**/*.scene.ts",
-        "apps/**/demo/**/*",
-      ],
+      // Demo app glue (main.tsx, scene-loaders.ts) imports scene modules and
+      // virtual:oblik-* modules whose exports are only consumed by the host.
+      files: ["apps/demo/**/*"],
       rules: {
         "eslint/no-unused-vars": "off",
       },
