@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "demo": "pnpm --filter oblik-demo dev",
+    "dev": "pnpm demo",
     "build": "pnpm -r --if-present build",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
