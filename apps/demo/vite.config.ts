@@ -7,7 +7,7 @@ import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
 
 // Config is loaded by Node; package exports to .ts are not.
-import { oblikPlugin } from "../../packages/oblik/src/source/vite-plugin.ts";
+import { oblikPlugin, oblikVanillaExtractHmr } from "../../packages/oblik/src/source/vite-plugin.ts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../..");
