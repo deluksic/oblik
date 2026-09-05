@@ -2,6 +2,18 @@ import { For, Show, createEffect, createSignal } from "solid-js";
 
 import { filterTools, type Preview, type ToolId, type ToolSpec } from "./tool";
 
+import {
+  cmd,
+  cmdHint,
+  empty,
+  input,
+  layer,
+  listItem,
+  listItemActive,
+  list,
+  picker,
+} from "../ui/commandPalette.module.css";
+import { panel } from "../ui/surface.module.css";
 import styles from "./Palette.module.css";
 
 const { max, min } = Math;
@@ -17,7 +29,7 @@ export type PaletteProps = {
 
 export function Palette(props: PaletteProps) {
   return (
-    <div class={styles.layer}>
+    <div class={layer}>
       <Show when={props.picker}>
         <Picker onPick={props.onPick} onClose={props.onClosePicker} />
       </Show>
@@ -113,10 +125,7 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
   const [inputEl, setInputEl] = createSignal<HTMLInputElement | undefined>(undefined);
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
-  const items = () => {
-    const list = filterTools(query());
-    return list;
-  };
+  const items = () => filterTools(query());
 
   createEffect(
     () => inputEl(),
@@ -156,9 +165,9 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
   );
 
   return (
-    <div class={styles.picker} onPointerDown={() => props.onClose()}>
+    <div class={[picker, styles.scrim]} onPointerDown={() => props.onClose()}>
       <div
-        class={styles.panel}
+        class={[panel, styles.panel]}
         role="dialog"
         aria-label="Insert"
         onPointerDown={(e) => e.stopPropagation()}
@@ -166,7 +175,7 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
         <input
           ref={setInputEl}
           type="search"
-          class={styles.input}
+          class={input}
           placeholder="Search..."
           autocomplete="off"
           value={query()}
@@ -175,8 +184,8 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
             setActive(0);
           }}
         />
-        <ul class={styles.list}>
-          <For each={filterTools(query())} fallback={<p class={styles.empty}>No match.</p>}>
+        <ul class={list}>
+          <For each={filterTools(query())} fallback={<p class={empty}>No match.</p>}>
             {(spec, i) => <ToolRow spec={spec} active={active() === i()} onPick={props.onPick} />}
           </For>
         </ul>
@@ -188,11 +197,11 @@ function Picker(props: { onPick: (id: ToolId) => void; onClose: () => void }) {
 function ToolRow(props: { spec: ToolSpec; active: boolean; onPick: (id: ToolId) => void }) {
   return (
     <li
-      class={[styles.listItem, { [styles.listItemActive]: props.active }]}
+      class={[listItem, { [listItemActive]: props.active }]}
       onClick={() => props.onPick(props.spec.id)}
     >
-      <span class={styles.cmd}>{props.spec.title}</span>
-      <span class={styles.cmdHint}>{props.spec.hint}</span>
+      <span class={cmd}>{props.spec.title}</span>
+      <span class={cmdHint}>{props.spec.hint}</span>
     </li>
   );
 }

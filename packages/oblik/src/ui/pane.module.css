@@ -1,3 +1,7 @@
+/*
+ * Shared pane scaffold used by the figure and euclid2 Panes. The figure
+ * keeps its local `.stage`.
+ */
 .workspace {
   display: flex;
   flex: 1;

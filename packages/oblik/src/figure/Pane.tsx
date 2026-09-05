@@ -41,6 +41,7 @@ import { isDrawnGeom } from "./pick";
 import type { FigureToolId } from "./tools";
 import { FigureView } from "./View";
 
+import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 import styles from "./Pane.module.css";
 
 export type FigurePaneProps = {
@@ -357,11 +358,9 @@ export function FigurePane(props: FigurePaneProps) {
   });
 
   return (
-    <div class={styles.workspace}>
-      <div class={styles.wrap}>
-        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>
-          {status()}
-        </p>
+    <div class={workspace}>
+      <div class={wrap}>
+        <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
         <div class={styles.stage}>
           <FigureView
             trace={world().trace}

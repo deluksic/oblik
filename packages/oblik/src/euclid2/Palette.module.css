@@ -1,23 +1,5 @@
-.layer {
-  position: absolute;
-  inset: 0;
-  z-index: 7;
-  min-width: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.picker {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 18vh 1rem 1rem;
+.scrim {
   background: color-mix(in srgb, var(--oblik-paper) 67%, transparent);
-  pointer-events: auto;
 }
 
 .promptDock {
@@ -37,10 +19,7 @@
 
 .panel {
   width: min(28rem, 100%);
-  background: var(--oblik-panel);
-  border: 1px solid var(--oblik-line);
   border-radius: 10px;
-  box-shadow: 0 18px 40px #0008;
 }
 
 .prompt {
@@ -51,13 +30,13 @@
   background: var(--oblik-panel);
   border: 1px solid var(--oblik-line);
   border-radius: 10px;
-  box-shadow: 0 18px 40px #0008;
+  box-shadow: var(--oblik-panel-shadow);
   padding: 0.55rem 0.75rem 0.65rem;
   pointer-events: auto;
 }
 
 .promptInvalid {
-  border-color: #ff7b7288;
+  border-color: color-mix(in srgb, var(--oblik-error) 53%, transparent);
 }
 
 .preview {
@@ -102,68 +81,18 @@
 }
 
 .slotInvalid {
-  color: #ff7b72;
-  caret-color: #ff7b72;
-  text-decoration: underline wavy #ff7b72;
+  color: var(--oblik-error);
+  caret-color: var(--oblik-error);
+  text-decoration: underline wavy var(--oblik-error);
   text-underline-offset: 0.12em;
 }
 
 .hintError {
-  color: #ff7b72;
+  color: var(--oblik-error);
 }
 
 .hint {
   margin: 0.25rem 0 0;
   color: var(--oblik-muted);
   font-size: 0.75rem;
-}
-
-.input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--oblik-line);
-  color: var(--oblik-text);
-  font: inherit;
-  padding: 0.75rem 0.9rem;
-  outline: none;
-}
-
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem 0;
-  max-height: 16rem;
-  overflow: auto;
-}
-
-.listItem {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
-}
-
-.listItemActive,
-.listItem:hover {
-  background: color-mix(in srgb, var(--oblik-accent) 12%, var(--oblik-panel));
-}
-
-.cmd {
-  color: var(--oblik-accent);
-  font-weight: 600;
-}
-
-.cmdHint {
-  color: var(--oblik-muted-cool);
-  font-size: 0.82rem;
-}
-
-.empty {
-  margin: 0;
-  padding: 0.9rem;
-  color: var(--oblik-muted);
 }

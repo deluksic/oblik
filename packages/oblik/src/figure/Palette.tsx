@@ -5,6 +5,17 @@ import IconPaintbrush from "~icons/lucide/paintbrush";
 
 import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./tools";
 
+import {
+  cmd,
+  cmdHint,
+  empty,
+  input,
+  layer,
+  listItem,
+  listItemActive,
+  list,
+  picker,
+} from "../ui/commandPalette.module.css";
 import { panel } from "../ui/surface.module.css";
 import styles from "./Palette.module.css";
 
@@ -28,7 +39,7 @@ export type FigurePaletteProps = {
 
 export function FigurePalette(props: FigurePaletteProps) {
   return (
-    <div class={styles.layer}>
+    <div class={layer}>
       <Show when={props.picker}>
         <Picker onPick={props.onPick} onClose={props.onClosePicker} />
       </Show>
@@ -80,7 +91,7 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
   );
 
   return (
-    <div class={styles.picker} onPointerDown={() => props.onClose()}>
+    <div class={[picker, styles.scrim]} onPointerDown={() => props.onClose()}>
       <div
         class={[panel, styles.panel]}
         role="dialog"
@@ -90,7 +101,7 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
         <input
           ref={setInputEl}
           type="search"
-          class={styles.input}
+          class={input}
           placeholder="Brush, eraser, or export…"
           autocomplete="off"
           value={query()}
@@ -99,8 +110,8 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
             setActive(0);
           }}
         />
-        <ul class={styles.list}>
-          <For each={filterFigureTools(query())} fallback={<p class={styles.empty}>No match.</p>}>
+        <ul class={list}>
+          <For each={filterFigureTools(query())} fallback={<p class={empty}>No match.</p>}>
             {(spec, i) => <ToolRow spec={spec} active={active() === i()} onPick={props.onPick} />}
           </For>
         </ul>
@@ -116,14 +127,14 @@ function ToolRow(props: {
 }) {
   return (
     <li
-      class={[styles.listItem, { [styles.listItemActive]: props.active }]}
+      class={[listItem, { [listItemActive]: props.active }]}
       onClick={() => props.onPick(props.spec.id)}
     >
       <div class={styles.row}>
         {toolIcon(props.spec.id)}
         <div class={styles.copy}>
-          <span class={styles.cmd}>{props.spec.title}</span>
-          <span class={styles.cmdHint}>{props.spec.hint}</span>
+          <span class={cmd}>{props.spec.title}</span>
+          <span class={cmdHint}>{props.spec.hint}</span>
         </div>
       </div>
     </li>

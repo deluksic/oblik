@@ -36,7 +36,7 @@ import {
 } from "./tool";
 import { Euclid2View } from "./view/View";
 
-import styles from "./Pane.module.css";
+import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 
 export type Euclid2PaneProps = {
   scene: Euclid2Scene;
@@ -321,11 +321,9 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   });
 
   return (
-    <div class={styles.workspace}>
-      <div class={styles.wrap}>
-        <p class={[styles.status, { [styles.statusError]: !!(writeError() ?? world().error) }]}>
-          {status()}
-        </p>
+    <div class={workspace}>
+      <div class={wrap}>
+        <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
         <Euclid2View
           trace={world().trace}
           initialCamera={props.scene.camera}
