@@ -64,7 +64,7 @@
       var(--oblik-figure-red) 54%,
       transparent 54%
     ),
-    repeating-conic-gradient(var(--oblik-figure-check) 0% 25%, var(--oblik-figure-cream) 0% 50%) 0 0
+    repeating-conic-gradient(var(--oblik-figure-check) 0% 25%, var(--oblik-figure-paper) 0% 50%) 0 0
       / 8px 8px;
 }
 

@@ -80,21 +80,22 @@
 
 /*
  * Figure canvas constants. The canvas is paper: it stays light in both
- * themes, so these don't swap. The ink/paint hexes serialized into scene
- * data (chips.ts) are the same palette.
+ * themes, and its tones are neutral (no saturation) — the scene value
+ * serialized as "cream" renders as the gray paper. The ink/paint hexes
+ * serialized into scene data (chips.ts) are a separate palette.
  */
 :root {
   --oblik-figure-ink: #1c1917;
   --oblik-figure-red: #c23b22;
-  --oblik-figure-cream: #f4efe4;
-  --oblik-figure-cream-soft: #faf6ee;
-  --oblik-figure-white: #fbfaf6;
+  --oblik-figure-paper: #f5f5f4;
+  --oblik-figure-paper-soft: #fafafa;
+  --oblik-figure-white: #fbfbfa;
   --oblik-figure-white-soft: #fff;
-  --oblik-figure-cream-line: #d4c7b4;
-  --oblik-figure-white-line: #e4ddd0;
-  --oblik-figure-check: #c8c3b6;
-  --oblik-figure-title: #8a8278;
-  --oblik-figure-title-hover: #5c564e;
+  --oblik-figure-paper-line: #d6d6d3;
+  --oblik-figure-white-line: #e4e4e2;
+  --oblik-figure-check: #c8c8c5;
+  --oblik-figure-title: #8a8a87;
+  --oblik-figure-title-hover: #5c5c59;
 }
 
 :root {

@@ -54,8 +54,8 @@ describe("figureToSvg", () => {
     expect(out.svg).toContain('stroke="#abcdef"');
     expect(out.svg).toContain('stroke-width="2"');
     expect(out.svg).toContain('vector-effect="non-scaling-stroke"');
-    // cream paper background by default
-    expect(out.svg).toContain('fill="#fff3e6"');
+    // gray paper background by default
+    expect(out.svg).toContain('fill="#f5f5f4"');
     // y-up world flipped into SVG space
     expect(out.svg).toContain("scale(1 -1)");
   });

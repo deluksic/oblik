@@ -36,7 +36,7 @@ type Rect = { x: number; y: number; w: number; h: number };
 const DEFAULT_STROKE = "#1c1917";
 const DEFAULT_STROKE_WIDTH = 1.35;
 const DEFAULT_POINT_WIDTH = 1.2;
-const PAPER_FILL: Record<"cream" | "white", string> = { cream: "#fff3e6", white: "#ffffff" };
+const PAPER_FILL: Record<"cream" | "white", string> = { cream: "#f5f5f4", white: "#ffffff" };
 const MAX_DIM = 2000;
 const MIN_DIM = 48;
 

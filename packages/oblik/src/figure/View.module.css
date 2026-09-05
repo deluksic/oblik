@@ -17,8 +17,8 @@
 }
 
 .cream {
-  background: var(--oblik-figure-cream);
-  --oblik-knockout: var(--oblik-figure-cream-soft);
+  background: var(--oblik-figure-paper);
+  --oblik-knockout: var(--oblik-figure-paper-soft);
 }
 
 .white {
@@ -116,14 +116,14 @@
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  border: 1px solid var(--oblik-figure-cream-line);
+  border: 1px solid var(--oblik-figure-paper-line);
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--oblik-figure-ink) 7%, transparent),
     0 6px 18px color-mix(in srgb, var(--oblik-figure-ink) 10%, transparent);
 }
 
 .cream > .page {
-  background: var(--oblik-figure-cream-soft);
+  background: var(--oblik-figure-paper-soft);
 }
 
 .white > .page {
@@ -177,7 +177,7 @@
   padding: 0;
   border: 1px solid var(--oblik-accent);
   border-radius: 6px;
-  background: var(--oblik-figure-cream-soft);
+  background: var(--oblik-figure-paper-soft);
   color: var(--oblik-accent);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--oblik-figure-ink) 14%, transparent);
   transform: translate(-50%, -50%);
