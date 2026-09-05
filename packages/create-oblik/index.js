@@ -35,7 +35,7 @@ fs.cpSync(templateDir, target, { recursive: true, force: false, errorOnExist: tr
 const pkgPath = path.join(target, "package.json");
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 pkg.name = name;
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, undefined, 2) + "\n");
 
 console.log(`Scaffolded oblik project in ${target}`);
 console.log(`
