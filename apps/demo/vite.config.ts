@@ -21,6 +21,7 @@ export default defineConfig({
       workspaceRoot,
       sceneDir: path.join(appRoot, "src/scenes"),
     }),
+    oblikVanillaExtractHmr(),
   ],
   server: {
     host: "127.0.0.1",
