@@ -5,6 +5,7 @@
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
     "types": ["node"],
+    "plugins": [{ "name": "typescript-plugin-css-modules" }],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

@@ -1,0 +1,126 @@
+/*
+ * Two-tier tokens. Tier 1 is the hue anchors: every oklch() color picks its
+ * hue from one of them, so re-tinting the theme is a few-number edit. Tier 2
+ * is the semantic set — dark (default on :root) and light (under
+ * [data-theme="light"]) declare the same names, so they can't drift.
+ *
+ * Ink grays are warm (hue 85, opposite the blue backdrop); text sitting on
+ * accent-tinted surfaces switches to the cool pair (hue 250) so the warm/cool
+ * clash doesn't get extreme.
+ */
+:root {
+  --oblik-hue-backdrop: 270;
+  --oblik-hue-ink: 85;
+  --oblik-hue-ink-cool: 250;
+  --oblik-hue-accent: 250;
+  --oblik-hue-error: 35;
+  --oblik-hue-cream: 70;
+
+  --oblik-paper: oklch(0.17 0.013 var(--oblik-hue-backdrop));
+  --oblik-raised: oklch(0.2 0.017 var(--oblik-hue-backdrop));
+  --oblik-well: oklch(0.21 0.017 var(--oblik-hue-backdrop));
+  --oblik-panel: oklch(0.22 0.016 var(--oblik-hue-backdrop));
+  --oblik-ink: oklch(0.86 0.02 var(--oblik-hue-ink));
+  --oblik-text: oklch(0.93 0.014 var(--oblik-hue-ink));
+  --oblik-muted: oklch(0.67 0.019 var(--oblik-hue-ink));
+  --oblik-dim: oklch(0.53 0.017 var(--oblik-hue-ink));
+  --oblik-muted-cool: oklch(0.67 0.019 var(--oblik-hue-ink-cool));
+  --oblik-dim-cool: oklch(0.53 0.017 var(--oblik-hue-ink-cool));
+  --oblik-accent: oklch(0.59 0.125 var(--oblik-hue-accent));
+  --oblik-hover: oklch(0.59 0.125 var(--oblik-hue-accent));
+  --oblik-error: oklch(0.6 0.14 var(--oblik-hue-error));
+  --oblik-ghost: oklch(0.67 0.019 var(--oblik-hue-ink));
+  --oblik-knockout: var(--oblik-paper);
+  --oblik-cream: oklch(0.97 0.02 var(--oblik-hue-cream));
+  --oblik-selected-paint: var(--oblik-cream);
+  --oblik-line: oklch(0.31 0.03 var(--oblik-hue-backdrop));
+  --oblik-grid: oklch(0.25 0.028 var(--oblik-hue-backdrop));
+  --oblik-axis: oklch(0.38 0.037 var(--oblik-hue-backdrop));
+  --oblik-ln: oklch(0.47 0.014 var(--oblik-hue-ink));
+  --oblik-code: oklch(0.82 0.019 var(--oblik-hue-ink));
+  --oblik-backdrop: oklch(0.17 0.013 var(--oblik-hue-backdrop) / 0.62);
+  --oblik-panel-shadow: 0 18px 40px #0008;
+  --oblik-stroke: 1.5px;
+  --oblik-stroke-selected: 2.25px;
+  --oblik-chrome-outline: 7px;
+  --oblik-chrome-knockout: 4px;
+  --oblik-chrome-point-outline: 14px;
+  --oblik-chrome-point-knockout: 9px;
+  --oblik-chrome-outline-hover: 0.5;
+  --oblik-chrome-outline-selected: 1;
+  --oblik-hit: 14px;
+}
+
+:root[data-theme="light"] {
+  --oblik-paper: oklch(0.965 0.007 var(--oblik-hue-backdrop));
+  --oblik-raised: oklch(0.94 0.009 var(--oblik-hue-backdrop));
+  --oblik-well: oklch(0.925 0.009 var(--oblik-hue-backdrop));
+  --oblik-panel: oklch(0.91 0.01 var(--oblik-hue-backdrop));
+  --oblik-ink: oklch(0.32 0.02 var(--oblik-hue-ink));
+  --oblik-text: oklch(0.24 0.02 var(--oblik-hue-ink));
+  --oblik-muted: oklch(0.5 0.019 var(--oblik-hue-ink));
+  --oblik-dim: oklch(0.62 0.016 var(--oblik-hue-ink));
+  --oblik-muted-cool: oklch(0.5 0.019 var(--oblik-hue-ink-cool));
+  --oblik-dim-cool: oklch(0.62 0.016 var(--oblik-hue-ink-cool));
+  --oblik-accent: oklch(0.5 0.14 var(--oblik-hue-accent));
+  --oblik-hover: oklch(0.5 0.14 var(--oblik-hue-accent));
+  --oblik-error: oklch(0.55 0.16 var(--oblik-hue-error));
+  --oblik-ghost: oklch(0.5 0.019 var(--oblik-hue-ink));
+  --oblik-knockout: var(--oblik-paper);
+  --oblik-cream: oklch(0.45 0.06 var(--oblik-hue-cream));
+  --oblik-selected-paint: oklch(0.55 0.12 var(--oblik-hue-cream));
+  --oblik-line: oklch(0.86 0.012 var(--oblik-hue-backdrop));
+  --oblik-grid: oklch(0.9 0.012 var(--oblik-hue-backdrop));
+  --oblik-axis: oklch(0.8 0.014 var(--oblik-hue-backdrop));
+  --oblik-ln: oklch(0.72 0.012 var(--oblik-hue-ink));
+  --oblik-code: oklch(0.38 0.019 var(--oblik-hue-ink));
+  --oblik-backdrop: oklch(0.3 0.02 var(--oblik-hue-backdrop) / 0.4);
+  --oblik-panel-shadow: 0 18px 40px oklch(0.3 0.02 var(--oblik-hue-backdrop) / 0.14);
+}
+
+:root {
+  --oblik-scrollbar-thumb: color-mix(in srgb, var(--oblik-muted) 42%, transparent);
+  --oblik-scrollbar-thumb-hover: color-mix(in srgb, var(--oblik-text) 28%, transparent);
+  --oblik-scrollbar-track: transparent;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  background: var(--oblik-paper);
+  color: var(--oblik-text);
+  font-family: system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+  scrollbar-color: var(--oblik-scrollbar-thumb) var(--oblik-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--oblik-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--oblik-scrollbar-thumb);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--oblik-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

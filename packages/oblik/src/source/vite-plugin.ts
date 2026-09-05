@@ -29,8 +29,6 @@ import {
 import { freshSiteId, stamp } from "./stamp";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
-export { oblikVanillaExtractHmr } from "./vanilla-extract-hmr";
-
 const VIRTUAL_ANN = "virtual:oblik-annotations";
 const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
 const VIRTUAL_ANN_BUNDLE_RESOLVED = "\0virtual:oblik-annotations-bundle";
