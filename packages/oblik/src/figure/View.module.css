@@ -17,13 +17,13 @@
 }
 
 .cream {
-  background: #f4efe4;
-  --oblik-knockout: #faf6ee;
+  background: var(--oblik-figure-cream);
+  --oblik-knockout: var(--oblik-figure-cream-soft);
 }
 
 .white {
-  background: #fbfaf6;
-  --oblik-knockout: #fff;
+  background: var(--oblik-figure-white);
+  --oblik-knockout: var(--oblik-figure-white-soft);
 }
 
 .world,
@@ -116,19 +116,19 @@
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  border: 1px solid #d4c7b4;
+  border: 1px solid var(--oblik-figure-cream-line);
   box-shadow:
-    0 1px 2px rgba(42, 34, 24, 0.07),
-    0 6px 18px rgba(42, 34, 24, 0.1);
+    0 1px 2px color-mix(in srgb, var(--oblik-figure-ink) 7%, transparent),
+    0 6px 18px color-mix(in srgb, var(--oblik-figure-ink) 10%, transparent);
 }
 
 .cream > .page {
-  background: #faf6ee;
+  background: var(--oblik-figure-cream-soft);
 }
 
 .white > .page {
-  background: #fff;
-  border-color: #e4ddd0;
+  background: var(--oblik-figure-white-soft);
+  border-color: var(--oblik-figure-white-line);
 }
 
 .frameTitle {
@@ -147,7 +147,7 @@
     500 11px/1 system-ui,
     sans-serif;
   letter-spacing: 0.02em;
-  color: #8a8278;
+  color: var(--oblik-figure-title);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -159,7 +159,7 @@
 }
 
 .frameTitle:hover {
-  color: #5c564e;
+  color: var(--oblik-figure-title-hover);
 }
 
 .frameTitleSelected {
@@ -177,9 +177,9 @@
   padding: 0;
   border: 1px solid var(--oblik-accent);
   border-radius: 6px;
-  background: #faf6ee;
+  background: var(--oblik-figure-cream-soft);
   color: var(--oblik-accent);
-  box-shadow: 0 2px 8px rgba(42, 34, 24, 0.14);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--oblik-figure-ink) 14%, transparent);
   transform: translate(-50%, -50%);
   touch-action: none;
 }
@@ -197,9 +197,9 @@
 }
 
 .frameHandle:hover {
-  background: #fff;
-  border-color: color-mix(in srgb, var(--oblik-accent) 78%, #1c1917);
-  color: color-mix(in srgb, var(--oblik-accent) 78%, #1c1917);
+  background: var(--oblik-figure-white-soft);
+  border-color: color-mix(in srgb, var(--oblik-accent) 78%, var(--oblik-figure-ink));
+  color: color-mix(in srgb, var(--oblik-accent) 78%, var(--oblik-figure-ink));
 }
 
 .frameHandleIcon {

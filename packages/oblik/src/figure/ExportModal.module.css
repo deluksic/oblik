@@ -33,7 +33,7 @@
   max-height: min(52vh, 420px);
   height: auto;
   border-radius: 4px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--oblik-figure-ink) 40%, transparent);
 }
 
 .empty {

@@ -78,6 +78,25 @@
   --oblik-panel-shadow: 0 18px 40px oklch(0.3 0.02 var(--oblik-hue-backdrop) / 0.14);
 }
 
+/*
+ * Figure canvas constants. The canvas is paper: it stays light in both
+ * themes, so these don't swap. The ink/paint hexes serialized into scene
+ * data (chips.ts) are the same palette.
+ */
+:root {
+  --oblik-figure-ink: #1c1917;
+  --oblik-figure-red: #c23b22;
+  --oblik-figure-cream: #f4efe4;
+  --oblik-figure-cream-soft: #faf6ee;
+  --oblik-figure-white: #fbfaf6;
+  --oblik-figure-white-soft: #fff;
+  --oblik-figure-cream-line: #d4c7b4;
+  --oblik-figure-white-line: #e4ddd0;
+  --oblik-figure-check: #c8c3b6;
+  --oblik-figure-title: #8a8278;
+  --oblik-figure-title-hover: #5c564e;
+}
+
 :root {
   --oblik-scrollbar-thumb: color-mix(in srgb, var(--oblik-muted) 42%, transparent);
   --oblik-scrollbar-thumb-hover: color-mix(in srgb, var(--oblik-text) 28%, transparent);

@@ -5,6 +5,7 @@ import IconPaintbrush from "~icons/lucide/paintbrush";
 
 import { filterFigureTools, type FigureToolId, type FigureToolSpec } from "./tools";
 
+import { panel } from "../ui/surface.module.css";
 import styles from "./Palette.module.css";
 
 const { max, min } = Math;
@@ -81,7 +82,7 @@ function Picker(props: { onPick: (id: FigureToolId) => void; onClose: () => void
   return (
     <div class={styles.picker} onPointerDown={() => props.onClose()}>
       <div
-        class={styles.panel}
+        class={[panel, styles.panel]}
         role="dialog"
         aria-label="Figure tool"
         onPointerDown={(e) => e.stopPropagation()}
