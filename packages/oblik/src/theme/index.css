@@ -51,31 +51,33 @@
   --oblik-hit: 14px;
 }
 
+/* Light runs near-achromatic — only accent, error, and the paint colors
+ * keep their chroma. */
 :root[data-theme="light"] {
-  --oblik-paper: oklch(0.965 0.007 var(--oblik-hue-backdrop));
-  --oblik-raised: oklch(0.94 0.009 var(--oblik-hue-backdrop));
-  --oblik-well: oklch(0.925 0.009 var(--oblik-hue-backdrop));
-  --oblik-panel: oklch(0.91 0.01 var(--oblik-hue-backdrop));
-  --oblik-ink: oklch(0.32 0.02 var(--oblik-hue-ink));
-  --oblik-text: oklch(0.24 0.02 var(--oblik-hue-ink));
-  --oblik-muted: oklch(0.5 0.019 var(--oblik-hue-ink));
-  --oblik-dim: oklch(0.62 0.016 var(--oblik-hue-ink));
-  --oblik-muted-cool: oklch(0.5 0.019 var(--oblik-hue-ink-cool));
-  --oblik-dim-cool: oklch(0.62 0.016 var(--oblik-hue-ink-cool));
+  --oblik-paper: oklch(0.965 0.003 var(--oblik-hue-backdrop));
+  --oblik-raised: oklch(0.94 0.003 var(--oblik-hue-backdrop));
+  --oblik-well: oklch(0.925 0.003 var(--oblik-hue-backdrop));
+  --oblik-panel: oklch(0.91 0.003 var(--oblik-hue-backdrop));
+  --oblik-ink: oklch(0.32 0.005 var(--oblik-hue-ink));
+  --oblik-text: oklch(0.24 0.005 var(--oblik-hue-ink));
+  --oblik-muted: oklch(0.5 0.004 var(--oblik-hue-ink));
+  --oblik-dim: oklch(0.62 0.003 var(--oblik-hue-ink));
+  --oblik-muted-cool: oklch(0.5 0.004 var(--oblik-hue-ink-cool));
+  --oblik-dim-cool: oklch(0.62 0.003 var(--oblik-hue-ink-cool));
   --oblik-accent: oklch(0.5 0.14 var(--oblik-hue-accent));
   --oblik-hover: oklch(0.5 0.14 var(--oblik-hue-accent));
   --oblik-error: oklch(0.55 0.16 var(--oblik-hue-error));
-  --oblik-ghost: oklch(0.5 0.019 var(--oblik-hue-ink));
+  --oblik-ghost: oklch(0.5 0.004 var(--oblik-hue-ink));
   --oblik-knockout: var(--oblik-paper);
   --oblik-cream: oklch(0.45 0.06 var(--oblik-hue-cream));
   --oblik-selected-paint: oklch(0.55 0.12 var(--oblik-hue-cream));
-  --oblik-line: oklch(0.86 0.012 var(--oblik-hue-backdrop));
-  --oblik-grid: oklch(0.9 0.012 var(--oblik-hue-backdrop));
-  --oblik-axis: oklch(0.8 0.014 var(--oblik-hue-backdrop));
-  --oblik-ln: oklch(0.72 0.012 var(--oblik-hue-ink));
-  --oblik-code: oklch(0.38 0.019 var(--oblik-hue-ink));
-  --oblik-backdrop: oklch(0.3 0.02 var(--oblik-hue-backdrop) / 0.4);
-  --oblik-panel-shadow: 0 18px 40px oklch(0.3 0.02 var(--oblik-hue-backdrop) / 0.14);
+  --oblik-line: oklch(0.86 0.003 var(--oblik-hue-backdrop));
+  --oblik-grid: oklch(0.9 0.003 var(--oblik-hue-backdrop));
+  --oblik-axis: oklch(0.8 0.003 var(--oblik-hue-backdrop));
+  --oblik-ln: oklch(0.72 0.003 var(--oblik-hue-ink));
+  --oblik-code: oklch(0.38 0.005 var(--oblik-hue-ink));
+  --oblik-backdrop: oklch(0.3 0.006 var(--oblik-hue-backdrop) / 0.4);
+  --oblik-panel-shadow: 0 18px 40px oklch(0.3 0.006 var(--oblik-hue-backdrop) / 0.14);
 }
 
 /*
@@ -85,17 +87,17 @@
  * serialized into scene data (chips.ts) are a separate palette.
  */
 :root {
-  --oblik-figure-ink: #1c1917;
-  --oblik-figure-red: #c23b22;
-  --oblik-figure-paper: #f5f5f4;
-  --oblik-figure-paper-soft: #fafafa;
-  --oblik-figure-white: #fbfbfa;
-  --oblik-figure-white-soft: #fff;
-  --oblik-figure-paper-line: #d6d6d3;
-  --oblik-figure-white-line: #e4e4e2;
-  --oblik-figure-check: #c8c8c5;
-  --oblik-figure-title: #8a8a87;
-  --oblik-figure-title-hover: #5c5c59;
+  --oblik-figure-ink: oklch(0.216 0.006 56);
+  --oblik-figure-red: oklch(0.548 0.176 33);
+  --oblik-figure-paper: oklch(0.97 0.001 106);
+  --oblik-figure-paper-soft: oklch(0.985 0 0);
+  --oblik-figure-white: oklch(0.988 0.001 106);
+  --oblik-figure-white-soft: oklch(1 0 0);
+  --oblik-figure-paper-line: oklch(0.875 0.004 106);
+  --oblik-figure-white-line: oklch(0.918 0.003 106);
+  --oblik-figure-check: oklch(0.832 0.004 106);
+  --oblik-figure-title: oklch(0.633 0.004 106);
+  --oblik-figure-title-hover: oklch(0.474 0.005 106);
 }
 
 :root {
