@@ -1,6 +1,5 @@
 import { circle, lineIntersection, parallelLine, point, region, segment } from "oblik";
 
-
 const { max, min } = Math;
 /** Shared plate constructors — stamp/analyze this file, not only the scene. */
 export function mountingPlateLayout(ox = 0, oy = 0) {

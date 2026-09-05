@@ -13,7 +13,6 @@ import {
   union,
 } from "oblik";
 
-
 const { max, min } = Math;
 export default defineScene({
   kind: "euclid2",

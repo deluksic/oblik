@@ -8,9 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@solidjs/web": "2.0.0-rc.0",
     "oblik": "github:deluksic/oblik#path:packages/oblik",
-    "solid-js": "2.0.0-rc.0",
-    "@solidjs/web": "2.0.0-rc.0"
+    "solid-js": "2.0.0-rc.0"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.128",

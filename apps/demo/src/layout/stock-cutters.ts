@@ -14,7 +14,6 @@ import {
   slider,
 } from "oblik";
 
-
 const { max, min } = Math;
 /**
  * Geometry layers:

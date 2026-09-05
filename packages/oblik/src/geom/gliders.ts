@@ -2,7 +2,6 @@ import { lineBasis } from "./ops";
 import type { Circle, LineLike, Segment } from "./types";
 import { add, dot, isFiniteVec, lerp, mul, norm, sub, type Vec2 } from "./vec";
 
-
 const { abs, max, min } = Math;
 export type GliderSegment = {
   kind: "gliderSegment";

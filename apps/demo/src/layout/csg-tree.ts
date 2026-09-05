@@ -15,7 +15,6 @@ import {
   union,
 } from "oblik";
 
-
 const { max, min } = Math;
 /**
  * Nested booleans for the CSG tree demo:

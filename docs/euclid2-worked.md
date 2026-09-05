@@ -6,23 +6,31 @@ Misses are NaN. Length reuse is a **named field**: Circle `.radius`, Offset `.di
 
 ## Gestures → disk
 
-| # | tool | clicks | disk |
-| --- | --- | --- | --- |
-| 1 | Point | empty | `const A = point(0, 0)` |
-| 2 | Point | empty | `const B = point(6, 0.4)` |
-| 3 | Line | A, B | `const ground = line(A, B)` |
-| 4 | Offset | ground, type `1.8` | `const shelf = offsetLine(ground, 1.8)` |
-| 5 | Circle | A, type `2.5` | `const reach = circle(A, 2.5)` |
-| 6 | Point | `reach ∩ shelf` (nearer click, `+1`) | `const P = circleLineIntersection(reach, shelf.line, +1)` |
-| 7 | Segment | A, P | `segment(A, P)` |
-| 8 | Point | empty | `const lamp = point(2.2, 3.1)` |
-| 9 | Circle | lamp, then P | `const beam = circle(lamp, dist(lamp, P))` |
-| 10 | Point | `beam ∩ ground` | `const Q = circleLineIntersection(beam, ground, +1)` |
-| 11 | Line | P, Q | `line(P, Q)` |
-| 12 | Offset | ground, then shelf in the **Length** slot (other side) | `const cellar = offsetLine(ground, -shelf.distance)` |
+| #   | tool    | clicks                                                 | disk                                                      |
+| --- | ------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| 1   | Point   | empty                                                  | `const A = point(0, 0)`                                   |
+| 2   | Point   | empty                                                  | `const B = point(6, 0.4)`                                 |
+| 3   | Line    | A, B                                                   | `const ground = line(A, B)`                               |
+| 4   | Offset  | ground, type `1.8`                                     | `const shelf = offsetLine(ground, 1.8)`                   |
+| 5   | Circle  | A, type `2.5`                                          | `const reach = circle(A, 2.5)`                            |
+| 6   | Point   | `reach ∩ shelf` (nearer click, `+1`)                   | `const P = circleLineIntersection(reach, shelf.line, +1)` |
+| 7   | Segment | A, P                                                   | `segment(A, P)`                                           |
+| 8   | Point   | empty                                                  | `const lamp = point(2.2, 3.1)`                            |
+| 9   | Circle  | lamp, then P                                           | `const beam = circle(lamp, dist(lamp, P))`                |
+| 10  | Point   | `beam ∩ ground`                                        | `const Q = circleLineIntersection(beam, ground, +1)`      |
+| 11  | Line    | P, Q                                                   | `line(P, Q)`                                              |
+| 12  | Offset  | ground, then shelf in the **Length** slot (other side) | `const cellar = offsetLine(ground, -shelf.distance)`      |
 
 ```ts
-import { point, line, circle, offsetLine, segment, dist, circleLineIntersection } from "@design-scenes/geom";
+import {
+  point,
+  line,
+  circle,
+  offsetLine,
+  segment,
+  dist,
+  circleLineIntersection,
+} from "@design-scenes/geom";
 
 export function scene() {
   const A = point(0, 0);
@@ -49,20 +57,20 @@ Length slot on step 12: hit is an Offset → writer emits `-shelf.distance`. Sam
 
 ## After the call-site annotator
 
-| call | `__annotations__.editable` | write |
-| --- | --- | --- |
-| `point(0, 0)` | true | `0`, `0` |
-| `point(6, 0.4)` | true | `6`, `0.4` |
-| `line(A, B)` | false | — |
-| `offsetLine(ground, 1.8)` | true | `1.8` |
-| `circle(A, 2.5)` | true | `2.5` |
-| `circleLineIntersection(reach, shelf.line, +1)` | false | — |
-| `segment(A, P)` | false | — |
-| `point(2.2, 3.1)` | true | lamp |
-| `circle(lamp, dist(lamp, P))` | false | — |
-| `circleLineIntersection(beam, ground, +1)` | false | — |
-| `line(P, Q)` | false | — |
-| `offsetLine(ground, -shelf.distance)` | false | — |
+| call                                            | `__annotations__.editable` | write      |
+| ----------------------------------------------- | -------------------------- | ---------- |
+| `point(0, 0)`                                   | true                       | `0`, `0`   |
+| `point(6, 0.4)`                                 | true                       | `6`, `0.4` |
+| `line(A, B)`                                    | false                      | —          |
+| `offsetLine(ground, 1.8)`                       | true                       | `1.8`      |
+| `circle(A, 2.5)`                                | true                       | `2.5`      |
+| `circleLineIntersection(reach, shelf.line, +1)` | false                      | —          |
+| `segment(A, P)`                                 | false                      | —          |
+| `point(2.2, 3.1)`                               | true                       | lamp       |
+| `circle(lamp, dist(lamp, P))`                   | false                      | —          |
+| `circleLineIntersection(beam, ground, +1)`      | false                      | —          |
+| `line(P, Q)`                                    | false                      | —          |
+| `offsetLine(ground, -shelf.distance)`           | false                      | —          |
 
 Handles: A, B, lamp, shelf `.distance`, reach `.radius`. Shown only while those placement values are finite.
 
@@ -76,13 +84,13 @@ Omit: P, Q, segment, beam, PQ. Keep: A, B, lamp, ground, shelf, cellar, reach, a
 
 ## Drags (DAG)
 
-| drag | follows |
-| --- | --- |
-| A | ground, shelf, cellar, reach, P, segment, beam, Q, PQ |
-| B | ground, shelf, cellar, not reach `.radius` |
-| shelf `1.8` | shelf, P, beam, Q, PQ, cellar (`-shelf.distance`) |
-| reach `2.5` | P, segment, beam, Q, PQ |
-| lamp | beam, Q, PQ; P does not move |
+| drag        | follows                                               |
+| ----------- | ----------------------------------------------------- |
+| A           | ground, shelf, cellar, reach, P, segment, beam, Q, PQ |
+| B           | ground, shelf, cellar, not reach `.radius`            |
+| shelf `1.8` | shelf, P, beam, Q, PQ, cellar (`-shelf.distance`)     |
+| reach `2.5` | P, segment, beam, Q, PQ                               |
+| lamp        | beam, Q, PQ; P does not move                          |
 
 ## Where it falls apart
 

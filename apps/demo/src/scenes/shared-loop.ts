@@ -1,6 +1,5 @@
 import { circle, dist, line, parallelLine, point, signedDist, defineScene } from "oblik";
 
-
 const { PI, cos, sin } = Math;
 export default defineScene({
   kind: "euclid2",

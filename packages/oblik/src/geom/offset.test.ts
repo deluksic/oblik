@@ -13,7 +13,6 @@ import {
 import type { Circle, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
-
 const { PI, cos, sin } = Math;
 function poly(pts: readonly Vec2[]): Region {
   const cycle: unknown[] = [];

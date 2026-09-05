@@ -3,7 +3,6 @@ import { describe, expect, test } from "vitest";
 import type { TraceNode } from "../eval/context";
 import { gliderOnTraceNode, resolvePlacePoint } from "./place";
 
-
 const { sqrt } = Math;
 function node(partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>): TraceNode {
   return {

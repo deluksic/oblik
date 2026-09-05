@@ -2,6 +2,10 @@
   "name": "oblik",
   "version": "0.0.0",
   "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -12,10 +16,6 @@
       "default": "./dist/plugin.js"
     }
   },
-  "files": [
-    "src",
-    "dist"
-  ],
   "scripts": {
     "test": "vitest run",
     "build": "node build.mjs",

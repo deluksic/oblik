@@ -23,7 +23,7 @@ export function dot(a: Vec2, b: Vec2): number {
 }
 
 export function len(a: Vec2): number {
-  return sqrt((a.x) * (a.x) + (a.y) * (a.y));
+  return sqrt(a.x * a.x + a.y * a.y);
 }
 
 export function norm(a: Vec2): Vec2 {

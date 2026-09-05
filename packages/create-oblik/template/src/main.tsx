@@ -1,5 +1,5 @@
-import { mountOblik } from "oblik/host";
 import type { DuplicateId, OblikSceneEntry } from "oblik";
+import { mountOblik } from "oblik/host";
 import {
   annotationCollisions as initialCollisions,
   annotationsByPath as initialAnnotations,

@@ -6,7 +6,6 @@ import { alongValue, filletValue, isCircleWalk, regionContains, regionValue } fr
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
-
 const { max } = Math;
 function seg(a: Vec2, b: Vec2): Segment {
   return { kind: "segment", a, b };

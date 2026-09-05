@@ -1,6 +1,6 @@
 # oblik
 
-A code-first design tool, written in TypeScript. You write a program; the program *is* the design. Editing happens in both directions: you type in the editor, you drag on the canvas, and both write to the same source file. Git is the history.
+A code-first design tool, written in TypeScript. You write a program; the program _is_ the design. Editing happens in both directions: you type in the editor, you drag on the canvas, and both write to the same source file. Git is the history.
 
 This is an experiment, not a product. It exists because existing design tools are silos — CAD, jewelry, and slicer apps each do one job well and talk to each other poorly — and because we wanted a tool where the design is ordinary code: functions, loops, imports, tests, reviewed in diffs.
 
@@ -12,7 +12,7 @@ One program, many views. A design program is pure TypeScript — geometry in, ge
 - **Figure** (`kind: "figure"`) — the same helpers, painted with ink and styled for publication. For blog-post diagrams and illustrations.
 - Future scene types (3D, SDF, slicing, maps) would be more views of the same programs, not new tools.
 
-The point of the experiment: if a scene is just a lens over a program, adding a new way to *look* at designs should not mean forking the design.
+The point of the experiment: if a scene is just a lens over a program, adding a new way to _look_ at designs should not mean forking the design.
 
 ## How it works
 
@@ -20,9 +20,9 @@ A library stays pure. A scene file declares the interactive bits — points, sli
 
 ```ts
 // scene — interactive inputs
-const A = point(3, 4);                       // draggable
-const r = circle(A, 2).radius;               // slider
-const t = pointOnSegment(seg, 0.3);          // glider
+const A = point(3, 4); // draggable
+const r = circle(A, 2).radius; // slider
+const t = pointOnSegment(seg, 0.3); // glider
 
 // library — plain math, importable, testable
 export const shape = ringProfile({ inner: r, seam: t, origin: A });

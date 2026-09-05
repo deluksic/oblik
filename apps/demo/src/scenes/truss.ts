@@ -1,4 +1,16 @@
-import { add, circle, lerp, mul, norm, perp, point, pointOnSegment, segment, sub, defineScene } from "oblik";
+import {
+  add,
+  circle,
+  lerp,
+  mul,
+  norm,
+  perp,
+  point,
+  pointOnSegment,
+  segment,
+  sub,
+  defineScene,
+} from "oblik";
 
 export default defineScene({
   kind: "euclid2",

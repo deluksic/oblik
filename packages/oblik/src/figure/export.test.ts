@@ -1,11 +1,20 @@
 import { describe, expect, test } from "vitest";
 
-import { circle, line, paint, point, region, csg2, diff, union, segment } from "../eval/constructors";
+import {
+  circle,
+  line,
+  paint,
+  point,
+  region,
+  csg2,
+  diff,
+  union,
+  segment,
+} from "../eval/constructors";
 import type { TraceNode } from "../eval/context";
 import { evaluate } from "../eval/evaluate";
 import { defineScene } from "../eval/scene";
 import { figureToSvg, type FigureExportOptions } from "./export";
-
 
 const { round } = Math;
 function traceFor(build: () => void): TraceNode[] {

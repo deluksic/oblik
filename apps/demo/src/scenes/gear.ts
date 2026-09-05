@@ -1,4 +1,15 @@
-import { add, circle, defineScene, point, pointOnCircle, polar, polygon, segment, slider, type Vec2 } from "oblik";
+import {
+  add,
+  circle,
+  defineScene,
+  point,
+  pointOnCircle,
+  polar,
+  polygon,
+  segment,
+  slider,
+  type Vec2,
+} from "oblik";
 
 import {
   centerDistance,
@@ -8,7 +19,6 @@ import {
   pitchRadiusFor,
   pitchPoint,
 } from "../layout/gear";
-
 
 const { PI, atan2 } = Math;
 
@@ -29,13 +39,16 @@ export default defineScene({
     const mesh = pointOnCircle(pitch1, 0.6561, 0.7547, "o_gear_mesh");
     const rot1 = atan2(mesh.y - pinion.y, mesh.x - pinion.x);
     const bore1 = circle(pinion, pitch1.radius * 0.32, "o_gear_b1");
-    const ring1 = gearOutline({
-      center: pinion,
-      teeth: z1,
-      pitchRadius: pitch1.radius,
-      pressureAngle: alpha,
-      rotation: rot1,
-    }, 16);
+    const ring1 = gearOutline(
+      {
+        center: pinion,
+        teeth: z1,
+        pitchRadius: pitch1.radius,
+        pressureAngle: alpha,
+        rotation: rot1,
+      },
+      16,
+    );
     const face1 = polygon(ring1, [bore1], "o_gear_face1");
 
     // Wheel is derived: same module, same pressure angle, centre on +X.
@@ -44,13 +57,16 @@ export default defineScene({
     const wheel: Vec2 = { x: pinion.x + centerDistance(pitch1.radius, pitch2), y: pinion.y };
     const rot2 = meshMateRotation(z1, z2, rot1);
     const bore2 = circle(wheel, pitch2 * 0.32, "o_gear_b2");
-    const ring2 = gearOutline({
-      center: wheel,
-      teeth: z2,
-      pitchRadius: pitch2,
-      pressureAngle: alpha,
-      rotation: rot2,
-    }, 16);
+    const ring2 = gearOutline(
+      {
+        center: wheel,
+        teeth: z2,
+        pitchRadius: pitch2,
+        pressureAngle: alpha,
+        rotation: rot2,
+      },
+      16,
+    );
     const face2 = polygon(ring2, [bore2], "o_gear_face2");
 
     const pitch2c = circle(wheel, pitch2, "o_gear_p2");

@@ -1,14 +1,4 @@
-import {
-  add,
-  ang,
-  dist,
-  polar,
-  rotate,
-  sweepCCW,
-  vec,
-  type Vec2,
-} from "oblik";
-
+import { add, ang, dist, polar, rotate, sweepCCW, vec, type Vec2 } from "oblik";
 
 const { PI, abs, cos, max, min, round, sin, sqrt } = Math;
 

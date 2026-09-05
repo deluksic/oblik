@@ -4,7 +4,6 @@ import type { Camera2, PaneSize } from "../camera";
 
 import styles from "./View.module.css";
 
-
 const { ceil, floor } = Math;
 export function Grid(props: { camera: Camera2; size: PaneSize }) {
   const ticks = createMemo(() => {

@@ -105,7 +105,7 @@ export function infiniteClip(
   cam: Camera2,
   size: PaneSize,
 ): { a: { x: number; y: number }; b: { x: number; y: number } } {
-  const span = max(size.w, size.h) / cam.scale + sqrt((cam.x) * (cam.x) + (cam.y) * (cam.y)) + 8;
+  const span = max(size.w, size.h) / cam.scale + sqrt(cam.x * cam.x + cam.y * cam.y) + 8;
   return {
     a: { x: origin.x - dir.x * span, y: origin.y - dir.y * span },
     b: { x: origin.x + dir.x * span, y: origin.y + dir.y * span },

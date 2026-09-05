@@ -34,12 +34,12 @@ Line, Point                            // no HasLength (infinite / none)
 
 A Length slot never switches on `.radius` vs `.d`. Introductions:
 
-| hit | disk |
-| --- | --- |
-| type / click empty | numeric literal on **this** constructor |
-| `HasLength` and finite | `name[LENGTH]` |
-| named slider | `name` |
-| Point (origin already bound) | `dist(c, q)` / `signedDist(q, L)` |
+| hit                          | disk                                    |
+| ---------------------------- | --------------------------------------- |
+| type / click empty           | numeric literal on **this** constructor |
+| `HasLength` and finite       | `name[LENGTH]`                          |
+| named slider                 | `name`                                  |
+| Point (origin already bound) | `dist(c, q)` / `signedDist(q, L)`       |
 
 Shared length: Slider tool first (`const r = slider(1.8)`), then Length-slot click on that slider. The slider owns the literal and the handle. `circle(A, r)` / `offsetLine(L, r)` are names → `editable: false` on those calls, no extra ring/parallel. Do not chase a bare `const r = 1.8`.
 
@@ -49,11 +49,11 @@ Misses are **NaN**, not `null`: `Point` with `x,y` NaN, `[LENGTH]` NaN, `dist` i
 
 ## Potential vs actual
 
-| radius arg | graph | `__annotations__.editable` |
-| --- | --- | --- |
-| `dist(c, q)` / `name[LENGTH]` / call | determined | `false` |
-| numeric literal | potential | `true`, unless disk says `{ editable: false }` |
-| slider / `HasLength` / `dist(...)` | determined **here** (owner is elsewhere) | `false` |
+| radius arg                           | graph                                    | `__annotations__.editable`                     |
+| ------------------------------------ | ---------------------------------------- | ---------------------------------------------- |
+| `dist(c, q)` / `name[LENGTH]` / call | determined                               | `false`                                        |
+| numeric literal                      | potential                                | `true`, unless disk says `{ editable: false }` |
+| slider / `HasLength` / `dist(...)`   | determined **here** (owner is elsewhere) | `false`                                        |
 
 TS types do not distinguish `2.4` from `dist(c, q)`. The annotator does.
 
@@ -80,11 +80,11 @@ Projections: `[LENGTH]`, `.center`, `.x`, `.y`. Slot of `T` takes a `T` or write
 
 ## Tools write (disk)
 
-| tool | slots | disk |
-| --- | --- | --- |
-| Slider | `<number>` | `const r = slider(1.8)` |
-| Point | `<Point>` | `point(x, y)` / reuse / `lineIntersection` / `circleLineIntersection(..., +1)` |
-| Circle | `<Point>`, `<number \| HasLength \| slider \| Point>` | `circle(c, 2.4)` or `circle(c, other[LENGTH])` or `circle(c, r)` or `circle(c, dist(c, q))` |
-| Line | `<Point>`, `<Point>` | `line(a, b)` |
-| Segment | `<Point>`, `<Point>` | `segment(a, b)` |
-| Offset | `<LineLike>`, `<number \| HasLength \| slider \| Point>` | `offsetLine(L, 1.2)` or `offsetLine(L, ±other[LENGTH])` or `offsetLine(L, r)` or `offsetLine(L, signedDist(q, L))` |
+| tool    | slots                                                    | disk                                                                                                               |
+| ------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Slider  | `<number>`                                               | `const r = slider(1.8)`                                                                                            |
+| Point   | `<Point>`                                                | `point(x, y)` / reuse / `lineIntersection` / `circleLineIntersection(..., +1)`                                     |
+| Circle  | `<Point>`, `<number \| HasLength \| slider \| Point>`    | `circle(c, 2.4)` or `circle(c, other[LENGTH])` or `circle(c, r)` or `circle(c, dist(c, q))`                        |
+| Line    | `<Point>`, `<Point>`                                     | `line(a, b)`                                                                                                       |
+| Segment | `<Point>`, `<Point>`                                     | `segment(a, b)`                                                                                                    |
+| Offset  | `<LineLike>`, `<number \| HasLength \| slider \| Point>` | `offsetLine(L, 1.2)` or `offsetLine(L, ±other[LENGTH])` or `offsetLine(L, r)` or `offsetLine(L, signedDist(q, L))` |
