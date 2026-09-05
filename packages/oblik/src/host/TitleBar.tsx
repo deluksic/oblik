@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import IconChevronDown from "~icons/lucide/chevron-down";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconMoon from "~icons/lucide/moon";
@@ -41,12 +41,13 @@ export function TitleBar(props: TitleBarProps) {
   const applyTheme = () => {
     document.documentElement.dataset.theme = resolvedTheme();
   };
-  applyTheme();
-  createEffect(() => {
-    theme.value();
-    applyTheme();
+  // First paint gets the right colors synchronously; the effect keeps it in
+  // sync after that, and the matchMedia listener covers system changes.
+  document.documentElement.dataset.theme = untrack(resolvedTheme);
+  createEffect(resolvedTheme, (t) => {
+    document.documentElement.dataset.theme = t;
   });
-  const onSystemThemeChange = () => applyTheme();
+  const onSystemThemeChange = () => untrack(applyTheme);
   prefersLight.addEventListener("change", onSystemThemeChange);
   onCleanup(() => prefersLight.removeEventListener("change", onSystemThemeChange));
 
