@@ -5,6 +5,8 @@ import { ModalTitleBar } from "../modal/ModalTitleBar";
 import { OBLIK_VERSION } from "../version";
 import { useStoredSignals } from "./StoredSignalsContext";
 
+import { btn, danger, secondary } from "../ui/button.module.css";
+import { kicker } from "../ui/surface.module.css";
 import styles from "./SettingsModal.module.css";
 
 export type SettingsModalProps = {
@@ -27,7 +29,7 @@ export function SettingsModal(props: SettingsModalProps) {
       <ModalTitleBar onClose={() => props.respond()}>Settings</ModalTitleBar>
 
       <section class={styles.section}>
-        <h3 class={styles.sectionTitle}>About</h3>
+        <h3 class={[kicker, styles.sectionTitle]}>About</h3>
         <div class={styles.row}>
           <span class={styles.rowLabel}>oblik</span>
           <code class={styles.version}>v{OBLIK_VERSION}</code>
@@ -35,7 +37,7 @@ export function SettingsModal(props: SettingsModalProps) {
       </section>
 
       <section class={styles.section}>
-        <h3 class={styles.sectionTitle}>Local data</h3>
+        <h3 class={[kicker, styles.sectionTitle]}>Local data</h3>
         <p class={styles.note}>
           Settings such as the sidebar width are persisted in this browser's localStorage.
         </p>
@@ -55,17 +57,17 @@ export function SettingsModal(props: SettingsModalProps) {
                   Clear every key on this origin and restore defaults? This cannot be undone.
                 </p>
                 <div class={styles.btnRow}>
-                  <button type="button" class={styles.secondary} onClick={() => setArmed(false)}>
+                  <button type="button" class={[btn, secondary]} onClick={() => setArmed(false)}>
                     Cancel
                   </button>
-                  <button type="button" class={styles.danger} onClick={confirmReset}>
+                  <button type="button" class={[btn, danger]} onClick={confirmReset}>
                     Clear all local data
                   </button>
                 </div>
               </div>
             }
           >
-            <button type="button" class={styles.resetBtn} onClick={() => setArmed(true)}>
+            <button type="button" class={[btn, styles.resetBtn]} onClick={() => setArmed(true)}>
               <IconTrash class={styles.resetIcon} aria-hidden="true" />
               Reset all local data
             </button>

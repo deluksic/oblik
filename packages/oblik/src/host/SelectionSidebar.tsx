@@ -11,6 +11,7 @@ import {
   type SelectionDetail,
 } from "./selection-detail";
 
+import { kicker } from "../ui/surface.module.css";
 import styles from "./SelectionSidebar.module.css";
 
 export type SelectionSidebarProps = {
@@ -51,7 +52,7 @@ export function SelectionInspector(props: {
   return (
     <>
       <SidebarIdentity crumb={detail().crumb} meta={detail().meta} />
-      <p class={styles.kicker}>Origin</p>
+      <p class={[kicker, styles.kicker]}>Origin</p>
       <Origin origin={detail().origin} onPickScope={props.onPickScope} />
       <Show when={detail().expose}>
         {(note) => <SidebarExpose note={note()} onExpose={props.onExpose} />}
@@ -64,7 +65,7 @@ export function SelectionInspector(props: {
 export function SidebarIdentity(props: { crumb: string; meta: string }) {
   return (
     <div class={styles.head}>
-      <p class={styles.kicker}>Identity</p>
+      <p class={[kicker, styles.kicker]}>Identity</p>
       <h2 class={styles.crumb}>{props.crumb}</h2>
       <p class={styles.meta}>{props.meta}</p>
     </div>
@@ -75,7 +76,7 @@ export function SidebarIdentity(props: { crumb: string; meta: string }) {
 export function SidebarSection(props: ParentProps<{ title: string }>) {
   return (
     <div class={styles.section}>
-      <p class={styles.kicker}>{props.title}</p>
+      <p class={[kicker, styles.kicker]}>{props.title}</p>
       {props.children}
     </div>
   );
@@ -101,7 +102,7 @@ export function SidebarExpose(props: { note: ExposeNote; onExpose?: (bind: strin
   const canAdd = () => props.note.kind === "hint" && !!props.note.bind && !!props.onExpose;
   return (
     <div class={[styles.expose, { [styles.exposeBlocked]: props.note.kind === "blocked" }]}>
-      <p class={styles.kicker}>Return bag</p>
+      <p class={[kicker, styles.kicker]}>Return bag</p>
       <p class={styles.exposeText}>{props.note.text}</p>
       {canAdd() ? (
         <button

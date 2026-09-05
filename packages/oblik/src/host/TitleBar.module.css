@@ -120,10 +120,7 @@
   max-height: 18rem;
   overflow: auto;
   padding: 0.3rem;
-  background: var(--oblik-panel);
-  border: 1px solid var(--oblik-line);
   border-radius: 10px;
-  box-shadow: 0 18px 40px #0008;
 }
 
 .item {
@@ -198,36 +195,6 @@
   color: var(--oblik-muted);
   font-size: 0.72rem;
   user-select: none;
-}
-
-.settings {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--oblik-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    border-color 0.14s;
-}
-
-.settings:hover,
-.settings:focus-visible {
-  color: var(--oblik-text);
-  background: var(--oblik-raised);
-  border-color: var(--oblik-dim);
-}
-
-.settings:focus-visible {
-  outline: none;
 }
 
 .settingsIcon {

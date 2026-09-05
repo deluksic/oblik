@@ -31,10 +31,7 @@
 
 .kicker {
   flex: none;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   font-size: 0.62rem;
-  color: var(--oblik-muted);
 }
 
 .crumb {

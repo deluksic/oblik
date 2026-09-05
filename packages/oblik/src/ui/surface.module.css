@@ -1,0 +1,12 @@
+.panel {
+  background: var(--oblik-panel);
+  border: 1px solid var(--oblik-line);
+  box-shadow: var(--oblik-panel-shadow);
+}
+
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--oblik-muted);
+}

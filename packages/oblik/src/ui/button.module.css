@@ -1,0 +1,94 @@
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    border-color 0.14s,
+    opacity 0.14s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: 1px solid var(--oblik-accent);
+  outline-offset: 1px;
+}
+
+.primary {
+  color: var(--oblik-paper);
+  background: var(--oblik-accent);
+  border: 1px solid var(--oblik-accent);
+}
+
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--oblik-accent) 88%, white);
+}
+
+.secondary {
+  color: var(--oblik-text);
+  background: var(--oblik-well);
+  border: 1px solid var(--oblik-line);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--oblik-raised);
+  border-color: var(--oblik-dim);
+}
+
+.danger {
+  color: var(--oblik-paper);
+  background: var(--oblik-error);
+  border: 1px solid var(--oblik-error);
+}
+
+.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--oblik-error) 86%, white);
+}
+
+.icon {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--oblik-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    border-color 0.14s;
+}
+
+.icon:hover {
+  color: var(--oblik-text);
+  background: var(--oblik-raised);
+  border-color: var(--oblik-dim);
+}
+
+.icon:focus-visible {
+  outline: 1px solid var(--oblik-accent);
+  outline-offset: 1px;
+}
+
+.iconTinted {
+  color: var(--oblik-muted);
+  background: var(--oblik-well);
+  border-color: var(--oblik-line);
+}

@@ -8,11 +8,13 @@ import IconSun from "~icons/lucide/sun";
 import { useRequestModal } from "../modal/ModalContext";
 import type { OblikSceneEntry } from "../source/catalog";
 import { OBLIK_VERSION } from "../version";
-import { createStoredSignal } from "./StoredSignalsContext";
 import { hasSceneError, navItems } from "./routing";
 import { SceneKindIcon } from "./SceneKindIcon";
 import { SettingsModal } from "./SettingsModal";
+import { createStoredSignal } from "./StoredSignalsContext";
 
+import { icon } from "../ui/button.module.css";
+import { panel } from "../ui/surface.module.css";
 import styles from "./TitleBar.module.css";
 
 export type TitleBarProps = {
@@ -145,7 +147,7 @@ export function TitleBar(props: TitleBarProps) {
           <Show when={menuOpen()}>
             <div class={styles.backdrop} onPointerDown={closeMenu} />
             <div
-              class={styles.menu}
+              class={[panel, styles.menu]}
               role="menu"
               aria-label="Scene"
               onPointerDown={(e) => e.stopPropagation()}
@@ -177,15 +179,20 @@ export function TitleBar(props: TitleBarProps) {
         <span class={styles.version}>v{OBLIK_VERSION}</span>
         <button
           type="button"
-          class={styles.settings}
-          aria-label={resolvedTheme() === "light" ? "Switch to dark theme" : "Switch to light theme"}
+          class={icon}
+          aria-label={
+            resolvedTheme() === "light" ? "Switch to dark theme" : "Switch to light theme"
+          }
           onClick={toggleTheme}
         >
-          <Show when={resolvedTheme() === "light"} fallback={<IconSun class={styles.settingsIcon} aria-hidden="true" />}>
+          <Show
+            when={resolvedTheme() === "light"}
+            fallback={<IconSun class={styles.settingsIcon} aria-hidden="true" />}
+          >
             <IconMoon class={styles.settingsIcon} aria-hidden="true" />
           </Show>
         </button>
-        <button type="button" class={styles.settings} aria-label="Settings" onClick={openSettings}>
+        <button type="button" class={icon} aria-label="Settings" onClick={openSettings}>
           <IconSettings class={styles.settingsIcon} aria-hidden="true" />
         </button>
       </div>

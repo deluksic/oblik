@@ -52,51 +52,6 @@
   flex: 1;
 }
 
-.secondary,
-.primary {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 8px 14px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  border-radius: 9px;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    border-color 0.14s,
-    opacity 0.14s;
-}
-
-.secondary {
-  color: var(--oblik-text);
-  background: var(--oblik-well);
-  border: 1px solid var(--oblik-line);
-}
-
-.secondary:hover:not(:disabled) {
-  background: var(--oblik-raised);
-  border-color: var(--oblik-dim);
-}
-
-.primary {
-  color: var(--oblik-paper);
-  background: var(--oblik-accent);
-  border: 1px solid var(--oblik-accent);
-}
-
-.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--oblik-accent) 88%, white);
-}
-
-.secondary:disabled,
-.primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .btnIcon {
   width: 1rem;
   height: 1rem;

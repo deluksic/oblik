@@ -12,33 +12,6 @@
   color: var(--oblik-text);
 }
 
-.close {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  font-size: 1.15rem;
-  line-height: 1;
-  color: var(--oblik-muted);
-  background: var(--oblik-well);
-  border: 1px solid var(--oblik-line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    border-color 0.14s;
-}
-
-.close:hover {
-  color: var(--oblik-text);
-  background: var(--oblik-raised);
-  border-color: var(--oblik-dim);
-}
-
 .closeIcon {
   width: 1rem;
   height: 1rem;

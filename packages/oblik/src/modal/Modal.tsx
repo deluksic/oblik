@@ -4,6 +4,7 @@ import type { ParentProps } from "solid-js";
 
 import { ModalContext, type ModalConfig } from "./ModalContext";
 
+import { panel } from "../ui/surface.module.css";
 import styles from "./Modal.module.css";
 
 type ModalInstance = {
@@ -96,7 +97,7 @@ function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknow
   return (
     <dialog
       ref={setEl}
-      class={[styles.modal, props.instance.config.class]}
+      class={[panel, styles.modal, props.instance.config.class]}
       onCancel={(e) => {
         e.preventDefault();
         props.onDismiss(undefined);

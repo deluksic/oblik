@@ -4,6 +4,7 @@ import IconDownload from "~icons/lucide/download";
 
 import { ModalTitleBar } from "../modal/ModalTitleBar";
 
+import { btn, primary, secondary } from "../ui/button.module.css";
 import styles from "./ExportModal.module.css";
 
 export type ExportModalProps = {
@@ -58,20 +59,20 @@ export function ExportModal(props: ExportModalProps) {
         </Show>
       </div>
       <footer class={styles.footer}>
-        <button type="button" class={styles.secondary} onClick={() => props.respond()}>
+        <button type="button" class={[btn, secondary]} onClick={() => props.respond()}>
           Close
         </button>
         <span class={styles.spacer} />
         <button
           type="button"
-          class={styles.secondary}
+          class={[btn, secondary]}
           disabled={props.empty}
           onClick={() => void copy()}
         >
           <IconClipboard class={styles.btnIcon} aria-hidden="true" />
           {copied() ? "Copied!" : "Copy SVG"}
         </button>
-        <button type="button" class={styles.primary} disabled={props.empty} onClick={download}>
+        <button type="button" class={[btn, primary]} disabled={props.empty} onClick={download}>
           <IconDownload class={styles.btnIcon} aria-hidden="true" />
           Download .svg
         </button>

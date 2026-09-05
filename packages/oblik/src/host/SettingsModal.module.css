@@ -12,12 +12,8 @@
 }
 
 .sectionTitle {
-  margin: 0;
   font-size: 0.68rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--oblik-muted);
 }
 
 .row {
@@ -44,33 +40,14 @@
   line-height: 1.45;
 }
 
-.resetBtn,
-.secondary,
-.danger {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  align-self: flex-start;
-  padding: 8px 14px;
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 500;
-  border-radius: 9px;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    border-color 0.14s;
-}
-
 .resetBtn {
+  align-self: flex-start;
   color: var(--oblik-text);
   background: var(--oblik-well);
   border: 1px solid var(--oblik-line);
 }
 
-.resetBtn:hover {
+.resetBtn:hover:not(:disabled) {
   border-color: var(--oblik-error);
   color: var(--oblik-error);
 }
@@ -107,25 +84,4 @@
 .btnRow {
   display: flex;
   gap: 0.6rem;
-}
-
-.secondary {
-  color: var(--oblik-text);
-  background: var(--oblik-well);
-  border: 1px solid var(--oblik-line);
-}
-
-.secondary:hover {
-  background: var(--oblik-raised);
-  border-color: var(--oblik-dim);
-}
-
-.danger {
-  color: var(--oblik-paper);
-  background: var(--oblik-error);
-  border: 1px solid var(--oblik-error);
-}
-
-.danger:hover {
-  background: color-mix(in srgb, var(--oblik-error) 86%, white);
 }

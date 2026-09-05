@@ -2,6 +2,7 @@ import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
 import IconX from "~icons/lucide/x";
 
+import { icon, iconTinted } from "../ui/button.module.css";
 import styles from "./ModalTitleBar.module.css";
 
 export type ModalTitleBarProps = {
@@ -16,7 +17,7 @@ export function ModalTitleBar(props: ParentProps<ModalTitleBarProps>) {
       <Show when={props.onClose}>
         <button
           type="button"
-          class={styles.close}
+          class={[icon, iconTinted]}
           aria-label="Close"
           onClick={() => props.onClose?.()}
         >
