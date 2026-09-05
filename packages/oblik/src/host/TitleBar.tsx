@@ -1,11 +1,14 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import IconChevronDown from "~icons/lucide/chevron-down";
 import IconChevronRight from "~icons/lucide/chevron-right";
+import IconMoon from "~icons/lucide/moon";
 import IconSettings from "~icons/lucide/settings";
+import IconSun from "~icons/lucide/sun";
 
 import { useRequestModal } from "../modal/ModalContext";
 import type { OblikSceneEntry } from "../source/catalog";
 import { OBLIK_VERSION } from "../version";
+import { createStoredSignal } from "./StoredSignalsContext";
 import { hasSceneError, navItems } from "./routing";
 import { SceneKindIcon } from "./SceneKindIcon";
 import { SettingsModal } from "./SettingsModal";
@@ -23,6 +26,33 @@ export type TitleBarProps = {
 export function TitleBar(props: TitleBarProps) {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const requestModal = useRequestModal();
+
+  // Theme preference: "system" follows the OS; an explicit light/dark pins it
+  // until settings' reset restores "system". Applied synchronously at setup so
+  // the first paint already has the right colors.
+  const theme = createStoredSignal<"light" | "dark" | "system">("oblik.theme", {
+    defaultValue: "system",
+  });
+  const prefersLight = window.matchMedia("(prefers-color-scheme: light)");
+
+  const resolvedTheme = () =>
+    theme.value() === "system" ? (prefersLight.matches ? "light" : "dark") : theme.value();
+
+  const applyTheme = () => {
+    document.documentElement.dataset.theme = resolvedTheme();
+  };
+  applyTheme();
+  createEffect(() => {
+    theme.value();
+    applyTheme();
+  });
+  const onSystemThemeChange = () => applyTheme();
+  prefersLight.addEventListener("change", onSystemThemeChange);
+  onCleanup(() => prefersLight.removeEventListener("change", onSystemThemeChange));
+
+  function toggleTheme() {
+    theme.set(resolvedTheme() === "light" ? "dark" : "light");
+  }
 
   const current = createMemo(() =>
     props.sceneId === undefined
@@ -144,6 +174,16 @@ export function TitleBar(props: TitleBarProps) {
       </div>
       <div class={styles.actions}>
         <span class={styles.version}>v{OBLIK_VERSION}</span>
+        <button
+          type="button"
+          class={styles.settings}
+          aria-label={resolvedTheme() === "light" ? "Switch to dark theme" : "Switch to light theme"}
+          onClick={toggleTheme}
+        >
+          <Show when={resolvedTheme() === "light"} fallback={<IconSun class={styles.settingsIcon} aria-hidden="true" />}>
+            <IconMoon class={styles.settingsIcon} aria-hidden="true" />
+          </Show>
+        </button>
         <button type="button" class={styles.settings} aria-label="Settings" onClick={openSettings}>
           <IconSettings class={styles.settingsIcon} aria-hidden="true" />
         </button>

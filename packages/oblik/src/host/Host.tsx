@@ -29,7 +29,8 @@ import { StoredSignalsProvider } from "./StoredSignalsContext";
 import { TitleBar } from "./TitleBar";
 import { Welcome } from "./Welcome";
 
-import "../theme.css";
+import "../theme/reset.css";
+import "../theme/index.css";
 import styles from "./Host.module.css";
 
 export type AnnotationBundle = Record<string, Record<string, Annotation>>;
