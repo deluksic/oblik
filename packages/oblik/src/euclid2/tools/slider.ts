@@ -1,4 +1,4 @@
-import type { Expr } from "@/source/expr";
+import type { Expr } from "#source/expr";
 
 import { round } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";

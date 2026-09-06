@@ -1,8 +1,8 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
-import type { TraceNode } from "@/eval/context";
-import { isFillGeom } from "@/geom/csg2";
-import { isGlider } from "@/geom/gliders";
+import type { TraceNode } from "#eval/context";
+import { isFillGeom } from "#geom/csg2";
+import { isGlider } from "#geom/gliders";
 
 import {
   kWorldToNdc,

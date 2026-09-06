@@ -1,11 +1,11 @@
 import { For, Show, createMemo } from "solid-js";
 
-import type { TraceNode } from "@/eval/context";
-import type { Circle, Csg2, Pick, Polygon, Region, Segment } from "@/geom";
-import { fillPaint } from "@/geom/csg-draw";
-import { isOffsetCsg, isCsg2 } from "@/geom/csg2";
-import { infiniteLineAxis } from "@/geom/ops";
-import { edgesSvgPath, walkSvgPath } from "@/geom/region";
+import type { TraceNode } from "#eval/context";
+import type { Circle, Csg2, Pick, Polygon, Region, Segment } from "#geom";
+import { fillPaint } from "#geom/csg-draw";
+import { isOffsetCsg, isCsg2 } from "#geom/csg2";
+import { infiniteLineAxis } from "#geom/ops";
+import { edgesSvgPath, walkSvgPath } from "#geom/region";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../camera";
 import { traceKey } from "../pick";

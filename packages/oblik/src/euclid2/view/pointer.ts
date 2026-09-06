@@ -1,9 +1,9 @@
-import type { TraceNode } from "@/eval/context";
-import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "@/geom";
-import { isCsg2, isOffset, isOffsetCsg, offsetOfCsg, offsetSourceSdf } from "@/geom/csg2";
-import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "@/geom/gliders";
-import { lineBasis, signedDist } from "@/geom/ops";
-import { mul, perp, sub } from "@/geom/vec";
+import type { TraceNode } from "#eval/context";
+import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "#geom";
+import { isCsg2, isOffset, isOffsetCsg, offsetOfCsg, offsetSourceSdf } from "#geom/csg2";
+import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "#geom/gliders";
+import { lineBasis, signedDist } from "#geom/ops";
+import { mul, perp, sub } from "#geom/vec";
 
 import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "@/eval/context";
-import type { Region, Segment } from "@/geom";
-import { wrapCsg, offsetValue } from "@/geom/csg2";
-import { regionValue } from "@/geom/region";
+import type { TraceNode } from "#eval/context";
+import type { Region, Segment } from "#geom";
+import { wrapCsg, offsetValue } from "#geom/csg2";
+import { regionValue } from "#geom/region";
 
 import { applyDrag, offsetDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 

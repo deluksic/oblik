@@ -1,6 +1,5 @@
 import { point, slider } from "oblik";
-
-import { defineScene } from "@/index";
+import { defineScene } from "oblik";
 
 import { recursiveQuad } from "../layout/recursive-squares";
 

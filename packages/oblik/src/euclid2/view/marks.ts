@@ -1,6 +1,6 @@
-import type { TraceNode } from "@/eval/context";
-import { isCsg2, isOffsetCsg } from "@/geom/csg2";
-import { isGlider } from "@/geom/gliders";
+import type { TraceNode } from "#eval/context";
+import { isCsg2, isOffsetCsg } from "#geom/csg2";
+import { isGlider } from "#geom/gliders";
 
 import { traceKey } from "../pick";
 

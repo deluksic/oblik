@@ -1,6 +1,6 @@
-import type { TraceNode } from "@/eval/context";
-import type { Circle, ParallelLine } from "@/geom";
-import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "@/source/expr";
+import type { TraceNode } from "#eval/context";
+import type { Circle, ParallelLine } from "#geom";
+import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "#source/expr";
 
 import { hitsNear, nodeByPrint, nodeByTraceAttr } from "../pick";
 import { isPinnedPoint } from "../place";

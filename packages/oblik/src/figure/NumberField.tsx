@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 
-import { formatNum } from "@/source/patch";
+import { formatNum } from "#source/patch";
 
 import { parseLiveNum, sameNum } from "./number-field";
 

@@ -1,4 +1,4 @@
-import type { TraceNode } from "@/eval/context";
+import type { TraceNode } from "#eval/context";
 
 import { circle } from "./circle";
 import { firstInvalid, focusedDraft, keySession, tabSession, typeSession, withSlot } from "./draft";

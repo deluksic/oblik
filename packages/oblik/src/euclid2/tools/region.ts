@@ -1,7 +1,7 @@
-import type { TraceNode } from "@/eval/context";
-import type { Branch, Circle, LineLike, LoopEdge } from "@/geom";
-import { alongK, lineBasis, projectOnCircle, projectOnLine } from "@/geom";
-import { printExpr, parsePath, type Expr } from "@/source/expr";
+import type { TraceNode } from "#eval/context";
+import type { Branch, Circle, LineLike, LoopEdge } from "#geom";
+import { alongK, lineBasis, projectOnCircle, projectOnLine } from "#geom";
+import { printExpr, parsePath, type Expr } from "#source/expr";
 
 import type { Camera2 } from "../camera";
 import { namedStrokesThrough, nodeByPrint, snapStrokeCarrier, type SnapFilter } from "../pick";

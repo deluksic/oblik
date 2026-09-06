@@ -1,4 +1,4 @@
-import { printExpr } from "@/source/expr";
+import { printExpr } from "#source/expr";
 
 import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";

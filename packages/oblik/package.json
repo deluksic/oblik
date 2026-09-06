@@ -7,6 +7,27 @@
     "dist"
   ],
   "type": "module",
+  "imports": {
+    "#eval/context": "./src/eval/context.ts",
+    "#eval/inv": "./src/eval/inv.ts",
+    "#eval/paint": "./src/eval/paint.ts",
+    "#eval/reuse-trace": "./src/eval/reuse-trace.ts",
+    "#eval/stack": "./src/eval/stack.ts",
+    "#geom": "./src/geom/index.ts",
+    "#geom/csg-draw": "./src/geom/csg-draw.ts",
+    "#geom/csg2": "./src/geom/csg2.ts",
+    "#geom/evaluate-regions": "./src/geom/evaluate-regions.ts",
+    "#geom/gliders": "./src/geom/gliders.ts",
+    "#geom/offset": "./src/geom/offset.ts",
+    "#geom/ops": "./src/geom/ops.ts",
+    "#geom/polygon": "./src/geom/polygon.ts",
+    "#geom/region": "./src/geom/region.ts",
+    "#geom/vec": "./src/geom/vec.ts",
+    "#source/expr": "./src/source/expr.ts",
+    "#source/hoist": "./src/source/hoist.ts",
+    "#source/mention": "./src/source/mention.ts",
+    "#source/patch": "./src/source/patch.ts"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./host": "./src/host/index.ts",

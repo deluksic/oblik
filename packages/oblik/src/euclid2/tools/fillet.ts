@@ -1,5 +1,5 @@
-import { filletAtVertex, isFiniteRegion, regionCorners, walkEdges, type Region } from "@/geom";
-import { printExpr, type Expr } from "@/source/expr";
+import { filletAtVertex, isFiniteRegion, regionCorners, walkEdges, type Region } from "#geom";
+import { printExpr, type Expr } from "#source/expr";
 
 import { snapRegion } from "../pick";
 import { dist, exprOfPlace, hoverBind, isPinnedPoint, round, sameRef } from "./common";

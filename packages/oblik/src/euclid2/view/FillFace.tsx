@@ -1,11 +1,11 @@
 import { For, Show, createMemo, type Accessor, type ParentProps } from "solid-js";
 
-import type { Csg2, Pick as GeomPick, Polygon, Region } from "@/geom";
-import { fillPaint, type CsgPaint, type DrawOp } from "@/geom/csg-draw";
-import { isPick } from "@/geom/csg2";
-import { evaluateRegions } from "@/geom/evaluate-regions";
-import { polygonSvgPath } from "@/geom/polygon";
-import { regionSvgPath } from "@/geom/region";
+import type { Csg2, Pick as GeomPick, Polygon, Region } from "#geom";
+import { fillPaint, type CsgPaint, type DrawOp } from "#geom/csg-draw";
+import { isPick } from "#geom/csg2";
+import { evaluateRegions } from "#geom/evaluate-regions";
+import { polygonSvgPath } from "#geom/polygon";
+import { regionSvgPath } from "#geom/region";
 
 import { chromeClipUrl, chromeOutsideClipId, type ChromeLayer } from "./chrome";
 import { ChromeOutsideClip } from "./ChromeClip";

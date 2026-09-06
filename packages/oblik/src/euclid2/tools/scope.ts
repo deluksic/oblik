@@ -1,10 +1,10 @@
-import type { TraceNode } from "@/eval/context";
-import { invMatches, type TraceInv } from "@/eval/inv";
-import { sourceFileKey } from "@/eval/stack";
-import type { Circle, LineLike, Region } from "@/geom";
-import { gliderAt, isGlider } from "@/geom/gliders";
-import { member, printExpr, type Expr } from "@/source/expr";
-import { fnNamed, insertPointNames, type MentionFile, type MentionFn } from "@/source/mention";
+import type { TraceNode } from "#eval/context";
+import { invMatches, type TraceInv } from "#eval/inv";
+import { sourceFileKey } from "#eval/stack";
+import type { Circle, LineLike, Region } from "#geom";
+import { gliderAt, isGlider } from "#geom/gliders";
+import { member, printExpr, type Expr } from "#source/expr";
+import { fnNamed, insertPointNames, type MentionFile, type MentionFn } from "#source/mention";
 
 import { isFiniteTrace, traceKey, type SnapFilter } from "../pick";
 import type { Placed, Scope } from "./types";

@@ -1,6 +1,6 @@
 import { createMemo } from "solid-js";
 
-import { parallelLineValue } from "@/geom/ops";
+import { parallelLineValue } from "#geom/ops";
 
 import { infiniteClip, worldToScreen, type Camera2, type PaneSize } from "../camera";
 import type { Ghost } from "../tool";

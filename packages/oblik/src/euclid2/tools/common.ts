@@ -1,5 +1,5 @@
-import { printExpr, parsePath, type Expr } from "@/source/expr";
-import { hoistIntersections, printHoist, takeBind } from "@/source/hoist";
+import { printExpr, parsePath, type Expr } from "#source/expr";
+import { hoistIntersections, printHoist, takeBind } from "#source/hoist";
 
 import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";

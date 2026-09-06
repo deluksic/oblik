@@ -1,4 +1,4 @@
-import { formatNum } from "@/source/patch";
+import { formatNum } from "#source/patch";
 
 /** Incomplete drafts like `-` / `.` stay invalid until they parse as a finite number. */
 export function parseLiveNum(raw: string, opts?: { min?: number }): number | undefined {

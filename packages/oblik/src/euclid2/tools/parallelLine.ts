@@ -1,6 +1,6 @@
-import type { LineLike } from "@/geom";
-import { signedDist } from "@/geom/ops";
-import { printExpr } from "@/source/expr";
+import type { LineLike } from "#geom";
+import { signedDist } from "#geom/ops";
+import { printExpr } from "#source/expr";
 
 import { snapLineCarrier } from "../pick";
 import {

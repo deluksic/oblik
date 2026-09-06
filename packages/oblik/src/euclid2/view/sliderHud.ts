@@ -1,4 +1,4 @@
-import type { TraceNode } from "@/eval/context";
+import type { TraceNode } from "#eval/context";
 
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 

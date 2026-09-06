@@ -1,7 +1,7 @@
 import { For, createMemo } from "solid-js";
 
-import type { SliderValue, TraceNode } from "@/eval/context";
-import { formatNum } from "@/source/patch";
+import type { SliderValue, TraceNode } from "#eval/context";
+import { formatNum } from "#source/patch";
 
 import { traceKey } from "../pick";
 import { layoutSliders, type SliderLayout } from "./sliderHud";

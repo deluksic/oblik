@@ -7,7 +7,7 @@ import {
   type CsgDraw,
   type CsgPaint,
   type DrawOp,
-} from "@/geom/csg-draw";
+} from "#geom/csg-draw";
 
 import { chromeClipUrl, layerStrokeWidth, type ChromeLayer } from "./chrome";
 import { ChromeOutsideClip } from "./ChromeClip";

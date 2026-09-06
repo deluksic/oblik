@@ -1,7 +1,7 @@
-import type { Region } from "@/geom";
-import { roundOffsetValue } from "@/geom/offset";
-import { signedDistToRegion, walkEdges } from "@/geom/region";
-import { printExpr } from "@/source/expr";
+import type { Region } from "#geom";
+import { roundOffsetValue } from "#geom/offset";
+import { signedDistToRegion, walkEdges } from "#geom/region";
+import { printExpr } from "#source/expr";
 
 import { snapRegion } from "../pick";
 import { exprOfPrint, hoverBind, previewCall, round } from "./common";
