@@ -12,8 +12,7 @@ describe("isUserAppSource", () => {
     expect(isUserAppSource(app, "/repo/apps/demo/src/scenes/shelf.ts")).toBe(true);
   });
 
-  test("rejects loaders, dts, and files outside the app", () => {
-    expect(isUserAppSource(app, "/repo/apps/demo/src/scene-loaders.ts")).toBe(false);
+  test("rejects dts and files outside the app", () => {
     expect(isUserAppSource(app, "/repo/apps/demo/src/vite-env.d.ts")).toBe(false);
     expect(isUserAppSource(app, "/repo/packages/oblik/src/index.ts")).toBe(false);
   });

@@ -1,4 +1,5 @@
 export { mountOblik } from "./Host";
+export { bootstrap, type BootstrapOpts } from "./bootstrap";
 export type {
   OblikMount,
   OblikMountOpts,

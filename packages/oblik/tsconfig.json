@@ -4,7 +4,7 @@
     "lib": ["ES2023", "DOM"],
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "plugins": [{ "name": "typescript-plugin-css-modules" }],
     "baseUrl": ".",
     "paths": {
