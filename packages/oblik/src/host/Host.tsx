@@ -11,7 +11,7 @@ import {
 } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import type { FigureScene, Scene } from "../eval/scene";
+import type { Euclid2Scene, FigureScene, Scene } from "../eval/scene";
 import { FigurePane } from "../figure/Pane";
 import { Modal } from "../modal/Modal";
 import type { Annotation } from "../source/analyze";
@@ -205,7 +205,7 @@ function Host(props: {
     if (kind === "euclid2") {
       return (
         <Euclid2Pane
-          scene={scene() as import("../eval/scene").Euclid2Scene}
+          scene={scene() as Euclid2Scene}
           file={file}
           annotations={annotations()}
           mentions={Object.values(props.mentions)}
