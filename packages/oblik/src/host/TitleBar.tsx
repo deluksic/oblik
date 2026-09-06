@@ -63,6 +63,19 @@ export function TitleBar(props: TitleBarProps) {
       : (props.scenes.find((s) => s.id === props.sceneId) ?? undefined),
   );
 
+  // The browser tab mirrors the open scene: its module filename (not the
+  // defineScene title) so the tab identifies the source file, and the app
+  // name again on the welcome screen.
+  createEffect(
+    () => {
+      const scene = current();
+      return scene === undefined ? undefined : scene.file;
+    },
+    (file) => {
+      document.title = file === undefined ? "oblik" : file;
+    },
+  );
+
   // Close the scene menu on Escape from the capture phase so the panes'
   // bubble-phase Escape handlers (tool/selection) never see it.
   createEffect(
