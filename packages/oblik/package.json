@@ -20,7 +20,8 @@
     "test": "vitest run",
     "build": "node build.mjs",
     "css:dts": "tcm -p '**/*.module.css' src",
-    "typecheck": "pnpm css:dts && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit"
+    "typecheck": "pnpm css:dts && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "prepare": "node build.mjs"
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
