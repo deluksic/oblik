@@ -147,7 +147,9 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
       if (!fs.existsSync(path.join(server.config.root, "index.html"))) {
         // Serve a shell for "/" so apps can mount with just a main.tsx.
         server.middlewares.use((req, res, next) => {
-          if (req.method !== "GET" || (req.url !== "/" && req.url !== "/index.html")) {
+          // Compare pathname only: "/?scene=x" must still hit the shell.
+          const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+          if (req.method !== "GET" || (pathname !== "/" && pathname !== "/index.html")) {
             next();
             return;
           }
