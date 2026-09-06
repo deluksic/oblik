@@ -127,7 +127,10 @@ function Host(props: {
     sceneRev();
     const e = entry();
     const loaders = props.loaders;
-    if (!e) throw new Error(`Unknown scene "${sceneId()}"`);
+    // Deleted scene, not an error: a throw here would escape the <Errored>
+    // boundary (memos recompute in the flush queue, outside its scope) and
+    // halt the whole reactive system. The pane renders a "deleted" notice.
+    if (!e) return undefined;
     if (e.error) throw new Error(e.error);
     const key = sceneLoaderKey(e.file);
     const cached = sceneCache.get(key);
@@ -148,10 +151,9 @@ function Host(props: {
   // open (the welcome `<Show>` short-circuits them). Branch identity on the
   // stable `sceneKind` memo so a scene is not remounted when only props change.
   const scene = createMemo(() => loaded());
-  const sceneKind = createMemo(() => scene().kind);
+  const sceneKind = createMemo(() => scene()?.kind);
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
-  const paneFile = createMemo(() => entry()?.path ?? undefined);
 
   createEffect(
     () => true,
@@ -186,9 +188,10 @@ function Host(props: {
   }
 
   const pane = createMemo(() => {
+    const e = entry();
+    if (!e) return <p class={styles.err}>Scene deleted</p>;
     const kind = sceneKind();
-    const file = paneFile();
-    if (file === undefined) return <p class={styles.err}>Unknown scene</p>;
+    const file = e.path;
     if (kind === "figure") {
       return (
         <FigurePane
@@ -223,7 +226,7 @@ function Host(props: {
         />
         <Show when={!isWelcome()}>
           <Loading fallback={undefined}>
-            <p>{scene().hint}</p>
+            <p>{scene()?.hint}</p>
           </Loading>
         </Show>
       </header>

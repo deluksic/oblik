@@ -29,33 +29,26 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
   });
 
   if (import.meta.hot) {
-    import.meta.hot.accept(
-      ["virtual:oblik-catalog", "virtual:oblik-annotations", "virtual:oblik-loaders"],
-      async (mods) => {
-        const catalogMod = mods?.[0] as { scenes: OblikSceneEntry[] } | undefined;
-        const annMod = mods?.[1] as
-          | {
-              annotationsByPath: AnnotationBundle;
-              annotationCollisions: DuplicateId[];
-              mentionsByPath: MentionBundle;
-            }
-          | undefined;
-        const loadersMod = mods?.[2] as { sceneLoaders: SceneLoaderMap } | undefined;
-        if (catalogMod) host.setScenes(catalogMod.scenes);
-        else host.setScenes((await import("virtual:oblik-catalog")).scenes);
-        if (annMod) {
-          host.setAnnotations(annMod.annotationsByPath);
-          host.setCollisions(annMod.annotationCollisions);
-          host.setMentions(annMod.mentionsByPath);
-        } else {
-          const fresh = await import("virtual:oblik-annotations");
-          host.setAnnotations(fresh.annotationsByPath);
-          host.setCollisions(fresh.annotationCollisions);
-          host.setMentions(fresh.mentionsByPath);
-        }
-        if (loadersMod) host.setLoaders(loadersMod.sceneLoaders);
-        else host.setLoaders((await import("virtual:oblik-loaders")).sceneLoaders);
-      },
-    );
+    // One accept per dep: the callback only ever sees the freshly fetched
+    // module. A combined multi-dep accept would fire on every update and
+    // re-import unchanged deps, which hits the browser's module cache and
+    // resurrects stale catalog/annotation state.
+    import.meta.hot.accept("virtual:oblik-catalog", (mod) => {
+      if (mod) host.setScenes((mod as unknown as { scenes: OblikSceneEntry[] }).scenes);
+    });
+    import.meta.hot.accept("virtual:oblik-annotations", (mod) => {
+      if (!mod) return;
+      const fresh = mod as unknown as {
+        annotationsByPath: AnnotationBundle;
+        annotationCollisions: DuplicateId[];
+        mentionsByPath: MentionBundle;
+      };
+      host.setAnnotations(fresh.annotationsByPath);
+      host.setCollisions(fresh.annotationCollisions);
+      host.setMentions(fresh.mentionsByPath);
+    });
+    import.meta.hot.accept("virtual:oblik-loaders", (mod) => {
+      if (mod) host.setLoaders((mod as unknown as { sceneLoaders: SceneLoaderMap }).sceneLoaders);
+    });
   }
 }
