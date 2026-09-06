@@ -55,6 +55,7 @@
   .slot {
     width: 100%;
     height: var(--sidebar-h);
+    border-top: 1px solid var(--oblik-line);
   }
 
   .handleSide {
