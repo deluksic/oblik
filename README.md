@@ -52,6 +52,19 @@ pnpm demo
 
 Opens [http://127.0.0.1:43127](http://127.0.0.1:43127) with a scene picker. Drag a handle; release writes the scene file. In figure scenes, click ink to inspect, hold Shift for construction, Space toggles Brush/Eraser.
 
+## Try it in a new project
+
+Scaffold a standalone project without cloning this repo:
+
+```sh
+pnpm dlx github:deluksic/oblik#path:packages/create-oblik my-figures
+cd my-figures
+pnpm install
+pnpm dev
+```
+
+(`create-oblik` isn't on npm, so `pnpm create` can't resolve it — the `dlx` form runs it straight from github.) The scaffold is a vite config, a three-line `main.tsx` that calls `bootstrap()` from `oblik/host`, and an empty `src/scenes/` — add a scene by dropping a `.ts` file there exporting `defineScene({ kind, title, build })`.
+
 ## Repo layout
 
 ```
