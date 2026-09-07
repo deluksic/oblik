@@ -19,7 +19,7 @@ import { lineBasis } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
-const { abs, max, sqrt } = Math;
+const { abs, max } = Math;
 export type Vec2 = { x: number; y: number };
 
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
@@ -127,16 +127,17 @@ export function snapBoundPoint(
   maxDist: number,
   filter?: SnapFilter,
 ): SnapPoint | undefined {
-  let best: { snap: SnapPoint; d: number } | undefined = undefined;
+  const maxD2 = maxDist * maxDist;
+  let best: { snap: SnapPoint; d2: number } | undefined = undefined;
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
     if (n.value.kind !== "point" && !isGlider(n.value)) continue;
     const bind = snapPrint(n, filter);
     const p = n.value.kind === "point" ? n.value : gliderAt(n.value);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-    const d = sqrt((p.x - world.x) * (p.x - world.x) + (p.y - world.y) * (p.y - world.y));
-    if (d > maxDist) continue;
-    if (!best || d < best.d) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d };
+    const d2 = (p.x - world.x) * (p.x - world.x) + (p.y - world.y) * (p.y - world.y);
+    if (d2 > maxD2) continue;
+    if (!best || d2 < best.d2) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d2 };
   }
   return best?.snap ?? undefined;
 }
@@ -190,9 +191,12 @@ export function hitTest(
 }
 
 export const PICK_CLICK_PX = 4;
+const PICK_CLICK_PX2 = PICK_CLICK_PX * PICK_CLICK_PX;
 
 export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
-  return sqrt((toX - fromX) * (toX - fromX) + (toY - fromY) * (toY - fromY)) >= PICK_CLICK_PX;
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  return dx * dx + dy * dy >= PICK_CLICK_PX2;
 }
 
 const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);

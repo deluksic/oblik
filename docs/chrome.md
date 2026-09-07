@@ -61,4 +61,10 @@ On `:root` in `packages/oblik/src/theme.css`. `--oblik-knockout` is the **paper 
 | `--oblik-chrome-outline-hover`    | 0.5     | Hover ring opacity            |
 | `--oblik-chrome-outline-selected` | 1       | Selected ring opacity         |
 | `--oblik-selected-paint`          | cream   | Construction hover/select ink |
+| `--oblik-ring`                    | accent  | Hover and selected ring color |
 | `--oblik-knockout`                | paper   | Gap fill color                |
+
+The ring color is `--oblik-ring`: it falls back to the accent in the dark
+theme, and the light theme declares a lighter blue so the halo does not read
+too dark against the near-white paper canvas. The accent token itself is left
+alone (it also fills primary buttons and UI text).

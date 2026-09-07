@@ -81,7 +81,7 @@
 
 .outline {
   fill: none;
-  stroke: var(--oblik-accent);
+  stroke: var(--oblik-ring);
   pointer-events: none;
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;

@@ -44,9 +44,7 @@ export function boltCircle(center: Vec2, r: number, n: number) {
   const holes = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * 2 * PI;
-    holes.push(
-      circle({ x: center.x + r * cos(a), y: center.y + r * sin(a) }, 0.5, "o_ce3b710b58"),
-    );
+    holes.push(circle({ x: center.x + r * cos(a), y: center.y + r * sin(a) }, 0.5, "o_ce3b710b58"));
   }
   return { holes };
 }

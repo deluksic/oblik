@@ -28,6 +28,7 @@
   --oblik-dim-cool: oklch(0.53 0.017 var(--oblik-hue-ink-cool));
   --oblik-accent: oklch(0.59 0.125 var(--oblik-hue-accent));
   --oblik-hover: oklch(0.59 0.125 var(--oblik-hue-accent));
+  --oblik-ring: var(--oblik-accent);
   --oblik-error: oklch(0.6 0.14 var(--oblik-hue-error));
   --oblik-ghost: oklch(0.67 0.019 var(--oblik-hue-ink));
   --oblik-knockout: var(--oblik-paper);
@@ -66,6 +67,7 @@
   --oblik-dim-cool: oklch(0.62 0.003 var(--oblik-hue-ink-cool));
   --oblik-accent: oklch(0.5 0.14 var(--oblik-hue-accent));
   --oblik-hover: oklch(0.5 0.14 var(--oblik-hue-accent));
+  --oblik-ring: oklch(0.7 0.14 var(--oblik-hue-accent));
   --oblik-error: oklch(0.55 0.16 var(--oblik-hue-error));
   --oblik-ghost: oklch(0.5 0.004 var(--oblik-hue-ink));
   --oblik-knockout: var(--oblik-paper);

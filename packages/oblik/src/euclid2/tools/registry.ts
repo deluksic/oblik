@@ -1,14 +1,7 @@
 import { captureUserStack, isUserSourcePath, normalizeStackFile } from "#eval/stack";
 
 import { compileComposite } from "./composite";
-import type {
-  BuiltinToolId,
-  RegisteredTool,
-  Tool,
-  ToolArg,
-  ToolDef,
-  ToolSpec,
-} from "./types";
+import type { BuiltinToolId, RegisteredTool, Tool, ToolArg, ToolDef, ToolSpec } from "./types";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -19,6 +12,7 @@ const BUILTIN_IDS: readonly BuiltinToolId[] = [
   "segment",
   "parallelLine",
   "perpendicularLine",
+  "tangent",
   "slider",
   "region",
   "roundOffset",

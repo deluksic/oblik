@@ -1,4 +1,4 @@
-import { createMemo } from "solid-js";
+import { For, createMemo } from "solid-js";
 
 import { parallelLineValue } from "#geom/ops";
 
@@ -28,6 +28,20 @@ function screenEnds(
   return { a: screenOf(ends.a, camera, size), b: screenOf(ends.b, camera, size) };
 }
 
+/** Pane-clipped ends of the infinite line through `a` and `b`. */
+function infiniteEnds(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  camera: Camera2,
+  size: PaneSize,
+) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = sqrt(dx * dx + dy * dy);
+  const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
+  return screenEnds(infiniteClip(a, dir, camera, size), camera, size);
+}
+
 export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
   const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : undefined));
   const corner = createMemo(() => (props.ghost.kind === "corner" ? props.ghost.at : undefined));
@@ -40,11 +54,7 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
   const lineEnds = createMemo(() => {
     const g = line();
     if (!g) return undefined;
-    const dx = g.b.x - g.a.x;
-    const dy = g.b.y - g.a.y;
-    const len = sqrt(dx * dx + dy * dy);
-    const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
-    return screenEnds(infiniteClip(g.a, dir, props.camera, props.size), props.camera, props.size);
+    return infiniteEnds(g.a, g.b, props.camera, props.size);
   });
   const parallelEnds = createMemo(() => {
     const g = parallel();
@@ -76,6 +86,14 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
     const s = segment();
     if (!s) return undefined;
     return screenEnds({ a: s.a, b: s.b }, props.camera, props.size);
+  });
+  const tangentLines = createMemo(() => {
+    const g = props.ghost.kind === "tangent" ? props.ghost : undefined;
+    if (!g) return undefined;
+    return g.strokes.map((s, i) => ({
+      ends: infiniteEnds(s.a, s.b, props.camera, props.size),
+      chosen: i === g.chosen,
+    }));
   });
   return (
     <g pointer-events="none">
@@ -129,6 +147,21 @@ export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize
           y2={segmentEnds()!.b.y}
           vector-effect="non-scaling-stroke"
         />
+      ) : undefined}
+      {tangentLines() ? (
+        <For each={tangentLines()}>
+          {(t) => (
+            <line
+              class={styles.ghost}
+              style={t.chosen ? undefined : { opacity: 0.3 }}
+              x1={t.ends.a.x}
+              y1={t.ends.a.y}
+              x2={t.ends.b.x}
+              y2={t.ends.b.y}
+              vector-effect="non-scaling-stroke"
+            />
+          )}
+        </For>
       ) : undefined}
       {parallelEnds() ? (
         <line

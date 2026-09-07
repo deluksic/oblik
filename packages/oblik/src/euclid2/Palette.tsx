@@ -98,6 +98,12 @@ function Prompt(props: {
               aria-label={props.preview.draft?.placeholder}
               onInput={(e) => props.onDraft?.(e.currentTarget.value)}
               onKeyDown={(e) => {
+                if (e.key === "," && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                  // , separates arguments — advance to the next field like Tab.
+                  e.preventDefault();
+                  props.onTab?.(1);
+                  return;
+                }
                 if (e.key === "Tab") {
                   e.preventDefault();
                   props.onTab?.(e.shiftKey ? -1 : 1);

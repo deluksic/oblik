@@ -91,4 +91,124 @@ export function circleCircleIntersectionValue(a: Circle, b: Circle, k: Branch): 
   return isFiniteVec(p) ? p : vec(Number.NaN, Number.NaN);
 }
 
+export type TangentBasis = { origin: Vec2; direction: Vec2; contact: Vec2 };
+
+/**
+ * Geometry of the tangent line through external point `p` to circle `c` on
+ * branch `k` (which of the two tangent points is used). The contact point is
+ * the classic construction: intersect `c` with the circle whose diameter is
+ * the p–center segment (Thales — every point on that circle sees the diameter
+ * under a right angle, so the hits are exactly where the radius meets the
+ * tangent at 90°). `undefined` when no real tangent exists.
+ *
+ * Squared arithmetic throughout: every guard is a comparison on `d2`/`r2`, and
+ * the only root is the tangent length `L = |p − T|`. The unit direction and the
+ * contact fall out without a second root, because `|d·L − perp(d)·k·r| = d2`.
+ */
+export function tangentBasis(c: Circle, p: Vec2, k: Branch): TangentBasis | undefined {
+  const { center, radius } = c;
+  const r = radius;
+  if (!Number.isFinite(r) || r <= 0 || !isFiniteVec(center) || !isFiniteVec(p)) return undefined;
+  const d = sub(center, p); // p → center
+  const d2 = dot(d, d); // D² = |p − center|² (finite, ≥ 0 after the guard above)
+  const r2 = r * r;
+  if (d2 === 0) return undefined; // p at the center
+  if (d2 < r2) return undefined; // p strictly inside: no real tangent
+  if (d2 === r2) {
+    // p sits on the circle: the two tangent points collapse into p itself, so
+    // the line is just the perpendicular through p.
+    return {
+      origin: { x: p.x, y: p.y },
+      direction: perp(norm(d)),
+      contact: { x: p.x, y: p.y },
+    };
+  }
+  const l2 = d2 - r2; // L² = |p − T|²
+  const l = sqrt(l2); // the only root
+  // T − p = (L/D²)·(d·L − perp(d)·k·r). The parenthesised vector has length
+  // exactly d2, so v/d2 is the unit direction and p + v·(L/d2) the contact.
+  // The −perp(d) term keeps k = 1 on the same side as circleCircleIntersectionValue.
+  const v = sub(mul(d, l), mul(perp(d), k * r));
+  const contact = add(p, mul(v, l / d2));
+  return {
+    origin: { x: p.x, y: p.y },
+    direction: mul(v, 1 / d2),
+    contact,
+  };
+}
+
+/** Infinite tangent line through external `p` to circle `c`, branch `k`. None → NaN line. */
+export function tangentLineValue(c: Circle, p: Vec2, k: Branch): Line {
+  const t = tangentBasis(c, p, k);
+  return t
+    ? { kind: "line", origin: t.origin, direction: t.direction }
+    : { kind: "line", origin: vec(Number.NaN, Number.NaN), direction: vec(Number.NaN, Number.NaN) };
+}
+
+/** Contact point of that tangent on `c`; NaN when no real tangent exists. */
+export function tangentContactValue(c: Circle, p: Vec2, k: Branch): Vec2 {
+  return tangentBasis(c, p, k)?.contact ?? vec(Number.NaN, Number.NaN);
+}
+
+export type CommonTangentFamily = "outer" | "inner";
+
+export type CommonTangentBasis = {
+  /** Contact on `a` — also the line's origin. */
+  origin: Vec2;
+  /** Unit direction from the `a` contact to the `b` contact. */
+  direction: Vec2;
+  contactA: Vec2;
+  contactB: Vec2;
+};
+
+/**
+ * One of the two common tangents of circles `a` (radius r1) and `b` (radius
+ * r2) on side `k`. `outer` tangents touch both circles on the same side
+ * (`D·n = r1 − r2`); `inner` (crossing) tangents touch them on opposite sides
+ * (`D·n = r1 + r2`). Same construction as the point-circle case, squared until
+ * a single root: solve `D·n = s` for a unit normal n, then the contacts are
+ * `O1 + r1·n` and `O2 ± r2·n`, and the tangent segment between them has length
+ * `L = √(d² − s²)`, so its unit direction needs no extra root.
+ * `undefined` when the family doesn't exist (d = 0, or d² < s²).
+ */
+export function commonTangentBasis(
+  a: Circle,
+  b: Circle,
+  family: CommonTangentFamily,
+  k: Branch,
+): CommonTangentBasis | undefined {
+  const r1 = a.radius;
+  const r2 = b.radius;
+  if (!Number.isFinite(r1) || r1 <= 0 || !Number.isFinite(r2) || r2 <= 0) return undefined;
+  if (!isFiniteVec(a.center) || !isFiniteVec(b.center)) return undefined;
+  const D = sub(b.center, a.center);
+  const d2 = dot(D, D); // squared center distance (finite, ≥ 0 after the guard above)
+  if (d2 === 0) return undefined; // concentric
+  const s = family === "outer" ? r1 - r2 : r1 + r2; // D·n target
+  const l2 = d2 - s * s;
+  if (!(l2 >= 0)) return undefined; // no tangent in this family
+  // Unit contact normal n = (s/d²)·D + k·(L/d²)·perp(D); |n| = 1 because s² + L² = d².
+  const l = sqrt(l2);
+  const n = add(mul(D, s / d2), mul(perp(D), (k * l) / d2));
+  const touchSameSide = family === "outer"; // b contact on +n (outer) or −n (inner)
+  const contactA = add(a.center, mul(n, r1));
+  const contactB = add(b.center, mul(n, touchSameSide ? r2 : -r2));
+  if (!isFiniteVec(contactA) || !isFiniteVec(contactB)) return undefined;
+  const direction = l > 0 ? mul(sub(contactB, contactA), 1 / l) : perp(norm(D)); // tangent segment degenerates at tangency
+  return { origin: { x: contactA.x, y: contactA.y }, direction, contactA, contactB };
+}
+
+/** Infinite common tangent line of two circles; `family` selects outer/inner. None → NaN line. */
+export function commonTangentLineValue(
+  a: Circle,
+  b: Circle,
+  family: CommonTangentFamily,
+  k: Branch,
+): Line {
+  const t = commonTangentBasis(a, b, family, k);
+  return t
+    ? { kind: "line", origin: t.origin, direction: t.direction }
+    : { kind: "line", origin: vec(Number.NaN, Number.NaN), direction: vec(Number.NaN, Number.NaN) };
+}
+
 export { dist };

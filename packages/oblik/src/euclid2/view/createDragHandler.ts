@@ -1,6 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
 
-const { sqrt } = Math;
 export type DragSession = {
   onPointerMove?: (event: PointerEvent) => void;
   onDone?: (event?: PointerEvent) => void;
@@ -33,12 +32,9 @@ function pastDeadZone(
   to: { clientX: number; clientY: number },
   radius: number,
 ): boolean {
-  return (
-    sqrt(
-      (to.clientX - from.clientX) * (to.clientX - from.clientX) +
-        (to.clientY - from.clientY) * (to.clientY - from.clientY),
-    ) >= radius
-  );
+  const dx = to.clientX - from.clientX;
+  const dy = to.clientY - from.clientY;
+  return dx * dx + dy * dy >= radius * radius;
 }
 
 function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {

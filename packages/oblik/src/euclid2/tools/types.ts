@@ -6,7 +6,7 @@ import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
-/** The ten hand-written euclid2 verbs. */
+/** The hand-written euclid2 verbs. */
 export type BuiltinToolId =
   | "point"
   | "circle"
@@ -14,6 +14,7 @@ export type BuiltinToolId =
   | "segment"
   | "parallelLine"
   | "perpendicularLine"
+  | "tangent"
   | "slider"
   | "region"
   | "roundOffset"
@@ -103,8 +104,8 @@ export type Field<S extends ToolSession = ToolSession> = {
   id: string;
   kind: FieldKind;
   placeholder: string;
-  /** For `ref`: existing point vs line/segment/parallel vs region. For `length`: slider bind. */
-  looks?: "point" | "carrier" | "region" | "length";
+  /** For `ref`: existing point vs line/segment/parallel vs circle vs region vs either point-or-circle operand. For `length`: slider bind. */
+  looks?: "point" | "carrier" | "circle" | "region" | "operand" | "length";
   open: (session: S) => boolean;
   get: (session: S) => string;
   set: (session: S, raw: string) => S;
@@ -144,6 +145,11 @@ export type Draft = {
 };
 
 export type Placed = { expr: Expr; at: Vec2 };
+
+/** One operand of the Tangent verb: a point the line passes through, or a circle it touches. */
+export type TangentOp =
+  | { kind: "point"; placed: Placed }
+  | { kind: "circle"; circle: Scope["circles"][string] };
 
 export type PlaceHit = {
   world: Vec2;
@@ -215,6 +221,15 @@ export type ToolSession =
       name: string;
     }
   | {
+      verb: "tangent";
+      focus: "a" | "b" | "name";
+      /** Two operands, in click order — each a point or a circle, either order. */
+      ops: [TangentOp | undefined, TangentOp | undefined];
+      aRef: string;
+      bRef: string;
+      name: string;
+    }
+  | {
       verb: "slider";
       focus: "value" | "min" | "max" | "step" | "name";
       value: string;
@@ -266,6 +281,17 @@ export type Ghost =
   | { kind: "corner"; at: Vec2 }
   | { kind: "circle"; center: Vec2; radius: number }
   | { kind: "line" | "segment"; a: Vec2; b: Vec2 }
+  | {
+      /**
+       * Candidate tangent strokes of the Tangent verb. Each stroke runs
+       * between its two contact endpoints; the view clips it to the pane.
+       * `chosen` (index into `strokes`) is drawn at full strength, the rest
+       * dimmed — the user clicks a stroke to commit that candidate.
+       */
+      kind: "tangent";
+      strokes: ReadonlyArray<{ a: Vec2; b: Vec2 }>;
+      chosen: number;
+    }
   | { kind: "parallelLine"; geom: LineLike; distance: number }
   | {
       kind: "region";

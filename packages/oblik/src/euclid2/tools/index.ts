@@ -7,12 +7,13 @@ import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
-import { registeredSpecs, registeredToolById } from "./registry";
 import { region } from "./region";
+import { registeredSpecs, registeredToolById } from "./registry";
 import { roundOffset } from "./roundOffset";
 import { scopeOf, type ScopeInput } from "./scope";
 import { segment } from "./segment";
 import { slider } from "./slider";
+import { tangent } from "./tangent";
 import type {
   BuiltinToolId,
   PlaceCtx,
@@ -63,6 +64,7 @@ const BUILTINS = {
   segment,
   parallelLine,
   perpendicularLine,
+  tangent,
   slider,
   region,
   roundOffset,
@@ -76,6 +78,7 @@ export const TOOLS: readonly ToolSpec[] = [
   segment.spec,
   parallelLine.spec,
   perpendicularLine.spec,
+  tangent.spec,
   slider.spec,
   region.spec,
   roundOffset.spec,

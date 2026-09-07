@@ -169,6 +169,48 @@ describe("insertCall", () => {
     expect(next).toMatch(/import \{ point, perpendicularLine \} from "oblik"/);
   });
 
+  test("inserts a tangent through a point to a circle with the branch literal", () => {
+    const next = insertCall(withBinds("P", "C"), {
+      from: "tangentPointCircle",
+      args: [
+        { kind: "ref", name: "P" },
+        { kind: "ref", name: "C" },
+        { kind: "num", value: -1 },
+      ],
+      id: "o_tan",
+    });
+    expect(next).toContain('const tpc = tangentPointCircle(P, C, -1, "o_tan");');
+    expect(next).toMatch(/import \{ point, tangentPointCircle \} from "oblik"/);
+  });
+
+  test("inserts an outer common tangent of two circles", () => {
+    const next = insertCall(withBinds("A", "B"), {
+      from: "tangentCircleCircleOuter",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "ref", name: "B" },
+        { kind: "num", value: 1 },
+      ],
+      id: "o_tco",
+    });
+    expect(next).toContain('const tco = tangentCircleCircleOuter(A, B, 1, "o_tco");');
+    expect(next).toMatch(/import \{ point, tangentCircleCircleOuter \} from "oblik"/);
+  });
+
+  test("inserts an inner common tangent of two circles", () => {
+    const next = insertCall(withBinds("A", "B"), {
+      from: "tangentCircleCircleInner",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "ref", name: "B" },
+        { kind: "num", value: -1 },
+      ],
+      id: "o_tci",
+    });
+    expect(next).toContain('const tci = tangentCircleCircleInner(A, B, -1, "o_tci");');
+    expect(next).toMatch(/import \{ point, tangentCircleCircleInner \} from "oblik"/);
+  });
+
   test("inserts a glider on a segment", () => {
     const next = insertCall(withBinds("span"), {
       from: "pointOnSegment",
@@ -866,8 +908,6 @@ describe("insertCall — registered tool jobs", () => {
   });
 
   test("still throws for an unknown non-tool callee", () => {
-    expect(() => insertCall(src, { from: "noSuchFn", args: [] })).toThrow(
-      /unknown constructor/,
-    );
+    expect(() => insertCall(src, { from: "noSuchFn", args: [] })).toThrow(/unknown constructor/);
   });
 });

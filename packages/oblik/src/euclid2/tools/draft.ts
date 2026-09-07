@@ -86,10 +86,23 @@ export function fieldError<S extends ToolSession>(
   const names =
     field.looks === "carrier"
       ? Object.keys(scope.carriers)
-      : field.looks === "region"
-        ? Object.keys(scope.regions)
-        : Object.keys(scope.points);
-  const label = field.looks === "carrier" ? "line" : field.looks === "region" ? "region" : "point";
+      : field.looks === "circle"
+        ? Object.keys(scope.circles)
+        : field.looks === "region"
+          ? Object.keys(scope.regions)
+          : field.looks === "operand"
+            ? [...Object.keys(scope.points), ...Object.keys(scope.circles)]
+            : Object.keys(scope.points);
+  const label =
+    field.looks === "carrier"
+      ? "line"
+      : field.looks === "circle"
+        ? "circle"
+        : field.looks === "region"
+          ? "region"
+          : field.looks === "operand"
+            ? "point or circle"
+            : "point";
   return refError(raw, names, label);
 }
 
@@ -146,6 +159,17 @@ export function resolveRegion(
   if (placed && printExpr(placed.expr) === t) return placed;
 }
 
+export function resolveCircle(
+  ref: string,
+  placed: Scope["circles"][string] | undefined,
+  scope: Scope,
+) {
+  const t = ref.trim();
+  if (!t) return placed;
+  if (scope.circles[t]) return scope.circles[t];
+  if (placed && printExpr(placed.expr) === t) return placed;
+}
+
 export function hitRef(hit: import("./types").PlaceHit): string {
   return hit.point.kind === "ref" ? hit.point.bind : "";
 }
@@ -193,7 +217,7 @@ export { numberField } from "./length";
 export function refField<S extends ToolSession>(
   id: string,
   placeholder: string,
-  looks: "point" | "carrier" | "region",
+  looks: "point" | "carrier" | "region" | "circle" | "operand",
   get: (session: S) => string,
   set: (session: S, raw: string) => S,
 ): Field<S> {
@@ -275,6 +299,7 @@ export function keySession<S extends ToolSession>(
   const sc = scopeOf(scope);
   if (e.ctrl || e.meta || e.alt) return { ignore: true };
   if (e.key === "Tab") return { session: tabSession(tool, session, e.shift ? -1 : 1) };
+  if (e.key === ",") return { session: tabSession(tool, session, 1) };
   if (e.key === "Enter") {
     const bad = firstInvalid(tool, session, sc);
     if (bad) {

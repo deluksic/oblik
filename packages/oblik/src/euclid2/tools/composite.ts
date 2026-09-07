@@ -1,10 +1,10 @@
-import type { Annotation } from "../../source/analyze";
 import type { TraceNode } from "#eval/context";
 import { withEval, type EvalCtx } from "#eval/context";
 import type { Region } from "#geom";
 import { signedDistToRegion } from "#geom/region";
 import { printExpr, type Expr } from "#source/expr";
 
+import type { Annotation } from "../../source/analyze";
 import { snapLineCarrier, snapRegion, type Vec2 } from "../pick";
 import { isPinnedPoint } from "../place";
 import { asPoint, dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, round } from "./common";
@@ -168,7 +168,9 @@ function segmentGeom(
   const t = f.kind === "text" ? f.raw.trim() : printExpr(f.expr);
   if (!t) return undefined;
   const c = scope.carriers[t];
-  return c && c.geom.kind === "segment" ? (c.geom as { kind: "segment"; a: Vec2; b: Vec2 }) : undefined;
+  return c && c.geom.kind === "segment"
+    ? (c.geom as { kind: "segment"; a: Vec2; b: Vec2 })
+    : undefined;
 }
 
 function anchorGeom(s: CompS, scope: Scope, label: string): Anchor | undefined {
@@ -244,7 +246,8 @@ function numericExpr(s: CompS, scope: Scope, arg: ToolArg): Expr | undefined {
   if (arg.kind !== "length" && arg.kind !== "number") return undefined;
   const f = s.fills[arg.label];
   if (arg.kind === "number") {
-    if (f?.kind === "expr") return f.value !== undefined ? { kind: "num", value: f.value } : undefined;
+    if (f?.kind === "expr")
+      return f.value !== undefined ? { kind: "num", value: f.value } : undefined;
     const t = typedText(s, arg.label).trim();
     const n = t !== "" ? parseNum(t) : undefined;
     if (n !== undefined) return { kind: "num", value: n };
@@ -509,7 +512,8 @@ export function compileComposite(reg: RegisteredTool): Tool<CompS> {
     commit(session, _place, scope) {
       const { job, missing } = tryJob(session, scope);
       if (!job) {
-        if (missing && session.focus !== missing) return { session: { ...session, focus: missing } };
+        if (missing && session.focus !== missing)
+          return { session: { ...session, focus: missing } };
         return undefined;
       }
       return { insert: job };
@@ -532,7 +536,8 @@ export function compileComposite(reg: RegisteredTool): Tool<CompS> {
           }
         } else if (arg.kind === "region") {
           v = regionGeom(session, scope, arg.label);
-          if (v === undefined && session.focus === arg.label && place?.region) v = place.region.geom;
+          if (v === undefined && session.focus === arg.label && place?.region)
+            v = place.region.geom;
         } else if (arg.kind === "segment") {
           v = segmentGeom(session, scope, arg.label);
           if (v === undefined && session.focus === arg.label && place?.carrier) {

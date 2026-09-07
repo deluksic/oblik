@@ -54,6 +54,31 @@ describe("keyTool", () => {
     expect(s).toMatchObject({ focus: "name" });
   });
 
+  test("comma advances to the next argument like Tab", () => {
+    let s = startTool("point");
+    s = asSession(keyTool(s, { key: "," }));
+    expect(s).toMatchObject({ focus: "y" });
+    s = asSession(keyTool(s, { key: "," }));
+    expect(s).toMatchObject({ focus: "name" });
+    s = asSession(keyTool(s, { key: "," }));
+    expect(s).toMatchObject({ focus: "x" });
+    // the comma itself is a separator, never text in the field
+    expect(s).toMatchObject({ x: "", y: "" });
+  });
+
+  test("comma separates typed arguments (point 1,2 then Enter inserts)", () => {
+    const done = keyTool(typeChars(startTool("point"), "1,2"), { key: "Enter" });
+    expect(done).toEqual({
+      insert: {
+        from: "point",
+        args: [
+          { kind: "num", value: 1 },
+          { kind: "num", value: 2 },
+        ],
+      },
+    });
+  });
+
   test("point types x and y then Enter inserts", () => {
     let s = typeChars(startTool("point"), "1.5");
     s = tabTool(s);

@@ -316,7 +316,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const status = createMemo(() => {
     const fail = writeError() ?? world().error;
     if (fail) return fail;
-    if (tool()) return "Type into the prompt, Tab between fields, Enter to commit. Escape cancels.";
+    if (tool())
+      return "Type into the prompt. Press , or Tab to advance to the next argument. Enter commits. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
     return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";

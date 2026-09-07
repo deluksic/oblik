@@ -58,14 +58,14 @@ export function stockCuttersLayout() {
   const half = max(slotL, slotW) / 2 - r;
   const Lc = { x: slotX - half, y: slotY };
   const Rc = { x: slotX + half, y: slotY };
-  const leftC = circle(Lc, r);
-  const rightC = circle(Rc, r);
+  const leftC = circle(Lc, r, "o_b94a85bff4");
+  const rightC = circle(Rc, r, "o_be203a2822");
   const P = { x: Lc.x, y: Lc.y + r };
   const Q = { x: Rc.x, y: Rc.y + r };
   const botR = { x: Rc.x, y: Rc.y - r };
   const T = { x: Lc.x, y: Lc.y - r };
-  const slotTop = segment(P, Q);
-  const slotBot = segment(botR, T);
+  const slotTop = segment(P, Q, "o_5e1310d45a");
+  const slotBot = segment(botR, T, "o_5fba2c3e37");
   const slot = region(
     [P, slotTop, Q, along(rightC, -1), botR, slotBot, T, along(leftC, -1)],
     [],

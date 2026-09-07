@@ -30,6 +30,8 @@ import {
   offsetValue,
   pickValue,
   rightOfValue,
+  tangentLineValue,
+  commonTangentLineValue,
   type Along,
   type Branch,
   type Circle,
@@ -184,6 +186,30 @@ export const parallelLine = mark(
 export const perpendicularLine = mark(
   (geom: LineLike, through: Vec2, id?: string): Line => {
     return traced(perpendicularLineValue(geom, through), id);
+  },
+  { dof: [] },
+);
+
+/** One of the two infinite tangents through point `p` to circle `c`, branch `k`. */
+export const tangentPointCircle = mark(
+  (p: Vec2, c: Circle, k: Branch, id?: string): Line => {
+    return traced(tangentLineValue(c, p, k), id);
+  },
+  { dof: [] },
+);
+
+/** One of the two outer (direct) common tangents of circles `a` and `b`, side `k`. */
+export const tangentCircleCircleOuter = mark(
+  (a: Circle, b: Circle, k: Branch, id?: string): Line => {
+    return traced(commonTangentLineValue(a, b, "outer", k), id);
+  },
+  { dof: [] },
+);
+
+/** One of the two inner (crossing) common tangents of circles `a` and `b`, side `k`. */
+export const tangentCircleCircleInner = mark(
+  (a: Circle, b: Circle, k: Branch, id?: string): Line => {
+    return traced(commonTangentLineValue(a, b, "inner", k), id);
   },
   { dof: [] },
 );
@@ -411,6 +437,9 @@ export const constructors = {
   line,
   parallelLine,
   perpendicularLine,
+  tangentPointCircle,
+  tangentCircleCircleOuter,
+  tangentCircleCircleInner,
   pointOnSegment,
   pointOnLine,
   pointOnCircle,
