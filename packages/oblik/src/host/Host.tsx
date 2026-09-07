@@ -194,17 +194,25 @@ function Host(props: {
     setSceneId(undefined);
   }
 
+  // Catalog refreshes replace the scenes array with structurally equal entry
+  // objects (any scene added/edited rescans the whole catalog). The pane memo
+  // must therefore branch only on primitive derivations of `entry` — reading
+  // the entry object here would return a fresh <Euclid2Pane> on every catalog
+  // change and remount the pane, killing the view's camera.
+  const sceneDeleted = createMemo(() => entry() === undefined);
+  const sceneError = createMemo(() => entry()?.error);
+  const sceneFile = createMemo(() => entry()?.path);
+
   const pane = createMemo(() => {
-    const e = entry();
-    if (!e) return <p class={styles.err}>Scene deleted</p>;
-    if (e.error) return <p class={styles.err}>{e.error}</p>;
+    if (sceneDeleted()) return <p class={styles.err}>Scene deleted</p>;
+    const err = sceneError();
+    if (err) return <p class={styles.err}>{err}</p>;
     const kind = sceneKind();
-    const file = e.path;
     if (kind === "figure") {
       return (
         <FigurePane
           scene={scene() as FigureScene}
-          file={file}
+          file={sceneFile() ?? ""}
           annotations={annotations()}
           mentions={mentionsList()}
         />
@@ -214,7 +222,7 @@ function Host(props: {
       return (
         <Euclid2Pane
           scene={scene() as Euclid2Scene}
-          file={file}
+          file={sceneFile() ?? ""}
           annotations={annotations()}
           mentions={mentionsList()}
         />
