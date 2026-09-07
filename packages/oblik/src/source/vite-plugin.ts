@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
 import type { Plugin, ViteDevServer } from "vite";
+import type { ModuleNode } from "vite";
+import { transformSync } from "esbuild";
 
 import { analyze } from "./analyze";
 import {
@@ -27,6 +29,7 @@ import {
   parsePaintPatch,
 } from "./schema";
 import { freshSiteId, stamp } from "./stamp";
+import { moduleRefToSpecifier } from "./tool-path";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
 const VIRTUAL_ANN = "virtual:oblik-annotations";
@@ -91,6 +94,55 @@ function isSceneTs(sceneDir: string, file: string): boolean {
   const abs = path.resolve(file).replace(/\\/g, "/");
   const dir = path.resolve(sceneDir).replace(/\\/g, "/");
   return abs.startsWith(`${dir}/`) && abs.endsWith(".ts") && !abs.endsWith(".d.ts");
+}
+
+/**
+ * Non-scene user modules (layout/helper files like `src/layout/tools.ts`) are
+ * given a self-accept in `transform`. Without it an edit to such a module
+ * escalates to a full page reload — nothing on the path from the demo entry
+ * accepts it. Scene files are excluded: they are already accepted by the
+ * virtual loaders, and adding a self-accept there would swallow the loader
+ * notification that replaces the scene module.
+ */
+const LIB_HMR_TAIL = `
+/* __oblik_lib_hmr */
+if (import.meta.hot) { import.meta.hot.accept(); }
+`;
+const APP_ENTRY_FILE = /[\\/]main\.ts$/;
+
+function isLibraryFile(sceneDir: string, file: string): boolean {
+  return !isSceneTs(sceneDir, file) && !APP_ENTRY_FILE.test(file);
+}
+
+/**
+ * All loaded app modules that must refresh when a library file changes: the
+ * changed module plus every app-source importer up to (and including) the
+ * scene modules. Scene modules have no self-accept, so returning them hands
+ * the update to the virtual loaders' accept → `applyHotScenes` re-executes the
+ * scene against the freshly re-imported library.
+ */
+function libraryUpdateModules(
+  seed: ReadonlySet<ModuleNode>,
+  appRoot: string,
+): ModuleNode[] {
+  const out: ModuleNode[] = [];
+  const seen = new Set<ModuleNode>();
+  const queue = [...seed];
+  for (const m of seed) seen.add(m);
+  while (queue.length > 0) {
+    const m = queue.shift()!;
+    out.push(m);
+    for (const imp of m.importers) {
+      if (seen.has(imp)) continue;
+      seen.add(imp);
+      const file = imp.id?.split("?")[0] ?? "";
+      if (!file) continue;
+      if (!isUserAppSource(appRoot, file)) continue;
+      if (APP_ENTRY_FILE.test(file)) continue; // entry has no accept — never route through it
+      queue.push(imp);
+    }
+  }
+  return out;
 }
 
 function catalogFingerprint(sceneDir: string, workspaceRoot: string): string {
@@ -209,13 +261,19 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             json(res, 400, { ok: false, error: "invalid json" });
             return;
           }
-          const job = parseInsert(body);
+          let job = parseInsert(body);
           if (typeof job === "string") {
             json(res, 400, { ok: false, error: job });
             return;
           }
           try {
             const abs = resolveUnder(workspaceRoot, job.file);
+            // Registered-tool inserts carry the tool's served URL pathname;
+            // map it to a relative specifier from the dest file before insert.
+            if (job.tool) {
+              const spec = moduleRefToSpecifier(abs, job.tool.module, server.config.root);
+              job = { ...job, tool: { module: spec, prefix: job.tool.prefix } };
+            }
             const src = fs.readFileSync(abs, "utf8");
             const patched = insertCall(src, job);
             await enqueue(abs, () => fs.writeFileSync(abs, patched));
@@ -414,19 +472,34 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
     transform(_code, id) {
       const file = id.split("?")[0] ?? id;
       if (!isUserAppSource(appRoot, file)) return undefined;
-      // Pre-phase plugins (e.g. @solidjs/vite-plugin's enforce:"pre" pass)
-      // reprint modules, so `code` here is not the file as authored. Stamp
-      // and serve the canonical on-disk source; otherwise a missing-id
+      // Pre-phase plugins (e.g. esbuild, @solidjs/vite-plugin's enforce:"pre"
+      // pass) reprint modules, so `code` here is not the file as authored.
+      // Stamp and serve the canonical on-disk source; otherwise a missing-id
       // write-back rewrites the file in the upstream formatter's style.
       const abs = path.resolve(file);
       const onDisk = fs.readFileSync(abs, "utf8");
       // Vite chains maps by source name — this must match the module Vite is serving
       // (`src/layout/foo.ts`), not a repo path (`apps/demo/src/layout/foo.ts`).
       const viteSource = path.relative(appRoot, file).replace(/\\/g, "/");
+      const isLib = isLibraryFile(sceneDir, file);
       const { source, added, map } = stamp(onDisk, freshSiteId, viteSource);
-      if (added.length === 0) return undefined;
-      void enqueue(abs, () => fs.writeFileSync(abs, source));
-      return { code: source, map };
+      if (added.length === 0 && !isLib) return undefined;
+      if (added.length > 0) void enqueue(abs, () => fs.writeFileSync(abs, source));
+      if (!isLib) return { code: source, map };
+      // Library module: emit finished JS. This transform runs *after* the
+      // upstream esbuild pass, so returning the raw on-disk TS here (which may
+      // hold `import type` / parameter annotations) would ship un-transpiled
+      // TypeScript to the browser. Compile the stamped source and append the
+      // self-accept that stops helper edits from full-reloading the page.
+      const tsBody = added.length > 0 ? source : onDisk;
+      const compiled = transformSync(tsBody + LIB_HMR_TAIL, {
+        loader: "ts",
+        format: "esm",
+        target: "esnext",
+        sourcemap: "inline",
+        sourcefile: viteSource,
+      });
+      return { code: compiled.code };
     },
     handleHotUpdate(ctx) {
       const server = ctx.server;
@@ -437,7 +510,17 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       }
       const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
       const extra = bundle ? [bundle] : [];
-      if (isSceneTs(sceneDir, ctx.file) && catalogChanged()) {
+      if (APP_ENTRY_FILE.test(ctx.file)) return undefined; // re-running bootstrap under HMR would double-mount — reload instead
+      if (!isSceneTs(sceneDir, ctx.file)) {
+        // Library module (e.g. a tool/layout file): it self-accepts in the
+        // transform, so push the change through the loaded scenes that import
+        // it — their loader accept re-executes them against the new module.
+        const changed = server.moduleGraph.getModulesByFile(ctx.file);
+        if (!changed || changed.size === 0) return extra.length > 0 ? extra : undefined;
+        const updates = libraryUpdateModules(changed, appRoot);
+        return updates.length > 0 ? [...updates, ...extra] : extra;
+      }
+      if (catalogChanged()) {
         invalidateCatalog(server);
         invalidateSceneLoaders(server);
         const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);

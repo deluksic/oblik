@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { Expr } from "./expr";
-import { hoistIntersections } from "./hoist";
+import { hoistIntersections, takeBind } from "./hoist";
 
 const crossing: Expr = {
   kind: "call",
@@ -139,5 +139,20 @@ describe("hoistIntersections", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("takeBind prefix override", () => {
+  test("uses the override prefix when free, then suffixes", () => {
+    const used = new Set<string>();
+    expect(takeBind(used, "boltCircle", undefined, "bc")).toBe("bc");
+    expect(takeBind(used, "boltCircle", undefined, "bc")).toBe("bc2");
+    expect(used.has("bc")).toBe(true);
+    expect(used.has("bc2")).toBe(true);
+  });
+
+  test("falls back to BIND_PREFIX without an override", () => {
+    const used = new Set<string>();
+    expect(takeBind(used, "circle")).toBe("c");
   });
 });

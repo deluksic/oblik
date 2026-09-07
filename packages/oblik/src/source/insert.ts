@@ -16,6 +16,13 @@ export type Insert = {
   args: Expr[];
   id?: string;
   patchVertex?: { id: string; index: number };
+  /**
+   * Registered-tool insert: `from` is the registered tool name (not a
+   * constructor) and `module` is the specifier to import it from (already
+   * mapped server-side; empty means same file — no import line). Tool calls
+   * take no trailing site id.
+   */
+  tool?: { module: string; prefix: string };
 };
 
 /** `paint` is a tape effect. Nothing refers to the value, so it is not a `const`. */
@@ -351,8 +358,9 @@ export function insertCall(
   nextId: () => string = freshSiteId,
 ): string {
   if (job.patchVertex) return patchRegionVertex(source, job);
+  const isTool = job.tool !== undefined;
   const specs = siteSpecs();
-  if (!specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
+  if (!isTool && !specs.has(job.from)) throw new Error(`unknown constructor ${job.from}`);
   const dest = job.dest?.trim() || "build";
   const parsed = parse(source);
   const destBody = findFnBody(parsed, dest);
@@ -368,8 +376,9 @@ export function insertCall(
   if (EFFECT_CTORS.has(job.from)) {
     statements.push({ from: job.from, args, id: job.id ?? nextId() });
   } else {
+    if (isTool) used.add(job.from); // the callee will be imported into this file — never shadow it
     statements.push({
-      bind: takeBind(used, job.from, job.bind),
+      bind: takeBind(used, job.from, job.bind, job.tool?.prefix),
       from: job.from,
       args,
       id: job.id ?? nextId(),
@@ -389,8 +398,18 @@ export function insertCall(
     const verb = missing.length === 1 ? "is" : "are";
     throw new Error(`${who} ${verb} not in ${dest}() — this scope cannot refer to ${who}.`);
   }
-  const names = [...new Set(statements.flatMap((s) => [s.from, ...s.args.flatMap(callees)]))];
+  const names = [
+    ...new Set(
+      statements
+        .flatMap((s) => [s.from, ...s.args.flatMap(callees)])
+        .filter((n) => !(isTool && n === job.from)),
+    ),
+  ];
   let next = ensureNamedImport(source, "oblik", names);
+  const toolModule = job.tool?.module.trim() ?? "";
+  if (isTool && toolModule !== "") {
+    next = ensureNamedImport(next, toolModule, [job.from]);
+  }
   const sf = parse(next);
   const body = findFnBody(sf, dest);
   if (!body) throw new Error(`no function ${dest}() with a block body`);
@@ -399,7 +418,10 @@ export function insertCall(
   const indent = last ? indentAt(next, last.getStart(sf)) : "    ";
   const chunk = statements
     .map((s) => {
-      const call = `${s.from}(${s.args.map(printExpr).join(", ")}, "${s.id}")`;
+      const withId = isTool && s.from === job.from;
+      const call = withId
+        ? `${s.from}(${s.args.map(printExpr).join(", ")})`
+        : `${s.from}(${s.args.map(printExpr).join(", ")}, "${s.id}")`;
       return s.bind ? `${indent}const ${s.bind} = ${call};\n` : `${indent}${call};\n`;
     })
     .join("");

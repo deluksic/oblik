@@ -169,7 +169,7 @@ export function regionEligibleCarriers(
   camera: Camera2,
   filter?: SnapFilter,
 ): ReadonlySet<string> | undefined {
-  if (!session || session.verb !== "region") return undefined;
+  if (!session || session.verb !== "region" || "tool" in session) return undefined;
   if (!needCarrier(session)) return undefined;
   const from = session.vertices[session.vertices.length - 1];
   if (!from) return undefined;

@@ -71,5 +71,7 @@ export { patchFrame, type FrameValues } from "./source/frame-edit";
 export { printExpr, member, parsePath, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";
 export { sceneLoaderKey, findDuplicateIds } from "./source/catalog";
+export { defineTool, arg } from "./euclid2/tools/registry";
+export type { RegisteredTool, ToolArg, ToolDef } from "./euclid2/tools/types";
 export type { Camera2 } from "./euclid2/camera";
 export * from "./geom";

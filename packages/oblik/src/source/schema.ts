@@ -57,6 +57,12 @@ export const insertSchema = v.object({
       index: v.pipe(v.number(), v.integer(), v.minValue(0)),
     }),
   ),
+  tool: v.optional(
+    v.object({
+      module: v.pipe(v.string(), v.minLength(1)),
+      prefix: v.pipe(v.string(), v.minLength(1)),
+    }),
+  ),
 });
 
 export type InsertBody = v.InferOutput<typeof insertSchema>;

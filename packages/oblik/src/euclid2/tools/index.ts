@@ -7,12 +7,14 @@ import { line } from "./line";
 import { parallelLine } from "./parallelLine";
 import { perpendicularLine } from "./perpendicularLine";
 import { point } from "./point";
+import { registeredSpecs, registeredToolById } from "./registry";
 import { region } from "./region";
 import { roundOffset } from "./roundOffset";
 import { scopeOf, type ScopeInput } from "./scope";
 import { segment } from "./segment";
 import { slider } from "./slider";
 import type {
+  BuiltinToolId,
   PlaceCtx,
   PlaceHit,
   Scope,
@@ -24,15 +26,20 @@ import type {
 } from "./types";
 
 export type {
+  BuiltinToolId,
+  CompositeFill,
   Draft,
   Ghost,
   InsertJob,
   PlaceCtx,
   PlaceHit,
   Preview,
+  RegisteredTool,
   Scope,
   Tool,
+  ToolArg,
   ToolChrome,
+  ToolDef,
   ToolId,
   ToolKey,
   ToolSession,
@@ -49,7 +56,7 @@ export {
   type ScopeFocus,
 } from "./scope";
 
-const byId = {
+const BUILTINS = {
   point,
   circle,
   line,
@@ -60,9 +67,9 @@ const byId = {
   region,
   roundOffset,
   fillet,
-} as Record<ToolId, Tool>;
+} as Record<BuiltinToolId, Tool>;
 
-export const TOOLS = [
+export const TOOLS: readonly ToolSpec[] = [
   point.spec,
   circle.spec,
   line.spec,
@@ -73,14 +80,34 @@ export const TOOLS = [
   region.spec,
   roundOffset.spec,
   fillet.spec,
-] as const;
+];
+
+/**
+ * Built-in tool by id, falling back to registered user tools. Registration
+ * happens at runtime (module eval / HMR), so this is always a live lookup —
+ * never a frozen static table.
+ */
+function resolveTool(id: string): Tool | undefined {
+  const builtin = (BUILTINS as Record<string, Tool>)[id];
+  if (builtin) return builtin;
+  return registeredToolById(id);
+}
 
 function of(session: ToolSession): Tool {
-  return byId[session.verb];
+  if (session.verb === "composite") {
+    const tool = registeredToolById(session.tool.name);
+    if (tool) return tool;
+    throw new Error(`unknown registered tool "${session.tool.name}"`);
+  }
+  const tool = resolveTool(session.verb);
+  if (!tool) throw new Error(`unknown tool "${session.verb}"`);
+  return tool;
 }
 
 export function toolById(id: ToolId): Tool {
-  return byId[id];
+  const tool = resolveTool(id);
+  if (!tool) throw new Error(`unknown tool "${id}"`);
+  return tool;
 }
 
 function titleMatch(t: ToolSpec, q: string): boolean {
@@ -106,16 +133,22 @@ function descriptionMatch(t: ToolSpec, q: string): boolean {
   );
 }
 
+/** Built-in specs plus registered user tools, evaluated at read time. */
+export function listTools(): ToolSpec[] {
+  return [...TOOLS, ...registeredSpecs()];
+}
+
 export function filterTools(query: string) {
   const q = query.trim().toLowerCase();
-  if (!q) return [...TOOLS];
-  const byTitle = TOOLS.filter((t) => titleMatch(t, q));
+  const all = listTools();
+  if (!q) return all;
+  const byTitle = all.filter((t) => titleMatch(t, q));
   if (byTitle.length > 0) return byTitle;
-  return TOOLS.filter((t) => descriptionMatch(t, q));
+  return all.filter((t) => descriptionMatch(t, q));
 }
 
 export function startTool(id: ToolId): ToolSession {
-  return byId[id].start();
+  return toolById(id).start();
 }
 
 export function clickTool(session: ToolSession, hit: PlaceHit, scope: ScopeInput = []) {

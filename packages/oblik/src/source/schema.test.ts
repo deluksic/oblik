@@ -63,4 +63,30 @@ describe("parseExpose", () => {
       bind: "hLeft",
     });
   });
+
+  test("accepts a registered-tool payload", () => {
+    const job = parseInsert({
+      file: "apps/demo/src/scenes/tool-lab.ts",
+      from: "boltCircle",
+      args: [
+        { kind: "ref", name: "P" },
+        { kind: "num", value: 5 },
+        { kind: "num", value: 6 },
+      ],
+      tool: { module: "/src/layout/tools.ts", prefix: "bc" },
+    });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job.tool).toEqual({ module: "/src/layout/tools.ts", prefix: "bc" });
+  });
+
+  test("rejects a tool payload with an empty module", () => {
+    const job = parseInsert({
+      file: "apps/demo/src/scenes/tool-lab.ts",
+      from: "boltCircle",
+      args: [],
+      tool: { module: "", prefix: "bc" },
+    });
+    expect(typeof job).toBe("string");
+  });
 });

@@ -35,14 +35,19 @@ const BIND = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type HoistedCall = { bind: string; from: string; args: Expr[] };
 
-function pickBind(used: Set<string>, from: string, requested?: string): string {
+function pickBind(
+  used: Set<string>,
+  from: string,
+  requested?: string,
+  prefixOverride?: string,
+): string {
   if (requested?.trim()) {
     const n = requested.trim();
     if (!BIND.test(n)) throw new Error("bind must be an identifier");
     if (used.has(n)) throw new Error(`bind ${n} is already used`);
     return n;
   }
-  const prefix = BIND_PREFIX[from] ?? "n";
+  const prefix = prefixOverride?.trim() || BIND_PREFIX[from] || "n";
   if (!used.has(prefix)) return prefix;
   for (let i = 2; i < 1000; i++) {
     const n = `${prefix}${i}`;
@@ -52,8 +57,13 @@ function pickBind(used: Set<string>, from: string, requested?: string): string {
 }
 
 /** Allocate `from`'s next bind and record it in `used`. */
-export function takeBind(used: Set<string>, from: string, requested?: string): string {
-  const bind = pickBind(used, from, requested);
+export function takeBind(
+  used: Set<string>,
+  from: string,
+  requested?: string,
+  prefixOverride?: string,
+): string {
+  const bind = pickBind(used, from, requested, prefixOverride);
   used.add(bind);
   return bind;
 }

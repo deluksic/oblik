@@ -155,6 +155,12 @@ function Host(props: {
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
 
+  // Read eagerly here (memo), but only reference the memo lazily inside the
+  // `pane` memo's JSX. The pane memo must keep its identity across annotation /
+  // mention bundle refreshes (every scene edit invalidates them), otherwise it
+  // returns a new <Euclid2Pane> and the pane — and its camera — remounts.
+  const mentionsList = createMemo(() => Object.values(props.mentions));
+
   createEffect(
     () => true,
     () => {
@@ -198,7 +204,7 @@ function Host(props: {
           scene={scene() as FigureScene}
           file={file}
           annotations={annotations()}
-          mentions={Object.values(props.mentions)}
+          mentions={mentionsList()}
         />
       );
     }
@@ -208,7 +214,7 @@ function Host(props: {
           scene={scene() as Euclid2Scene}
           file={file}
           annotations={annotations()}
-          mentions={Object.values(props.mentions)}
+          mentions={mentionsList()}
         />
       );
     }

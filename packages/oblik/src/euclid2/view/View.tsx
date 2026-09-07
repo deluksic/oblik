@@ -30,6 +30,7 @@ import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { RegionFill, RegionGhost, RegionOutline, Stroke } from "./Ink";
+import { TraceGhost } from "./TraceGhost";
 import {
   isGrabbable,
   isHot,
@@ -343,6 +344,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
       <svg class={styles.world} viewBox={vb()}>
         <g transform={worldXf()}>
           <Grid camera={camera()} size={size()} />
+          {props.ghost?.kind === "trace" ? (
+            <TraceGhost ghost={props.ghost} camera={camera()} size={size()} />
+          ) : undefined}
           <RegionChrome
             band={fillBand()}
             hoverId={props.hoverId}
@@ -405,7 +409,7 @@ export function Euclid2View(props: Euclid2ViewProps) {
         {props.placing && !chrome().hideSnap && props.place && props.place.point.kind !== "free" ? (
           <PlaceSnap point={props.place.point} camera={camera()} size={size()} />
         ) : undefined}
-        {props.ghost && props.ghost.kind !== "region" ? (
+        {props.ghost && props.ghost.kind !== "region" && props.ghost.kind !== "trace" ? (
           <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
         ) : undefined}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />

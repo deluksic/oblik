@@ -793,3 +793,81 @@ export default defineScene({
     expect(bag).toContain("return { A, extra };");
   });
 });
+
+describe("insertCall — registered tool jobs", () => {
+  test("inserts a tool call with a relative import and no trailing id", () => {
+    const next = insertCall(src, {
+      from: "boltCircle",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "num", value: 5 },
+        { kind: "num", value: 6 },
+      ],
+      tool: { module: "../layout/tools", prefix: "bc" },
+    });
+    expect(next).toContain('import { boltCircle } from "../layout/tools";');
+    expect(next).toContain("const bc = boltCircle(A, 5, 6);");
+    expect(next).not.toContain('boltCircle(A, 5, 6, "');
+  });
+
+  test("hoists literal points inside a tool call, still importing point from oblik", () => {
+    const next = insertCall(src, {
+      from: "boltCircle",
+      args: [
+        {
+          kind: "call",
+          name: "point",
+          args: [
+            { kind: "num", value: 1 },
+            { kind: "num", value: 2 },
+          ],
+        },
+        { kind: "num", value: 5 },
+        { kind: "num", value: 6 },
+      ],
+      tool: { module: "../layout/tools", prefix: "bc" },
+    });
+    expect(next).toContain('import { point } from "oblik";');
+    expect(next).toContain('import { boltCircle } from "../layout/tools";');
+    expect(next).toMatch(/const p = point\(1, 2, "o_[0-9a-f]+"\);/);
+    expect(next).toContain("const bc = boltCircle(p, 5, 6);");
+    expect(next).not.toContain('boltCircle(p, 5, 6, "');
+  });
+
+  test("skips the import when the tool module is the dest file", () => {
+    const next = insertCall(src, {
+      from: "localTool",
+      args: [{ kind: "ref", name: "A" }],
+      tool: { module: "", prefix: "lt" },
+    });
+    expect(next).not.toContain("import { localTool }");
+    expect(next).toContain("const lt = localTool(A);");
+  });
+
+  test("never lets an unnamed bind shadow the tool callee", () => {
+    const next = insertCall(src, {
+      from: "rect",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "num", value: 4 },
+        { kind: "num", value: 3 },
+      ],
+      tool: { module: "../layout/tools", prefix: "rect" },
+    });
+    expect(next).toContain("const rect2 = rect(A, 4, 3);");
+    expect(() =>
+      insertCall(src, {
+        from: "rect",
+        bind: "rect",
+        args: [{ kind: "ref", name: "A" }],
+        tool: { module: "../layout/tools", prefix: "rect" },
+      }),
+    ).toThrow(/already used/);
+  });
+
+  test("still throws for an unknown non-tool callee", () => {
+    expect(() => insertCall(src, { from: "noSuchFn", args: [] })).toThrow(
+      /unknown constructor/,
+    );
+  });
+});

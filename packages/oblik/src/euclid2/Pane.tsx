@@ -248,6 +248,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     args: unknown;
     bind?: string;
     patchVertex?: { id: string; index: number };
+    tool?: { module: string; prefix: string };
   }) {
     const dest = focus();
     const res = await fetch("/__oblik-insert", {

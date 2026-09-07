@@ -6,7 +6,8 @@ import type { Camera2, PaneSize } from "../camera";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
-export type ToolId =
+/** The ten hand-written euclid2 verbs. */
+export type BuiltinToolId =
   | "point"
   | "circle"
   | "line"
@@ -18,6 +19,12 @@ export type ToolId =
   | "roundOffset"
   | "fillet";
 
+/**
+ * Any tool id the pane can route. Built-ins keep autocomplete; user tools
+ * registered with `defineTool` use their registered name as the id.
+ */
+export type ToolId = BuiltinToolId | (string & {});
+
 export type ToolSpec = {
   id: ToolId;
   title: string;
@@ -25,6 +32,69 @@ export type ToolSpec = {
   prefix: string;
   aliases?: readonly string[];
 };
+
+/**
+ * One positional argument of a registered composite tool. Positional, matching
+ * the fn's params in order; `label` is the field placeholder / anchor key.
+ *
+ * - `point`: click empty space (literal point) or mention an existing point.
+ * - `region`: click a face or mention an existing region.
+ * - `segment`: click an existing segment stroke or mention its name.
+ * - `length`: a length *expression* — type a number / `p.radius` /
+ *   `par.distance` / slider, click an existing length to reuse it live, or with
+ *   `anchor` (label of an earlier point/region arg) click to measure
+ *   `dist`/signed offset from that anchor. Anchors enable cursor-draft ghosts.
+ * - `number`: a numeric *literal* — typed value (or `def`); clicking an
+ *   existing length reuses it as an evaluated number. Never measured from an
+ *   anchor, never an expression.
+ *
+ * Args without a `def` are **required**: the ghost and the insert wait until
+ * they are populated (typed, clicked, or measured). A `def` pre-fills the arg
+ * so Enter can commit a default call immediately.
+ */
+export type ToolArg =
+  | { kind: "point"; label: string }
+  | { kind: "region"; label: string }
+  | { kind: "segment"; label: string }
+  | { kind: "length"; label: string; def?: number; anchor?: string }
+  | { kind: "number"; label: string; def?: number; integer?: boolean };
+
+export type ToolDef = {
+  /**
+   * Registry key = palette id = the callee written into source. Defaults to
+   * `fn.name` and must match the module's exported binding. Unique per page.
+   */
+  name?: string;
+  title: string;
+  hint?: string;
+  /** Bind-name prefix (`bc` → `bc1`, `bc2`). */
+  prefix: string;
+  args: readonly ToolArg[];
+  /** Caller module, for tests / exotic toolchains. Defaults to the stack. */
+  module?: string;
+};
+
+export type RegisteredTool = {
+  name: string;
+  title: string;
+  hint: string;
+  prefix: string;
+  args: readonly ToolArg[];
+  fn: (...values: unknown[]) => unknown;
+  /** Vite-root URL pathname (dev) or absolute path (node/tests). */
+  module: string;
+};
+
+/** Per-arg session state: what was typed, or what a gesture resolved to. */
+export type CompositeFill =
+  | { kind: "text"; raw: string }
+  | {
+      /** A gesture (click) resolved this arg. `at`/`value` cache concrete values for ghost/measure. */
+      kind: "expr";
+      expr: Expr;
+      at?: Vec2;
+      value?: number;
+    };
 
 export type FieldKind = "number" | "ident" | "ref" | "length";
 
@@ -180,6 +250,15 @@ export type ToolSession =
       vertexExpr?: Expr;
       typed: string;
       lengthPick?: Expr;
+    }
+  | {
+      /** Registered user tool; `tool.name` is the palette id / callee. */
+      verb: "composite";
+      tool: RegisteredTool;
+      /** Focused arg label (or `"name"`). */
+      focus: string;
+      fills: Record<string, CompositeFill>;
+      name: string;
     };
 
 export type Ghost =
@@ -195,6 +274,13 @@ export type Ghost =
       loops?: Loop[];
       hover?: LoopEdge;
       arrow?: { at: Vec2; tx: number; ty: number };
+    }
+  | {
+      /** Draft-evaluated trace of a registered tool; the view renders these muted. */
+      kind: "trace";
+      /** Unique per draft; view keys are `${stamp}:${key}` so they never collide with live ids. */
+      stamp: string;
+      nodes: TraceNode[];
     };
 
 export type InsertJob = {
@@ -213,6 +299,12 @@ export type InsertJob = {
   args: Expr[];
   bind?: string;
   patchVertex?: { id: string; index: number };
+  /**
+   * Present on registered-tool inserts: `from` is the registered name (not a
+   * constructor), `module` is where to import it from (server maps it to a
+   * relative specifier), and `prefix` drives the fallback bind name.
+   */
+  tool?: { module: string; prefix: string };
 };
 
 export type ToolStep = { session: ToolSession } | { insert: InsertJob };
