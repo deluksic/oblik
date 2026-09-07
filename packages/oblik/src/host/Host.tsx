@@ -6,7 +6,6 @@ import {
   Loading,
   createMemo,
   createSignal,
-  onCleanup,
   Show,
 } from "solid-js";
 
@@ -124,7 +123,7 @@ function Host(props: {
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? undefined);
 
-  const loaded = createMemo(async () => {
+  const loaded = createMemo(() => {
     sceneRev();
     const e = entry();
     const loaders = props.loaders;
@@ -135,17 +134,16 @@ function Host(props: {
     if (e.error) throw new Error(e.error);
     const key = sceneLoaderKey(e.file);
     const cached = sceneCache.get(key);
+    // Cache hits return synchronously so the scene lands in the same flush as
+    // the HMR signal writes; an async memo would pend and settle a microtask
+    // later, forcing a second world re-run per scene edit.
     if (cached) return cached;
     const loader = loaders[key];
     if (!loader) throw new Error(`No loader for ${e.file}`);
-    let cancelled = false;
-    onCleanup(() => {
-      cancelled = true;
+    return loader().then((sceneMod) => {
+      sceneCache.set(key, sceneMod.default);
+      return sceneMod.default;
     });
-    const sceneMod = await loader();
-    if (cancelled) return sceneMod.default;
-    sceneCache.set(key, sceneMod.default);
-    return sceneMod.default;
   });
 
   // NOTE (Solid 2): `pane`/`sceneKind` are only ever evaluated when a scene is
