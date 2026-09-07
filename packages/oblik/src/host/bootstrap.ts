@@ -33,9 +33,23 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
     // module. A combined multi-dep accept would fire on every update and
     // re-import unchanged deps, which hits the browser's module cache and
     // resurrects stale catalog/annotation state.
+    //
+    // Each accept skips no-op updates (same content as last seen), so one
+    // scene edit only invalidates downstream memos when something changed.
+    let lastScenes = JSON.stringify(initialScenes);
     import.meta.hot.accept("virtual:oblik-catalog", (mod) => {
-      if (mod) host.setScenes((mod as unknown as { scenes: OblikSceneEntry[] }).scenes);
+      if (!mod) return;
+      const scenes = (mod as unknown as { scenes: OblikSceneEntry[] }).scenes;
+      const next = JSON.stringify(scenes);
+      if (next === lastScenes) return;
+      lastScenes = next;
+      host.setScenes(scenes);
     });
+    let lastAnnotations = JSON.stringify([
+      initialAnnotations,
+      initialMentions,
+      initialCollisions,
+    ]);
     import.meta.hot.accept("virtual:oblik-annotations", (mod) => {
       if (!mod) return;
       const fresh = mod as unknown as {
@@ -43,12 +57,25 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
         annotationCollisions: DuplicateId[];
         mentionsByPath: MentionBundle;
       };
+      const next = JSON.stringify([
+        fresh.annotationsByPath,
+        fresh.mentionsByPath,
+        fresh.annotationCollisions,
+      ]);
+      if (next === lastAnnotations) return;
+      lastAnnotations = next;
       host.setAnnotations(fresh.annotationsByPath);
       host.setCollisions(fresh.annotationCollisions);
       host.setMentions(fresh.mentionsByPath);
     });
+    let lastLoaders = JSON.stringify(initialLoaders);
     import.meta.hot.accept("virtual:oblik-loaders", (mod) => {
-      if (mod) host.setLoaders((mod as unknown as { sceneLoaders: SceneLoaderMap }).sceneLoaders);
+      if (!mod) return;
+      const loaders = (mod as unknown as { sceneLoaders: SceneLoaderMap }).sceneLoaders;
+      const next = JSON.stringify(loaders);
+      if (next === lastLoaders) return;
+      lastLoaders = next;
+      host.setLoaders(loaders);
     });
   }
 }

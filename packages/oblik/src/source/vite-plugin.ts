@@ -506,7 +506,14 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       if (!isUserAppSource(appRoot, ctx.file)) return;
       invalidateAnnotationsBundle(server);
       for (const mod of server.moduleGraph.idToModuleMap.values()) {
-        if (mod.id?.startsWith(VIRTUAL_ANN_RESOLVED)) void server.reloadModule(mod);
+        // Exact prefix, minus the bundle: its resolved id extends the per-file
+        // prefix, and reloading it here would double-fire bootstrap's accept.
+        if (
+          mod.id?.startsWith(VIRTUAL_ANN_RESOLVED) &&
+          mod.id !== VIRTUAL_ANN_BUNDLE_RESOLVED
+        ) {
+          void server.reloadModule(mod);
+        }
       }
       const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
       const extra = bundle ? [bundle] : [];
