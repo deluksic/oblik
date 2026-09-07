@@ -43,7 +43,7 @@ export default defineScene({
     const rhs = segment(br, tr, "o_is_rhs");
     const top = segment(tr, tl, "o_is_top");
     const lhs = segment(tl, bl, "o_is_lhs");
-    const stock = region([bl, bot, br, rhs, tr, top, tl, lhs], []);
+    const stock = region([bl, bot, br, rhs, tr, top, tl, lhs], [], "o_d789f67d69");
 
     const drillR = slider(0.16, { min: 0.04, max: 0.4, step: 0.01 }, "o_is_drillR");
     const inset = 0.38;
@@ -60,15 +60,16 @@ export default defineScene({
     const half = max(slotL, slotW) / 2 - r;
     const Lc = { x: slotX - half, y: slotY };
     const Rc = { x: slotX + half, y: slotY };
-    const leftC = circle(Lc, r);
-    const rightC = circle(Rc, r);
+    const leftC = circle(Lc, r, "o_e6c04ffbe5");
+    const rightC = circle(Rc, r, "o_185c705bea");
     const P = { x: Lc.x, y: Lc.y + r };
     const Q = { x: Rc.x, y: Rc.y + r };
     const botR = { x: Rc.x, y: Rc.y - r };
     const T = { x: Lc.x, y: Lc.y - r };
     const slot = region(
-      [P, segment(P, Q), Q, along(rightC, -1), botR, segment(botR, T), T, along(leftC, -1)],
+      [P, segment(P, Q, "o_c60cbc470b"), Q, along(rightC, -1), botR, segment(botR, T, "o_90507144cb"), T, along(leftC, -1)],
       [],
+      "o_953e10b6a8",
     );
     const probe = point(5.15, 2.35, "o_is_probe");
     const face = diff(stock, [d0, d1, slot]);
@@ -86,6 +87,7 @@ export default defineScene({
     const plate = region(
       [fillet(Fa, fr), fab, fillet(Fb, fr), fbc, fillet(Fc, fr), fcd, fillet(Fd, fr), fda],
       [],
+      "o_275e9c78ca",
     );
     const holeC = point(11, 1.5, "o_is_hc");
     const hole = circle(holeC, 0.42, "o_is_hole");

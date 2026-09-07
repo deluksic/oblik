@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import IconSearch from "~icons/lucide/search";
 
 import type { OblikSceneEntry } from "../source/catalog";
+import { useFocusOnMount } from "../ui/useFocusOnMount";
 import { hasSceneError, navItems } from "./routing";
 import { SceneKindIcon } from "./SceneKindIcon";
 
@@ -14,6 +15,7 @@ export type WelcomeProps = {
 
 export function Welcome(props: WelcomeProps) {
   const [query, setQuery] = createSignal("");
+  const focusSearch = useFocusOnMount();
 
   const scenes = createMemo(() => navItems(props.scenes));
 
@@ -44,6 +46,7 @@ export function Welcome(props: WelcomeProps) {
         <div class={styles.searchBox}>
           <IconSearch class={styles.searchIcon} aria-hidden="true" />
           <input
+            ref={focusSearch}
             type="search"
             class={styles.search}
             placeholder="Filter scenes…"

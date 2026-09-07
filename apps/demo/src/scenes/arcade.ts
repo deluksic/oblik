@@ -23,7 +23,7 @@ export default defineScene({
     const B = pointOnCircle(disk, 0.766, -0.643, "o_ar_b");
     const oa = segment(O, A, "o_ar_oa");
     const ob = segment(O, B, "o_ar_ob");
-    const mouth = region([O, oa, A, along(disk, -1), B, ob], []);
+    const mouth = region([O, oa, A, along(disk, -1), B, ob], [], "o_7597a80fa0");
     const pac = csg2(diff(disk, [mouth]), "o_ar_pac");
 
     circle(point(3.28, 1.6, "o_ar_p0"), 0.11, "o_ar_d0");
@@ -44,7 +44,7 @@ export default defineScene({
     const tunicRhs = segment(br, tr, "o_ar_tr");
     const tunicTop = segment(tr, tl, "o_ar_tt");
     const tunicLhs = segment(tl, bl, "o_ar_tl");
-    const tunic = region([bl, tunicBot, br, tunicRhs, tr, tunicTop, tl, tunicLhs], []);
+    const tunic = region([bl, tunicBot, br, tunicRhs, tr, tunicTop, tl, tunicLhs], [], "o_a8257e99ec");
     const scallop = 0.35;
     const s0 = circle(point(left + scallop, bot, "o_ar_s0"), scallop, "o_ar_c0");
     const s1 = circle(point(G.x, bot, "o_ar_s1"), scallop, "o_ar_c1");
