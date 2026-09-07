@@ -13,6 +13,7 @@ import type { DuplicateId, OblikSceneEntry } from "../source/catalog";
 import type { AnnotationBundle, MentionBundle, SceneLoaderMap } from "./Host";
 import { mountOblik } from "./Host";
 import { batchHmr } from "./hmr-batch";
+import { sceneLoaderKeys } from "./loader-keys";
 
 export type BootstrapOpts = {
   el?: HTMLElement;
@@ -71,16 +72,11 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
         host.setMentions(fresh.mentionsByPath);
       });
     });
-    // Loader values are functions, so they can't be JSON-deduped like the
-    // catalog above (JSON.stringify drops them, making every map look equal
-    // to "{}"). Loader identity is the key set: scene edits propagate through
-    // the loaders module's own accepts, never through setLoaders.
-    const loaderKeys = (m: SceneLoaderMap) => Object.keys(m).sort().join("\n");
-    let lastLoaders = loaderKeys(initialLoaders);
+    let lastLoaders = sceneLoaderKeys(initialLoaders);
     import.meta.hot.accept("virtual:oblik-loaders", (mod) => {
       if (!mod) return;
       const loaders = (mod as unknown as { sceneLoaders: SceneLoaderMap }).sceneLoaders;
-      const next = loaderKeys(loaders);
+      const next = sceneLoaderKeys(loaders);
       if (next === lastLoaders) return;
       lastLoaders = next;
       batchHmr(() => host.setLoaders(loaders));
