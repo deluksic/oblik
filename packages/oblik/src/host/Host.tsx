@@ -4,6 +4,7 @@ import {
   Errored,
   For,
   Loading,
+  NotReadyError,
   createMemo,
   createSignal,
   Show,
@@ -126,20 +127,20 @@ function Host(props: {
   const scene = createMemo(() => {
     sceneRev();
     const e = entry();
-    const loaders = props.loaders;
-    // Deleted scene, not an error: a throw here would escape the <Errored>
-    // boundary (memos recompute in the flush queue, outside its scope) and
-    // halt the whole reactive system. The pane renders a "deleted" notice.
-    if (!e) return undefined;
-    if (e.error) throw new Error(e.error);
+    // Deleted or errored scenes are terminal; the pane renders a notice.
+    if (!e || e.error) return undefined;
     const key = sceneLoaderKey(e.file);
     const cached = sceneCache.get(key);
     // Cache hits return synchronously so the scene lands in the same flush as
     // the HMR signal writes; a pending memo would settle a microtask later,
     // forcing a second world re-run per scene edit.
     if (cached) return cached;
-    const loader = loaders[key];
-    if (!loader) throw new Error(`No loader for ${e.file}`);
+    const loader = props.loaders[key];
+    // Catalog knows the scene but the loaders HMR has not landed yet. Throw
+    // pending (not a plain Error — a memo Error on recompute escapes the
+    // <Errored> boundary and halts the whole reactive system); the memo
+    // retries when props.loaders changes.
+    if (!loader) throw new NotReadyError(undefined);
     return loader().then((sceneMod) => {
       sceneCache.set(key, sceneMod.default);
       return sceneMod.default;
@@ -196,6 +197,7 @@ function Host(props: {
   const pane = createMemo(() => {
     const e = entry();
     if (!e) return <p class={styles.err}>Scene deleted</p>;
+    if (e.error) return <p class={styles.err}>{e.error}</p>;
     const kind = sceneKind();
     const file = e.path;
     if (kind === "figure") {

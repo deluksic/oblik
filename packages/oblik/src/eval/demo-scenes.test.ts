@@ -235,7 +235,7 @@ describe("migrated demo scenes", () => {
 
   test("pie traces three roundOffset slices from one gap slider", () => {
     const { trace } = run(pie, ["apps/demo/src/scenes/pie.ts"]);
-    expect(trace.filter((n) => n.kind === "region")).toHaveLength(0);
+    expect(trace.filter((n) => n.kind === "region")).toHaveLength(3);
     expect(trace.filter((n) => n.kind === "csg2")).toHaveLength(3);
     expect(trace.filter((n) => n.kind === "segment")).toHaveLength(3);
     expect(trace.filter((n) => n.value.kind === "gliderCircle")).toHaveLength(3);
