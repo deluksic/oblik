@@ -2,8 +2,7 @@ import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
-import type { Plugin, ViteDevServer } from "vite";
-import type { ModuleNode } from "vite";
+import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 import { transformSync } from "esbuild";
 
 import {
@@ -120,11 +119,11 @@ function isLibraryFile(sceneDir: string, file: string): boolean {
  * scene against the freshly re-imported library.
  */
 function libraryUpdateModules(
-  seed: ReadonlySet<ModuleNode>,
+  seed: ReadonlySet<EnvironmentModuleNode>,
   appRoot: string,
-): ModuleNode[] {
-  const out: ModuleNode[] = [];
-  const seen = new Set<ModuleNode>();
+): EnvironmentModuleNode[] {
+  const out: EnvironmentModuleNode[] = [];
+  const seen = new Set<EnvironmentModuleNode>();
   const queue = [...seed];
   for (const m of seed) seen.add(m);
   while (queue.length > 0) {
@@ -487,34 +486,41 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       });
       return { code: compiled.code };
     },
-    handleHotUpdate(ctx) {
-      const server = ctx.server;
-      console.log("[oblik-dbg] handleHotUpdate", ctx.file, "modules=", ctx.modules?.length ?? ctx.modules?.size);
-      if (!isUserAppSource(appRoot, ctx.file)) return;
+    hotUpdate(options) {
+      const env = this.environment;
+      if (env.name !== "client") return; // ssr graph has no oblik virtuals; default handling is a no-op there
+      if (!isUserAppSource(appRoot, options.file)) return;
       // Bundle/catalog/loaders must ride in the SAME update payload as the
       // scene modules. reloadModule would deliver each as its own HMR event,
       // and every event runs bootstrap's accept callbacks in a fresh task —
       // one world re-run per event instead of one per edit.
-      const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
+      const bundle = env.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
       const extra = bundle ? [bundle] : [];
-      if (APP_ENTRY_FILE.test(ctx.file)) return undefined; // re-running bootstrap under HMR would double-mount — reload instead
-      if (!isSceneTs(sceneDir, ctx.file)) {
+      if (APP_ENTRY_FILE.test(options.file)) return undefined; // re-running bootstrap under HMR would double-mount — reload instead
+      if (!isSceneTs(sceneDir, options.file)) {
         // Library module (e.g. a tool/layout file): it self-accepts in the
         // transform, so push the change through the loaded scenes that import
         // it — their loader accept re-executes them against the new module.
-        const changed = server.moduleGraph.getModulesByFile(ctx.file);
+        const changed = env.moduleGraph.getModulesByFile(options.file);
         if (!changed || changed.size === 0) return extra.length > 0 ? extra : undefined;
         const updates = libraryUpdateModules(changed, appRoot);
         return updates.length > 0 ? [...updates, ...extra] : extra;
       }
       if (catalogChanged()) {
-        const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
+        const catalog = env.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
         if (catalog) extra.push(catalog);
-        const loaders = server.moduleGraph.getModuleById(VIRTUAL_LOADERS_RESOLVED);
+        const loaders = env.moduleGraph.getModuleById(VIRTUAL_LOADERS_RESOLVED);
         if (loaders) extra.push(loaders);
       }
-      console.log("[oblik-dbg] scene return", ctx.modules?.length ?? ctx.modules?.size, "+extra", extra.length);
-      return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
+      // A scene module the client pruned (empty-file add / delete drops it
+      // from the loaders) keeps its module node but loses every importer
+      // edge; letting it ride the payload dead-ends vite's update walk into a
+      // full page reload. hotUpdate runs for create/delete events too (the
+      // legacy handleHotUpdate did not), which is what made recreate-then-edit
+      // reload. The extras still reach bootstrap's accepts, and the next
+      // loader call imports the scene fresh.
+      const live = options.modules.filter((mod) => mod.importers.size > 0);
+      return live.length > 0 || extra.length > 0 ? [...live, ...extra] : undefined;
     },
   };
 }
