@@ -22,6 +22,7 @@ import {
   type OblikSceneEntry,
 } from "../source/catalog";
 import type { MentionFile } from "../source/mention";
+import { batchHmr } from "./hmr-batch";
 import { currentSceneId, openScene, openWelcome } from "./routing";
 import { registerSceneHot } from "./scene-hot";
 import { originFileLabel } from "./selection-detail";
@@ -166,8 +167,10 @@ function Host(props: {
     () => {
       registerSceneHot({
         onHot(key, hotScene) {
-          sceneCache.set(key, hotScene);
-          setSceneRev((r) => r + 1);
+          batchHmr(() => {
+            sceneCache.set(key, hotScene);
+            setSceneRev((r) => r + 1);
+          });
         },
       });
       return () => registerSceneHot(undefined);

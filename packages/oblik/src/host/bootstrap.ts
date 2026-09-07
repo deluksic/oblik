@@ -12,6 +12,7 @@ import { sceneLoaders as initialLoaders } from "virtual:oblik-loaders";
 import type { DuplicateId, OblikSceneEntry } from "../source/catalog";
 import type { AnnotationBundle, MentionBundle, SceneLoaderMap } from "./Host";
 import { mountOblik } from "./Host";
+import { batchHmr } from "./hmr-batch";
 
 export type BootstrapOpts = {
   el?: HTMLElement;
@@ -43,7 +44,7 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
       const next = JSON.stringify(scenes);
       if (next === lastScenes) return;
       lastScenes = next;
-      host.setScenes(scenes);
+      batchHmr(() => host.setScenes(scenes));
     });
     let lastAnnotations = JSON.stringify([
       initialAnnotations,
@@ -64,9 +65,11 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
       ]);
       if (next === lastAnnotations) return;
       lastAnnotations = next;
-      host.setAnnotations(fresh.annotationsByPath);
-      host.setCollisions(fresh.annotationCollisions);
-      host.setMentions(fresh.mentionsByPath);
+      batchHmr(() => {
+        host.setAnnotations(fresh.annotationsByPath);
+        host.setCollisions(fresh.annotationCollisions);
+        host.setMentions(fresh.mentionsByPath);
+      });
     });
     let lastLoaders = JSON.stringify(initialLoaders);
     import.meta.hot.accept("virtual:oblik-loaders", (mod) => {
@@ -75,7 +78,7 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
       const next = JSON.stringify(loaders);
       if (next === lastLoaders) return;
       lastLoaders = next;
-      host.setLoaders(loaders);
+      batchHmr(() => host.setLoaders(loaders));
     });
   }
 }
