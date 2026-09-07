@@ -489,6 +489,7 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
     },
     handleHotUpdate(ctx) {
       const server = ctx.server;
+      console.log("[oblik-dbg] handleHotUpdate", ctx.file, "modules=", ctx.modules?.length ?? ctx.modules?.size);
       if (!isUserAppSource(appRoot, ctx.file)) return;
       // Bundle/catalog/loaders must ride in the SAME update payload as the
       // scene modules. reloadModule would deliver each as its own HMR event,
@@ -512,6 +513,7 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
         const loaders = server.moduleGraph.getModuleById(VIRTUAL_LOADERS_RESOLVED);
         if (loaders) extra.push(loaders);
       }
+      console.log("[oblik-dbg] scene return", ctx.modules?.length ?? ctx.modules?.size, "+extra", extra.length);
       return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
     },
   };
