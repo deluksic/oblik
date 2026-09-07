@@ -47,7 +47,7 @@ export function parallelLineValue(geom: LineLike, signedD: number): ParallelLine
 /** Infinite line through `through`, perpendicular to the carrier of `geom`. */
 export function perpendicularLineValue(geom: LineLike, through: Vec2): Line {
   const { dir } = lineBasis(geom);
-  return { kind: "line", origin: through, direction: perp(dir) };
+  return { kind: "line", origin: { x: through.x, y: through.y }, direction: perp(dir) };
 }
 
 export function lineIntersectionValue(a: LineLike, b: LineLike): Vec2 {

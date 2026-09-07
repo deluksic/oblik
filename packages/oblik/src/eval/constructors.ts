@@ -148,14 +148,16 @@ export const point = mark(
 export const circle = mark(
   (center: Vec2, radius: number, id?: string): Circle => {
     const r = draftAt(id, 0, radius);
-    return traced({ kind: "circle", center, radius: r }, id);
+    return traced({ kind: "circle", center: { x: center.x, y: center.y }, radius: r }, id);
   },
   { dof: [1] },
 );
 
 export const segment = mark(
   (a: Vec2, b: Vec2, id?: string): Segment => {
-    return traced({ kind: "segment", a, b }, id);
+    // Copy endpoints: embedding a glider value here nests the whole ancestor
+    // tree, and trace reuse deep-compares values — exponential in recursion depth.
+    return traced({ kind: "segment", a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } }, id);
   },
   { dof: [] },
 );
@@ -166,7 +168,7 @@ export const line = mark(
     const dy = b.y - a.y;
     const l = sqrt(dx * dx + dy * dy);
     const direction = l < 1e-9 ? { x: 1, y: 0 } : { x: dx / l, y: dy / l };
-    return traced({ kind: "line", origin: a, direction }, id);
+    return traced({ kind: "line", origin: { x: a.x, y: a.y }, direction }, id);
   },
   { dof: [] },
 );

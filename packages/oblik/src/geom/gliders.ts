@@ -53,7 +53,14 @@ export function unit2(x: number, y: number): { ux: number; uy: number } {
 export function pointOnSegmentValue(seg: Segment, t: number): GliderSegment {
   const tt = clamp01(t);
   const p = lerp(seg.a, seg.b, tt);
-  return { kind: "gliderSegment", a: seg.a, b: seg.b, t: tt, x: p.x, y: p.y };
+  return {
+    kind: "gliderSegment",
+    a: { x: seg.a.x, y: seg.a.y },
+    b: { x: seg.b.x, y: seg.b.y },
+    t: tt,
+    x: p.x,
+    y: p.y,
+  };
 }
 
 export function pointOnLineValue(geom: LineLike, s: number): GliderLine {
@@ -67,7 +74,7 @@ export function pointOnCircleValue(c: Circle, ux: number, uy: number): GliderCir
   const p = add(c.center, mul({ x: uu, y: vv }, c.radius));
   return {
     kind: "gliderCircle",
-    center: c.center,
+    center: { x: c.center.x, y: c.center.y },
     radius: c.radius,
     ux: uu,
     uy: vv,
