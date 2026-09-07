@@ -71,6 +71,7 @@ Static-only: `class={styles.nav}`.
 
 - **`createEffect` (compute / effect split)** — see below. **Do not use `onSettled`** — forbidden here (oxlint `no-restricted-imports` + `solid-conventions.test.ts`).
 - **Async resource in `createMemo`** — register `onCleanup` **before** the first `await`. If the memo re-runs while awaiting, cleanup still runs. Host.tsx's `loaded` memo is the canonical example (module cache + `cancelled` flag + `setSceneRev` on HMR).
+- **Never throw `NotReadyError` yourself.** The runtime stamps pending errors with the source node it derives internally; a hand-made one has no source, and the runtime converts the rejection into a fatal "Read of an unresolved async source after an `await`" that halts reactivity. To keep a memo pending until some dependency changes (e.g. an HMR bundle that has not landed), return a never-settling promise — `return new Promise<T>(() => {})` — the dependency re-run supersedes the stale flight. Host.tsx's scene memo does this when the loaders map lags the catalog.
 - **Refs** — use signal refs (`const [el, setEl] = createSignal<HTMLDivElement | null>(null)` + `ref={setEl}`) so `createEffect` can react when the node mounts.
 
 ## Reactivity

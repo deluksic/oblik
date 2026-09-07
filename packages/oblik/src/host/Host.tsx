@@ -4,7 +4,6 @@ import {
   Errored,
   For,
   Loading,
-  NotReadyError,
   createMemo,
   createSignal,
   Show,
@@ -136,11 +135,12 @@ function Host(props: {
     // forcing a second world re-run per scene edit.
     if (cached) return cached;
     const loader = props.loaders[key];
-    // Catalog knows the scene but the loaders HMR has not landed yet. Throw
-    // pending (not a plain Error — a memo Error on recompute escapes the
-    // <Errored> boundary and halts the whole reactive system); the memo
-    // retries when props.loaders changes.
-    if (!loader) throw new NotReadyError(undefined);
+    // Catalog knows the scene but the loaders HMR has not landed yet. Park the
+    // memo on a never-settling flight — the runtime's own pending machinery —
+    // instead of throwing NotReadyError: a hand-made one has no source node,
+    // and the runtime turns that into a fatal reactivity halt. The memo
+    // retries when props.loaders (a dependency read above) changes.
+    if (!loader) return new Promise<Scene>(() => {});
     return loader().then((sceneMod) => {
       sceneCache.set(key, sceneMod.default);
       return sceneMod.default;
