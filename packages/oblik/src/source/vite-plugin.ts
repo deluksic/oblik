@@ -504,10 +504,7 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
     handleHotUpdate(ctx) {
       const server = ctx.server;
       if (!isUserAppSource(appRoot, ctx.file)) return;
-      invalidateAnnotationsBundle(server);
       for (const mod of server.moduleGraph.idToModuleMap.values()) {
-        // Exact prefix, minus the bundle: its resolved id extends the per-file
-        // prefix, and reloading it here would double-fire bootstrap's accept.
         if (
           mod.id?.startsWith(VIRTUAL_ANN_RESOLVED) &&
           mod.id !== VIRTUAL_ANN_BUNDLE_RESOLVED
@@ -515,6 +512,10 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
           void server.reloadModule(mod);
         }
       }
+      // Bundle/catalog/loaders must ride in the SAME update payload as the
+      // scene modules. reloadModule would deliver each as its own HMR event,
+      // and every event runs bootstrap's accept callbacks in a fresh task —
+      // one world re-run per event instead of one per edit.
       const bundle = server.moduleGraph.getModuleById(VIRTUAL_ANN_BUNDLE_RESOLVED);
       const extra = bundle ? [bundle] : [];
       if (APP_ENTRY_FILE.test(ctx.file)) return undefined; // re-running bootstrap under HMR would double-mount — reload instead
@@ -528,10 +529,10 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
         return updates.length > 0 ? [...updates, ...extra] : extra;
       }
       if (catalogChanged()) {
-        invalidateCatalog(server);
-        invalidateSceneLoaders(server);
         const catalog = server.moduleGraph.getModuleById(VIRTUAL_CATALOG_RESOLVED);
         if (catalog) extra.push(catalog);
+        const loaders = server.moduleGraph.getModuleById(VIRTUAL_LOADERS_RESOLVED);
+        if (loaders) extra.push(loaders);
       }
       return extra.length > 0 ? [...ctx.modules, ...extra] : ctx.modules;
     },
