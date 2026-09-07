@@ -16,12 +16,6 @@ declare module "virtual:oblik-annotations" {
   export const mentionsByPath: Record<string, MentionFile>;
 }
 
-declare module "virtual:oblik-annotations?*" {
-  import type { Annotation } from "oblik";
-  const annotations: Record<string, Annotation>;
-  export default annotations;
-}
-
 declare module "virtual:oblik-loaders" {
   import type { SceneLoaderMap } from "oblik/host";
   export const sceneLoaders: SceneLoaderMap;

@@ -123,7 +123,7 @@ function Host(props: {
 
   const entry = createMemo(() => props.scenes.find((s) => s.id === sceneId()) ?? undefined);
 
-  const loaded = createMemo(() => {
+  const scene = createMemo(() => {
     sceneRev();
     const e = entry();
     const loaders = props.loaders;
@@ -135,8 +135,8 @@ function Host(props: {
     const key = sceneLoaderKey(e.file);
     const cached = sceneCache.get(key);
     // Cache hits return synchronously so the scene lands in the same flush as
-    // the HMR signal writes; an async memo would pend and settle a microtask
-    // later, forcing a second world re-run per scene edit.
+    // the HMR signal writes; a pending memo would settle a microtask later,
+    // forcing a second world re-run per scene edit.
     if (cached) return cached;
     const loader = loaders[key];
     if (!loader) throw new Error(`No loader for ${e.file}`);
@@ -149,7 +149,6 @@ function Host(props: {
   // NOTE (Solid 2): `pane`/`sceneKind` are only ever evaluated when a scene is
   // open (the welcome `<Show>` short-circuits them). Branch identity on the
   // stable `sceneKind` memo so a scene is not remounted when only props change.
-  const scene = createMemo(() => loaded());
   const sceneKind = createMemo(() => scene()?.kind);
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));

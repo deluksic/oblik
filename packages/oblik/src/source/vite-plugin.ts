@@ -6,7 +6,6 @@ import type { Plugin, ViteDevServer } from "vite";
 import type { ModuleNode } from "vite";
 import { transformSync } from "esbuild";
 
-import { analyze } from "./analyze";
 import {
   scanAnnotationsBundle,
   scanMentionsBundle,
@@ -33,7 +32,6 @@ import { moduleRefToSpecifier } from "./tool-path";
 import { isUserAppSource, listUserAppSources } from "./user-source";
 
 const VIRTUAL_ANN = "virtual:oblik-annotations";
-const VIRTUAL_ANN_RESOLVED = "\0" + VIRTUAL_ANN;
 const VIRTUAL_ANN_BUNDLE_RESOLVED = "\0virtual:oblik-annotations-bundle";
 const VIRTUAL_CATALOG = "virtual:oblik-catalog";
 const VIRTUAL_CATALOG_RESOLVED = "\0" + VIRTUAL_CATALOG;
@@ -431,9 +429,6 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     resolveId(id, importer) {
       if (id === VIRTUAL_CATALOG) return VIRTUAL_CATALOG_RESOLVED;
       if (id === VIRTUAL_ANN) return VIRTUAL_ANN_BUNDLE_RESOLVED;
-      if (id.startsWith(`${VIRTUAL_ANN}?`)) {
-        return VIRTUAL_ANN_RESOLVED + id.slice(VIRTUAL_ANN.length);
-      }
       if (id === VIRTUAL_LOADERS) return VIRTUAL_LOADERS_RESOLVED;
       // Loader keys are app-src-relative ("./scenes/x.ts"); the virtual module
       // has no directory, so anchor them where scene-loaders.ts used to live.
@@ -459,15 +454,6 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
       if (id === VIRTUAL_LOADERS_RESOLVED) {
         return sceneLoadersModule(sceneGlobKeys(sceneDir));
       }
-      if (!id.startsWith(VIRTUAL_ANN_RESOLVED)) return;
-      const q = id.includes("?") ? id.slice(id.indexOf("?") + 1) : "";
-      const params = new URLSearchParams(q);
-      const file = params.get("file");
-      if (!file) return "export default {};\n";
-      const abs = resolveUnder(workspaceRoot, file);
-      const src = fs.readFileSync(abs, "utf8");
-      const map = analyze(src, file.replace(/\\/g, "/"));
-      return `export default ${JSON.stringify(Object.fromEntries(map))};\n`;
     },
     transform(_code, id) {
       const file = id.split("?")[0] ?? id;
@@ -504,14 +490,6 @@ export const mentionsByPath = ${JSON.stringify(mentionsByPath)};
     handleHotUpdate(ctx) {
       const server = ctx.server;
       if (!isUserAppSource(appRoot, ctx.file)) return;
-      for (const mod of server.moduleGraph.idToModuleMap.values()) {
-        if (
-          mod.id?.startsWith(VIRTUAL_ANN_RESOLVED) &&
-          mod.id !== VIRTUAL_ANN_BUNDLE_RESOLVED
-        ) {
-          void server.reloadModule(mod);
-        }
-      }
       // Bundle/catalog/loaders must ride in the SAME update payload as the
       // scene modules. reloadModule would deliver each as its own HMR event,
       // and every event runs bootstrap's accept callbacks in a fresh task —

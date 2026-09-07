@@ -1,4 +1,5 @@
-let pending: (() => void)[] | undefined;
+const pending: (() => void)[] = [];
+let scheduled = false;
 
 /**
  * Defer `fn` to the next macrotask, merged with any other HMR updates that
@@ -8,13 +9,11 @@ let pending: (() => void)[] | undefined;
  * into a single re-run.
  */
 export function batchHmr(fn: () => void): void {
-  if (!pending) {
-    pending = [];
-    setTimeout(() => {
-      const fns = pending!;
-      pending = undefined;
-      for (const f of fns) f();
-    }, 0);
-  }
   pending.push(fn);
+  if (scheduled) return;
+  scheduled = true;
+  setTimeout(() => {
+    scheduled = false;
+    for (const f of pending.splice(0)) f();
+  }, 0);
 }
