@@ -1,6 +1,8 @@
 import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
 
+import IconPanelBottomClose from "~icons/lucide/panel-bottom-close";
+import IconPanelBottomOpen from "~icons/lucide/panel-bottom-open";
 import IconPanelRightClose from "~icons/lucide/panel-right-close";
 import IconPanelRightOpen from "~icons/lucide/panel-right-open";
 
@@ -26,8 +28,9 @@ import styles from "./ResizableSidebar.module.css";
  * signal shared by every pane (same id ⇒ same signal) so they persist across
  * scene switches and reloads. Drag math lives in the shared `createDragHandler` —
  * one handler and one handle per orientation, CSS picks which is visible.
- * Collapsed state is a stored signal too: the open button swaps the sidebar for
- * a slim reopen strip, and the preference survives reloads.
+ * Collapsed state is a stored signal too: the sidebar swaps for a small
+ * floating reopen button over the canvas's top-right corner (it anchors to the
+ * positioned `.wrap` sibling in each pane), and the preference survives reloads.
  */
 export function ResizableSidebar(props: ParentProps) {
   const width = createStoredSignal<number>(SIDEBAR_STORE_ID, {
@@ -67,16 +70,15 @@ export function ResizableSidebar(props: ParentProps) {
     <Show
       when={!collapsed.value()}
       fallback={
-        <div class={styles.collapsed}>
-          <button
-            type="button"
-            class={icon}
-            aria-label="Open sidebar"
-            onClick={() => collapsed.set(true)}
-          >
-            <IconPanelRightOpen />
-          </button>
-        </div>
+        <button
+          type="button"
+          class={[icon, styles.fab]}
+          aria-label="Open sidebar"
+          onClick={() => collapsed.set(false)}
+        >
+          <IconPanelRightOpen class={styles.iconWide} />
+          <IconPanelBottomOpen class={styles.iconNarrow} />
+        </button>
       }
     >
       <div
@@ -109,9 +111,10 @@ export function ResizableSidebar(props: ParentProps) {
           type="button"
           class={[icon, styles.toggle]}
           aria-label="Close sidebar"
-          onClick={() => collapsed.set(false)}
+          onClick={() => collapsed.set(true)}
         >
-          <IconPanelRightClose />
+          <IconPanelRightClose class={styles.iconWide} />
+          <IconPanelBottomClose class={styles.iconNarrow} />
         </button>
         {props.children}
       </div>

@@ -59,15 +59,23 @@
   border-color: var(--oblik-line);
 }
 
-.collapsed {
-  flex: none;
-  width: 2.25rem;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 6px;
-  border-left: 1px solid var(--oblik-line);
+/* Floating reopen button, anchored to the pane's `.wrap` (canvas column). */
+.fab {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
   background: var(--oblik-raised);
+  border-color: var(--oblik-line);
+}
+
+/* Both orientations are rendered; the breakpoint picks the right icon. */
+.iconWide {
+  display: block;
+}
+
+.iconNarrow {
+  display: none;
 }
 
 /* Docked-to-bottom layout; 48rem breakpoint mirrors pane.module.css `.workspace`. */
@@ -86,14 +94,11 @@
     display: block;
   }
 
-  .collapsed {
-    width: 100%;
-    height: 2.25rem;
-    padding-top: 0;
-    padding-left: 6px;
-    align-items: center;
-    justify-content: flex-start;
-    border-left: none;
-    border-top: 1px solid var(--oblik-line);
+  .iconWide {
+    display: none;
+  }
+
+  .iconNarrow {
+    display: block;
   }
 }
