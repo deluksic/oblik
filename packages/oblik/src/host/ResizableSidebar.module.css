@@ -59,11 +59,12 @@
   border-color: var(--oblik-line);
 }
 
-/* Floating reopen button, anchored to the pane's `.wrap` (canvas column). */
+/* Floating reopen button. Same corner as the close toggle so toggling does
+   not shift it; the docked-layout breakpoint moves it to the bottom. */
 .fab {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
+  top: 6px;
+  right: 6px;
   z-index: 3;
   background: var(--oblik-raised);
   border-color: var(--oblik-line);
@@ -92,6 +93,11 @@
 
   .handleTop {
     display: block;
+  }
+
+  .fab {
+    top: auto;
+    bottom: 6px;
   }
 
   .iconWide {
