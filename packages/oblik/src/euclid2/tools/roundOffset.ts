@@ -11,7 +11,7 @@ import {
   nameField,
   previewName,
   refField,
-  resolveRegion,
+  resolveSlot,
   withBind,
 } from "./draft";
 import {
@@ -39,7 +39,7 @@ const fields: Field<OffsetSession>[] = [
 ];
 
 function faceOf(session: OffsetSession, scope: Scope) {
-  return resolveRegion(session.faceRef, session.face, scope);
+  return resolveSlot("region", session.faceRef, session.face, scope);
 }
 
 function distAt(hit: PlaceHit, geom: Region): number {

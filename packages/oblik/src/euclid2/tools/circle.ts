@@ -1,11 +1,10 @@
-import { printExpr } from "#source/expr";
-
 import {
   asPoint,
   dist,
   exprOfPlace,
   hoverPlace,
   isPinnedPoint,
+  pinnedPointLabel,
   previewCall,
   round,
   sameRef,
@@ -17,7 +16,8 @@ import {
   nameField,
   previewName,
   refField,
-  resolvePoint,
+  resolveSlot,
+  slotLabel,
   withBind,
 } from "./draft";
 import {
@@ -46,7 +46,7 @@ const fields: Field<CircleSession>[] = [
 ];
 
 function centerOf(session: CircleSession, scope: Scope): Placed | undefined {
-  return resolvePoint(session.centerRef, session.center, scope);
+  return resolveSlot("point", session.centerRef, session.center, scope);
 }
 
 function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope: Scope) {
@@ -64,13 +64,7 @@ function radiusExpr(session: CircleSession, center: Placed, hit: PlaceHit, scope
 }
 
 function centerLabel(session: CircleSession, scope: Scope, place: PlaceHit | undefined): string {
-  const t = session.centerRef.trim();
-  if (t) return t;
-  const placed = centerOf(session, scope);
-  if (placed) return printExpr(placed.expr);
-  const p = place?.point;
-  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
-  return "center";
+  return slotLabel(session.centerRef, centerOf(session, scope), pinnedPointLabel(place), "center");
 }
 
 export const circle: Tool<CircleSession> = {

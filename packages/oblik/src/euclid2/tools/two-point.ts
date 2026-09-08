@@ -1,24 +1,18 @@
-import { printExpr } from "#source/expr";
-
-import { asPoint, exprOfPlace, hoverPlace, isPinnedPoint, previewCall } from "./common";
-import { hitRef, inSlot, nameField, previewName, refField, resolvePoint, withBind } from "./draft";
-import type { Field, PlaceHit, Placed, Preview, Tool, ToolSession, ToolSpec } from "./types";
+import { asPoint, exprOfPlace, hoverPlace, isPinnedPoint, pinnedPointLabel, previewCall } from "./common";
+import {
+  hitRef,
+  inSlot,
+  nameField,
+  previewName,
+  refField,
+  resolveSlot,
+  slotLabel,
+  withBind,
+} from "./draft";
+import type { Field, Preview, Tool, ToolSession, ToolSpec } from "./types";
 
 type TwoPointId = "line" | "segment";
 type TwoPointSession = Extract<ToolSession, { verb: TwoPointId }>;
-
-function label(
-  ref: string,
-  placed: Placed | undefined,
-  fallback: string,
-  place: PlaceHit | undefined,
-): string {
-  if (ref.trim()) return ref.trim();
-  if (placed) return printExpr(placed.expr);
-  const p = place?.point;
-  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
-  return fallback;
-}
 
 export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPointSession> {
   const fields: Field<TwoPointSession>[] = [
@@ -48,7 +42,7 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
       return hoverPlace(hit.point, trace);
     },
     click(session, hit, scope) {
-      const a = resolvePoint(session.aRef, session.a, scope);
+      const a = resolveSlot("point", session.aRef, session.a, scope);
       if (!a) {
         return {
           session: {
@@ -64,8 +58,8 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
       };
     },
     commit(session, _place, scope) {
-      const a = resolvePoint(session.aRef, session.a, scope);
-      const b = resolvePoint(session.bRef, session.b, scope);
+      const a = resolveSlot("point", session.aRef, session.a, scope);
+      const b = resolveSlot("point", session.bRef, session.b, scope);
       if (a && b) return { insert: withBind(session, { from: spec.id, args: [a.expr, b.expr] }) };
       if (
         session.focus === "name" ||
@@ -78,8 +72,8 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
     },
     ghost(session, place, scope) {
       const cursor = place?.point.at;
-      const a = resolvePoint(session.aRef, session.a, scope);
-      const b = resolvePoint(session.bRef, session.b, scope);
+      const a = resolveSlot("point", session.aRef, session.a, scope);
+      const b = resolveSlot("point", session.bRef, session.b, scope);
       if (a && b) return { kind: spec.id as "line" | "segment", a: a.at, b: b.at };
       if (!cursor) {
         if (a) return { kind: "point", at: a.at };
@@ -90,16 +84,10 @@ export function defineTwoPoint(spec: ToolSpec & { id: TwoPointId }): Tool<TwoPoi
     },
     preview(session, place, scope): Preview {
       const bind = previewName(session, spec.prefix);
-      const a = resolvePoint(session.aRef, session.a, scope);
-      const b = resolvePoint(session.bRef, session.b, scope);
-      const aTok = inSlot(
-        session.focus === "a",
-        label(session.aRef, a, "a", !a ? place : undefined),
-      );
-      const bTok = inSlot(
-        session.focus === "b",
-        label(session.bRef, b, "b", a && !b ? place : undefined),
-      );
+      const a = resolveSlot("point", session.aRef, session.a, scope);
+      const b = resolveSlot("point", session.bRef, session.b, scope);
+      const aTok = inSlot(session.focus === "a", slotLabel(session.aRef, a, pinnedPointLabel(place), "a"));
+      const bTok = inSlot(session.focus === "b", slotLabel(session.bRef, b, pinnedPointLabel(place), "b"));
       const name = inSlot(session.focus === "name", bind);
       if (a && b) {
         return {

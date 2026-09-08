@@ -1,6 +1,5 @@
 import type { LineLike } from "#geom";
 import { signedDist } from "#geom/ops";
-import { printExpr } from "#source/expr";
 
 import { snapLineCarrier } from "../pick";
 import {
@@ -18,7 +17,8 @@ import {
   nameField,
   previewName,
   refField,
-  resolveCarrier,
+  resolveSlot,
+  slotLabel,
   withBind,
 } from "./draft";
 import {
@@ -46,7 +46,7 @@ const fields: Field<ParallelSession>[] = [
 ];
 
 function carrierOf(session: ParallelSession, scope: Scope) {
-  return resolveCarrier(session.carrierRef, session.carrier, scope);
+  return resolveSlot("carrier", session.carrierRef, session.carrier, scope);
 }
 
 function distAt(hit: PlaceHit, geom: LineLike): number {
@@ -77,11 +77,7 @@ function distExpr(
 }
 
 function carrierLabel(session: ParallelSession, scope: Scope, place: PlaceHit | undefined): string {
-  if (session.carrierRef.trim()) return session.carrierRef.trim();
-  const c = carrierOf(session, scope);
-  if (c) return printExpr(c.expr);
-  if (place?.carrier) return place.carrier.bind;
-  return "carrier";
+  return slotLabel(session.carrierRef, carrierOf(session, scope), place?.carrier?.bind, "carrier");
 }
 
 export const parallelLine: Tool<ParallelSession> = {

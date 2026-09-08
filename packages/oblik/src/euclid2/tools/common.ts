@@ -126,6 +126,12 @@ export function exprOfPrint(print: string): Expr {
   return parsePath(print);
 }
 
+/** Printed expr of the cursor's pinned point — the hover label for point slots. */
+export function pinnedPointLabel(place: PlaceHit | undefined): string | undefined {
+  const p = place?.point;
+  return p && isPinnedPoint(p) ? printExpr(exprOfPlace(p)) : undefined;
+}
+
 export function hoverBind(
   trace: readonly { occ: number; bind?: string; id: string }[],
   bind: string,

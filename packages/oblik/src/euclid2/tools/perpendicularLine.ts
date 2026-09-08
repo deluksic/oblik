@@ -1,7 +1,6 @@
 import type { LineLike } from "#geom";
 import { lineBasis } from "#geom/ops";
 import { add, perp } from "#geom/vec";
-import { printExpr } from "#source/expr";
 
 import { snapLineCarrier } from "../pick";
 import {
@@ -11,17 +10,10 @@ import {
   hoverBind,
   hoverPlace,
   isPinnedPoint,
+  pinnedPointLabel,
   previewCall,
 } from "./common";
-import {
-  inSlot,
-  nameField,
-  previewName,
-  refField,
-  resolveCarrier,
-  resolvePoint,
-  withBind,
-} from "./draft";
+import { inSlot, nameField, previewName, refField, resolveSlot, slotLabel, withBind } from "./draft";
 import { scopeFromTrace, toolScope } from "./scope";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -46,28 +38,29 @@ const fields: Field<PerpSession>[] = [
 ];
 
 function carrierOf(session: PerpSession, scope: Scope) {
-  return resolveCarrier(session.carrierRef, session.carrier, scope);
+  return resolveSlot("carrier", session.carrierRef, session.carrier, scope);
 }
 
 function throughOf(session: PerpSession, scope: Scope) {
-  return resolvePoint(session.throughRef, session.through, scope);
+  return resolveSlot("point", session.throughRef, session.through, scope);
 }
 
 function carrierLabel(session: PerpSession, scope: Scope, place: PlaceHit | undefined): string {
-  if (session.carrierRef.trim()) return session.carrierRef.trim();
-  const c = carrierOf(session, scope);
-  if (c) return printExpr(c.expr);
-  if (place?.carrier) return place.carrier.bind;
-  return "line";
+  return slotLabel(
+    session.carrierRef,
+    carrierOf(session, scope),
+    place?.carrier?.bind,
+    "line",
+  );
 }
 
 function throughLabel(session: PerpSession, scope: Scope, place: PlaceHit | undefined): string {
-  if (session.throughRef.trim()) return session.throughRef.trim();
-  const t = throughOf(session, scope);
-  if (t) return printExpr(t.expr);
-  const p = place?.point;
-  if (p && isPinnedPoint(p)) return printExpr(exprOfPlace(p));
-  return "point";
+  return slotLabel(
+    session.throughRef,
+    throughOf(session, scope),
+    pinnedPointLabel(place),
+    "point",
+  );
 }
 
 function perpGhostLine(carrier: LineLike, through: { x: number; y: number }) {

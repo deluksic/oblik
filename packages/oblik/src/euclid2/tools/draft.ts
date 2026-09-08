@@ -1,4 +1,4 @@
-import { printExpr } from "#source/expr";
+import { printExpr, type Expr } from "#source/expr";
 
 import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";
@@ -7,12 +7,25 @@ import type {
   Field,
   FieldKind,
   Draft,
+  Placed,
   Scope,
   Tool,
   ToolKey,
   ToolSession,
   ToolStep,
 } from "./types";
+
+/** What a `ref` field accepts, minus the length machinery. */
+export type RefLooks = "point" | "carrier" | "circle" | "region" | "operand";
+
+/** The value a slot of each `RefLooks` holds. */
+export type SlotValue = {
+  point: Placed;
+  carrier: Scope["carriers"][string];
+  circle: Scope["circles"][string];
+  region: Scope["regions"][string];
+  operand: Scope["points"][string] | Scope["circles"][string];
+};
 
 const { max } = Math;
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -74,6 +87,21 @@ export function lengthError(raw: string, scope: Scope): string | undefined {
   return refError(raw, Object.keys(scope.lengths), "slider");
 }
 
+const REF_TABLES: Record<
+  RefLooks,
+  { table: (scope: Scope) => Readonly<Record<string, unknown>>; names: (scope: Scope) => string[]; label: string }
+> = {
+  point: { table: (s) => s.points, names: (s) => Object.keys(s.points), label: "point" },
+  carrier: { table: (s) => s.carriers, names: (s) => Object.keys(s.carriers), label: "line" },
+  circle: { table: (s) => s.circles, names: (s) => Object.keys(s.circles), label: "circle" },
+  region: { table: (s) => s.regions, names: (s) => Object.keys(s.regions), label: "region" },
+  operand: {
+    table: (s) => ({ ...s.points, ...s.circles }),
+    names: (s) => [...Object.keys(s.points), ...Object.keys(s.circles)],
+    label: "point or circle",
+  },
+};
+
 export function fieldError<S extends ToolSession>(
   field: Field<S>,
   session: S,
@@ -83,27 +111,8 @@ export function fieldError<S extends ToolSession>(
   if (field.kind === "length") return lengthError(raw, scope);
   if (field.kind === "number") return numError(raw);
   if (field.kind === "ident") return identError(raw, scope.used);
-  const names =
-    field.looks === "carrier"
-      ? Object.keys(scope.carriers)
-      : field.looks === "circle"
-        ? Object.keys(scope.circles)
-        : field.looks === "region"
-          ? Object.keys(scope.regions)
-          : field.looks === "operand"
-            ? [...Object.keys(scope.points), ...Object.keys(scope.circles)]
-            : Object.keys(scope.points);
-  const label =
-    field.looks === "carrier"
-      ? "line"
-      : field.looks === "circle"
-        ? "circle"
-        : field.looks === "region"
-          ? "region"
-          : field.looks === "operand"
-            ? "point or circle"
-            : "point";
-  return refError(raw, names, label);
+  const looks = REF_TABLES[field.looks === "length" || !field.looks ? "point" : field.looks];
+  return refError(raw, looks.names(scope), looks.label);
 }
 
 export function firstInvalid<S extends ToolSession>(
@@ -126,48 +135,35 @@ export function withBind(session: { name?: string }, job: InsertJob): InsertJob 
   return bind ? { ...job, bind } : job;
 }
 
-export function resolvePoint(
+/**
+ * Typed ref beats placed, placed beats nothing. `kind` selects the scope
+ * table; a typed ref matching the placed value's printed expr keeps it
+ * (the placement may be newer than the printed tape).
+ */
+export function resolveSlot<K extends RefLooks>(
+  kind: K,
   ref: string,
-  placed: import("./types").Placed | undefined,
+  placed: SlotValue[K] | undefined,
   scope: Scope,
-) {
+): SlotValue[K] | undefined {
   const t = ref.trim();
   if (!t) return placed;
-  if (scope.points[t]) return scope.points[t];
-  if (placed && printExpr(placed.expr) === t) return placed;
+  const table = REF_TABLES[kind].table(scope) as Record<string, SlotValue[K]>;
+  if (table[t]) return table[t];
+  return placed && printExpr(placed.expr) === t ? placed : undefined;
 }
 
-export function resolveCarrier(
+/** Typed ref text beats a resolved expr, which beats the hover label or fallback. */
+export function slotLabel(
   ref: string,
-  placed: Scope["carriers"][string] | undefined,
-  scope: Scope,
-) {
+  resolved: { expr: Expr } | undefined,
+  hover: string | undefined,
+  fallback: string,
+): string {
   const t = ref.trim();
-  if (!t) return placed;
-  if (scope.carriers[t]) return scope.carriers[t];
-  if (placed && printExpr(placed.expr) === t) return placed;
-}
-
-export function resolveRegion(
-  ref: string,
-  placed: Scope["regions"][string] | undefined,
-  scope: Scope,
-) {
-  const t = ref.trim();
-  if (!t) return placed;
-  if (scope.regions[t]) return scope.regions[t];
-  if (placed && printExpr(placed.expr) === t) return placed;
-}
-
-export function resolveCircle(
-  ref: string,
-  placed: Scope["circles"][string] | undefined,
-  scope: Scope,
-) {
-  const t = ref.trim();
-  if (!t) return placed;
-  if (scope.circles[t]) return scope.circles[t];
-  if (placed && printExpr(placed.expr) === t) return placed;
+  if (t) return t;
+  if (resolved) return printExpr(resolved.expr);
+  return hover ?? fallback;
 }
 
 export function hitRef(hit: import("./types").PlaceHit): string {
