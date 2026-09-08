@@ -94,8 +94,23 @@ function focusFromNode(n: TraceNode): ScopeFocus | undefined {
   };
 }
 
+function sameDraft(a: Draft, b: Draft): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [id, av] of a) {
+    const bv = b.get(id);
+    if (!bv || bv.length !== av.length || bv.some((v, i) => v !== av[i])) return false;
+  }
+  return true;
+}
+
 export function Euclid2Pane(props: Euclid2PaneProps) {
-  const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()));
+  // Content equality: a drag past a slider's end (or a clamped/stationary
+  // handle) re-emits identical values on every pointermove — the signal must
+  // not notify, or the scene re-evals for nothing.
+  const [draft, setDraft] = createSignal<Draft>(() => (props.scene, new Map()), {
+    equals: sameDraft,
+  });
   const [picker, setPicker] = createSignal(() => (props.scene, false));
   const [tool, setTool] = createSignal<ToolSession | undefined>(() => (props.scene, undefined));
   const [place, setPlace] = createSignal<PlaceHit | undefined>(() => (props.scene, undefined));
