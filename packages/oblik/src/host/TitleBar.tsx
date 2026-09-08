@@ -176,7 +176,7 @@ export function TitleBar(props: TitleBarProps) {
                   >
                     <span class={styles.itemMain}>
                       <SceneKindIcon kind={scene.kind} class={styles.itemIcon} />
-                      <span class={styles.itemTitle}>{scene.title}</span>
+                      <span class={styles.itemTitle}>{scene.path}</span>
                     </span>
                     <Show when={hasSceneError(scene)}>
                       <span class={styles.itemErr}>(error)</span>

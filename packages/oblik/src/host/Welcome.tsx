@@ -70,11 +70,8 @@ export function Welcome(props: WelcomeProps) {
                   >
                     <SceneKindIcon kind={scene.kind} class={styles.rowIcon} />
                     <span class={styles.rowBody}>
-                      <span class={styles.rowTitle}>{scene.title}</span>
-                      <Show
-                        when={hasSceneError(scene)}
-                        fallback={<span class={styles.rowMeta}>{scene.path}</span>}
-                      >
+                      <span class={styles.rowTitle}>{scene.path}</span>
+                      <Show when={hasSceneError(scene)}>
                         <span class={styles.rowError}>{scene.error}</span>
                       </Show>
                     </span>

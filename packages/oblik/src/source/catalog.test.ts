@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +9,7 @@ import {
   findDuplicateIds,
   parseOblikSceneSource,
   scanAnnotationsBundle,
+  scanOblikCatalog,
   sceneLoadersModule,
 } from "./catalog";
 import { listUserAppSources } from "./user-source";
@@ -29,11 +32,28 @@ describe("parseOblikSceneSource", () => {
       "/repo/apps/demo/src/scenes/shelf.ts",
       src,
       "apps/demo/src/scenes/shelf.ts",
+      "shelf.ts",
     );
     expect(e).toEqual({
       id: "shelf",
       file: "shelf.ts",
       path: "apps/demo/src/scenes/shelf.ts",
+      title: "Shelf",
+      kind: "euclid2",
+    });
+  });
+
+  test("a nested scene gets a path-based id unique across folders", () => {
+    const e = parseOblikSceneSource(
+      "/repo/apps/demo/src/scenes/gear/tree.ts",
+      src,
+      "apps/demo/src/scenes/gear/tree.ts",
+      `gear${path.sep}tree.ts`,
+    );
+    expect(e).toEqual({
+      id: "gear/tree",
+      file: "gear/tree.ts",
+      path: "apps/demo/src/scenes/gear/tree.ts",
       title: "Shelf",
       kind: "euclid2",
     });
@@ -51,6 +71,7 @@ export default defineScene({
       "/repo/apps/demo/src/scenes/plate-figure.ts",
       figure,
       "apps/demo/src/scenes/plate-figure.ts",
+      "plate-figure.ts",
     );
     expect(e).toEqual({
       id: "plate-figure",
@@ -62,7 +83,7 @@ export default defineScene({
   });
 
   test("errors when defineScene is missing", () => {
-    const e = parseOblikSceneSource("/repo/x.ts", "export const x = 1;", "x.ts");
+    const e = parseOblikSceneSource("/repo/x.ts", "export const x = 1;", "x.ts", "x.ts");
     expect(e.error).toMatch(/defineScene/);
   });
 
@@ -75,6 +96,23 @@ export default defineScene({
     expect(mod).toContain("applyHotScenes");
     expect(mod).not.toContain("notifyHelperHot");
     expect(mod).not.toContain('import "./layout/');
+  });
+});
+
+describe("scanOblikCatalog", () => {
+  test("walks scene subfolders and keeps same-basename scenes distinct", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "oblik-scenes-"));
+    const sceneDir = path.join(root, "apps", "demo", "src", "scenes");
+    fs.mkdirSync(path.join(sceneDir, "gear"), { recursive: true });
+    fs.mkdirSync(path.join(sceneDir, "layout"), { recursive: true });
+    fs.writeFileSync(path.join(sceneDir, "tree.ts"), src);
+    fs.writeFileSync(path.join(sceneDir, "gear", "tree.ts"), src);
+    fs.writeFileSync(path.join(sceneDir, "layout", "tree.ts"), src);
+    fs.writeFileSync(path.join(sceneDir, "helper.ts"), "export const x = 1;");
+    const entries = scanOblikCatalog(sceneDir, root);
+    expect(entries.map((e) => e.id)).toEqual(["gear/tree", "layout/tree", "tree"]);
+    expect(entries.every((e) => e.error === undefined)).toBe(true);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });
 

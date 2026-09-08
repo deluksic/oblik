@@ -25,7 +25,7 @@ export function openWelcome(): void {
 }
 
 export function navItems(scenes: OblikSceneEntry[]): OblikSceneEntry[] {
-  return [...scenes].toSorted((a, b) => a.title.localeCompare(b.title));
+  return [...scenes].toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 export function hasSceneError(scene: OblikSceneEntry): boolean {

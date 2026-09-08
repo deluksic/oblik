@@ -7,7 +7,9 @@ import { listAnnotationSites, type Annotation } from "./analyze";
 import { analyzeMentions, type MentionFile } from "./mention";
 
 export type OblikSceneEntry = {
+  /** Scene-relative posix path without extension (e.g. `layout/tree`) — unique per file, URL-safe when encoded. */
   id: string;
+  /** Scene-relative posix path with extension (e.g. `layout/tree.ts`) — the loader-key tail. */
   file: string;
   path: string;
   title: string;
@@ -48,9 +50,11 @@ export function parseOblikSceneSource(
   absPath: string,
   source: string,
   relPath: string,
+  sceneRel: string,
 ): OblikSceneEntry {
-  const file = path.basename(absPath);
-  const id = path.basename(absPath, ".ts");
+  const file = sceneRel.replace(/\\/g, "/");
+  const id = file.replace(/\.ts$/, "");
+  const base = path.basename(absPath, ".ts");
   const { title, kind } = parseDefineScene(source, file);
 
   if (!source.includes("defineScene")) {
@@ -58,7 +62,7 @@ export function parseOblikSceneSource(
       id,
       file,
       path: relPath.replace(/\\/g, "/"),
-      title: title ?? id,
+      title: title ?? base,
       kind: "euclid2",
       error: "no defineScene export",
     };
@@ -69,7 +73,7 @@ export function parseOblikSceneSource(
       id,
       file,
       path: relPath.replace(/\\/g, "/"),
-      title: title ?? id,
+      title: title ?? base,
       kind: "euclid2",
       error: `unsupported kind "${kind}"`,
     };
@@ -79,18 +83,24 @@ export function parseOblikSceneSource(
     id,
     file,
     path: relPath.replace(/\\/g, "/"),
-    title: title ?? id,
+    title: title ?? base,
     kind: kind === "figure" ? "figure" : "euclid2",
   };
 }
 
 export function listSceneFiles(sceneDir: string): string[] {
   if (!fs.existsSync(sceneDir)) return [];
-  return fs
-    .readdirSync(sceneDir)
-    .filter((n) => n.endsWith(".ts") && !n.endsWith(".d.ts"))
-    .map((n) => path.join(sceneDir, n))
-    .toSorted();
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (ent.isDirectory()) walk(path.join(dir, ent.name));
+      else if (ent.isFile() && ent.name.endsWith(".ts") && !ent.name.endsWith(".d.ts")) {
+        out.push(path.join(dir, ent.name));
+      }
+    }
+  };
+  walk(sceneDir);
+  return out.toSorted();
 }
 
 export function listCatalogFiles(sceneDir: string): string[] {
@@ -102,7 +112,8 @@ export function listCatalogFiles(sceneDir: string): string[] {
 export function scanOblikCatalog(sceneDir: string, workspaceRoot: string): OblikSceneEntry[] {
   const entries = listCatalogFiles(sceneDir).map((abs) => {
     const rel = path.relative(workspaceRoot, abs);
-    return parseOblikSceneSource(abs, fs.readFileSync(abs, "utf8"), rel);
+    const sceneRel = path.relative(sceneDir, abs);
+    return parseOblikSceneSource(abs, fs.readFileSync(abs, "utf8"), rel, sceneRel);
   });
   const seen = new Map<string, string>();
   for (const e of entries) {
@@ -118,7 +129,9 @@ export function sceneLoaderKey(file: string): string {
 }
 
 export function sceneGlobKeys(sceneDir: string): string[] {
-  return listCatalogFiles(sceneDir).map((abs) => sceneLoaderKey(path.basename(abs)));
+  return listCatalogFiles(sceneDir).map((abs) =>
+    sceneLoaderKey(path.relative(sceneDir, abs).replace(/\\/g, "/")),
+  );
 }
 
 export function sceneLoadersAcceptTail(keys: string[]): string {
