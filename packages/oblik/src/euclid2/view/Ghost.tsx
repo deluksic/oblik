@@ -12,20 +12,14 @@ const GHOST_POINT_R = 4;
 const CORNER_R = 5;
 const CORNER_RING_R = 11;
 
-function screenOf(
-  world: { x: number; y: number },
-  camera: Camera2,
-  size: PaneSize,
-): { x: number; y: number } {
+type Screen = { x: number; y: number };
+
+function screenOf(world: { x: number; y: number }, camera: Camera2, size: PaneSize): Screen {
   return worldToScreen(world, camera, size);
 }
 
-function screenEnds(
-  ends: { a: { x: number; y: number }; b: { x: number; y: number } },
-  camera: Camera2,
-  size: PaneSize,
-) {
-  return { a: screenOf(ends.a, camera, size), b: screenOf(ends.b, camera, size) };
+function screenEnds(a: { x: number; y: number }, b: { x: number; y: number }, camera: Camera2, size: PaneSize) {
+  return { a: screenOf(a, camera, size), b: screenOf(b, camera, size) };
 }
 
 /** Pane-clipped ends of the infinite line through `a` and `b`. */
@@ -39,140 +33,90 @@ function infiniteEnds(
   const dy = b.y - a.y;
   const len = sqrt(dx * dx + dy * dy);
   const dir = len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
-  return screenEnds(infiniteClip(a, dir, camera, size), camera, size);
+  const ends = infiniteClip(a, dir, camera, size);
+  return screenEnds(ends.a, ends.b, camera, size);
+}
+
+function strokeEl(ends: { a: Screen; b: Screen }) {
+  return (
+    <line
+      class={styles.ghost}
+      x1={ends.a.x}
+      y1={ends.a.y}
+      x2={ends.b.x}
+      y2={ends.b.y}
+      vector-effect="non-scaling-stroke"
+    />
+  );
 }
 
 export function GhostMark(props: { ghost: Ghost; camera: Camera2; size: PaneSize }) {
-  const point = createMemo(() => (props.ghost.kind === "point" ? props.ghost.at : undefined));
-  const corner = createMemo(() => (props.ghost.kind === "corner" ? props.ghost.at : undefined));
-  const circle = createMemo(() => (props.ghost.kind === "circle" ? props.ghost : undefined));
-  const line = createMemo(() => (props.ghost.kind === "line" ? props.ghost : undefined));
-  const segment = createMemo(() => (props.ghost.kind === "segment" ? props.ghost : undefined));
-  const parallel = createMemo(() =>
-    props.ghost.kind === "parallelLine" ? props.ghost : undefined,
-  );
-  const lineEnds = createMemo(() => {
-    const g = line();
-    if (!g) return undefined;
-    return infiniteEnds(g.a, g.b, props.camera, props.size);
-  });
-  const parallelEnds = createMemo(() => {
-    const g = parallel();
-    if (!g) return undefined;
-    const pl = parallelLineValue(g.geom, g.distance);
-    return screenEnds(
-      infiniteClip(pl.line.origin, pl.line.direction, props.camera, props.size),
-      props.camera,
-      props.size,
-    );
-  });
-  const pointPos = createMemo(() => {
-    const p = point();
-    return p ? screenOf(p, props.camera, props.size) : undefined;
-  });
-  const cornerPos = createMemo(() => {
-    const p = corner();
-    return p ? screenOf(p, props.camera, props.size) : undefined;
-  });
-  const circlePos = createMemo(() => {
-    const c = circle();
-    if (!c) return undefined;
-    return {
-      center: screenOf(c.center, props.camera, props.size),
-      r: abs(c.radius) * props.camera.scale,
-    };
-  });
-  const segmentEnds = createMemo(() => {
-    const s = segment();
-    if (!s) return undefined;
-    return screenEnds({ a: s.a, b: s.b }, props.camera, props.size);
-  });
-  const tangentLines = createMemo(() => {
-    const g = props.ghost.kind === "tangent" ? props.ghost : undefined;
-    if (!g) return undefined;
-    return g.strokes.map((s, i) => ({
-      ends: infiniteEnds(s.a, s.b, props.camera, props.size),
-      chosen: i === g.chosen,
-    }));
-  });
-  return (
-    <g pointer-events="none">
-      {cornerPos() ? (
-        <>
-          <circle
-            class={styles.ghostCornerRing}
-            cx={cornerPos()!.x}
-            cy={cornerPos()!.y}
-            r={CORNER_RING_R}
-          />
-          <circle class={styles.ghostCorner} cx={cornerPos()!.x} cy={cornerPos()!.y} r={CORNER_R} />
-        </>
-      ) : undefined}
-      {pointPos() ? (
-        <circle class={styles.ghostPoint} cx={pointPos()!.x} cy={pointPos()!.y} r={GHOST_POINT_R} />
-      ) : undefined}
-      {circlePos() ? (
-        <>
-          <circle
-            class={styles.ghostPoint}
-            cx={circlePos()!.center.x}
-            cy={circlePos()!.center.y}
-            r={GHOST_POINT_R}
-          />
-          <circle
-            class={styles.ghost}
-            cx={circlePos()!.center.x}
-            cy={circlePos()!.center.y}
-            r={circlePos()!.r}
-            vector-effect="non-scaling-stroke"
-          />
-        </>
-      ) : undefined}
-      {lineEnds() ? (
-        <line
-          class={styles.ghost}
-          x1={lineEnds()!.a.x}
-          y1={lineEnds()!.a.y}
-          x2={lineEnds()!.b.x}
-          y2={lineEnds()!.b.y}
-          vector-effect="non-scaling-stroke"
-        />
-      ) : undefined}
-      {segmentEnds() ? (
-        <line
-          class={styles.ghost}
-          x1={segmentEnds()!.a.x}
-          y1={segmentEnds()!.a.y}
-          x2={segmentEnds()!.b.x}
-          y2={segmentEnds()!.b.y}
-          vector-effect="non-scaling-stroke"
-        />
-      ) : undefined}
-      {tangentLines() ? (
-        <For each={tangentLines()}>
-          {(t) => (
-            <line
+  const mark = createMemo(() => {
+    const g = props.ghost;
+    const { camera, size } = props;
+    switch (g.kind) {
+      case "point": {
+        const p = screenOf(g.at, camera, size);
+        return <circle class={styles.ghostPoint} cx={p.x} cy={p.y} r={GHOST_POINT_R} />;
+      }
+      case "corner": {
+        const p = screenOf(g.at, camera, size);
+        return (
+          <>
+            <circle class={styles.ghostCornerRing} cx={p.x} cy={p.y} r={CORNER_RING_R} />
+            <circle class={styles.ghostCorner} cx={p.x} cy={p.y} r={CORNER_R} />
+          </>
+        );
+      }
+      case "circle": {
+        const c = screenOf(g.center, camera, size);
+        const r = abs(g.radius) * camera.scale;
+        return (
+          <>
+            <circle class={styles.ghostPoint} cx={c.x} cy={c.y} r={GHOST_POINT_R} />
+            <circle
               class={styles.ghost}
-              style={t.chosen ? undefined : { opacity: 0.3 }}
-              x1={t.ends.a.x}
-              y1={t.ends.a.y}
-              x2={t.ends.b.x}
-              y2={t.ends.b.y}
+              cx={c.x}
+              cy={c.y}
+              r={r}
               vector-effect="non-scaling-stroke"
             />
-          )}
-        </For>
-      ) : undefined}
-      {parallelEnds() ? (
-        <line
-          class={styles.ghost}
-          x1={parallelEnds()!.a.x}
-          y1={parallelEnds()!.a.y}
-          x2={parallelEnds()!.b.x}
-          y2={parallelEnds()!.b.y}
-          vector-effect="non-scaling-stroke"
-        />
-      ) : undefined}
-    </g>
-  );
+          </>
+        );
+      }
+      case "line":
+        return strokeEl(infiniteEnds(g.a, g.b, camera, size));
+      case "segment":
+        return strokeEl(screenEnds(g.a, g.b, camera, size));
+      case "parallelLine": {
+        const pl = parallelLineValue(g.geom, g.distance);
+        return strokeEl(infiniteEnds(pl.line.origin, pl.line.direction, camera, size));
+      }
+      case "tangent":
+        return (
+          <For
+            each={g.strokes.map((s, i) => ({
+              ends: infiniteEnds(s.a, s.b, camera, size),
+              chosen: i === g.chosen,
+            }))}
+          >
+            {(t) => (
+              <line
+                class={styles.ghost}
+                style={t.chosen ? undefined : { opacity: 0.3 }}
+                x1={t.ends.a.x}
+                y1={t.ends.a.y}
+                x2={t.ends.b.x}
+                y2={t.ends.b.y}
+                vector-effect="non-scaling-stroke"
+              />
+            )}
+          </For>
+        );
+      // region / trace ghosts are rendered by their own marks
+      default:
+        return undefined;
+    }
+  });
+  return <g pointer-events="none">{mark()}</g>;
 }
