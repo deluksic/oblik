@@ -12,7 +12,8 @@ export type OblikSceneEntry = {
   /** Scene-relative posix path with extension (e.g. `layout/tree.ts`) — the loader-key tail. */
   file: string;
   path: string;
-  title: string;
+  /** Authored `defineScene` title; undefined when the scene doesn't declare one. */
+  title?: string;
   kind: "euclid2" | "figure";
   error?: string;
 };
@@ -47,14 +48,12 @@ function parseDefineScene(source: string, file: string): { title?: string; kind?
 }
 
 export function parseOblikSceneSource(
-  absPath: string,
   source: string,
   relPath: string,
   sceneRel: string,
 ): OblikSceneEntry {
   const file = sceneRel.replace(/\\/g, "/");
   const id = file.replace(/\.ts$/, "");
-  const base = path.basename(absPath, ".ts");
   const { title, kind } = parseDefineScene(source, file);
 
   if (!source.includes("defineScene")) {
@@ -62,7 +61,7 @@ export function parseOblikSceneSource(
       id,
       file,
       path: relPath.replace(/\\/g, "/"),
-      title: title ?? base,
+      title,
       kind: "euclid2",
       error: "no defineScene export",
     };
@@ -73,7 +72,7 @@ export function parseOblikSceneSource(
       id,
       file,
       path: relPath.replace(/\\/g, "/"),
-      title: title ?? base,
+      title,
       kind: "euclid2",
       error: `unsupported kind "${kind}"`,
     };
@@ -83,7 +82,7 @@ export function parseOblikSceneSource(
     id,
     file,
     path: relPath.replace(/\\/g, "/"),
-    title: title ?? base,
+    title,
     kind: kind === "figure" ? "figure" : "euclid2",
   };
 }
@@ -113,7 +112,7 @@ export function scanOblikCatalog(sceneDir: string, workspaceRoot: string): Oblik
   const entries = listCatalogFiles(sceneDir).map((abs) => {
     const rel = path.relative(workspaceRoot, abs);
     const sceneRel = path.relative(sceneDir, abs);
-    return parseOblikSceneSource(abs, fs.readFileSync(abs, "utf8"), rel, sceneRel);
+    return parseOblikSceneSource(fs.readFileSync(abs, "utf8"), rel, sceneRel);
   });
   const seen = new Map<string, string>();
   for (const e of entries) {

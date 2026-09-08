@@ -27,7 +27,7 @@ export function Welcome(props: WelcomeProps) {
     if (!q) return scenes();
     return scenes().filter(
       (s) =>
-        s.title.toLowerCase().includes(q) ||
+        s.title?.toLowerCase().includes(q) ||
         s.file.toLowerCase().includes(q) ||
         s.path.toLowerCase().includes(q),
     );
@@ -70,10 +70,14 @@ export function Welcome(props: WelcomeProps) {
                   >
                     <SceneKindIcon kind={scene.kind} class={styles.rowIcon} />
                     <span class={styles.rowBody}>
-                      <span class={styles.rowTitle}>{scene.path}</span>
-                      <Show when={hasSceneError(scene)}>
+                      <span class={styles.rowTitle}>{scene.title ?? scene.file}</span>
+                      {hasSceneError(scene) ? (
                         <span class={styles.rowError}>{scene.error}</span>
-                      </Show>
+                      ) : (
+                        <Show when={scene.title !== undefined}>
+                          <span class={styles.rowMeta}>{scene.file}</span>
+                        </Show>
+                      )}
                     </span>
                   </button>
                 </li>

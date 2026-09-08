@@ -150,7 +150,7 @@ export function TitleBar(props: TitleBarProps) {
                 {(scene) => (
                   <>
                     <SceneKindIcon kind={scene().kind} class={styles.crumbIcon} />
-                    <span class={styles.sceneTitle}>{scene().title}</span>
+                    <span class={styles.sceneTitle}>{scene().title ?? scene().file}</span>
                   </>
                 )}
               </Show>
@@ -176,7 +176,12 @@ export function TitleBar(props: TitleBarProps) {
                   >
                     <span class={styles.itemMain}>
                       <SceneKindIcon kind={scene.kind} class={styles.itemIcon} />
-                      <span class={styles.itemTitle}>{scene.path}</span>
+                      <span class={styles.itemBody}>
+                        <span class={styles.itemTitle}>{scene.title ?? scene.file}</span>
+                        <Show when={scene.title !== undefined}>
+                          <span class={styles.itemPath}>{scene.file}</span>
+                        </Show>
+                      </span>
                     </span>
                     <Show when={hasSceneError(scene)}>
                       <span class={styles.itemErr}>(error)</span>

@@ -171,8 +171,23 @@
   color: var(--oblik-dim);
 }
 
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .itemTitle {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemPath {
+  font-size: 0.72rem;
+  color: var(--oblik-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

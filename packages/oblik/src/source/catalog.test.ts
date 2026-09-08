@@ -28,12 +28,7 @@ export default defineScene({
 
 describe("parseOblikSceneSource", () => {
   test("reads title and kind from defineScene", () => {
-    const e = parseOblikSceneSource(
-      "/repo/apps/demo/src/scenes/shelf.ts",
-      src,
-      "apps/demo/src/scenes/shelf.ts",
-      "shelf.ts",
-    );
+    const e = parseOblikSceneSource(src, "apps/demo/src/scenes/shelf.ts", "shelf.ts");
     expect(e).toEqual({
       id: "shelf",
       file: "shelf.ts",
@@ -44,12 +39,7 @@ describe("parseOblikSceneSource", () => {
   });
 
   test("a nested scene gets a path-based id unique across folders", () => {
-    const e = parseOblikSceneSource(
-      "/repo/apps/demo/src/scenes/gear/tree.ts",
-      src,
-      "apps/demo/src/scenes/gear/tree.ts",
-      `gear${path.sep}tree.ts`,
-    );
+    const e = parseOblikSceneSource(src, "apps/demo/src/scenes/gear/tree.ts", `gear${path.sep}tree.ts`);
     expect(e).toEqual({
       id: "gear/tree",
       file: "gear/tree.ts",
@@ -57,6 +47,15 @@ describe("parseOblikSceneSource", () => {
       title: "Shelf",
       kind: "euclid2",
     });
+  });
+
+  test("title stays undefined when the scene declares none", () => {
+    const plain = `import { defineScene } from "oblik";
+export default defineScene({ kind: "euclid2", build() {} });
+`;
+    const e = parseOblikSceneSource(plain, "apps/demo/src/scenes/plain.ts", "plain.ts");
+    expect(e.title).toBeUndefined();
+    expect(e.id).toBe("plain");
   });
 
   test("reads a figure scene kind", () => {
@@ -67,12 +66,7 @@ export default defineScene({
   build() {},
 });
 `;
-    const e = parseOblikSceneSource(
-      "/repo/apps/demo/src/scenes/plate-figure.ts",
-      figure,
-      "apps/demo/src/scenes/plate-figure.ts",
-      "plate-figure.ts",
-    );
+    const e = parseOblikSceneSource(figure, "apps/demo/src/scenes/plate-figure.ts", "plate-figure.ts");
     expect(e).toEqual({
       id: "plate-figure",
       file: "plate-figure.ts",
@@ -83,7 +77,7 @@ export default defineScene({
   });
 
   test("errors when defineScene is missing", () => {
-    const e = parseOblikSceneSource("/repo/x.ts", "export const x = 1;", "x.ts", "x.ts");
+    const e = parseOblikSceneSource("export const x = 1;", "x.ts", "x.ts");
     expect(e.error).toMatch(/defineScene/);
   });
 
