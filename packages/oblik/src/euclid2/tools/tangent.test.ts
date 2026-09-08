@@ -56,7 +56,7 @@ const pointCall = (x: number, y: number) => ({
 describe("tangent tool", () => {
   test("starts with two empty operand slots, no ghost", () => {
     const s0 = startTool("tangent");
-    expect(s0).toMatchObject({ verb: "tangent", focus: "a", ops: [undefined, undefined] });
+    expect(s0).toMatchObject({ verb: "tangent", focus: "a", a: undefined, b: undefined });
     expect(ghostOf(s0, hit(free(1, 1)), scope)).toBeUndefined();
   });
 
@@ -65,13 +65,13 @@ describe("tangent tool", () => {
     const p1 = clickTool(s0, hit(free(2, 0)), scope);
     if (!("session" in p1)) throw new Error("expected session");
     const s1 = p1.session as TSession;
-    expect(s1.ops[0]).toMatchObject({ kind: "point" });
+    expect(s1.a).toMatchObject({ kind: "point" });
     expect(s1.focus).toBe("b");
 
     const c1 = clickTool(s1, hitCircle("C", circleC, { x: 0.5, y: 1.2 }), scope);
     if (!("session" in c1)) throw new Error("expected session after the circle click");
     const s2 = c1.session as TSession;
-    expect(s2.ops[1]).toMatchObject({ kind: "circle" });
+    expect(s2.b).toMatchObject({ kind: "circle" });
 
     const g = ghostOf(s2, hit(free(0.5, 1)), scope);
     if (g?.kind !== "tangent") throw new Error("expected tangent ghost");
@@ -182,10 +182,10 @@ describe("tangent tool", () => {
     const p2 = clickTool(p1.session as TSession, hit(free(3, 1)), scope);
     if (!("session" in p2)) throw new Error("expected session");
     const s = p2.session as TSession;
-    const op = s.ops[0];
+    const op = s.a;
     if (op?.kind !== "point") throw new Error("expected a point operand");
     expect(op.placed.at).toEqual({ x: 3, y: 1 });
-    expect(s.ops[1]).toBeUndefined();
+    expect(s.b).toBeUndefined();
   });
 
   test("unknown typed operand blocks commit", () => {

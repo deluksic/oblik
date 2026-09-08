@@ -223,8 +223,9 @@ export type ToolSession =
   | {
       verb: "tangent";
       focus: "a" | "b" | "name";
-      /** Two operands, in click order — each a point or a circle, either order. */
-      ops: [TangentOp | undefined, TangentOp | undefined];
+      /** Operands — each a point or a circle, either order. */
+      a?: TangentOp;
+      b?: TangentOp;
       aRef: string;
       bRef: string;
       name: string;
