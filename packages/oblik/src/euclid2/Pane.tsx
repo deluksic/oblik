@@ -7,6 +7,7 @@ import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
 import { ResizableSidebar } from "../host/ResizableSidebar";
+import { openInEditor } from "../host/editor";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -299,6 +300,15 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(undefined);
   }
 
+  async function openAt(file: string, line: number) {
+    try {
+      await openInEditor(file, line);
+      setWriteError(undefined);
+    } catch (err) {
+      setWriteError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   function onPlace(hit: PlaceHit) {
     const session = tool();
     if (!session) return;
@@ -392,6 +402,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             detail={selectionDetail()}
             onPickScope={pickScope}
             onExpose={(bind) => void expose(bind)}
+            onOpenFile={(file, line) => void openAt(file, line)}
           />
         </Loading>
       </ResizableSidebar>

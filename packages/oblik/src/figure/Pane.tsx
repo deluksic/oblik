@@ -10,6 +10,7 @@ import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
 import { ResizableSidebar } from "../host/ResizableSidebar";
+import { openInEditor } from "../host/editor";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -237,6 +238,15 @@ export function FigurePane(props: FigurePaneProps) {
     return lookFromBrush(brush(), geom.value.kind);
   }
 
+  async function openAt(file: string, line: number) {
+    try {
+      await openInEditor(file, line);
+      setWriteError(undefined);
+    } catch (err) {
+      setWriteError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   function geomForPaint(paint: TraceNode): TraceNode | undefined {
     if (!isPaint(paint.value)) return undefined;
     const t = (paint.value as PaintValue).targets[0];
@@ -410,6 +420,7 @@ export function FigurePane(props: FigurePaneProps) {
                   detail={selectionDetail()}
                   onPickScope={pickScope}
                   onExpose={(bind) => void expose(bind)}
+                  onOpenFile={(file, line) => void openAt(file, line)}
                 />
               </Loading>
             }

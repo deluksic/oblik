@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseExpose, parseInsert } from "./schema";
+import { parseExpose, parseInsert, parseOpen } from "./schema";
 
 describe("parseInsert", () => {
   test("accepts slider args with props", () => {
@@ -88,5 +88,20 @@ describe("parseExpose", () => {
       tool: { module: "", prefix: "bc" },
     });
     expect(typeof job).toBe("string");
+  });
+});
+
+describe("parseOpen", () => {
+  test("accepts a file and line", () => {
+    const job = parseOpen({ file: "src/layout/csg-tree.ts", line: 42 });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job).toEqual({ file: "src/layout/csg-tree.ts", line: 42 });
+  });
+
+  test("rejects an empty file or a non-positive line", () => {
+    expect(typeof parseOpen({ file: "", line: 1 })).toBe("string");
+    expect(typeof parseOpen({ file: "a.ts", line: 0 })).toBe("string");
+    expect(typeof parseOpen({ file: "a.ts", line: "42" })).toBe("string");
   });
 });

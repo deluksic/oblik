@@ -19,6 +19,7 @@ export type SelectionSidebarProps = {
   detail?: SelectionDetail;
   onPickScope?: (pick: ScopePick) => void;
   onExpose?: (bind: string) => void;
+  onOpenFile?: (file: string, line: number) => void;
 };
 
 /**
@@ -36,6 +37,7 @@ export function SelectionSidebar(props: ParentProps<SelectionSidebarProps>) {
           detail={props.detail}
           onPickScope={props.onPickScope}
           onExpose={props.onExpose}
+          onOpenFile={props.onOpenFile}
         />
       )}
     </aside>
@@ -47,13 +49,14 @@ export function SelectionInspector(props: {
   detail?: SelectionDetail;
   onPickScope?: (pick: ScopePick) => void;
   onExpose?: (bind: string) => void;
+  onOpenFile?: (file: string, line: number) => void;
 }) {
   const detail = () => props.detail ?? EMPTY_SELECTION_DETAIL;
   return (
     <>
       <SidebarIdentity crumb={detail().crumb} meta={detail().meta} />
       <p class={[kicker, styles.kicker]}>Origin</p>
-      <Origin origin={detail().origin} onPickScope={props.onPickScope} />
+      <Origin origin={detail().origin} onPickScope={props.onPickScope} onOpenFile={props.onOpenFile} />
       <Show when={detail().expose}>
         {(note) => <SidebarExpose note={note()} onExpose={props.onExpose} />}
       </Show>
@@ -83,7 +86,11 @@ export function SidebarSection(props: ParentProps<{ title: string }>) {
 }
 
 /** Source-quote list with scope-dive picking. Reusable across scene kinds. */
-export function Origin(props: { origin: OriginView; onPickScope?: (pick: ScopePick) => void }) {
+export function Origin(props: {
+  origin: OriginView;
+  onPickScope?: (pick: ScopePick) => void;
+  onOpenFile?: (file: string, line: number) => void;
+}) {
   const empty = () => props.origin.kind === "empty";
   const frames = () => (props.origin.kind === "origin" ? props.origin.frames : []);
   const message = () => (props.origin.kind === "empty" ? props.origin.message : "");
@@ -91,7 +98,9 @@ export function Origin(props: { origin: OriginView; onPickScope?: (pick: ScopePi
     <div class={styles.originList}>
       <p class={[styles.emptyOrigin, { [styles.hidden]: !empty() }]}>{message()}</p>
       <For each={frames()}>
-        {(frame) => <OriginFrameBox frame={frame} onPickScope={props.onPickScope} />}
+        {(frame) => (
+          <OriginFrameBox frame={frame} onPickScope={props.onPickScope} onOpenFile={props.onOpenFile} />
+        )}
       </For>
     </div>
   );
@@ -120,7 +129,14 @@ export function SidebarExpose(props: { note: ExposeNote; onExpose?: (bind: strin
   );
 }
 
-function OriginFrameBox(props: { frame: OriginFrame; onPickScope?: (pick: ScopePick) => void }) {
+function OriginFrameBox(props: {
+  frame: OriginFrame;
+  onPickScope?: (pick: ScopePick) => void;
+  onOpenFile?: (file: string, line: number) => void;
+}) {
+  // Guarded click instead of `disabled`: a disabled button swallows clicks on
+  // its descendants, which would block the line-number open affordance inside.
+  const canDive = () => !!props.frame.pick && !props.frame.current && !!props.onPickScope;
   return (
     <button
       type="button"
@@ -128,24 +144,34 @@ function OriginFrameBox(props: { frame: OriginFrame; onPickScope?: (pick: ScopeP
         styles.originBox,
         {
           [styles.scopeCurrent]: !!props.frame.current,
-          [styles.scopePick]: !!props.frame.pick && !props.frame.current,
+          [styles.scopePick]: canDive(),
         },
       ]}
-      disabled={!props.frame.pick || props.frame.current || !props.onPickScope}
+      aria-disabled={canDive() ? "false" : "true"}
       onClick={() => {
         const pick = props.frame.pick;
-        if (pick && !props.frame.current) props.onPickScope?.(pick);
+        if (pick && !props.frame.current && props.onPickScope) props.onPickScope(pick);
       }}
     >
       <p class={styles.originFile}>{props.frame.file}</p>
       <div class={styles.quote}>
-        <For each={props.frame.lines}>{(row) => <OriginLine row={row} />}</For>
+        <For each={props.frame.lines}>
+          {(row) => <OriginLine row={row} file={props.frame.file} onOpenFile={props.onOpenFile} />}
+        </For>
       </div>
     </button>
   );
 }
 
-function OriginLine(props: { row: OriginDisplayLine }) {
+function OriginLine(props: {
+  row: OriginDisplayLine;
+  file: string;
+  onOpenFile?: (file: string, line: number) => void;
+}) {
+  const openLine = (line: number) => (e: MouseEvent) => {
+    e.stopPropagation();
+    props.onOpenFile?.(props.file, line);
+  };
   return (
     <>
       {props.row.kind === "ellipsis" ? (
@@ -161,7 +187,18 @@ function OriginLine(props: { row: OriginDisplayLine }) {
             [styles.current]: !!props.row.current,
           }}
         >
-          <span class={styles.ln}>{props.row.line}</span>
+          <Show
+            when={props.onOpenFile}
+            fallback={<span class={styles.ln}>{props.row.line}</span>}
+          >
+            <span
+              class={[styles.ln, styles.lnOpen]}
+              title="Open in editor"
+              onClick={openLine(props.row.line)}
+            >
+              {props.row.line}
+            </span>
+          </Show>
           <span class={styles.tx}>{props.row.text || " "}</span>
         </div>
       )}

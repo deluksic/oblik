@@ -131,3 +131,16 @@ export function parseExpose(raw: unknown): ExposeBody | string {
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
 }
+
+export const openSchema = v.object({
+  file: v.pipe(v.string(), v.minLength(1)),
+  line: v.pipe(v.number(), v.minValue(1)),
+});
+
+export type OpenBody = v.InferOutput<typeof openSchema>;
+
+export function parseOpen(raw: unknown): OpenBody | string {
+  const r = v.safeParse(openSchema, raw);
+  if (r.success) return r.output;
+  return r.issues.map((i) => i.message).join("; ");
+}

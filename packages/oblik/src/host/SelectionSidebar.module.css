@@ -188,6 +188,14 @@
   user-select: none;
 }
 
+.lnOpen {
+  cursor: pointer;
+}
+
+.lnOpen:hover {
+  color: var(--oblik-accent);
+}
+
 .tx {
   grid-column: 2;
   min-width: 0;

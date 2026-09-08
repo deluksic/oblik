@@ -17,6 +17,7 @@ import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { patchPaintStyle, removePaintCall } from "./paint-edit";
 import { patchLiterals } from "./patch";
+import { EDITOR_OPEN_DEFAULT, editorArgv, spawnEditor } from "./open-editor.server";
 import { resolveSceneFileAbs } from "./scene-path.server";
 import {
   parseErase,
@@ -24,6 +25,7 @@ import {
   parseFrameEdit,
   parseInsert,
   parseLiteralPatch,
+  parseOpen,
   parsePaintPatch,
 } from "./schema";
 import { freshSiteId, stamp } from "./stamp";
@@ -63,6 +65,11 @@ const FALLBACK_INDEX_HTML = `<!doctype html>
 export type OblikPluginOpts = {
   workspaceRoot: string;
   sceneDir: string;
+  /**
+   * Command run (detached) when the user clicks a line number in the Origin
+   * panel. `{file}` and `{line}` are substituted; no shell is involved.
+   */
+  editorOpen?: string;
 };
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -165,6 +172,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   const sceneDir = path.resolve(opts.sceneDir);
   const appRoot = path.dirname(path.dirname(sceneDir));
+  const editorOpen = opts.editorOpen ?? EDITOR_OPEN_DEFAULT;
   const writeTail = new Map<string, Promise<void>>();
   let lastCatalog = "";
 
@@ -395,6 +403,32 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           } catch (err) {
             res.statusCode = 404;
             res.end(err instanceof Error ? err.message : String(err));
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-open") {
+          let body: unknown;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { ok: false, error: "invalid json" });
+            return;
+          }
+          const job = parseOpen(body);
+          if (typeof job === "string") {
+            json(res, 400, { ok: false, error: job });
+            return;
+          }
+          try {
+            const abs = resolveSceneFileAbs(workspaceRoot, sceneDir, job.file);
+            const argv = editorArgv(editorOpen, abs, job.line);
+            spawnEditor(
+              argv,
+              () => json(res, 200, { ok: true }),
+              (err) => json(res, 500, { ok: false, error: err.message }),
+            );
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
           }
           return;
         }
