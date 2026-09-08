@@ -50,6 +50,26 @@
   cursor: row-resize;
 }
 
+.toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  background: var(--oblik-raised);
+  border-color: var(--oblik-line);
+}
+
+.collapsed {
+  flex: none;
+  width: 2.25rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+  border-left: 1px solid var(--oblik-line);
+  background: var(--oblik-raised);
+}
+
 /* Docked-to-bottom layout; 48rem breakpoint mirrors pane.module.css `.workspace`. */
 @media (max-width: 48rem) {
   .slot {
@@ -64,5 +84,16 @@
 
   .handleTop {
     display: block;
+  }
+
+  .collapsed {
+    width: 100%;
+    height: 2.25rem;
+    padding-top: 0;
+    padding-left: 6px;
+    align-items: center;
+    justify-content: flex-start;
+    border-left: none;
+    border-top: 1px solid var(--oblik-line);
   }
 }
