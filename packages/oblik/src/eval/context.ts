@@ -1,5 +1,6 @@
 import type { Geom } from "../geom";
 import type { Annotation } from "../source/analyze";
+import type { EvalMemo } from "./memo";
 import type { FigureStyle, PaintValue } from "./paint";
 import { $node } from "./site";
 import type { CallSite } from "./stack";
@@ -44,6 +45,11 @@ export type EvalCtx = {
   module?: string;
   /** When false, constructors skip `captureUserStack` (live drag preview). */
   captureStack: boolean;
+  /** Per-scene-module constructor memo. Ghost/tool evals leave it unset. */
+  memo?: EvalMemo;
+  stats: { built: number; hits: number };
+  /** Call tallies for `memo(fn)` sites, reset per eval. */
+  userMemoOcc?: Map<object, number>;
 };
 
 export type Traced<T> = T & { readonly [$node]: TraceNode };

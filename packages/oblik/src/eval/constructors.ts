@@ -51,6 +51,7 @@ import {
   type Vec2,
 } from "../geom";
 import { brand, currentEval, type SliderValue, type TraceNode, type TraceValue } from "./context";
+import { memoized } from "./memo";
 import {
   cloneStyle,
   lookOf,
@@ -134,8 +135,9 @@ function isFiniteValue(v: { kind: string }): boolean {
 }
 
 function mark<F extends (...args: never[]) => unknown>(fn: F, spec: SiteSpec): F {
-  (fn as F & { [$site]: SiteSpec })[$site] = spec;
-  return fn;
+  const wrapped = memoized(fn);
+  (wrapped as F & { [$site]: SiteSpec })[$site] = spec;
+  return wrapped;
 }
 
 export const point = mark(

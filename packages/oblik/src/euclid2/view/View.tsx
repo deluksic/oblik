@@ -77,6 +77,7 @@ export type Euclid2ViewProps = {
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | undefined) => void;
   scope?: Scope;
+  evalStats?: { ms: number; built: number; hits: number } | undefined;
 };
 
 function readPaneSize(el: Element): PaneSize | undefined {
@@ -414,6 +415,12 @@ export function Euclid2View(props: Euclid2ViewProps) {
         ) : undefined}
         <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
+      {props.evalStats ? (
+        <div class={styles.evalstats}>
+          {props.evalStats.ms.toFixed(1)}ms · {props.evalStats.built} built ·{" "}
+          {props.evalStats.hits} cached
+        </div>
+      ) : undefined}
     </div>
   );
 }

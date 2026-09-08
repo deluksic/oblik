@@ -395,6 +395,7 @@ export function runToolTrace(
     annotations: new Map<string, Annotation>(),
     occ: new Map(),
     captureStack: false,
+    stats: { built: 0, hits: 0 },
   };
   try {
     withEval(ctx, () => fn(...values));

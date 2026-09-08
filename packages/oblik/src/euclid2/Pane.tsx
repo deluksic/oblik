@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
+import { newEvalMemo, type EvalMemo } from "../eval/memo";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
@@ -45,6 +46,14 @@ export type Euclid2PaneProps = {
   annotations: Record<string, Annotation>;
   mentions?: readonly MentionFile[];
 };
+
+type WorldEval = ReturnType<typeof tryEvaluate> & { ms: number };
+
+// Keyed on the scene module object: identical across draft ticks, replaced by
+// HMR on every source edit — invalidation for free.
+const evalMemos = new WeakMap<object, EvalMemo>();
+
+const evalstats = new URLSearchParams(location.search).has("evalstats");
 
 function entryFocus(file: string): ScopeFocus {
   return { file, name: "build", serial: 0 };
@@ -125,18 +134,26 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
 
   const mentions = createMemo(() => props.mentions ?? []);
-  const world = createMemo((prev: ReturnType<typeof tryEvaluate> | undefined) => {
+  const world = createMemo((prev: WorldEval | undefined) => {
     console.log("Running world");
+    const t0 = performance.now();
+    let m = evalMemos.get(props.scene);
+    if (!m) {
+      m = newEvalMemo();
+      evalMemos.set(props.scene, m);
+    }
     const w = tryEvaluate(props.scene, {
       draft: draft(),
       annotations: props.annotations,
       module: props.file,
       captureStack: !liveEdit(),
+      memo: m,
     });
+    const ms = performance.now() - t0;
     w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
     if (liveEdit()) carryTraceInv(prev?.trace, w.trace);
     else if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
-    return w;
+    return { ...w, ms };
   });
 
   const scope = createMemo(() =>
@@ -369,6 +386,11 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onLiveEdit={setLiveEdit}
           onPlace={onPlace}
           onCursor={setPlace}
+          evalStats={
+            evalstats
+              ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
+              : undefined
+          }
         />
         <Palette
           picker={picker()}

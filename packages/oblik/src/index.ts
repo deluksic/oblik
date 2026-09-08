@@ -8,6 +8,7 @@ export {
   type EvaluateResult,
 } from "./eval/evaluate";
 export { nodeOf, type TraceNode } from "./eval/context";
+export { memo, type EvalMemo } from "./eval/memo";
 export { $site, $node } from "./eval/site";
 export {
   point,

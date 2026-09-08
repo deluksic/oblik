@@ -1,9 +1,10 @@
 import type { TraceNode } from "../eval/context";
-import type { Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
+import type { Aabb, Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
 import {
   distToCsg,
   distToPolygon,
   distToRegion,
+  fillAabb,
   isFillGeom,
   isFiniteCsg2,
   isFinitePick,
@@ -19,7 +20,7 @@ import { lineBasis } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
 import type { Camera2, PaneSize } from "./camera";
 
-const { abs, max } = Math;
+const { abs, max, min } = Math;
 export type Vec2 = { x: number; y: number };
 
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
@@ -147,6 +148,62 @@ function pickRadiusWorld(n: TraceNode, camera: Camera2, maxPx: number): number {
   return px / max(8, camera.scale);
 }
 
+// Nodes are identity-stable across evals (memoization + reuseUnchangedTrace),
+// so each node's AABB is computed once and reused. A cached `undefined` means
+// unbounded (lines) or empty — such nodes are never culled.
+const aabbCache = new WeakMap<TraceNode, Aabb | undefined>();
+
+function aabbOf(n: TraceNode): Aabb | undefined {
+  if (aabbCache.has(n)) return aabbCache.get(n);
+  let box: Aabb | undefined;
+  const v = n.value;
+  if (v.kind === "point") {
+    box = { minX: v.x, minY: v.y, maxX: v.x, maxY: v.y };
+  } else if (isGlider(v)) {
+    const p = gliderAt(v);
+    box = { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y };
+  } else if (v.kind === "segment") {
+    box = {
+      minX: min(v.a.x, v.b.x),
+      minY: min(v.a.y, v.b.y),
+      maxX: max(v.a.x, v.b.x),
+      maxY: max(v.a.y, v.b.y),
+    };
+  } else if (v.kind === "circle") {
+    const r = abs(v.radius);
+    box = { minX: v.center.x - r, minY: v.center.y - r, maxX: v.center.x + r, maxY: v.center.y + r };
+  } else if (isPolygon(v)) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of v.boundary) {
+      minX = min(minX, p.x);
+      minY = min(minY, p.y);
+      maxX = max(maxX, p.x);
+      maxY = max(maxY, p.y);
+    }
+    box = Number.isFinite(minX) ? { minX, minY, maxX, maxY } : undefined;
+  } else if (isRegion(v) || isCsg2(v) || isPick(v)) {
+    box = fillAabb(v);
+  }
+  // line/parallelLine are unbounded — no box, never culled.
+  aabbCache.set(n, box);
+  return box;
+}
+
+/** True when `world` plus pick radius `r` cannot reach the node's bounds. */
+function aabbCulls(n: TraceNode, world: Vec2, r: number): boolean {
+  const box = aabbOf(n);
+  if (!box) return false;
+  return (
+    world.x < box.minX - r ||
+    world.x > box.maxX + r ||
+    world.y < box.minY - r ||
+    world.y > box.maxY + r
+  );
+}
+
 function pickRank(n: TraceNode): number {
   if (n.value.kind === "point" || isGlider(n.value)) return 0;
   if (isCsg2(n.value) || isPick(n.value)) return 2;
@@ -166,9 +223,11 @@ export function hitsNear(
   for (let tape = 0; tape < trace.length; tape++) {
     const n = trace[tape]!;
     if (!isFiniteTrace(n)) continue;
+    const r = pickRadiusWorld(n, camera, maxPx);
+    if (aabbCulls(n, world, r)) continue;
     const d = geomDistWorld(world, n);
     const insideFill = isFillGeom(n.value) && d === 0;
-    if (insideFill || d <= pickRadiusWorld(n, camera, maxPx)) out.push({ node: n, d, tape });
+    if (insideFill || d <= r) out.push({ node: n, d, tape });
   }
   out.sort((a, b) => {
     const ra = pickRank(a.node);
@@ -214,6 +273,7 @@ export function snapLineCarrier(
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
     if (!LINE_LIKE.has(n.value.kind)) continue;
+    if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike, d };
@@ -245,6 +305,7 @@ export function snapRegion(
     const idx = i++;
     if (!snapEligible(n, filter)) continue;
     if (!isRegion(n.value)) continue;
+    if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     const inside = d === 0;
     if (!inside && d > pickRadiusWorld(n, camera, maxPx)) continue;
@@ -269,7 +330,9 @@ function isNamedStroke(n: TraceNode, filter?: SnapFilter): boolean {
 }
 
 function strokeWithin(n: TraceNode, at: Vec2, camera: Camera2, maxPx: number): boolean {
-  return geomDistWorld(at, n) <= pickRadiusWorld(n, camera, maxPx);
+  const r = pickRadiusWorld(n, camera, maxPx);
+  if (aabbCulls(n, at, r)) return false;
+  return geomDistWorld(at, n) <= r;
 }
 
 /** Named strokes/circles that pass near `at` (same pick radius as a hover). */
@@ -302,6 +365,7 @@ export function snapStrokeCarrier(
   for (const n of trace) {
     if (!isNamedStroke(n, filter)) continue;
     if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
+    if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     if (!best || d < best.d)

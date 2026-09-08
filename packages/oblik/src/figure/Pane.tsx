@@ -5,6 +5,7 @@ import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../e
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
+import { newEvalMemo, type EvalMemo } from "../eval/memo";
 import { isPaint, type PaintValue } from "../eval/paint";
 import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
@@ -51,6 +52,10 @@ export type FigurePaneProps = {
   annotations: Record<string, Annotation>;
   mentions?: readonly MentionFile[];
 };
+
+// Keyed on the scene module object: identical across re-evals, replaced by HMR
+// on every source edit — invalidation for free.
+const evalMemos = new WeakMap<object, EvalMemo>();
 
 function entryFocus(file: string): ScopeFocus {
   return { file, name: "build", serial: 0 };
@@ -135,9 +140,15 @@ export function FigurePane(props: FigurePaneProps) {
   });
 
   const world = createMemo((prev: ReturnType<typeof tryEvaluate> | undefined) => {
+    let m = evalMemos.get(props.scene);
+    if (!m) {
+      m = newEvalMemo();
+      evalMemos.set(props.scene, m);
+    }
     const w = tryEvaluate(props.scene, {
       annotations: props.annotations,
       module: props.file,
+      memo: m,
     });
     w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
     if (mentions().length > 0 && w.trace.length > 0) assignInv(w.trace, mentions());
