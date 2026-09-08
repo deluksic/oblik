@@ -4,8 +4,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.85rem 1rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-left: 1px solid var(--oblik-line);
   background: var(--oblik-raised);
   overflow: hidden;
@@ -15,14 +15,14 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--space-1);
 }
 
 .section {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--space-1);
 }
 
 .sidebar :is(p, h2) {
@@ -52,7 +52,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: var(--space-3);
   overflow: auto;
 }
 
@@ -97,8 +97,8 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.45rem 0.55rem;
+  gap: var(--space-1);
+  padding: var(--space-2);
   border: 1px solid var(--oblik-line);
   border-radius: 0.35rem;
   background: var(--oblik-paper);
@@ -116,7 +116,7 @@
 
 .exposeBtn {
   align-self: start;
-  padding: 0.28rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--oblik-line);
   border-radius: 0.28rem;
   background: var(--oblik-raised);
@@ -132,7 +132,7 @@
 }
 
 .originFile {
-  padding: 0.35rem 0.55rem;
+  padding: var(--space-1) var(--space-2);
   font-size: 0.68rem;
   color: var(--oblik-accent);
   border-bottom: 1px solid var(--oblik-line);
@@ -154,7 +154,7 @@
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: baseline;
-  padding: 0 0.45rem;
+  padding: 0 var(--space-2);
 }
 
 .codeRow,
@@ -183,7 +183,7 @@
 .ln {
   grid-column: 1;
   text-align: right;
-  padding-right: 0.5rem;
+  padding-right: var(--space-2);
   color: var(--oblik-ln);
   user-select: none;
 }

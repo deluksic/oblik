@@ -28,7 +28,7 @@
 
 .status {
   flex: none;
-  padding: 0.35rem 1.1rem;
+  padding: var(--space-1) var(--space-4);
   border-bottom: 1px solid var(--oblik-line);
   color: var(--oblik-accent);
   font-size: 0.78rem;

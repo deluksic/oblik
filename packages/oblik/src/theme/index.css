@@ -9,6 +9,18 @@
  * clash doesn't get extreme.
  */
 :root {
+  /*
+   * Spacing ladder, for spacing things apart only (gap, padding, margin,
+   * edge offsets) — never sizing (strokes, radii, widths, heights).
+   * Tailwind-inspired: steps 0.5/1/2/3/4/6 of the 4px grid.
+   */
+  --space-0: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
   --oblik-hue-backdrop: 270;
   --oblik-hue-ink: 85;
   --oblik-hue-ink-cool: 250;

@@ -1,14 +1,14 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   min-width: min(70vw, 420px);
 }
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .sectionTitle {
@@ -19,7 +19,7 @@
 .row {
   display: flex;
   align-items: baseline;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }
 
 .rowLabel {
@@ -60,8 +60,8 @@
 .armBox {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid color-mix(in srgb, var(--oblik-error) 45%, var(--oblik-line));
   border-radius: 10px;
   background: color-mix(in srgb, var(--oblik-error) 8%, var(--oblik-raised));
@@ -83,5 +83,5 @@
 
 .btnRow {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }

@@ -17,8 +17,8 @@
   margin: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px 18px 16px;
+  gap: var(--space-4);
+  padding: var(--space-4);
   color: var(--oblik-text);
   border-radius: 14px;
   max-width: min(92vw, 760px);

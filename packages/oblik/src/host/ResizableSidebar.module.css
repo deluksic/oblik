@@ -52,8 +52,8 @@
 
 .toggle {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: var(--space-2);
+  right: var(--space-2);
   z-index: 3;
   background: var(--oblik-raised);
   border-color: var(--oblik-line);
@@ -63,8 +63,8 @@
    not shift it; the docked-layout breakpoint moves it to the bottom. */
 .fab {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: var(--space-2);
+  right: var(--space-2);
   z-index: 3;
   background: var(--oblik-raised);
   border-color: var(--oblik-line);
@@ -97,7 +97,7 @@
 
   .fab {
     top: auto;
-    bottom: 6px;
+    bottom: var(--space-2);
   }
 
   .iconWide {

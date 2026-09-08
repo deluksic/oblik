@@ -10,12 +10,12 @@
 
 .head {
   flex: none;
-  padding: 0.7rem 1.1rem;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--oblik-line);
 }
 
 .head p {
-  margin: 0.25rem 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--oblik-muted);
   font-size: 0.82rem;
 }
@@ -36,12 +36,12 @@
 }
 
 .err {
-  margin: 1rem;
+  margin: var(--space-4);
   color: var(--oblik-error);
 }
 
 .muted {
-  margin: 1rem;
+  margin: var(--space-4);
   color: var(--oblik-muted);
   font-size: 0.82rem;
 }
@@ -49,7 +49,7 @@
 .dupWarn {
   flex: 0 0 auto;
   margin: 0;
-  padding: 0.55rem 1.1rem;
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid color-mix(in srgb, var(--oblik-error) 55%, var(--oblik-line));
   background: color-mix(in srgb, var(--oblik-error) 14%, var(--oblik-raised));
   color: var(--oblik-text);
@@ -68,8 +68,8 @@
 }
 
 .dupSites {
-  margin: 0.25rem 0 0;
-  padding: 0 0 0 1.1rem;
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-4);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   color: var(--oblik-cream);
