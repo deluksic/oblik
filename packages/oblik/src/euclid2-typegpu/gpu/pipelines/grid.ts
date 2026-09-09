@@ -14,7 +14,7 @@ const { ceil, floor } = Math;
 export function buildGridDraws(
   cam: Camera2,
   size: PaneSize,
-  colors: { grid: [number, number, number]; axis: [number, number, number] },
+  colors: { grid: readonly [number, number, number]; axis: readonly [number, number, number] },
   maxDraws: number,
 ): { draws: StrokeDrawValue[]; count: number } {
   const halfH = size.h / 2 / cam.scale + 1;
@@ -54,7 +54,7 @@ function intsIn(lo: number, hi: number, cap: number): number[] {
 function hairline(
   from: [number, number],
   to: [number, number],
-  color: [number, number, number],
+  color: readonly [number, number, number],
   radius: number,
 ): StrokeDrawValue {
   const a = StrokeCtrl({ position: vec2f(from[0], from[1]), radius });
@@ -64,6 +64,6 @@ function hairline(
     b: a,
     c: d,
     d,
-    run: StrokeRun({ color: vec3f(color[0], color[1], color[2]), start: 0, count: 0, flags: 0 }),
+    run: StrokeRun({ color: vec3f(color[0], color[1], color[2]), alpha: 1, start: 0, count: 0, flags: 0 }),
   });
 }

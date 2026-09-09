@@ -7,16 +7,12 @@ import {
   caps,
   endCapSlot,
   lineSegmentIndices,
+  LineControlPoint,
   polylineVariableWidth,
   startCapSlot,
 } from "../../vendor/typegpu-geometry";
-import { Frame, MAX_JOIN_COUNT, MAX_GRID_DRAWS, MAX_STROKE_DRAWS, StrokeDraw } from "../schemas";
-
-export const worldLayout = tgpu.bindGroupLayout({
-  frame: { uniform: Frame },
-  strokes: { storage: arrayOf(StrokeDraw, MAX_STROKE_DRAWS) },
-  grid: { storage: arrayOf(StrokeDraw, MAX_GRID_DRAWS) },
-});
+import { MAX_JOIN_COUNT } from "../schemas";
+import { worldLayout } from "../layout";
 
 /** World → clip through the Frame uniform; affine, so it commutes with the
  * library's homogeneous w-multiply trick. Matches euclid2/camera.ts worldToScreen:
@@ -36,36 +32,50 @@ const toClip = tgpu.fn([vec2f, f32], vec4f)((p, w) => {
 
 const gridVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, color: interpolate("flat", vec3f) },
+  out: { outPos: builtin.position, color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const draw = worldLayout.$.grid[instanceIndex];
   if (draw.a.radius < 0 || draw.b.radius < 0 || draw.c.radius < 0 || draw.d.radius < 0) {
-    return { outPos: vec4f(), color: vec3f() };
+    return { outPos: vec4f(), color: vec3f(), alpha: 0 };
   }
-  const result = polylineVariableWidth(draw.a, draw.b, draw.c, draw.d, vertexIndex, MAX_JOIN_COUNT);
-  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color };
+  const result = polylineVariableWidth(
+    LineControlPoint({ position: draw.a.position, radius: draw.a.radius }),
+    LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
+    LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
+    LineControlPoint({ position: draw.d.position, radius: draw.d.radius }),
+    vertexIndex,
+    MAX_JOIN_COUNT,
+  );
+  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color, alpha: 1 };
 });
 
 const strokeVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, color: interpolate("flat", vec3f) },
+  out: { outPos: builtin.position, color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const draw = worldLayout.$.strokes[instanceIndex];
+  const draw = worldLayout.$.strokes[worldLayout.$.strokeOrder[instanceIndex]];
   if (draw.a.radius < 0 || draw.b.radius < 0 || draw.c.radius < 0 || draw.d.radius < 0) {
-    return { outPos: vec4f(), color: vec3f() };
+    return { outPos: vec4f(), color: vec3f(), alpha: 0 };
   }
-  const result = polylineVariableWidth(draw.a, draw.b, draw.c, draw.d, vertexIndex, MAX_JOIN_COUNT);
-  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color };
+  const result = polylineVariableWidth(
+    LineControlPoint({ position: draw.a.position, radius: draw.a.radius }),
+    LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
+    LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
+    LineControlPoint({ position: draw.d.position, radius: draw.d.radius }),
+    vertexIndex,
+    MAX_JOIN_COUNT,
+  );
+  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color, alpha: draw.run.alpha };
 });
 
 const strokeFragment = tgpu.fragmentFn({
-  in: { color: interpolate("flat", vec3f) },
+  in: { color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
   out: vec4f,
-})(({ color }) => {
+})(({ color, alpha }) => {
   "use gpu";
-  return vec4f(color, 1);
+  return vec4f(color, alpha);
 });
 
 const alphaBlend: GPUBlendState = {
@@ -76,7 +86,7 @@ const alphaBlend: GPUBlendState = {
 export type StrokePipelines = {
   /** Hairline grid pass: instances indexed into the `grid` storage array. */
   grid: (pass: GPURenderPassEncoder) => { drawIndexed(indexCount: number, instanceCount: number): void };
-  /** World stroke pass: instances indexed into the `strokes` storage array. */
+  /** World stroke pass: instances index `strokeOrder` into the `strokes` array. */
   strokes: (pass: GPURenderPassEncoder) => { drawIndexed(indexCount: number, instanceCount: number): void };
   readonly indexCount: number;
   destroy(): void;

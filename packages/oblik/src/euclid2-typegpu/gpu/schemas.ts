@@ -7,6 +7,11 @@ export const STROKE_INDICES_PER_SEGMENT = 12 + 12 * MAX_JOIN_COUNT;
 
 export const MAX_GRID_DRAWS = 2048;
 export const MAX_STROKE_DRAWS = 4096;
+export const MAX_CIRCLES = 512;
+/** Fan pieces per circle/arc instance; verts = 2·(pieces+1) ≤ 258. */
+export const MAX_CIRCLE_PIECES = 128;
+export const MAX_FILL_REGIONS = 256;
+export const MAX_FILL_EDGES = 4096;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -34,6 +39,7 @@ export type StrokeCtrlValue = Infer<typeof StrokeCtrl>;
 
 export const StrokeRun = struct({
   color: vec3f,
+  alpha: f32,
   /** Ctrl-point range within the run's ctrl array (adapter bookkeeping). */
   start: u32,
   count: u32,
@@ -50,3 +56,42 @@ export const StrokeDraw = struct({
   run: StrokeRun,
 });
 export type StrokeDrawValue = Infer<typeof StrokeDraw>;
+
+/** Analytic stroked circle/arc: annulus band r0→r1 swept a0→a1 (a1 < a0 = CW). */
+export const CircleInst = struct({
+  center: vec2f,
+  r0: f32,
+  r1: f32,
+  a0: f32,
+  a1: f32,
+  /** Active fan pieces (≤ MAX_CIRCLE_PIECES); vertex shader clamps beyond. */
+  pieces: f32,
+  color: vec3f,
+  alpha: f32,
+  flags: u32,
+});
+export type CircleInstValue = Infer<typeof CircleInst>;
+
+/** One fill boundary span: a circle-carrier arc (radius > 0, signed sweep
+ * `span`) or a straight segment (radius <= 0, a→b). */
+export const FillEdge = struct({
+  a: vec2f,
+  b: vec2f,
+  center: vec2f,
+  radius: f32,
+  /** Signed sweep in radians for arcs; segment edges carry 0. */
+  span: f32,
+});
+export type FillEdgeValue = Infer<typeof FillEdge>;
+
+/** SDF fragment quad covering one fill island; edges live in a shared array. */
+export const FillRegion = struct({
+  aabbMin: vec2f,
+  aabbMax: vec2f,
+  edgeOffset: u32,
+  edgeCount: u32,
+  color: vec3f,
+  alpha: f32,
+  flags: u32,
+});
+export type FillRegionValue = Infer<typeof FillRegion>;
