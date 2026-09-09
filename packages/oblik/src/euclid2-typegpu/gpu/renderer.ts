@@ -43,7 +43,7 @@ export function createRenderer(opts: {
   let currentMsaaView: GPUTextureView | undefined;
 
   const size = { width: 1, height: 1 };
-  const ro = new ResizeObserver(() => resize());
+  const ro = new ResizeObserver((entries) => resize(entries));
   const renderer: GpuRenderer = {
     root,
     canvas,
@@ -62,11 +62,23 @@ export function createRenderer(opts: {
   let raf = 0;
   let destroyed = false;
 
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const width = Math.max(1, Math.round(rect.width * dpr));
-    const height = Math.max(1, Math.round(rect.height * dpr));
+  function resize(entries?: ResizeObserverEntry[]) {
+    // devicePixelContentBoxSize gives the exact device-pixel box (no rounding
+    // drift from CSS px * dpr); fall back to the rect when unsupported.
+    const box = entries
+      ?.find((e) => e.target === canvas)
+      ?.devicePixelContentBoxSize?.[0];
+    let width: number;
+    let height: number;
+    if (box) {
+      width = Math.max(1, box.inlineSize);
+      height = Math.max(1, box.blockSize);
+    } else {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      width = Math.max(1, Math.round(rect.width * dpr));
+      height = Math.max(1, Math.round(rect.height * dpr));
+    }
     if (width === size.width && height === size.height) return;
     size.width = width;
     size.height = height;

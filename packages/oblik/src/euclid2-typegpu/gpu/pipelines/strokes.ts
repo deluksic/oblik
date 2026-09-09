@@ -18,9 +18,11 @@ export const worldLayout = tgpu.bindGroupLayout({
   grid: { storage: arrayOf(StrokeDraw, MAX_GRID_DRAWS) },
 });
 
-/** World (y-up) → clip (y-down) through the Frame uniform; affine, so it commutes
- * with the library's homogeneous w-multiply trick. NDC normalizes x and y by
- * different half-extents, so the px-per-world scale k is per-axis. */
+/** World → clip through the Frame uniform; affine, so it commutes with the
+ * library's homogeneous w-multiply trick. Matches euclid2/camera.ts worldToScreen:
+ * device = pane/2 - (world - cam) * scale (y-up world). NDC normalizes x and y by
+ * different half-extents, so the px-per-world scale k is per-axis. WebGPU's NDC
+ * y axis points down (framebuffer bottom), so no extra negation here. */
 const toClip = tgpu.fn([vec2f, f32], vec4f)((p, w) => {
   "use gpu";
   const f = worldLayout.$.frame;
@@ -28,7 +30,7 @@ const toClip = tgpu.fn([vec2f, f32], vec4f)((p, w) => {
     f.scale * 2 / max(1, f.pane.x),
     f.scale * 2 / max(1, f.pane.y),
   );
-  const ndc = vec2f(k.x * (p.x - f.cam.x), -(k.y * (p.y - f.cam.y)));
+  const ndc = vec2f(k.x * (p.x - f.cam.x), k.y * (p.y - f.cam.y));
   return vec4f(ndc * w, 0, w);
 });
 
