@@ -4,6 +4,9 @@ allowBuilds:
 
 minimumReleaseAge: 0
 
+overrides:
+  typescript: npm:tsover@~6.0.2
+
 packages:
   - "packages/*"
   - "apps/*"

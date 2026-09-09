@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import solid from "@solidjs/vite-plugin";
 import Icons from "unplugin-icons/vite";
+import typegpu from "unplugin-typegpu/vite";
 import { defineConfig } from "vite";
 
 // Config is loaded by Node; package exports to .ts are not.
@@ -13,6 +14,7 @@ const workspaceRoot = path.resolve(appRoot, "../..");
 
 export default defineConfig({
   plugins: [
+    typegpu(),
     solid(),
     Icons({ compiler: "solid" }),
     oblikPlugin({
@@ -27,6 +29,6 @@ export default defineConfig({
     fs: { allow: [workspaceRoot] },
   },
   optimizeDeps: {
-    exclude: ["oblik"],
+    exclude: ["oblik", "typegpu", "@typegpu/sdf"],
   },
 });

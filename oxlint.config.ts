@@ -15,6 +15,8 @@ export default defineConfig({
     // Scene files are written by the oblik editor (and AI) — do not lint them at all.
     "**/scenes/**",
     "**/*.scene.ts",
+    // Vendored third-party source (typegpu-geometry for the P12 prototype).
+    "**/vendor/**",
   ],
   env: {
     browser: true,

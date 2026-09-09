@@ -15,8 +15,10 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.128",
     "@solidjs/vite-plugin": "3.0.0-next.40",
+    "@webgpu/types": "^0.1.72",
     "typescript": "~6.0.2",
     "unplugin-icons": "^23.0.1",
+    "unplugin-typegpu": "^0.12.3",
     "vite": "^8.2.0"
   }
 }
