@@ -9,8 +9,11 @@ export type GpuRenderer = {
   readonly format: GPUTextureFormat;
   /** Backing-store size in device pixels. */
   readonly size: { width: number; height: number };
-  /** Swapchain texture view for the current frame; re-fetched after resize. */
+  /** Swapchain texture view; fetched fresh per frame (the context rotates
+   * textures after every present). */
   swapchainView(): GPUTextureView;
+  /** 4× MSAA attachment matching the backing store; resolved into the swapchain. */
+  msaaView(): GPUTextureView;
   /** Schedule a redraw; the rAF loop coalesces requests until it fires. */
   requestFrame(): void;
   destroy(): void;
@@ -28,7 +31,11 @@ export function createRenderer(opts: {
   const context: GPUCanvasContext = maybeContext;
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device: root.device, format, alphaMode: "opaque" });
-  let currentTextureView: GPUTextureView | undefined;
+  root.device.addEventListener("uncapturederror", (e) => {
+    console.error("WebGPU uncaptured error", e.error?.message);
+  });
+  let msaaTexture: GPUTexture | undefined;
+  let currentMsaaView: GPUTextureView | undefined;
 
   const size = { width: 1, height: 1 };
   const ro = new ResizeObserver(() => resize());
@@ -38,6 +45,7 @@ export function createRenderer(opts: {
     format,
     size,
     swapchainView,
+    msaaView: ensureMsaa,
     requestFrame: () => {
       dirty = true;
     },
@@ -58,14 +66,28 @@ export function createRenderer(opts: {
     size.height = height;
     canvas.width = width;
     canvas.height = height;
-    currentTextureView = undefined;
+    currentMsaaView = undefined;
     dirty = true;
   }
 
-  /** Swapchain texture view for the current frame; re-fetched after resize. */
+  /** Swapchain texture view; fetched fresh each frame — the context rotates
+   * textures after every present, so a cached view goes stale. */
   function swapchainView(): GPUTextureView {
-    currentTextureView ??= context.getCurrentTexture().createView();
-    return currentTextureView;
+    return context.getCurrentTexture().createView();
+  }
+
+  /** 4× MSAA attachment matching the backing store; resolved into the swapchain. */
+  function ensureMsaa(): GPUTextureView {
+    if (currentMsaaView) return currentMsaaView;
+    msaaTexture?.destroy();
+    msaaTexture = root.device.createTexture({
+      size: [size.width, size.height, 1],
+      format,
+      sampleCount: 4,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    currentMsaaView = msaaTexture.createView();
+    return currentMsaaView;
   }
 
   function frame() {
@@ -80,6 +102,7 @@ export function createRenderer(opts: {
     destroyed = true;
     cancelAnimationFrame(raf);
     ro.disconnect();
+    msaaTexture?.destroy();
   }
 
   ro.observe(canvas);
