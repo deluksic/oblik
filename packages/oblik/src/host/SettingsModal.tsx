@@ -3,6 +3,7 @@ import IconTrash from "~icons/lucide/trash-2";
 
 import { ModalTitleBar } from "../modal/ModalTitleBar";
 import { OBLIK_VERSION } from "../version";
+import { createEvalstatsSetting } from "./evalstats";
 import { useStoredSignals } from "./StoredSignalsContext";
 
 import { btn, danger, secondary } from "../ui/button.module.css";
@@ -15,6 +16,7 @@ export type SettingsModalProps = {
 
 export function SettingsModal(props: SettingsModalProps) {
   const { resetAll } = useStoredSignals();
+  const evalstats = createEvalstatsSetting();
   const [armed, setArmed] = createSignal(false);
   const [cleared, setCleared] = createSignal(false);
 
@@ -34,6 +36,20 @@ export function SettingsModal(props: SettingsModalProps) {
           <span class={styles.rowLabel}>oblik</span>
           <code class={styles.version}>v{OBLIK_VERSION}</code>
         </div>
+      </section>
+
+      <section class={styles.section}>
+        <h3 class={[kicker, styles.sectionTitle]}>Debug</h3>
+        <label class={styles.toggleRow}>
+          <input
+            type="checkbox"
+            class={styles.toggle}
+            checked={evalstats.value()}
+            onChange={(e) => evalstats.set(e.currentTarget.checked)}
+          />
+          <span class={styles.rowLabel}>Eval stats chip</span>
+        </label>
+        <p class={styles.note}>Show eval time and cache hits on 2D paper panes.</p>
       </section>
 
       <section class={styles.section}>

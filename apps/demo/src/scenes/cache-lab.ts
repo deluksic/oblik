@@ -21,7 +21,7 @@ const petalRing = memo((n: number, r: number) => {
 export default defineScene({
   kind: "euclid2",
   title: "Cache lab",
-  hint: "Open with ?evalstats=1. Drag the free bead — built stays at ~2 while the grid, ring layout, and CSG chain replay from the cache.",
+  hint: "Turn on the eval stats chip in Settings. Drag the free bead — built stays at ~2 while the grid, ring layout, and CSG chain replay from the cache.",
   camera: { x: 7.6, y: 3.4, scale: 42 },
   build() {
     // 100 looped points: the frontier that must hit on every draft tick.

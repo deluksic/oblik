@@ -40,6 +40,17 @@
   line-height: 1.45;
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.toggle {
+  accent-color: var(--oblik-accent);
+}
+
 .resetBtn {
   align-self: flex-start;
   color: var(--oblik-text);

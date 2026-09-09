@@ -9,6 +9,7 @@ import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
 import { ResizableSidebar } from "../host/ResizableSidebar";
 import { openInEditor } from "../host/editor";
+import { createEvalstatsSetting } from "../host/evalstats";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -52,8 +53,6 @@ type WorldEval = ReturnType<typeof tryEvaluate> & { ms: number };
 // Keyed on the scene module object: identical across draft ticks, replaced by
 // HMR on every source edit — invalidation for free.
 const evalMemos = new WeakMap<object, EvalMemo>();
-
-const evalstats = new URLSearchParams(location.search).has("evalstats");
 
 function entryFocus(file: string): ScopeFocus {
   return { file, name: "build", serial: 0 };
@@ -132,6 +131,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [toolLock, setToolLock] = createSignal(false);
   const [writeError, setWriteError] = createSignal<string | undefined>(undefined);
   const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
+  const evalstats = createEvalstatsSetting();
 
   const mentions = createMemo(() => props.mentions ?? []);
   const world = createMemo((prev: WorldEval | undefined) => {
@@ -387,7 +387,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
           onPlace={onPlace}
           onCursor={setPlace}
           evalStats={
-            evalstats
+            evalstats.value()
               ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
               : undefined
           }
