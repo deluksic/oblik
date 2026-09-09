@@ -4,7 +4,7 @@ import { builtin, f32, interpolate, u32, vec2f, vec3f, vec4f } from "typegpu/dat
 import { max, min } from "typegpu/std";
 
 import type { Camera2, PaneSize } from "../../../euclid2/camera";
-import { worldLayout } from "../layout";
+import { gridLayout } from "../layout";
 
 const { ceil, floor } = Math;
 
@@ -76,7 +76,7 @@ const toClip = tgpu.fn(
   vec4f,
 )((p) => {
   "use gpu";
-  const f = worldLayout.$.frame;
+  const f = gridLayout.$.frame;
   const k = vec2f((f.scale * 2) / max(1, f.pane.x), (f.scale * 2) / max(1, f.pane.y));
   return vec4f(k * (p - f.cam), 0, 1);
 });
@@ -117,8 +117,8 @@ const gridVertex = tgpu.vertexFn({
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const span = worldLayout.$.gridSpan;
-  const f = worldLayout.$.frame;
+  const span = gridLayout.$.gridSpan;
+  const f = gridLayout.$.frame;
   const hw = f32(0.5) / f.scale;
   const n = span.counts.x;
   const vertical = instanceIndex < n;
@@ -142,8 +142,8 @@ const axisVertex = tgpu.vertexFn({
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const span = worldLayout.$.gridSpan;
-  const f = worldLayout.$.frame;
+  const span = gridLayout.$.gridSpan;
+  const f = gridLayout.$.frame;
   const hw = f32(0.5) / f.scale;
   const vertical = instanceIndex === u32(0);
   const shown = vertical ? span.axis.x !== u32(0) : span.axis.y !== u32(0);

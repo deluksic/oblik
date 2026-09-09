@@ -30,7 +30,6 @@ import { GhostMark } from "./Ghost";
 import { Grid } from "./Grid";
 import { Handle, PlaceSnap, PointMark } from "./Hud";
 import { RegionFill, RegionGhost, RegionOutline, Stroke } from "./Ink";
-import { TraceGhost } from "./TraceGhost";
 import {
   isGrabbable,
   isHot,
@@ -43,17 +42,10 @@ import {
   sameList,
   type ChromeSplit,
 } from "./marks";
-import { NumberSliders } from "./NumberSliders";
-import {
-  applyDrag,
-  editDragOf,
-  panDrag,
-  placeFromEvent,
-  sliderDrag,
-  topHit,
-  type EditDrag,
-} from "./pointer";
-import { hitSlider, sliderNodes } from "./sliderHud";
+import { applyDrag, editDragOf, panDrag, placeFromEvent, topHit, type EditDrag } from "./pointer";
+import { SliderDock } from "./SliderDock";
+import { sliderNodes } from "./sliderHud";
+import { TraceGhost } from "./TraceGhost";
 
 import styles from "./View.module.css";
 
@@ -86,9 +78,11 @@ function readPaneSize(el: Element): PaneSize | undefined {
   return { w: r.width, h: r.height };
 }
 
-function screenOf(e: PointerEvent, el: HTMLDivElement): { x: number; y: number } {
-  const rect = el.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+/** True when the pointer event landed on the HTML slider dock, which owns its
+ * own pointer/hover/drag interactions (the SVG view only routes around it). */
+function isSliderHudTarget(e: { target: EventTarget | null }): boolean {
+  const t = e.target;
+  return t instanceof Element && t.closest("[data-slider-hud]") !== null;
 }
 
 export function Euclid2View(props: Euclid2ViewProps) {
@@ -171,10 +165,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   // Small dead zones absorb pointer jitter; click-vs-drag is decided at
   // release by travel distance.
-  const startEdit = drag.start(
-    (e, session: EditDrag) => editSession(session, e),
-    { deadZoneRadius: 2 },
-  );
+  const startEdit = drag.start((e, session: EditDrag) => editSession(session, e), {
+    deadZoneRadius: 2,
+  });
 
   const startPan = drag.start(
     // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
@@ -204,11 +197,9 @@ export function Euclid2View(props: Euclid2ViewProps) {
       placeAt(e, el);
       return;
     }
-    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (slider) {
-      startEdit(e, sliderDrag(slider, e));
-      return;
-    }
+    // The HTML slider dock handles its own drags (live draft → commit on
+    // release, click picks); don't also start a pan/edit here.
+    if (isSliderHudTarget(e)) return;
     const hits = topHit(e, el, camera(), size(), props.trace);
     const hit = hits[0];
     if (hit && isGrabbable(hit)) {
@@ -236,11 +227,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
     if (props.placing || drag.phase() === "dragging") return;
     const el = paneEl();
     if (!el) return;
-    const slider = hitSlider(screenOf(e, el), sliderNodes(props.trace));
-    if (slider) {
-      props.onHoverId?.(slider.id);
-      return;
-    }
+    // The slider dock drives its own hover lift (panel highlights).
+    if (isSliderHudTarget(e)) return;
     const hit = topHit(e, el, camera(), size(), props.trace)[0];
     props.onHoverId?.(hit?.id ?? undefined);
   }
@@ -421,12 +409,22 @@ export function Euclid2View(props: Euclid2ViewProps) {
         {props.ghost && props.ghost.kind !== "region" && props.ghost.kind !== "trace" ? (
           <GhostMark ghost={props.ghost} camera={camera()} size={size()} />
         ) : undefined}
-        <NumberSliders nodes={sliders()} hotId={props.hoverId} selectedKey={props.selectedKey} />
       </svg>
+      <SliderDock
+        nodes={sliders()}
+        placing={props.placing}
+        hotId={props.hoverId}
+        selectedKey={props.selectedKey}
+        onHoverId={props.onHoverId}
+        onPick={props.onPick}
+        onDraft={props.onDraft}
+        onCommit={props.onCommit}
+        onLiveEdit={props.onLiveEdit}
+      />
       {props.evalStats ? (
         <div class={styles.evalstats}>
-          {props.evalStats.ms.toFixed(1)}ms · {props.evalStats.built} built ·{" "}
-          {props.evalStats.hits} cached
+          {props.evalStats.ms.toFixed(1)}ms · {props.evalStats.built} built · {props.evalStats.hits}{" "}
+          cached
         </div>
       ) : undefined}
     </div>

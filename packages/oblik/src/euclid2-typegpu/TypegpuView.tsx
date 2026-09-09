@@ -1,7 +1,6 @@
 import { Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
-import { isGlider } from "#geom/gliders";
 
 import {
   screenToWorld,
@@ -10,12 +9,15 @@ import {
   type Camera2,
   type PaneSize,
 } from "../euclid2/camera";
-import { hitsNear, isFiniteTrace, PICK_CLICK_PX } from "../euclid2/pick";
+import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX } from "../euclid2/pick";
 import { mutedForScope, toolChrome } from "../euclid2/tool";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
 import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
-import { createDragHandler } from "../euclid2/view/createDragHandler";
-import { applyDrag, panDrag } from "../euclid2/view/pointer";
+import { createDragHandler, type DragSession } from "../euclid2/view/createDragHandler";
+import { isGrabbable, hoverNode } from "../euclid2/view/marks";
+import { applyDrag, editDragOf, panDrag, type EditDrag } from "../euclid2/view/pointer";
+import { SliderDock } from "../euclid2/view/SliderDock";
+import { sliderNodes } from "../euclid2/view/sliderHud";
 import { resolveTheme, type ResolvedTheme } from "../host/theme";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
@@ -49,10 +51,18 @@ type GpuState = "init" | "ok" | "unavailable";
 
 const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
 
-/** Nodes the GPU pane draws today (slider HUD and point/glider discs are later
- * cuts); only drawn nodes are pickable — you cannot select what is not rendered. */
+/** Nodes the GPU pane draws (fills, ink, and point/glider marks); only drawn
+ * nodes are pickable — you cannot select what is not rendered. Slider HUD
+ * stays excluded. */
 function isDrawnNode(n: TraceNode): boolean {
-  return isFiniteTrace(n) && n.kind !== "slider" && n.kind !== "point" && !isGlider(n.value);
+  return isFiniteTrace(n) && n.kind !== "slider";
+}
+
+/** True when the pointer event landed on the HTML slider dock, which owns its
+ * own pointer/hover/drag interactions (the GPU view only routes around it). */
+function isSliderHudTarget(e: { target: EventTarget | null }): boolean {
+  const t = e.target;
+  return t instanceof Element && t.closest("[data-slider-hud]") !== null;
 }
 
 // -- CSS color parsing (string in, floats out; no canvas probes) -------------
@@ -178,6 +188,7 @@ export function TypegpuView(props: TypegpuViewProps) {
   const [patchStats, setPatchStats] = createSignal<{ written: number; total: number } | undefined>(
     undefined,
   );
+  const sliders = createMemo(() => sliderNodes(props.trace));
 
   // Resolved theme (user override merged with the OS default, driven by Solid
   // signals — see host/theme.ts). Colors re-read whenever it changes.
@@ -188,6 +199,8 @@ export function TypegpuView(props: TypegpuViewProps) {
   let gpuRenderer: GpuRenderer | undefined;
   let world: Painter | undefined;
   let adapter: Adapter | undefined;
+  /** Single drag state machine shared by pan and handle-edit sessions. */
+  const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
   createEffect(
     (): [HTMLDivElement | undefined, HTMLCanvasElement | undefined] => [paperEl(), canvasEl()],
@@ -255,6 +268,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       ToolSession | undefined,
       Scope | undefined,
       ResolvedTheme,
+      string,
     ] => [
       camera(),
       size(),
@@ -267,8 +281,9 @@ export function TypegpuView(props: TypegpuViewProps) {
       props.toolSession,
       props.scope,
       resolvedTheme(),
+      drag.phase(),
     ],
-    ([cam, sz, el, , trace, hoverId, selectedKey, placing, toolSession, scope]) => {
+    ([cam, sz, el, , trace, hoverId, selectedKey, placing, toolSession, scope, , phase]) => {
       if (!gpuRenderer || !world || !adapter || !el) return;
       // Theme-derived colors the painter bakes in (paper clear + grid/axis
       // pipelines): swap them only when the resolved theme actually moves them.
@@ -292,10 +307,15 @@ export function TypegpuView(props: TypegpuViewProps) {
           ink: readCssColor(el, "--oblik-ink"),
           accent: readCssColor(el, "--oblik-accent"),
           selectedPaint: readCssColor(el, "--oblik-selected-paint"),
+          ring: readCssColor(el, "--oblik-ring"),
+          paper: readCssColor(el, "--oblik-paper"),
         },
         strokePx: CONSTRUCTION_STROKE_PX,
         hoverId,
         selectedKey,
+        // Mirror the SVG view: while a drag is live the chrome paints lift but
+        // their halo/knockout rings are suppressed.
+        showHalos: phase !== "dragging",
         hideFills: chrome.hideFills ?? false,
         muted: (n) => chrome.muteStrokes === true || (!!scope && mutedForScope(n, scope)),
       });
@@ -304,8 +324,6 @@ export function TypegpuView(props: TypegpuViewProps) {
       gpuRenderer.requestFrame();
     },
   );
-
-  const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
   /** CPU pick at the pointer (shared `pick.ts`, no DOM), restricted to nodes the
    * pane actually draws — see `isDrawnNode`. */
@@ -340,17 +358,72 @@ export function TypegpuView(props: TypegpuViewProps) {
     { deadZoneRadius: 1 },
   );
 
+  /** Grab-cursor while the hovered node is a draggable handle. */
+  const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
+
+  // Handle editing (points, gliders, radii, parallels, offsets) — same session
+  // semantics as the SVG view: live drafts during the drag, a literal commit on
+  // release, and a sub-click release picks the node instead.
+  function editSession(session: EditDrag, down: PointerEvent): DragSession {
+    let live = false;
+    return {
+      onPointerMove(ev) {
+        const next = applyDrag(session, ev, paperEl(), camera(), size(), props.trace);
+        if (next.draft) {
+          if (!live) {
+            live = true;
+            props.onLiveEdit?.(true);
+          }
+          props.onDraft(next.draft.id, next.draft.values);
+        }
+      },
+      onDone(ev) {
+        // Drop live-edit before commit so Solid batches one eval with stacks
+        // and the final draft; the sidebar unfreezes on that same tick.
+        if (live) props.onLiveEdit?.(false);
+        if (!ev) return;
+        // The 2px dead zone only absorbs jitter; travel past it still counts
+        // toward the release-time click-vs-drag call: sub-click travel selects.
+        if (!movedPastClick(down.clientX, down.clientY, ev.clientX, ev.clientY)) {
+          props.onPick?.([session.node]);
+          return;
+        }
+        const next = applyDrag(session, ev, paperEl(), camera(), size(), props.trace);
+        if (next.draft) props.onCommit(next.draft.id, next.draft.values);
+      },
+    };
+  }
+
+  const startEdit = drag.start(
+    // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
+    (e, session: EditDrag) => editSession(session, e),
+    { deadZoneRadius: 2 },
+  );
+
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const el = paperEl();
     if (!el) return;
     if (props.placing) return; // placement tools are a later cut (the SVG view also does not pan while placing).
-    startPan(e, hitsAt(e, el));
+    // The HTML slider dock handles its own drags (live draft → commit on
+    // release, click picks); don't also start a pan here.
+    if (isSliderHudTarget(e)) return;
+    const hits = hitsAt(e, el);
+    const hit = hits[0];
+    if (hit && isGrabbable(hit)) {
+      const session = editDragOf(e, el, hit, camera(), size());
+      if (session) {
+        startEdit(e, session);
+        return;
+      }
+    }
+    startPan(e, hits);
   }
 
-  /** Hover lift: update while idle, never mid-drag; cleared on pointer leave. */
+  /** Hover lift: update while idle, never mid-drag; cleared on pointer leave.
+   * The slider dock drives its own hover lift (panel highlights). */
   function onPointerMove(e: PointerEvent) {
-    if (props.placing || drag.phase() === "dragging") return;
+    if (props.placing || drag.phase() === "dragging" || isSliderHudTarget(e)) return;
     const el = paperEl();
     if (!el) return;
     const hit = hitsAt(e, el)[0];
@@ -387,13 +460,30 @@ export function TypegpuView(props: TypegpuViewProps) {
   return (
     <div
       ref={setPaperEl}
-      class={styles.paper}
+      class={[
+        styles.paper,
+        {
+          [styles.grabbing]: drag.phase() === "dragging",
+          [styles.grab]: grabbingHover() && drag.phase() !== "dragging" && !props.placing,
+        },
+      ]}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => props.onHoverId?.(undefined)}
       onWheel={onWheel}
     >
       <canvas ref={setCanvasEl} class={styles.canvas} />
+      <SliderDock
+        nodes={sliders()}
+        placing={props.placing}
+        hotId={props.hoverId}
+        selectedKey={props.selectedKey}
+        onHoverId={props.onHoverId}
+        onPick={props.onPick}
+        onDraft={props.onDraft}
+        onCommit={props.onCommit}
+        onLiveEdit={props.onLiveEdit}
+      />
       <Show when={gpu() === "unavailable"}>
         <div class={styles.fallback}>WebGPU unavailable</div>
       </Show>

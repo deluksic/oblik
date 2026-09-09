@@ -1,18 +1,19 @@
-import { tgpu } from "typegpu";
-import type { TgpuBindGroup, TgpuRoot } from "typegpu";
-import { arrayOf, builtin, f32, interpolate, u16, vec2f, vec3f, vec4f } from "typegpu/data";
-import { max } from "typegpu/std";
-
 import {
   caps,
   endCapSlot,
   lineSegmentIndices,
   LineControlPoint,
+  lineVariableWidth,
   polylineVariableWidth,
   startCapSlot,
-} from "../../vendor/typegpu-geometry";
-import { worldLayout } from "../layout";
-import { MAX_JOIN_COUNT } from "../schemas";
+} from "@typegpu/geometry";
+import { tgpu } from "typegpu";
+import type { TgpuBindGroup, TgpuRoot } from "typegpu";
+import { arrayOf, builtin, f32, interpolate, u16, u32, vec2f, vec3f, vec4f } from "typegpu/data";
+import { max } from "typegpu/std";
+
+import { strokeLayout } from "../layout";
+import { MAX_JOIN_COUNT, RUN_GEOM_TWO_POINT } from "../schemas";
 
 /** World → clip through the Frame uniform; affine, so it commutes with the
  * library's homogeneous w-multiply trick. Matches euclid2/camera.ts worldToScreen:
@@ -24,7 +25,7 @@ const toClip = tgpu.fn(
   vec4f,
 )((p, w) => {
   "use gpu";
-  const f = worldLayout.$.frame;
+  const f = strokeLayout.$.frame;
   const k = vec2f((f.scale * 2) / max(1, f.pane.x), (f.scale * 2) / max(1, f.pane.y));
   const ndc = vec2f(k.x * (p.x - f.cam.x), k.y * (p.y - f.cam.y));
   return vec4f(ndc * w, 0, w);
@@ -39,9 +40,22 @@ const strokeVertex = tgpu.vertexFn({
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const draw = worldLayout.$.strokes[worldLayout.$.strokeOrder[instanceIndex]];
+  const draw = strokeLayout.$.strokes[strokeLayout.$.strokeOrder[instanceIndex]];
   if (draw.a.radius < 0 || draw.b.radius < 0 || draw.c.radius < 0 || draw.d.radius < 0) {
     return { outPos: vec4f(), color: vec3f(), alpha: 0 };
+  }
+  // Two-point geometry (halo/knockout chrome of a straight stroke): a plain
+  // round-capped segment between draw.b and draw.c, via lineVariableWidth.
+  // Paint instances use the mirrored-neighbour polyline encoding (draw.a/d),
+  // whose round joins produce the paint's round caps.
+  if ((draw.run.flags & RUN_GEOM_TWO_POINT) !== u32(0)) {
+    const r = lineVariableWidth(
+      LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
+      LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
+      vertexIndex,
+      MAX_JOIN_COUNT,
+    );
+    return { outPos: toClip(r.vertexPosition, r.w), color: draw.run.color, alpha: draw.run.alpha };
   }
   const result = polylineVariableWidth(
     LineControlPoint({ position: draw.a.position, radius: draw.a.radius }),
@@ -91,9 +105,12 @@ export function createStrokePipelines(
 
   const targets = { format, blend: alphaBlend };
 
+  // Round caps: two-point chrome instances end at their real endpoints, so the
+  // cap slots draw the semicircles. Paint instances never hit the cap path
+  // (their mirrored neighbours are never contained), so round is safe there too.
   const strokePipeline = root
-    .with(startCapSlot, caps.butt)
-    .with(endCapSlot, caps.butt)
+    .with(startCapSlot, caps.round)
+    .with(endCapSlot, caps.round)
     .createRenderPipeline({
       vertex: strokeVertex,
       fragment: strokeFragment,

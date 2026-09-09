@@ -26,8 +26,8 @@ const { max, min } = Math;
  * Stock, ears, and cutters are plain geometry — only `shell` and its children are the CSG field.
  */
 export function csgTreeLayout() {
-  const origin = point(0.2, 0.25, "o_ct_origin");
-  const opp = point(5.1, 3.35, "o_ct_opp");
+  const origin = point(-0.4, -1.1, "o_ct_origin");
+  const opp = point(5.22, 3.18, "o_ct_opp");
   const minX = min(origin.x, opp.x);
   const maxX = max(origin.x, opp.x);
   const minY = min(origin.y, opp.y);
@@ -42,9 +42,9 @@ export function csgTreeLayout() {
   const lhs = segment(tl, bl, "o_ct_lhs");
   const stock = region([bl, bot, br, rhs, tr, top, tl, lhs], [], "o_ct_stock");
 
-  const earW = slider(0.55, { min: 0.2, max: 1.1, step: 0.02 }, "o_ct_earW");
-  const earH = slider(0.95, { min: 0.35, max: 1.5, step: 0.02 }, "o_ct_earH");
-  const earLift = slider(0.55, { min: 0.1, max: 1.4, step: 0.02 }, "o_ct_earLift");
+  const earW = slider(0.48, { min: 0.2, max: 1.1, step: 0.02 }, "o_ct_earW");
+  const earH = slider(0.97, { min: 0.35, max: 1.5, step: 0.02 }, "o_ct_earH");
+  const earLift = slider(0.84, { min: 0.1, max: 1.4, step: 0.02 }, "o_ct_earLift");
   const earL = region(
     [
       { x: minX - earW, y: minY + earLift },
@@ -76,7 +76,7 @@ export function csgTreeLayout() {
   const frameF = union([stock, earL, earR]);
   const frame = csg2(frameF, "o_ct_frame");
 
-  const drillR = slider(0.15, { min: 0.05, max: 0.42, step: 0.01 }, "o_ct_drillR");
+  const drillR = slider(0.31, { min: 0.05, max: 0.42, step: 0.01 }, "o_ct_drillR");
   const inset = 0.55;
   const c0 = point(minX + inset, minY + inset, "o_ct_c0");
   const c1 = point(maxX - inset, minY + inset, "o_ct_c1");
@@ -87,10 +87,10 @@ export function csgTreeLayout() {
   const d2 = circle(c2, drillR, "o_ct_d2");
   const d3 = circle(c3, drillR, "o_ct_d3");
 
-  const slotX = slider(2.65, { min: 0.5, max: 4.8, step: 0.02 }, "o_ct_slotX");
-  const slotY = slider(1.8, { min: 0.4, max: 3, step: 0.02 }, "o_ct_slotY");
-  const slotL = slider(1.35, { min: 0.35, max: 3.5, step: 0.02 }, "o_ct_slotL");
-  const slotW = slider(0.38, { min: 0.14, max: 0.9, step: 0.02 }, "o_ct_slotW");
+  const slotX = slider(2.7, { min: 0.5, max: 4.8, step: 0.02 }, "o_ct_slotX");
+  const slotY = slider(0.64, { min: 0.4, max: 3, step: 0.02 }, "o_ct_slotY");
+  const slotL = slider(3.51, { min: 0.35, max: 3.5, step: 0.02 }, "o_ct_slotL");
+  const slotW = slider(0.52, { min: 0.14, max: 0.9, step: 0.02 }, "o_ct_slotW");
   const r = slotW / 2;
   const half = max(slotL, slotW) / 2 - r;
   const Lc = { x: slotX - half, y: slotY };
@@ -112,7 +112,7 @@ export function csgTreeLayout() {
 
   const midAt = point((minX + maxX) / 2, (minY + maxY) / 2, "o_ct_midAt");
   const midline = perpendicularLine(bot, midAt, "o_ct_midline");
-  const probe = point(1.15, 1.75, "o_ct_probe");
+  const probe = point(1.34, 1.49, "o_ct_probe");
   const hold = csg2(pick(shellF, probe), "o_ct_hold");
   const west = csg2(intersect([shellF, leftOf(midline)]), "o_ct_west");
   const east = csg2(intersect([shellF, rightOf(midline)]), "o_ct_east");

@@ -11,6 +11,9 @@ export const MAX_CIRCLES = 512;
 export const MAX_CIRCLE_PIECES = 128;
 export const MAX_FILL_REGIONS = 256;
 export const MAX_FILL_EDGES = 4096;
+/** Instanced disc slots (up to 4 per point node: halo ring, knockout, paper
+ * outline, paint); shared by all layered discs of a point. */
+export const MAX_POINTS = 4096;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -43,6 +46,9 @@ export type GridSpanValue = Infer<typeof GridSpan>;
 /** Bit flags on StrokeRun.flags. */
 export const RUN_MUTED = 1 << 0;
 export const RUN_DASHED = 1 << 1;
+/** Instance geometry is a plain two-point segment (lineVariableWidth on b→c),
+ * not the mirrored-neighbour polyline encoding. */
+export const RUN_GEOM_TWO_POINT = 1 << 2;
 
 export const StrokeCtrl = struct({
   position: vec2f,
@@ -70,6 +76,17 @@ export const StrokeDraw = struct({
   run: StrokeRun,
 });
 export type StrokeDrawValue = Infer<typeof StrokeDraw>;
+
+/** One layered disc of a point/glider mark: paint, paper outline, knockout,
+ * or hover/select halo. Instances draw in `pointOrder` so discs stack
+ * back-to-front like the SVG PointMark; radius <= 0 culls the disc. */
+export const PointInst = struct({
+  center: vec2f,
+  radius: f32,
+  color: vec3f,
+  alpha: f32,
+});
+export type PointInstValue = Infer<typeof PointInst>;
 
 /** Analytic stroked circle/arc: annulus band r0→r1 swept a0→a1 (a1 < a0 = CW). */
 export const CircleInst = struct({

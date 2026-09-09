@@ -4,18 +4,29 @@ import type { TraceNode } from "#eval/context";
 import type { Circle, CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { evaluateRegions } from "#geom/evaluate-regions";
-import { isGlider } from "#geom/gliders";
+import { gliderAt, isGlider, type Glider } from "#geom/gliders";
 import { infiniteLineAxis } from "#geom/ops";
 import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/region";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
+import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
-import type { CircleInstValue, FillEdgeValue, FillRegionValue, StrokeDrawValue } from "./schemas";
+import { pointMarkRadius } from "../../euclid2/view/pointMark";
+import type {
+  CircleInstValue,
+  FillEdgeValue,
+  FillRegionValue,
+  PointInstValue,
+  StrokeDrawValue,
+} from "./schemas";
 import {
   CircleInst,
   FillEdge,
   FillRegion,
+  MAX_POINTS,
+  PointInst,
+  RUN_GEOM_TWO_POINT,
   RUN_MUTED,
   StrokeCtrl,
   StrokeDraw,
@@ -24,6 +35,23 @@ import {
 import { createSlotPool } from "./slots";
 
 const TAU = Math.PI * 2;
+/** Muted (chrome.mutePoints/scope) opacity — matches the SVG `.muted` rule. */
+const MUTED_ALPHA = 0.32;
+
+/** Layered disc slots of one point/glider node, back-to-front: halo ring,
+ * selected knockout, paper outline, paint. Culled layers carry radius <= 0. */
+const POINT_DISC_COUNT = 4;
+const RING = 0;
+const KNOCKOUT = 1;
+const OUTLINE = 2;
+const PAINT = 3;
+
+/** Layered draw slots of one ink (stroke/circle) node, back-to-front: halo
+ * ring, selected knockout, paint. Culled layers carry radius <= 0. */
+const INK_DISC_COUNT = 3;
+const INK_HALO = 0;
+const INK_KNOCKOUT = 1;
+const INK_PAINT = 2;
 
 export type Rgb = readonly [number, number, number];
 
@@ -31,11 +59,14 @@ export type AdapterInput = {
   trace: readonly TraceNode[];
   cam: Camera2;
   size: PaneSize;
-  colors: { ink: Rgb; accent: Rgb; selectedPaint: Rgb };
+  colors: { ink: Rgb; accent: Rgb; selectedPaint: Rgb; ring: Rgb; paper: Rgb };
   /** Construction paint width in CSS px (half of it is the ctrl radius). */
   strokePx: number;
   hoverId: string | undefined;
   selectedKey: string | undefined;
+  /** False while dragging: omit halo rings and knockouts (the paint still
+   * lifts), mirroring the SVG view's chrome passes during a drag. */
+  showHalos: boolean;
   hideFills: boolean;
   muted: (n: TraceNode) => boolean;
 };
@@ -46,12 +77,31 @@ export type SlotPatch<T> = {
   count: number;
 };
 
+/** Draw-order bands per ink kind, mirroring the SVG chrome pass order: rest
+ * paints, hover halos, hover paints, lifted halos, lifted paints. The painter
+ * plays these bands back-to-front per kind so a hovered/selected node's chrome
+ * lands above every rest paint yet below points, and selected chrome lands
+ * above hovered chrome regardless of shape kind. */
+export type InkBands = {
+  /** Paint draws of idle nodes. */
+  rest: Uint32Array;
+  /** Halo ring + knockout draws of hovered (not selected) nodes. */
+  hoverHalo: Uint32Array;
+  /** Paint draws of hovered (not selected) nodes. */
+  hoverPaint: Uint32Array;
+  /** Halo ring + knockout draws of selected nodes. */
+  liftedHalo: Uint32Array;
+  /** Paint draws of selected nodes. */
+  liftedPaint: Uint32Array;
+};
+
 export type TickPatch = {
-  strokes: SlotPatch<StrokeDrawValue>;
-  circles: SlotPatch<CircleInstValue>;
+  strokes: { writes: { idx: number; value: StrokeDrawValue }[]; bands: InkBands };
+  circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
   fills: SlotPatch<FillRegionValue>;
   /** Edge blocks back the fill regions; no draw list of their own. */
   fillEdges: { writes: { idx: number; value: FillEdgeValue }[] };
+  points: SlotPatch<PointInstValue>;
   stats: { written: number; total: number };
 };
 
@@ -86,12 +136,14 @@ export function createAdapter(): Adapter {
   const circlePool = createSlotPool(512);
   const fillPool = createSlotPool(256);
   const edgePool = createSlotPool(4096);
+  const pointPool = createSlotPool(MAX_POINTS);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
   const lastStroke = new Map<object, Float64Array>();
   const lastCircle = new Map<object, Float64Array>();
   const lastFillRegion = new Map<object, Float64Array>();
   const lastFillEdges = new Map<object, Float64Array>();
+  const lastPoint = new Map<object, Float64Array>();
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
@@ -103,59 +155,140 @@ export function createAdapter(): Adapter {
     const ink = finite.filter(
       (n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value),
     );
-    const present = new Set<object>([...ink, ...fills]);
+    // Mirrors the SVG view's `points()` memo: point nodes and gliders, never sliders.
+    const points = finite.filter((n) => n.kind === "point" || isGlider(n.value));
+    const present = new Set<object>([...ink, ...fills, ...points]);
     strokePool.sync(present);
     circlePool.sync(present);
     fillPool.sync(present);
     edgePool.sync(present);
+    pointPool.sync(present);
 
     const white = (n: TraceNode) => isHot(n, input.hoverId, input.selectedKey);
 
-    // --- strokes + circles (ink band, rest → hover → lifted) ---
+    // --- strokes + circles (ink band). Five draw-order bands per kind mirror
+    // --- the SVG chrome passes: rest paints, hover halos, hover paints,
+    // --- lifted halos, lifted paints. The painter interleaves strokes and
+    // --- circles within each band so chrome stacks per-state, not per-shape:
+    // --- a hovered circle's paint sits under a selected edge's halo.
     const strokeWrites: { idx: number; value: StrokeDrawValue }[] = [];
-    const strokeOrder: number[] = [];
+    const strokeRest: number[] = [];
+    const strokeHoverHalo: number[] = [];
+    const strokeHoverPaint: number[] = [];
+    const strokeLiftedHalo: number[] = [];
+    const strokeLiftedPaint: number[] = [];
     const circleWrites: { idx: number; value: CircleInstValue }[] = [];
-    const circleOrder: number[] = [];
+    const circleRest: number[] = [];
+    const circleHoverHalo: number[] = [];
+    const circleHoverPaint: number[] = [];
+    const circleLiftedHalo: number[] = [];
+    const circleLiftedPaint: number[] = [];
 
     const inkBand = splitChrome(ink, (n) => isSelected(n, input.selectedKey), white);
-    for (const n of [...inkBand.rest, ...inkBand.hover, ...inkBand.lifted]) {
-      const lifted = white(n);
-      const muted = input.muted(n) && !lifted;
-      const editable = n.editable && !lifted;
-      const color = lifted ? colors.selectedPaint : editable ? colors.accent : colors.ink;
-      const alpha = muted ? 0.32 : 1;
-      const flags = muted ? RUN_MUTED : 0;
-      const v = n.value;
-      if (v.kind === "circle") {
-        const r = Math.abs(v.radius);
-        const pieces = Math.max(32, Math.min(128, Math.ceil((TAU * r * scale) / 6)));
-        const value = CircleInst({
-          center: vec2f(v.center.x, v.center.y),
-          r0: r - halfStroke,
-          r1: r + halfStroke,
-          a0: 0,
-          a1: TAU,
-          pieces,
-          color: vec3f(color[0], color[1], color[2]),
-          alpha,
-          flags,
-        });
-        const start = circlePool.alloc(n, 1);
-        if (start === undefined) continue;
-        if (diff(lastCircle, n, encodeCircle(value))) {
-          circleWrites.push({ idx: start, value });
+    // Chrome bands sit at the same CSS px widths regardless of state (the
+    // selected overlayBands pass is what points/ink chrome share upstream).
+    const outlineHalf = overlayBands(strokePx, { selected: true }).outline / 2 / scale;
+    const knockoutHalf = overlayBands(strokePx, { selected: true }).knockout / 2 / scale;
+
+    const emitStrokeLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
+      const start = strokePool.alloc(n, INK_DISC_COUNT);
+      if (start === undefined) return;
+      const hot = white(n);
+      const selected = isSelected(n, input.selectedKey);
+      const discs = strokeInkDiscs(
+        n,
+        colors,
+        halfStroke,
+        outlineHalf,
+        knockoutHalf,
+        cam,
+        size,
+        hot,
+        selected,
+        input.muted(n) && !hot,
+      );
+      if (!discs) return;
+      if (diff(lastStroke, n, encodeStrokes(discs))) {
+        for (let i = 0; i < INK_DISC_COUNT; i++) {
+          strokeWrites.push({ idx: start + i, value: discs[i]! });
         }
-        circleOrder.push(start);
-      } else {
-        const value = strokeValue(n, color, alpha, flags, cam, size, halfStroke);
-        if (!value) continue;
-        const start = strokePool.alloc(n, 1);
-        if (start === undefined) continue;
-        if (diff(lastStroke, n, encodeStroke(value))) {
-          strokeWrites.push({ idx: start, value });
-        }
-        strokeOrder.push(start);
       }
+      for (const layer of layers) {
+        if (discs[layer]!.a.radius > 0) into.push(start + layer);
+      }
+    };
+    const emitCircleLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
+      const start = circlePool.alloc(n, INK_DISC_COUNT);
+      if (start === undefined) return;
+      const hot = white(n);
+      const selected = isSelected(n, input.selectedKey);
+      const discs = circleInkDiscs(
+        n,
+        colors,
+        halfStroke,
+        outlineHalf,
+        knockoutHalf,
+        scale,
+        hot,
+        selected,
+        input.muted(n) && !hot,
+      );
+      if (diff(lastCircle, n, encodeCircles(discs))) {
+        for (let i = 0; i < INK_DISC_COUNT; i++) {
+          circleWrites.push({ idx: start + i, value: discs[i]! });
+        }
+      }
+      for (const layer of layers) {
+        if (discs[layer]!.r1 > discs[layer]!.r0) into.push(start + layer);
+      }
+    };
+    const emitInk = (n: TraceNode, layers: readonly number[], sInto: number[], cInto: number[]) =>
+      n.value.kind === "circle"
+        ? emitCircleLayers(n, layers, cInto)
+        : emitStrokeLayers(n, layers, sInto);
+    // Halos off while dragging (SVG parity): the five chrome passes collapse
+    // to paint-only rest/hover/lifted passes.
+    const passes: { nodes: TraceNode[]; layers: readonly number[]; s: number[]; c: number[] }[] =
+      input.showHalos
+        ? [
+            { nodes: inkBand.rest, layers: [INK_PAINT], s: strokeRest, c: circleRest },
+            {
+              nodes: inkBand.hover,
+              layers: [INK_HALO, INK_KNOCKOUT],
+              s: strokeHoverHalo,
+              c: circleHoverHalo,
+            },
+            {
+              nodes: inkBand.hover,
+              layers: [INK_PAINT],
+              s: strokeHoverPaint,
+              c: circleHoverPaint,
+            },
+            {
+              nodes: inkBand.lifted,
+              layers: [INK_HALO, INK_KNOCKOUT],
+              s: strokeLiftedHalo,
+              c: circleLiftedHalo,
+            },
+            {
+              nodes: inkBand.lifted,
+              layers: [INK_PAINT],
+              s: strokeLiftedPaint,
+              c: circleLiftedPaint,
+            },
+          ]
+        : [
+            { nodes: inkBand.rest, layers: [INK_PAINT], s: strokeRest, c: circleRest },
+            { nodes: inkBand.hover, layers: [INK_PAINT], s: strokeHoverPaint, c: circleHoverPaint },
+            {
+              nodes: inkBand.lifted,
+              layers: [INK_PAINT],
+              s: strokeLiftedPaint,
+              c: circleLiftedPaint,
+            },
+          ];
+    for (const pass of passes) {
+      for (const n of pass.nodes) emitInk(n, pass.layers, pass.s, pass.c);
     }
 
     // --- fills (rest → hover → lifted) ---
@@ -206,16 +339,73 @@ export function createAdapter(): Adapter {
       for (let i = 0; i < geom.edges.length; i++) fillOrder.push(regionStart + i);
     }
 
+    // --- points (SVG PointMark passes: rest dots, hover halo, hover dot,
+    // --- lifted halos, lifted dots — each node's discs stack back-to-front)
+    const pointWrites: { idx: number; value: PointInstValue }[] = [];
+    const pointOrder: number[] = [];
+    const pointBand = splitChrome(
+      points,
+      (n) => isSelected(n, input.selectedKey),
+      (n) => isHot(n, input.hoverId, input.selectedKey),
+    );
+    /** Allocate a node's 4 disc slots, write changed discs, and queue the
+     * back-to-front subset `layers` (only active discs reach the order). */
+    const emitPointLayers = (n: TraceNode, layers: readonly number[]) => {
+      const start = pointPool.alloc(n, POINT_DISC_COUNT);
+      if (start === undefined) return;
+      const discs = pointDiscsOf(
+        n,
+        input.colors,
+        scale,
+        isHot(n, input.hoverId, input.selectedKey),
+        isSelected(n, input.selectedKey),
+        input.muted(n) && !isHot(n, input.hoverId, input.selectedKey),
+      );
+      if (diff(lastPoint, n, encodePoints(discs))) {
+        for (let i = 0; i < POINT_DISC_COUNT; i++) {
+          pointWrites.push({ idx: start + i, value: discs[i]! });
+        }
+      }
+      for (const layer of layers) {
+        if (discs[layer]!.radius > 0) pointOrder.push(start + layer);
+      }
+    };
+    // Back-to-front per SVG PointMark passes: a node's halo/knockout discs are
+    // queued *before* its outline+paint so the chrome sits under the paint
+    // (a halo disc is a full disc out to R+outline — drawn after the paint it
+    // would cover the dot). While dragging, halos are skipped entirely.
+    if (input.showHalos) {
+      for (const n of pointBand.rest) emitPointLayers(n, [OUTLINE, PAINT]);
+      for (const n of pointBand.hover) emitPointLayers(n, [RING, KNOCKOUT]);
+      for (const n of pointBand.hover) emitPointLayers(n, [OUTLINE, PAINT]);
+      for (const n of pointBand.lifted) emitPointLayers(n, [RING, KNOCKOUT]);
+      for (const n of pointBand.lifted) emitPointLayers(n, [OUTLINE, PAINT]);
+    } else {
+      for (const n of pointBand.rest) emitPointLayers(n, [OUTLINE, PAINT]);
+      for (const n of pointBand.hover) emitPointLayers(n, [OUTLINE, PAINT]);
+      for (const n of pointBand.lifted) emitPointLayers(n, [OUTLINE, PAINT]);
+    }
+
     return {
       strokes: {
         writes: strokeWrites,
-        order: Uint32Array.from(strokeOrder),
-        count: strokeOrder.length,
+        bands: {
+          rest: Uint32Array.from(strokeRest),
+          hoverHalo: Uint32Array.from(strokeHoverHalo),
+          hoverPaint: Uint32Array.from(strokeHoverPaint),
+          liftedHalo: Uint32Array.from(strokeLiftedHalo),
+          liftedPaint: Uint32Array.from(strokeLiftedPaint),
+        },
       },
       circles: {
         writes: circleWrites,
-        order: Uint32Array.from(circleOrder),
-        count: circleOrder.length,
+        bands: {
+          rest: Uint32Array.from(circleRest),
+          hoverHalo: Uint32Array.from(circleHoverHalo),
+          hoverPaint: Uint32Array.from(circleHoverPaint),
+          liftedHalo: Uint32Array.from(circleLiftedHalo),
+          liftedPaint: Uint32Array.from(circleLiftedPaint),
+        },
       },
       fills: {
         writes: fillWrites,
@@ -223,10 +413,19 @@ export function createAdapter(): Adapter {
         count: fillOrder.length,
       },
       fillEdges: { writes: fillEdgeWrites },
+      points: {
+        writes: pointWrites,
+        order: Uint32Array.from(pointOrder),
+        count: pointOrder.length,
+      },
       stats: {
         written:
-          strokeWrites.length + circleWrites.length + fillWrites.length + fillEdgeWrites.length,
-        total: strokePool.used + circlePool.used + fillPool.used + edgePool.used,
+          strokeWrites.length +
+          circleWrites.length +
+          fillWrites.length +
+          fillEdgeWrites.length +
+          pointWrites.length,
+        total: strokePool.used + circlePool.used + fillPool.used + edgePool.used + pointPool.used,
       },
     };
   }
@@ -261,10 +460,12 @@ export function createAdapter(): Adapter {
     lastCircle.clear();
     lastFillRegion.clear();
     lastFillEdges.clear();
+    lastPoint.clear();
     strokePool.reset();
     circlePool.reset();
     fillPool.reset();
     edgePool.reset();
+    pointPool.reset();
   }
 
   return { tick, destroy };
@@ -278,6 +479,47 @@ function blockOffset(blocks: FillEdgeValue[][], i: number): number {
 
 // -- geometry ---------------------------------------------------------------
 
+/** Visible run of a stroke node: segment endpoints, or the pane-clipped
+ * extent of an infinite line. Undefined for degenerate/unbounded geometry. */
+function strokeEndpoints(
+  n: TraceNode,
+  cam: Camera2,
+  size: PaneSize,
+): { a: Vec2; b: Vec2 } | undefined {
+  const v = n.value;
+  if (v.kind === "segment") return { a: v.a, b: v.b };
+  if (v.kind === "line" || v.kind === "parallelLine") {
+    const axis = infiniteLineAxis(v);
+    if (!axis) return undefined;
+    return infiniteClip(axis.origin, axis.dir, cam, size);
+  }
+  return undefined;
+}
+
+/** Round-capped two-point instance (lineVariableWidth geometry): endpoints at
+ * draw.b → draw.c, radius = half width. `radius <= 0` culls the draw. */
+function twoPointStroke(
+  ends: { a: Vec2; b: Vec2 },
+  color: Rgb,
+  alpha: number,
+  radius: number,
+): StrokeDrawValue {
+  const ctrl = (p: Vec2) => StrokeCtrl({ position: vec2f(p.x, p.y), radius });
+  return StrokeDraw({
+    a: ctrl(ends.a),
+    b: ctrl(ends.a),
+    c: ctrl(ends.b),
+    d: ctrl(ends.b),
+    run: StrokeRun({
+      color: vec3f(color[0], color[1], color[2]),
+      alpha,
+      start: 0,
+      count: 0,
+      flags: RUN_GEOM_TWO_POINT,
+    }),
+  });
+}
+
 /** Stroked segment/line payload: one 4-ctrl instance, mirrored neighbors for
  * round caps (SVG `stroke-linecap: round` parity). */
 function strokeValue(
@@ -289,21 +531,9 @@ function strokeValue(
   size: PaneSize,
   radius: number,
 ): StrokeDrawValue | undefined {
-  const v = n.value;
-  let a: Vec2;
-  let b: Vec2;
-  if (v.kind === "segment") {
-    a = v.a;
-    b = v.b;
-  } else if (v.kind === "line" || v.kind === "parallelLine") {
-    const axis = infiniteLineAxis(v);
-    if (!axis) return undefined;
-    const ends = infiniteClip(axis.origin, axis.dir, cam, size);
-    a = ends.a;
-    b = ends.b;
-  } else {
-    return undefined;
-  }
+  const ends = strokeEndpoints(n, cam, size);
+  if (!ends) return undefined;
+  const { a, b } = ends;
   return StrokeDraw({
     a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radius }),
     b: StrokeCtrl({ position: vec2f(a.x, a.y), radius }),
@@ -317,6 +547,95 @@ function strokeValue(
       flags,
     }),
   });
+}
+
+/** The three layered draws of one stroke node: halo ring (hot), knockout
+ * (selected), paint. Inactive layers carry radius -1 and never reach the
+ * draw order. Undefined when the node has no drawable run. */
+function strokeInkDiscs(
+  n: TraceNode,
+  colors: AdapterInput["colors"],
+  halfStroke: number,
+  outlineHalf: number,
+  knockoutHalf: number,
+  cam: Camera2,
+  size: PaneSize,
+  hot: boolean,
+  selected: boolean,
+  muted: boolean,
+): StrokeDrawValue[] | undefined {
+  const ends = strokeEndpoints(n, cam, size);
+  if (!ends) return undefined;
+  const paint = strokeValue(
+    n,
+    hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink,
+    muted ? MUTED_ALPHA : 1,
+    muted ? RUN_MUTED : 0,
+    cam,
+    size,
+    halfStroke,
+  );
+  if (!paint) return undefined;
+  const haloAlpha = selected
+    ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
+    : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
+  return [
+    twoPointStroke(ends, colors.ring, haloAlpha, hot ? outlineHalf : -1),
+    twoPointStroke(ends, colors.paper, 1, selected ? knockoutHalf : -1),
+    paint,
+  ];
+}
+
+/** The three layered annuli of one circle node (halo ring, knockout, paint);
+ * inactive layers carry r1 <= r0 so the vertex shader culls them. */
+function circleInkDiscs(
+  n: TraceNode,
+  colors: AdapterInput["colors"],
+  halfStroke: number,
+  outlineHalf: number,
+  knockoutHalf: number,
+  scale: number,
+  hot: boolean,
+  selected: boolean,
+  muted: boolean,
+): CircleInstValue[] {
+  const v = n.value as Circle;
+  const r = Math.abs(v.radius);
+  const cx = v.center.x;
+  const cy = v.center.y;
+  const pieces = Math.max(32, Math.min(128, Math.ceil((TAU * r * scale) / 6)));
+  const disc = (r0: number, r1: number, color: Rgb, alpha: number, flags = 0): CircleInstValue =>
+    CircleInst({
+      center: vec2f(cx, cy),
+      r0,
+      r1,
+      a0: 0,
+      a1: TAU,
+      pieces,
+      color: vec3f(color[0], color[1], color[2]),
+      alpha,
+      flags,
+    });
+  const haloAlpha = selected
+    ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
+    : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
+  const paintColor = hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink;
+  return [
+    disc(hot ? Math.max(0, r - outlineHalf) : 0, hot ? r + outlineHalf : 0, colors.ring, haloAlpha),
+    disc(
+      selected ? Math.max(0, r - knockoutHalf) : 0,
+      selected ? r + knockoutHalf : 0,
+      colors.paper,
+      1,
+    ),
+    disc(
+      r - halfStroke,
+      r + halfStroke,
+      paintColor,
+      muted ? MUTED_ALPHA : 1,
+      muted ? RUN_MUTED : 0,
+    ),
+  ];
 }
 
 /** Fill islands for a node: polygon nodes build their own region; everything
@@ -446,6 +765,63 @@ function fillEdge(e: LoopEdge): FillEdgeValue {
   });
 }
 
+// -- point/glider marks (layered discs, mirrors euclid2 PointMark) ------------
+
+/** GPU-only visual tuning over the shared SVG point metrics: paint dots read
+ * ~1 CSS px large on the GPU, so each paint radius is trimmed by 1 CSS px
+ * (most visible on the wider draggable dots); the always-on paper rim under
+ * the paint (the "normal knockout", POINT_STROKE_PX) reads thin on the GPU,
+ * so it is widened by 0.5 CSS px. The selected knockout gap and halo ring
+ * keep their standard chrome widths. */
+const POINT_RADIUS_TRIM_PX = 1;
+const POINT_RIM_EXTRA_PX = 0.5;
+
+/** The four concentric discs that compose one point mark, back-to-front
+ * (halo ring / knockout first — drawn under the mark). Radii are CSS px
+ * converted to world units (1 CSS px = 1 / scale world units, matching
+ * euclid2/camera.ts worldToScreen). Inactive layers carry radius -1 so the
+ * vertex shader culls them; muted fades the mark (paint + paper outline)
+ * like the SVG `.muted` element opacity. */
+function pointDiscsOf(
+  n: TraceNode,
+  colors: AdapterInput["colors"],
+  scale: number,
+  hot: boolean,
+  selected: boolean,
+  muted: boolean,
+): PointInstValue[] {
+  const v = n.value;
+  const at: Vec2 = v.kind === "point" ? { x: v.x, y: v.y } : gliderAt(v as Glider);
+  const markR = (pointMarkRadius(n.editable) - POINT_RADIUS_TRIM_PX) / scale;
+  const px = (half: number) => half / scale;
+  const disc = (radius: number, color: Rgb, alpha: number): PointInstValue =>
+    PointInst({
+      center: vec2f(at.x, at.y),
+      radius,
+      color: vec3f(color[0], color[1], color[2]),
+      alpha,
+    });
+  const markAlpha = muted ? MUTED_ALPHA : 1;
+  const paintColor = hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink;
+  return [
+    // Halo ring: hover at 0.5, selected at 1.0 (chrome pointOutlinePx).
+    disc(
+      hot ? markR + px(DEFAULT_CHROME_METRICS.pointOutlinePx / 2) : -1,
+      colors.ring,
+      selected
+        ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
+        : DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
+    ),
+    // Selected knockout gap in paper (chrome pointKnockoutPx).
+    disc(selected ? markR + px(DEFAULT_CHROME_METRICS.pointKnockoutPx / 2) : -1, colors.paper, 1),
+    // Normal knockout: paper rim beneath the paint disc (SVG paint stroke,
+    // POINT_STROKE_PX + 0.5).
+    disc(markR + px(POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX), colors.paper, markAlpha),
+    // The paint disc itself.
+    disc(markR, paintColor, markAlpha),
+  ];
+}
+
 // -- payload encoding (canonical float diffs) --------------------------------
 
 function encodeStroke(v: StrokeDrawValue): Float64Array {
@@ -483,6 +859,28 @@ function encodeCircle(v: CircleInstValue): Float64Array {
   return f;
 }
 
+/** Whole-node payload: the three layered draws of an ink stroke node. */
+function encodeStrokes(draws: readonly StrokeDrawValue[]): Float64Array {
+  const out = new Float64Array(draws.length * 19);
+  let at = 0;
+  for (const d of draws) {
+    out.set(encodeStroke(d), at);
+    at += 19;
+  }
+  return out;
+}
+
+/** Whole-node payload: the three layered annuli of a circle node. */
+function encodeCircles(discs: readonly CircleInstValue[]): Float64Array {
+  const out = new Float64Array(discs.length * 13);
+  let at = 0;
+  for (const d of discs) {
+    out.set(encodeCircle(d), at);
+    at += 13;
+  }
+  return out;
+}
+
 function encodeFillEdges(edges: readonly FillEdgeValue[]): Float64Array {
   const f = new Float64Array(edges.length * 8);
   for (let i = 0; i < edges.length; i++) {
@@ -496,6 +894,22 @@ function encodeFillEdges(edges: readonly FillEdgeValue[]): Float64Array {
     f[j++] = e.center.y;
     f[j++] = e.radius;
     f[j] = e.span;
+  }
+  return f;
+}
+
+function encodePoints(discs: readonly PointInstValue[]): Float64Array {
+  const f = new Float64Array(discs.length * 7);
+  for (let i = 0; i < discs.length; i++) {
+    const v = discs[i]!;
+    let j = i * 7;
+    f[j++] = v.center.x;
+    f[j++] = v.center.y;
+    f[j++] = v.radius;
+    f[j++] = v.color.r;
+    f[j++] = v.color.g;
+    f[j++] = v.color.b;
+    f[j] = v.alpha;
   }
   return f;
 }

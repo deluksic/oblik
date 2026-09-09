@@ -3,26 +3,30 @@ import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { builtin, f32, interpolate, vec2f, vec3f, vec4f } from "typegpu/data";
 import { cos, max, sin } from "typegpu/std";
 
+import { circleLayout } from "../layout";
 import { MAX_CIRCLE_PIECES } from "../schemas";
-import { worldLayout } from "../layout";
 
 /** World → clip, same mapping as pipelines/strokes.ts toClip. */
-const toClip = tgpu.fn([vec2f], vec4f)((p) => {
+const toClip = tgpu.fn(
+  [vec2f],
+  vec4f,
+)((p) => {
   "use gpu";
-  const f = worldLayout.$.frame;
-  const k = vec2f(
-    f.scale * 2 / max(1, f.pane.x),
-    f.scale * 2 / max(1, f.pane.y),
-  );
+  const f = circleLayout.$.frame;
+  const k = vec2f((f.scale * 2) / max(1, f.pane.x), (f.scale * 2) / max(1, f.pane.y));
   return vec4f(k * (p - f.cam), 0, 1);
 });
 
 const circleVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
+  out: {
+    outPos: builtin.position,
+    color: interpolate("flat", vec3f),
+    alpha: interpolate("flat", f32),
+  },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const inst = worldLayout.$.circles[worldLayout.$.circleOrder[instanceIndex]];
+  const inst = circleLayout.$.circles[circleLayout.$.circleOrder[instanceIndex]];
   // Math.floor keeps the pair index integral — `vertexIndex / 2` alone compiles
   // as float division and lands outer vertices at half-piece angles, which
   // tapers the band to zero at both sweep ends.

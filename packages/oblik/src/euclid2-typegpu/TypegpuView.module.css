@@ -11,6 +11,14 @@
   user-select: none;
 }
 
+.grab {
+  cursor: grab;
+}
+
+.grabbing {
+  cursor: grabbing;
+}
+
 .canvas {
   position: absolute;
   inset: 0;

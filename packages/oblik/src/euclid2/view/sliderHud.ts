@@ -3,11 +3,28 @@ import type { TraceNode } from "#eval/context";
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
 const { max, min, round } = Math;
-const MARGIN = 12;
-const PANEL_W = 200;
-const PANEL_H = 56;
-const STACK_GAP = 8;
-const TRACK_H = 6;
+/** HTML slider dock geometry. Kept in sync with `layoutSliders` so the
+ * pure-coordinate hit tests (length tool, drag math) keep matching the DOM. */
+export const SLIDER_MARGIN = 12;
+export const SLIDER_PANEL_W = 200;
+export const SLIDER_PANEL_H = 56;
+export const SLIDER_STACK_GAP = 8;
+export const SLIDER_TRACK_H = 6;
+const MARGIN = SLIDER_MARGIN;
+const PANEL_W = SLIDER_PANEL_W;
+const PANEL_H = SLIDER_PANEL_H;
+const STACK_GAP = SLIDER_STACK_GAP;
+const TRACK_H = SLIDER_TRACK_H;
+
+/** Vertical scroll of the HTML slider dock (0 when unscrolled). The dock feeds
+ * this so screen-space hit tests track panels after the list has scrolled. */
+let dockScrollTop = 0;
+export function setSliderDockScrollTop(y: number): void {
+  dockScrollTop = y;
+}
+export function sliderDockScrollTop(): number {
+  return dockScrollTop;
+}
 
 export type SliderLayout = {
   node: TraceNode;
@@ -60,12 +77,13 @@ export function hitSlider(
   screen: { x: number; y: number },
   nodes: readonly TraceNode[],
 ): TraceNode | undefined {
+  const y = screen.y + dockScrollTop;
   const layouts = layoutSliders(nodes);
   for (let i = layouts.length - 1; i >= 0; i--) {
     const L = layouts[i];
     if (!L) continue;
-    const { x, y, w, h } = L.panel;
-    if (screen.x >= x && screen.x <= x + w && screen.y >= y && screen.y <= y + h) {
+    const { x, w, h } = L.panel;
+    if (screen.x >= x && screen.x <= x + w && y >= L.panel.y && y <= L.panel.y + h) {
       return L.node;
     }
   }

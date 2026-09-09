@@ -3,7 +3,7 @@ import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
 import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
 
-import { worldLayout } from "../layout";
+import { fillLayout } from "../layout";
 
 const TAU = 6.283185307179586;
 
@@ -27,7 +27,7 @@ const toClip = tgpu.fn(
   vec4f,
 )((p) => {
   "use gpu";
-  const fr = worldLayout.$.frame;
+  const fr = fillLayout.$.frame;
   const k = vec2f((fr.scale * 2) / max(1, fr.pane.x), (fr.scale * 2) / max(1, fr.pane.y));
   return vec4f(k * (p - fr.cam), 0, 1);
 });
@@ -41,8 +41,8 @@ const fillVertex = tgpu.vertexFn({
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
-  const slot = worldLayout.$.fillOrder[instanceIndex];
-  const region = worldLayout.$.fills[slot];
+  const slot = fillLayout.$.fillOrder[instanceIndex];
+  const region = fillLayout.$.fills[slot];
   const x = vertexIndex === 1 || vertexIndex === 3 ? region.aabbMax.x : region.aabbMin.x;
   const y = vertexIndex >= 2 ? region.aabbMax.y : region.aabbMin.y;
   return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), regionIndex: slot };
@@ -53,11 +53,11 @@ const fillFragment = tgpu.fragmentFn({
   out: vec4f,
 })(({ p, regionIndex }) => {
   "use gpu";
-  const region = worldLayout.$.fills[regionIndex];
+  const region = fillLayout.$.fills[regionIndex];
   let winding = 0;
   let dmin = 1e30;
   for (let i = u32(0); i < region.edgeCount; i += 1) {
-    const e = worldLayout.$.fillEdges[region.edgeOffset + i];
+    const e = fillLayout.$.fillEdges[region.edgeOffset + i];
     if (e.radius <= 0) {
       const ab = e.b - e.a;
       const ap = p - e.a;
