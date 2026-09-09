@@ -1,13 +1,21 @@
 import { Show, createEffect, createSignal, untrack } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
+import { isGlider } from "#geom/gliders";
 
-import { wheelZoomFactor, zoomAt, type Camera2, type PaneSize } from "../euclid2/camera";
-import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
+import {
+  screenToWorld,
+  wheelZoomFactor,
+  zoomAt,
+  type Camera2,
+  type PaneSize,
+} from "../euclid2/camera";
+import { hitsNear, isFiniteTrace, PICK_CLICK_PX } from "../euclid2/pick";
 import { mutedForScope, toolChrome } from "../euclid2/tool";
-import { applyDrag, panDrag } from "../euclid2/view/pointer";
-import { createDragHandler } from "../euclid2/view/createDragHandler";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
+import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
+import { createDragHandler } from "../euclid2/view/createDragHandler";
+import { applyDrag, panDrag } from "../euclid2/view/pointer";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
 import { clearToPaper, createRenderer, type GpuRenderer, type Rgba } from "./gpu/renderer";
@@ -39,6 +47,12 @@ export type TypegpuViewProps = {
 type GpuState = "init" | "ok" | "unavailable";
 
 const DEFAULT_CAMERA: Camera2 = { x: 0, y: 0, scale: 48 };
+
+/** Nodes the GPU pane draws today (slider HUD and point/glider discs are later
+ * cuts); only drawn nodes are pickable — you cannot select what is not rendered. */
+function isDrawnNode(n: TraceNode): boolean {
+  return isFiniteTrace(n) && n.kind !== "slider" && n.kind !== "point" && !isGlider(n.value);
+}
 
 // -- CSS color parsing (string in, floats out; no canvas probes) -------------
 
@@ -186,7 +200,8 @@ export function TypegpuView(props: TypegpuViewProps) {
           gpuRenderer = createRenderer({
             root,
             canvas,
-            draw: (r, resolveOverride) => (world ? world.draw(r, resolveOverride) : clearToPaper(r, paper)),
+            draw: (r, resolveOverride) =>
+              world ? world.draw(r, resolveOverride) : clearToPaper(r, paper),
           });
           (window as { __gpuCapture?: GpuRenderer["capture"] }).__gpuCapture = gpuRenderer.capture;
           world = createPainter({ root, format: gpuRenderer.format, paper, gridColors });
@@ -262,18 +277,36 @@ export function TypegpuView(props: TypegpuViewProps) {
     },
   );
 
-  const drag = createDragHandler({ deadZoneRadius: 1, preventDefault: false });
+  const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
+  /** CPU pick at the pointer (shared `pick.ts`, no DOM), restricted to nodes the
+   * pane actually draws — see `isDrawnNode`. */
+  function hitsAt(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
+    const cam = camera();
+    const rect = el.getBoundingClientRect();
+    const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return hitsNear(props.trace, screenToWorld(screen, cam, size()), cam, size()).filter(
+      isDrawnNode,
+    );
+  }
+
+  // Mirrors the SVG view's pan gesture: a drag pans; releasing without having
+  // panned is a click that picks the hits under the pointer ([] deselects).
   const startPan = drag.start(
     // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
-    (e) => {
+    (e, hits: TraceNode[]) => {
       const initialStart = panDrag(e, camera());
+      const pick = hits.length > 0 ? hits : undefined;
+      let moved = false;
       return {
         onPointerMove(ev) {
+          moved = true;
           const next = applyDrag(initialStart, ev, paperEl(), camera(), size(), props.trace);
           if (next.camera) setCamera(next.camera);
         },
-        onDone() {},
+        onDone() {
+          if (!moved) props.onPick?.(pick ?? []);
+        },
       };
     },
     { deadZoneRadius: 1 },
@@ -281,8 +314,19 @@ export function TypegpuView(props: TypegpuViewProps) {
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    if (!paperEl()) return;
-    startPan(e);
+    const el = paperEl();
+    if (!el) return;
+    if (props.placing) return; // placement tools are a later cut (the SVG view also does not pan while placing).
+    startPan(e, hitsAt(e, el));
+  }
+
+  /** Hover lift: update while idle, never mid-drag; cleared on pointer leave. */
+  function onPointerMove(e: PointerEvent) {
+    if (props.placing || drag.phase() === "dragging") return;
+    const el = paperEl();
+    if (!el) return;
+    const hit = hitsAt(e, el)[0];
+    props.onHoverId?.(hit?.id);
   }
 
   function onWheel(e: WheelEvent) {
@@ -313,15 +357,22 @@ export function TypegpuView(props: TypegpuViewProps) {
   );
 
   return (
-    <div ref={setPaperEl} class={styles.paper} onPointerDown={onPointerDown} onWheel={onWheel}>
+    <div
+      ref={setPaperEl}
+      class={styles.paper}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerLeave={() => props.onHoverId?.(undefined)}
+      onWheel={onWheel}
+    >
       <canvas ref={setCanvasEl} class={styles.canvas} />
       <Show when={gpu() === "unavailable"}>
         <div class={styles.fallback}>WebGPU unavailable</div>
       </Show>
       {props.evalStats ? (
         <div class={styles.evalstats}>
-          {props.evalStats.ms.toFixed(1)}ms · {props.evalStats.built} built ·{" "}
-          {props.evalStats.hits} cached
+          {props.evalStats.ms.toFixed(1)}ms · {props.evalStats.built} built · {props.evalStats.hits}{" "}
+          cached
           {patchStats() ? ` · ${patchStats()!.written}/${patchStats()!.total} gpu` : ""}
         </div>
       ) : undefined}
