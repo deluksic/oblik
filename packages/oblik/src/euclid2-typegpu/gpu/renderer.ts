@@ -16,14 +16,19 @@ export type GpuRenderer = {
   msaaView(): GPUTextureView;
   /** Schedule a redraw; the rAF loop coalesces requests until it fires. */
   requestFrame(): void;
+  /** Render one frame into an offscreen texture and read it back as RGBA8 rows
+   * (no row padding). Works even where canvas-to-screenshot compositing fails
+   * (headless SwiftShader). */
+  capture(): Promise<{ width: number; height: number; bytes: Uint8Array }>;
   destroy(): void;
 };
 
 export function createRenderer(opts: {
   root: TgpuRoot;
   canvas: HTMLCanvasElement;
-  /** Called on every rendered frame; may call requestFrame() to keep animating. */
-  draw: (renderer: GpuRenderer) => void;
+  /** Called on every rendered frame; may call requestFrame() to keep animating.
+   * `resolveOverride` redirects the MSAA resolve away from the swapchain (capture). */
+  draw: (renderer: GpuRenderer, resolveOverride?: GPUTextureView) => void;
 }): GpuRenderer {
   const { root, canvas } = opts;
   const maybeContext = canvas.getContext("webgpu");
@@ -49,6 +54,7 @@ export function createRenderer(opts: {
     requestFrame: () => {
       dirty = true;
     },
+    capture,
     destroy,
   };
 
@@ -76,10 +82,11 @@ export function createRenderer(opts: {
     return context.getCurrentTexture().createView();
   }
 
-  /** 4× MSAA attachment matching the backing store; resolved into the swapchain. */
+  /** 4× MSAA attachment matching the backing store; resolved into the swapchain.
+   * Superseded textures are left to GC — destroying them here trips
+   * "destroyed texture used in a submit" while earlier frames are still pending. */
   function ensureMsaa(): GPUTextureView {
     if (currentMsaaView) return currentMsaaView;
-    msaaTexture?.destroy();
     msaaTexture = root.device.createTexture({
       size: [size.width, size.height, 1],
       format,
@@ -95,6 +102,35 @@ export function createRenderer(opts: {
     if (!dirty) return;
     dirty = false;
     opts.draw(renderer);
+  }
+
+  async function capture(): Promise<{ width: number; height: number; bytes: Uint8Array }> {
+    const { width, height } = size;
+    const resolve = root.device.createTexture({
+      size: [width, height, 1],
+      format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+    dirty = false;
+    opts.draw(renderer, resolve.createView());
+    const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
+    const staging = root.device.createBuffer({
+      size: bytesPerRow * height,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+    const encoder = root.device.createCommandEncoder();
+    encoder.copyTextureToBuffer({ texture: resolve }, { buffer: staging, bytesPerRow }, [width, height, 1]);
+    root.device.queue.submit([encoder.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const mapped = new Uint8Array(staging.getMappedRange());
+    const bytes = new Uint8Array(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      bytes.set(mapped.subarray(y * bytesPerRow, y * bytesPerRow + width * 4), y * width * 4);
+    }
+    staging.unmap();
+    staging.destroy();
+    resolve.destroy();
+    return { width, height, bytes };
   }
 
   function destroy() {

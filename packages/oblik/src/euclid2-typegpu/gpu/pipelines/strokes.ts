@@ -19,12 +19,16 @@ export const worldLayout = tgpu.bindGroupLayout({
 });
 
 /** World (y-up) → clip (y-down) through the Frame uniform; affine, so it commutes
- * with the library's homogeneous w-multiply trick. */
+ * with the library's homogeneous w-multiply trick. NDC normalizes x and y by
+ * different half-extents, so the px-per-world scale k is per-axis. */
 const toClip = tgpu.fn([vec2f, f32], vec4f)((p, w) => {
   "use gpu";
   const f = worldLayout.$.frame;
-  const k = f.scale * 2 / max(1, f.pane.y);
-  const ndc = vec2f(k * (p.x - f.cam.x), -(k * (p.y - f.cam.y)));
+  const k = vec2f(
+    f.scale * 2 / max(1, f.pane.x),
+    f.scale * 2 / max(1, f.pane.y),
+  );
+  const ndc = vec2f(k.x * (p.x - f.cam.x), -(k.y * (p.y - f.cam.y)));
   return vec4f(ndc * w, 0, w);
 });
 

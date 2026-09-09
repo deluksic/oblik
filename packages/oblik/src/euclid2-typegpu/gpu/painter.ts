@@ -13,12 +13,16 @@ export type Painter = {
   sync(cam: Camera2, size: PaneSize, dpr: number): void;
   /** Replace the world stroke instances (adapter output). */
   setStrokes(draws: readonly StrokeDrawValue[]): void;
-  /** Record the clear + grid + stroke passes and submit. */
-  draw(renderer: {
-    root: TgpuRoot;
-    msaaView(): GPUTextureView;
-    swapchainView(): GPUTextureView;
-  }): void;
+  /** Record the clear + grid + stroke passes and submit. `resolveOverride`
+   * redirects the MSAA resolve away from the swapchain (offscreen capture). */
+  draw(
+    renderer: {
+      root: TgpuRoot;
+      msaaView(): GPUTextureView;
+      swapchainView(): GPUTextureView;
+    },
+    resolveOverride?: GPUTextureView,
+  ): void;
   destroy(): void;
 };
 
@@ -57,13 +61,13 @@ export function createPainter(opts: {
       strokeBuffer.writePartial(draws.map((value, idx) => ({ idx, value })));
       strokeCount = draws.length;
     },
-    draw(renderer) {
+    draw(renderer, resolveOverride) {
       const encoder = renderer.root.device.createCommandEncoder();
       const pass = encoder.beginRenderPass({
         colorAttachments: [
           {
             view: renderer.msaaView(),
-            resolveTarget: renderer.swapchainView(),
+            resolveTarget: resolveOverride ?? renderer.swapchainView(),
             clearValue: opts.paper,
             loadOp: "clear",
             storeOp: "store",

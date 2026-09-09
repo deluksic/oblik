@@ -101,8 +101,9 @@ export function TypegpuView(props: TypegpuViewProps) {
           gpuRenderer = createRenderer({
             root,
             canvas,
-            draw: (r) => (world ? world.draw(r) : clearToPaper(r, paper)),
+            draw: (r, resolveOverride) => (world ? world.draw(r, resolveOverride) : clearToPaper(r, paper)),
           });
+          (window as { __gpuCapture?: GpuRenderer["capture"] }).__gpuCapture = gpuRenderer.capture;
           world = createPainter({ root, format: gpuRenderer.format, paper, gridColors });
           setGpu("ok");
           setReady(ready() + 1);
@@ -114,6 +115,7 @@ export function TypegpuView(props: TypegpuViewProps) {
         });
       return () => {
         disposed = true;
+        delete (window as { __gpuCapture?: GpuRenderer["capture"] }).__gpuCapture;
         gpuRenderer?.destroy();
         gpuRenderer = undefined;
         world?.destroy();
