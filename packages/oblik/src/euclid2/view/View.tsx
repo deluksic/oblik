@@ -12,7 +12,7 @@ import {
   type Camera2,
   type PaneSize,
 } from "../camera";
-import { isFiniteTrace, PICK_CLICK_PX, traceKey } from "../pick";
+import { isFiniteTrace, movedPastClick, PICK_CLICK_PX, traceKey } from "../pick";
 import {
   hoverTool,
   mutedForScope,
@@ -72,7 +72,7 @@ export type Euclid2ViewProps = {
   onPick?: (hits: TraceNode[]) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
-  /** True while an edit drag is past the dead zone; false on release/cancel. */
+  /** True while an edit drag has produced a draft; false on release/cancel. */
   onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | undefined) => void;
@@ -139,12 +139,10 @@ export function Euclid2View(props: Euclid2ViewProps) {
 
   const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
-  function editSession(session: EditDrag): DragSession {
-    let moved = false;
+  function editSession(session: EditDrag, down: PointerEvent): DragSession {
     let live = false;
     return {
       onPointerMove(ev) {
-        moved = true;
         const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
         if (next.draft) {
           if (!live) {
@@ -158,18 +156,24 @@ export function Euclid2View(props: Euclid2ViewProps) {
         // Drop live-edit before commit so Solid batches one eval with stacks
         // and the final draft; the sidebar unfreezes on that same tick.
         if (live) props.onLiveEdit?.(false);
-        if (!moved) {
+        if (!ev) return;
+        // Edit drags track from the first pixel (no dead zone), so the
+        // click-vs-drag call is made at release: sub-click travel selects.
+        if (!movedPastClick(down.clientX, down.clientY, ev.clientX, ev.clientY)) {
           props.onPick?.([session.node]);
           return;
         }
-        if (!ev) return;
         const next = applyDrag(session, ev, paneEl(), camera(), size(), props.trace);
         if (next.draft) props.onCommit(next.draft.id, next.draft.values);
       },
     };
   }
 
-  const startEdit = drag.start((_e, session: EditDrag) => editSession(session));
+  // Edit drags track from the first pixel; pan keeps the click dead zone.
+  const startEdit = drag.start(
+    (e, session: EditDrag) => editSession(session, e),
+    { deadZoneRadius: 0 },
+  );
 
   // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
   const startPan = drag.start((e, hits: TraceNode[]) => {
