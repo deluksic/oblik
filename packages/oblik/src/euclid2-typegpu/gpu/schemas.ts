@@ -1,11 +1,10 @@
-import { f32, struct, u32, vec2f, vec3f } from "typegpu/data";
+import { f32, struct, u32, vec2f, vec2u, vec3f } from "typegpu/data";
 import type { Infer } from "typegpu/data";
 
 /** Vertex layout of the vendored polyline expander (2 core + 4 per join triangle). */
 export const MAX_JOIN_COUNT = 6;
 export const STROKE_INDICES_PER_SEGMENT = 12 + 12 * MAX_JOIN_COUNT;
 
-export const MAX_GRID_DRAWS = 2048;
 export const MAX_STROKE_DRAWS = 4096;
 export const MAX_CIRCLES = 512;
 /** Fan pieces per circle/arc instance; verts = 2·(pieces+1) ≤ 258. */
@@ -25,6 +24,21 @@ export const Frame = struct({
   outlinePx: f32,
 });
 export type FrameValue = Infer<typeof Frame>;
+
+/** One uniform written per view sync: the grid's integer windows. The vertex
+ * shader derives every hairline position from these — the CPU only counts. */
+export const GridSpan = struct({
+  /** First retained line coordinate per direction (window start after trimming). */
+  first: vec2f,
+  /** Full window rectangle; every hairline spans lo..hi along its long axis. */
+  lo: vec2f,
+  hi: vec2f,
+  /** Retained line counts: x vertical lines (world x = first.x + i), y horizontal. */
+  counts: vec2u,
+  /** Axis visibility: x = world x=0 vertical axis in window, y = world y=0 horizontal. */
+  axis: vec2u,
+});
+export type GridSpanValue = Infer<typeof GridSpan>;
 
 /** Bit flags on StrokeRun.flags. */
 export const RUN_MUTED = 1 << 0;

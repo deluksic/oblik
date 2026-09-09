@@ -11,48 +11,32 @@ import {
   polylineVariableWidth,
   startCapSlot,
 } from "../../vendor/typegpu-geometry";
-import { MAX_JOIN_COUNT } from "../schemas";
 import { worldLayout } from "../layout";
+import { MAX_JOIN_COUNT } from "../schemas";
 
 /** World → clip through the Frame uniform; affine, so it commutes with the
  * library's homogeneous w-multiply trick. Matches euclid2/camera.ts worldToScreen:
  * device = pane/2 - (world - cam) * scale (y-up world). NDC normalizes x and y by
  * different half-extents, so the px-per-world scale k is per-axis. WebGPU's NDC
  * y axis points down (framebuffer bottom), so no extra negation here. */
-const toClip = tgpu.fn([vec2f, f32], vec4f)((p, w) => {
+const toClip = tgpu.fn(
+  [vec2f, f32],
+  vec4f,
+)((p, w) => {
   "use gpu";
   const f = worldLayout.$.frame;
-  const k = vec2f(
-    f.scale * 2 / max(1, f.pane.x),
-    f.scale * 2 / max(1, f.pane.y),
-  );
+  const k = vec2f((f.scale * 2) / max(1, f.pane.x), (f.scale * 2) / max(1, f.pane.y));
   const ndc = vec2f(k.x * (p.x - f.cam.x), k.y * (p.y - f.cam.y));
   return vec4f(ndc * w, 0, w);
 });
 
-const gridVertex = tgpu.vertexFn({
-  in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
-})(({ instanceIndex, vertexIndex }) => {
-  "use gpu";
-  const draw = worldLayout.$.grid[instanceIndex];
-  if (draw.a.radius < 0 || draw.b.radius < 0 || draw.c.radius < 0 || draw.d.radius < 0) {
-    return { outPos: vec4f(), color: vec3f(), alpha: 0 };
-  }
-  const result = polylineVariableWidth(
-    LineControlPoint({ position: draw.a.position, radius: draw.a.radius }),
-    LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
-    LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
-    LineControlPoint({ position: draw.d.position, radius: draw.d.radius }),
-    vertexIndex,
-    MAX_JOIN_COUNT,
-  );
-  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color, alpha: 1 };
-});
-
 const strokeVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
+  out: {
+    outPos: builtin.position,
+    color: interpolate("flat", vec3f),
+    alpha: interpolate("flat", f32),
+  },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const draw = worldLayout.$.strokes[worldLayout.$.strokeOrder[instanceIndex]];
@@ -67,7 +51,11 @@ const strokeVertex = tgpu.vertexFn({
     vertexIndex,
     MAX_JOIN_COUNT,
   );
-  return { outPos: toClip(result.vertexPosition, result.w), color: draw.run.color, alpha: draw.run.alpha };
+  return {
+    outPos: toClip(result.vertexPosition, result.w),
+    color: draw.run.color,
+    alpha: draw.run.alpha,
+  };
 });
 
 const strokeFragment = tgpu.fragmentFn({
@@ -84,10 +72,10 @@ const alphaBlend: GPUBlendState = {
 };
 
 export type StrokePipelines = {
-  /** Hairline grid pass: instances indexed into the `grid` storage array. */
-  grid: (pass: GPURenderPassEncoder) => { drawIndexed(indexCount: number, instanceCount: number): void };
   /** World stroke pass: instances index `strokeOrder` into the `strokes` array. */
-  strokes: (pass: GPURenderPassEncoder) => { drawIndexed(indexCount: number, instanceCount: number): void };
+  strokes: (pass: GPURenderPassEncoder) => {
+    drawIndexed(indexCount: number, instanceCount: number): void;
+  };
   readonly indexCount: number;
   destroy(): void;
 };
@@ -103,18 +91,6 @@ export function createStrokePipelines(
 
   const targets = { format, blend: alphaBlend };
 
-  const gridPipeline = root
-    .with(startCapSlot, caps.butt)
-    .with(endCapSlot, caps.butt)
-    .createRenderPipeline({
-      vertex: gridVertex,
-      fragment: strokeFragment,
-      targets,
-      multisample: { count: 4 },
-    })
-    .with(bindGroup)
-    .withIndexBuffer(indexBuffer);
-
   const strokePipeline = root
     .with(startCapSlot, caps.butt)
     .with(endCapSlot, caps.butt)
@@ -128,7 +104,6 @@ export function createStrokePipelines(
     .withIndexBuffer(indexBuffer);
 
   return {
-    grid: (pass) => gridPipeline.with(pass),
     strokes: (pass) => strokePipeline.with(pass),
     indexCount,
     destroy: () => indexBuffer.destroy(),

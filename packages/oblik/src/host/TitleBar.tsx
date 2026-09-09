@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
 import IconChevronDown from "~icons/lucide/chevron-down";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconMoon from "~icons/lucide/moon";
@@ -11,7 +11,7 @@ import { OBLIK_VERSION } from "../version";
 import { hasSceneError, navItems } from "./routing";
 import { SceneKindIcon } from "./SceneKindIcon";
 import { SettingsModal } from "./SettingsModal";
-import { createStoredSignal } from "./StoredSignalsContext";
+import { resolveTheme, themePreference } from "./theme";
 
 import { icon } from "../ui/button.module.css";
 import { panel } from "../ui/surface.module.css";
@@ -29,29 +29,19 @@ export function TitleBar(props: TitleBarProps) {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const requestModal = useRequestModal();
 
-  // Theme preference: "system" follows the OS; an explicit light/dark pins it
-  // until settings' reset restores "system". Applied synchronously at setup so
-  // the first paint already has the right colors.
-  const theme = createStoredSignal<"light" | "dark" | "system">("oblik.theme", {
-    defaultValue: "system",
-  });
-  const prefersLight = window.matchMedia("(prefers-color-scheme: light)");
+  // Theme preference: the shared registry signal ("system" default) merged with
+  // the OS default by resolveTheme (host/theme.ts owns the only listener — the
+  // system matchMedia change). This component only mirrors the result onto the
+  // `<html data-theme>` attribute that the CSS switch reads.
+  const theme = themePreference();
+  const resolvedTheme = createMemo(resolveTheme);
 
-  const resolvedTheme = () =>
-    theme.value() === "system" ? (prefersLight.matches ? "light" : "dark") : theme.value();
-
-  const applyTheme = () => {
-    document.documentElement.dataset.theme = resolvedTheme();
-  };
-  // First paint gets the right colors synchronously; the effect keeps it in
-  // sync after that, and the matchMedia listener covers system changes.
+  // First paint gets the right colors synchronously; the effect keeps the
+  // attribute in sync on preference or system changes.
   document.documentElement.dataset.theme = untrack(resolvedTheme);
   createEffect(resolvedTheme, (t) => {
     document.documentElement.dataset.theme = t;
   });
-  const onSystemThemeChange = () => untrack(applyTheme);
-  prefersLight.addEventListener("change", onSystemThemeChange);
-  onCleanup(() => prefersLight.removeEventListener("change", onSystemThemeChange));
 
   function toggleTheme() {
     theme.set(resolvedTheme() === "light" ? "dark" : "light");

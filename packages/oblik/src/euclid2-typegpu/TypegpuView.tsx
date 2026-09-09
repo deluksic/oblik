@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal, untrack } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
 import { isGlider } from "#geom/gliders";
@@ -16,6 +16,7 @@ import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
 import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
 import { createDragHandler } from "../euclid2/view/createDragHandler";
 import { applyDrag, panDrag } from "../euclid2/view/pointer";
+import { resolveTheme, type ResolvedTheme } from "../host/theme";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
 import { clearToPaper, createRenderer, type GpuRenderer, type Rgba } from "./gpu/renderer";
@@ -158,6 +159,12 @@ function readCssColor(el: HTMLElement, prop: string): Rgb {
   return [r, g, b];
 }
 
+/** Stable key for the colors the painter bakes in (paper clear + grid/axis
+ * pipelines); only a changed key rebuilds them. */
+function themeKey(paper: Rgba, grid: { grid: Rgb; axis: Rgb }): string {
+  return [paper.r, paper.g, paper.b, paper.a, ...grid.grid, ...grid.axis].join(",");
+}
+
 export function TypegpuView(props: TypegpuViewProps) {
   const [paperEl, setPaperEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const [canvasEl, setCanvasEl] = createSignal<HTMLCanvasElement | undefined>(undefined);
@@ -171,6 +178,12 @@ export function TypegpuView(props: TypegpuViewProps) {
   const [patchStats, setPatchStats] = createSignal<{ written: number; total: number } | undefined>(
     undefined,
   );
+
+  // Resolved theme (user override merged with the OS default, driven by Solid
+  // signals — see host/theme.ts). Colors re-read whenever it changes.
+  const resolvedTheme = createMemo(resolveTheme);
+  /** Theme colors last applied to the painter (init snapshot or setTheme). */
+  let lastThemeKey = "";
 
   let gpuRenderer: GpuRenderer | undefined;
   let world: Painter | undefined;
@@ -205,6 +218,7 @@ export function TypegpuView(props: TypegpuViewProps) {
           });
           (window as { __gpuCapture?: GpuRenderer["capture"] }).__gpuCapture = gpuRenderer.capture;
           world = createPainter({ root, format: gpuRenderer.format, paper, gridColors });
+          lastThemeKey = themeKey(paper, gridColors);
           adapter = createAdapter();
           setGpu("ok");
           setReady(ready() + 1);
@@ -240,6 +254,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       boolean,
       ToolSession | undefined,
       Scope | undefined,
+      ResolvedTheme,
     ] => [
       camera(),
       size(),
@@ -251,9 +266,22 @@ export function TypegpuView(props: TypegpuViewProps) {
       props.placing ?? false,
       props.toolSession,
       props.scope,
+      resolvedTheme(),
     ],
     ([cam, sz, el, , trace, hoverId, selectedKey, placing, toolSession, scope]) => {
       if (!gpuRenderer || !world || !adapter || !el) return;
+      // Theme-derived colors the painter bakes in (paper clear + grid/axis
+      // pipelines): swap them only when the resolved theme actually moves them.
+      const paper = readPaperColor(el);
+      const gridColors = {
+        grid: readCssColor(el, "--oblik-grid"),
+        axis: readCssColor(el, "--oblik-axis"),
+      };
+      const key = themeKey(paper, gridColors);
+      if (key !== lastThemeKey) {
+        lastThemeKey = key;
+        world.setTheme(paper, gridColors);
+      }
       world.sync(cam, sz, window.devicePixelRatio || 1);
       const chrome = toolChrome(placing ? toolSession : undefined);
       const patch = adapter.tick({
