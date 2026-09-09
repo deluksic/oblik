@@ -157,8 +157,8 @@ export function Euclid2View(props: Euclid2ViewProps) {
         // and the final draft; the sidebar unfreezes on that same tick.
         if (live) props.onLiveEdit?.(false);
         if (!ev) return;
-        // Edit drags track from the first pixel (no dead zone), so the
-        // click-vs-drag call is made at release: sub-click travel selects.
+        // The 2px dead zone only absorbs jitter; travel past it still counts
+        // toward the release-time click-vs-drag call: sub-click travel selects.
         if (!movedPastClick(down.clientX, down.clientY, ev.clientX, ev.clientY)) {
           props.onPick?.([session.node]);
           return;
@@ -169,28 +169,32 @@ export function Euclid2View(props: Euclid2ViewProps) {
     };
   }
 
-  // Edit drags track from the first pixel; pan keeps the click dead zone.
+  // Small dead zones absorb pointer jitter; click-vs-drag is decided at
+  // release by travel distance.
   const startEdit = drag.start(
     (e, session: EditDrag) => editSession(session, e),
-    { deadZoneRadius: 0 },
+    { deadZoneRadius: 2 },
   );
 
-  // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
-  const startPan = drag.start((e, hits: TraceNode[]) => {
-    const initialStart = panDrag(e, camera());
-    const pick = hits.length > 0 ? hits : undefined;
-    let moved = false;
-    return {
-      onPointerMove(ev) {
-        moved = true;
-        const next = applyDrag(initialStart, ev, paneEl(), camera(), size(), props.trace);
-        if (next.camera) setCamera(next.camera);
-      },
-      onDone() {
-        if (!moved) props.onPick?.(pick ?? []);
-      },
-    };
-  });
+  const startPan = drag.start(
+    // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
+    (e, hits: TraceNode[]) => {
+      const initialStart = panDrag(e, camera());
+      const pick = hits.length > 0 ? hits : undefined;
+      let moved = false;
+      return {
+        onPointerMove(ev) {
+          moved = true;
+          const next = applyDrag(initialStart, ev, paneEl(), camera(), size(), props.trace);
+          if (next.camera) setCamera(next.camera);
+        },
+        onDone() {
+          if (!moved) props.onPick?.(pick ?? []);
+        },
+      };
+    },
+    { deadZoneRadius: 1 },
+  );
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
