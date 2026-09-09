@@ -116,6 +116,37 @@ export function sweepMemo(m: EvalMemo, counts: Map<string, number>): void {
   }
 }
 
+/**
+ * Stale entries are never wrong — a hit still requires a fresh fingerprint
+ * compare at the same key — so the sweep only reclaims memory and can wait
+ * for idle time. Pending sweeps coalesce: consecutive evals merge their occ
+ * tallies (max per id) and one idle pass prunes against the union.
+ */
+const pendingSweeps = new WeakMap<EvalMemo, { counts: Map<string, number> }>();
+
+export function scheduleSweep(m: EvalMemo, counts: Map<string, number>): void {
+  const pending = pendingSweeps.get(m);
+  if (pending) {
+    for (const [id, n] of counts) {
+      const prev = pending.counts.get(id);
+      if (prev === undefined || n > prev) pending.counts.set(id, n);
+    }
+    return;
+  }
+  const next = { counts: new Map(counts) };
+  pendingSweeps.set(m, next);
+  const run = () => {
+    pendingSweeps.delete(m);
+    sweepMemo(m, next.counts);
+  };
+  // Browser: defer to idle. Node/tests: sweep inline so results are synchronous.
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(() => run(), { timeout: 1000 });
+  } else {
+    run();
+  }
+}
+
 // ---- user memo(fn) -----------------------------------------------------------
 
 type UserMemoEntry = { args: unknown[]; result: unknown };

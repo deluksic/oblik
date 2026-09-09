@@ -1,6 +1,6 @@
 import type { Annotation } from "../source/analyze";
 import { currentEval, nodeOf, withEval, type EvalCtx, type TraceNode } from "./context";
-import { sweepMemo, type EvalMemo } from "./memo";
+import { scheduleSweep, type EvalMemo } from "./memo";
 import type { Scene } from "./scene";
 
 export type Draft = Map<string, number[]>;
@@ -44,7 +44,7 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): EvaluateResult {
     stats: { built: 0, hits: 0 },
   };
   const value = withEval(ctx, () => mod.build());
-  if (ctx.memo) sweepMemo(ctx.memo, ctx.occ);
+  if (ctx.memo) scheduleSweep(ctx.memo, ctx.occ);
   return { value, trace: ctx.trace, stats: ctx.stats };
 }
 
