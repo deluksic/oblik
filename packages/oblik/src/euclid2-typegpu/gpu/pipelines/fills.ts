@@ -10,7 +10,10 @@ const TAU = 6.283185307179586;
 /** Angular inside-test for an arc edge: is `q` within `absSpan` of the start
  * angle `a0`, sweeping in direction `k`? TGSL has no closures, so this is a
  * module-level fn rather than an inline arrow. */
-const withinArc = tgpu.fn([f32, f32, f32, f32, bool], bool)((q, k, a0, absSpan, full) => {
+const withinArc = tgpu.fn(
+  [f32, f32, f32, f32, bool],
+  bool,
+)((q, k, a0, absSpan, full) => {
   "use gpu";
   if (full) return true;
   let t = k > 0 ? q - a0 : a0 - q;
@@ -19,19 +22,23 @@ const withinArc = tgpu.fn([f32, f32, f32, f32, bool], bool)((q, k, a0, absSpan, 
 });
 
 /** World → clip, same mapping as pipelines/strokes.ts toClip. */
-const toClip = tgpu.fn([vec2f], vec4f)((p) => {
+const toClip = tgpu.fn(
+  [vec2f],
+  vec4f,
+)((p) => {
   "use gpu";
   const fr = worldLayout.$.frame;
-  const k = vec2f(
-    fr.scale * 2 / max(1, fr.pane.x),
-    fr.scale * 2 / max(1, fr.pane.y),
-  );
+  const k = vec2f((fr.scale * 2) / max(1, fr.pane.x), (fr.scale * 2) / max(1, fr.pane.y));
   return vec4f(k * (p - fr.cam), 0, 1);
 });
 
 const fillVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: { outPos: builtin.position, p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
+  out: {
+    outPos: builtin.position,
+    p: interpolate("linear", vec2f),
+    regionIndex: interpolate("flat", u32),
+  },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const slot = worldLayout.$.fillOrder[instanceIndex];
@@ -49,7 +56,7 @@ const fillFragment = tgpu.fragmentFn({
   const region = worldLayout.$.fills[regionIndex];
   let winding = 0;
   let dmin = 1e30;
-  for (let i = 0; i < region.edgeCount; i++) {
+  for (let i = u32(0); i < region.edgeCount; i += 1) {
     const e = worldLayout.$.fillEdges[region.edgeOffset + i];
     if (e.radius <= 0) {
       const ab = e.b - e.a;
@@ -57,7 +64,7 @@ const fillFragment = tgpu.fragmentFn({
       const denom = dot(ab, ab);
       const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
       dmin = min(dmin, length(ap - ab * t));
-      if ((e.a.y > p.y) !== (e.b.y > p.y)) {
+      if (e.a.y > p.y !== e.b.y > p.y) {
         const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
         if (xint > p.x) {
           winding += e.b.y > e.a.y ? 1 : -1;
@@ -77,14 +84,14 @@ const fillFragment = tgpu.fragmentFn({
       }
       if (abs(v.y) < e.radius) {
         const dx = sqrt(e.radius * e.radius - v.y * v.y);
-        let s = -1;
+        let s = f32(-1);
         while (true) {
           const cx = e.center.x + s * dx;
           if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
-            winding += k * (s > 0 ? 1 : -1);
+            winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
           }
-          if (s === 1) break;
-          s = 1;
+          if (s === f32(1)) break;
+          s = f32(1);
         }
       }
     }
@@ -99,9 +106,12 @@ const alphaBlend: GPUBlendState = {
   alpha: { operation: "add", srcFactor: "one", dstFactor: "one" },
 };
 
+/** Quad corners per region instance (triangle-strip AABB). */
+export const FILL_QUAD_VERTICES = 4;
+
 export type FillPipelines = {
   fills: (pass: GPURenderPassEncoder) => {
-    draw(instanceCount: number): void;
+    draw(vertexCount: number, instanceCount: number): void;
   };
   destroy(): void;
 };

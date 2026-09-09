@@ -1,15 +1,19 @@
-import type { Camera2, PaneSize } from "../../euclid2/camera";
 import type { TgpuRoot } from "typegpu";
 import { arrayOf, u32 } from "typegpu/data";
 
-import type { Rgba } from "./renderer";
-import { makeFrameValue } from "./frame";
+import type { Camera2, PaneSize } from "../../euclid2/camera";
 import type { TickPatch } from "./adapter";
-import { buildGridDraws } from "./pipelines/grid";
-import { createCirclePipelines, CIRCLE_VERTEX_COUNT, type CirclePipelines } from "./pipelines/circles";
-import { createFillPipelines, type FillPipelines } from "./pipelines/fills";
-import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
+import { makeFrameValue } from "./frame";
 import { worldLayout } from "./layout";
+import {
+  createCirclePipelines,
+  CIRCLE_VERTEX_COUNT,
+  type CirclePipelines,
+} from "./pipelines/circles";
+import { createFillPipelines, FILL_QUAD_VERTICES, type FillPipelines } from "./pipelines/fills";
+import { buildGridDraws } from "./pipelines/grid";
+import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
+import type { Rgba } from "./renderer";
 import {
   CircleInst,
   FillEdge,
@@ -117,7 +121,7 @@ export function createPainter(opts: {
       });
       const gridPass = pipelines.grid(pass);
       gridPass.drawIndexed(pipelines.indexCount, gridCount);
-      if (fillCount > 0) fills.fills(pass).draw(fillCount);
+      if (fillCount > 0) fills.fills(pass).draw(FILL_QUAD_VERTICES, fillCount);
       const strokePass = pipelines.strokes(pass);
       strokePass.drawIndexed(pipelines.indexCount, strokeCount);
       if (circleCount > 0) circles.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleCount);

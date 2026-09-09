@@ -1,3 +1,5 @@
+import { vec2f, vec3f } from "typegpu/data";
+
 import type { TraceNode } from "#eval/context";
 import type { Circle, CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
@@ -5,14 +7,20 @@ import { evaluateRegions } from "#geom/evaluate-regions";
 import { isGlider } from "#geom/gliders";
 import { infiniteLineAxis } from "#geom/ops";
 import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/region";
-import { vec2f, vec3f } from "typegpu/data";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
-
 import type { CircleInstValue, FillEdgeValue, FillRegionValue, StrokeDrawValue } from "./schemas";
-import { CircleInst, FillEdge, FillRegion, RUN_MUTED, StrokeCtrl, StrokeDraw, StrokeRun } from "./schemas";
+import {
+  CircleInst,
+  FillEdge,
+  FillRegion,
+  RUN_MUTED,
+  StrokeCtrl,
+  StrokeDraw,
+  StrokeRun,
+} from "./schemas";
 import { createSlotPool } from "./slots";
 
 const TAU = Math.PI * 2;
@@ -120,7 +128,7 @@ export function createAdapter(): Adapter {
       const v = n.value;
       if (v.kind === "circle") {
         const r = Math.abs(v.radius);
-        const pieces = Math.max(8, Math.min(128, Math.ceil((TAU * r * scale) / 6)));
+        const pieces = Math.max(32, Math.min(128, Math.ceil((TAU * r * scale) / 6)));
         const value = CircleInst({
           center: vec2f(v.center.x, v.center.y),
           r0: r - halfStroke,
