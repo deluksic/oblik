@@ -6,7 +6,7 @@ import type { Rgba } from "./renderer";
 import { makeFrameValue } from "./frame";
 import type { TickPatch } from "./adapter";
 import { buildGridDraws } from "./pipelines/grid";
-import { createCirclePipelines, CIRCLE_INDEX_COUNT, type CirclePipelines } from "./pipelines/circles";
+import { createCirclePipelines, CIRCLE_VERTEX_COUNT, type CirclePipelines } from "./pipelines/circles";
 import { createFillPipelines, type FillPipelines } from "./pipelines/fills";
 import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
 import { worldLayout } from "./layout";
@@ -120,13 +120,12 @@ export function createPainter(opts: {
       if (fillCount > 0) fills.fills(pass).draw(fillCount);
       const strokePass = pipelines.strokes(pass);
       strokePass.drawIndexed(pipelines.indexCount, strokeCount);
-      if (circleCount > 0) circles.circles(pass).drawIndexed(CIRCLE_INDEX_COUNT, circleCount);
+      if (circleCount > 0) circles.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleCount);
       pass.end();
       renderer.root.device.queue.submit([encoder.finish()]);
     },
     destroy() {
       pipelines.destroy();
-      circles.destroy();
       fills.destroy();
       frameBuffer.destroy();
       strokeBuffer.destroy();

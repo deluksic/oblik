@@ -1,6 +1,6 @@
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
-import { arrayOf, builtin, f32, interpolate, u16, u32, vec2f, vec3f, vec4f } from "typegpu/data";
+import { builtin, f32, interpolate, vec2f, vec3f, vec4f } from "typegpu/data";
 import { cos, max, sin } from "typegpu/std";
 
 import { MAX_CIRCLE_PIECES } from "../schemas";
@@ -23,11 +23,14 @@ const circleVertex = tgpu.vertexFn({
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const inst = worldLayout.$.circles[worldLayout.$.circleOrder[instanceIndex]];
-  const piece = vertexIndex / 2;
-  if (inst.r1 <= inst.r0 || inst.a1 === inst.a0 || piece > u32(inst.pieces)) {
+  // Math.floor keeps the pair index integral — `vertexIndex / 2` alone compiles
+  // as float division and lands outer vertices at half-piece angles, which
+  // tapers the band to zero at both sweep ends.
+  const piece = Math.floor(vertexIndex / 2);
+  if (inst.r1 <= inst.r0 || inst.a1 === inst.a0 || piece > inst.pieces) {
     return { outPos: vec4f(0, 0, -2, 1), color: vec3f(), alpha: 0 };
   }
-  const t = f32(piece) / inst.pieces;
+  const t = piece / inst.pieces;
   const ang = inst.a0 + t * (inst.a1 - inst.a0);
   const r = vertexIndex % 2 === 0 ? inst.r0 : inst.r1;
   const pos = inst.center + vec2f(cos(ang), sin(ang)) * r;
@@ -47,16 +50,15 @@ const alphaBlend: GPUBlendState = {
   alpha: { operation: "add", srcFactor: "one", dstFactor: "one" },
 };
 
-/** Shared static triangle-list indices: each fan piece is a quad from the
- * inner/outer ring vertex pair, so indexCount = 6·MAX_CIRCLE_PIECES always and
- * the active piece count lives in the instance. */
-export const CIRCLE_INDEX_COUNT = MAX_CIRCLE_PIECES * 6;
+/** Triangle-strip vertex count per instance: pairs of inner/outer ring vertices
+ * for every piece boundary plus one closing pair; the active piece count lives
+ * in the instance, tail vertices are culled in the vertex shader. */
+export const CIRCLE_VERTEX_COUNT = 2 * (MAX_CIRCLE_PIECES + 1);
 
 export type CirclePipelines = {
   circles: (pass: GPURenderPassEncoder) => {
-    drawIndexed(indexCount: number, instanceCount: number): void;
+    draw(vertexCount: number, instanceCount: number): void;
   };
-  destroy(): void;
 };
 
 export function createCirclePipelines(
@@ -64,25 +66,17 @@ export function createCirclePipelines(
   bindGroup: TgpuBindGroup,
   format: GPUTextureFormat,
 ): CirclePipelines {
-  const indices: number[] = [];
-  for (let p = 0; p < MAX_CIRCLE_PIECES; p++) {
-    const v = p * 2;
-    indices.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
-  }
-  const indexBuffer = root.createBuffer(arrayOf(u16, indices.length), indices).$usage("index");
-
   const circlePipeline = root
     .createRenderPipeline({
       vertex: circleVertex,
       fragment: circleFragment,
       targets: { format, blend: alphaBlend },
+      primitive: { topology: "triangle-strip" },
       multisample: { count: 4 },
     })
-    .with(bindGroup)
-    .withIndexBuffer(indexBuffer);
+    .with(bindGroup);
 
   return {
     circles: (pass) => circlePipeline.with(pass),
-    destroy: () => indexBuffer.destroy(),
   };
 }
