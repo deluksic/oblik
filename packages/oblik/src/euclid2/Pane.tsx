@@ -1,5 +1,4 @@
-import { Dynamic } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Loading, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading } from "solid-js";
 
 import { TypegpuView } from "../euclid2-typegpu/TypegpuView";
 import type { TraceNode } from "../eval/context";
@@ -19,7 +18,6 @@ import {
   type SelectionDetail,
 } from "../host/selection-detail";
 import { SelectionSidebar } from "../host/SelectionSidebar";
-import { createStoredSignal } from "../host/StoredSignalsContext";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import { Palette } from "./Palette";
@@ -40,7 +38,6 @@ import {
   type ToolSession,
   type ToolStep,
 } from "./tool";
-import { Euclid2View } from "./view/View";
 
 import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 import styles from "./Pane.module.css";
@@ -136,23 +133,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [writeError, setWriteError] = createSignal<string | undefined>(undefined);
   const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
   const evalstats = createEvalstatsSetting();
-
-  // Renderer choice (WebGPU vs SVG) for this scene file, persisted per scene so
-  // the same world stays on its chosen implementation across reloads. No
-  // WebGPU capability detection here: an unsupported browser falls out of the
-  // GPU view's own init and shows its "WebGPU unavailable" notice.
-  const gpu = createStoredSignal<boolean>(`oblik.euclid2.gpu.${untrack(() => props.file)}`, {
-    defaultValue: true,
-  });
-
-  function setRenderer(useGpu: boolean) {
-    if (useGpu === gpu.value()) return;
-    gpu.set(useGpu);
-    // The swapped-in view starts with its own camera and no hover; drop the
-    // stale hover id so the first frame is clean. Selection/draft/tool state
-    // lives here in the pane and survives the swap.
-    setHoverId(undefined);
-  }
 
   const mentions = createMemo(() => props.mentions ?? []);
   const world = createMemo((prev: WorldEval | undefined) => {
@@ -391,8 +371,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       <div class={wrap}>
         <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
         <div class={styles.paperWrap}>
-          <Dynamic
-            component={gpu.value() ? TypegpuView : Euclid2View}
+          <TypegpuView
             trace={world().trace}
             initialCamera={props.scene.camera}
             placing={tool() !== undefined}
@@ -415,24 +394,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
                 : undefined
             }
           />
-          <div class={styles.renderSwitch} role="group" aria-label="Renderer">
-            <button
-              type="button"
-              class={[styles.opt, { [styles.active]: !gpu.value() }]}
-              aria-pressed={!gpu.value() ? "true" : "false"}
-              onClick={() => setRenderer(false)}
-            >
-              SVG
-            </button>
-            <button
-              type="button"
-              class={[styles.opt, { [styles.active]: gpu.value() }]}
-              aria-pressed={gpu.value() ? "true" : "false"}
-              onClick={() => setRenderer(true)}
-            >
-              GPU
-            </button>
-          </div>
         </div>
         <Palette
           picker={picker()}
