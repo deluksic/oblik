@@ -21,6 +21,11 @@ While dragging, skip the overlay passes. Paint (including lifted paint) stays.
 
 ## Hover
 
+- **Hover names one occurrence, exactly like selection.** Both views match on the node's
+  trace key, `id:occ` (`traceKey`): pointing at one copy of a repeated node — a loop's
+  instances, a `polarRepeat` cell — lights up that copy only. A bare `id` would light up
+  every instance at once. The placement tools report the same key for the snap under the
+  cursor.
 - Overlay is **outline only**: the same 7px accent band as a selected ring, at 50% opacity, **no knockout / no paper gap**.
 - Construction paint goes **cream/white** (`--oblik-selected-paint`) if it is not already. Editable blue points included.
 - Figure paint **keeps the style color**.
