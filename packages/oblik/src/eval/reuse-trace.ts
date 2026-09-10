@@ -1,4 +1,4 @@
-import type { TraceNode } from "./context";
+import { isSceneBag, type SceneBag, type SceneValue, type TraceNode } from "./context";
 import type { PaintStroke } from "./paint";
 
 function nodeKey(n: TraceNode): string {
@@ -14,7 +14,7 @@ export function sameDrawNode(a: TraceNode, b: TraceNode): boolean {
   return sameDrawValue(a.value, b.value);
 }
 
-export function sameDrawValue(a: unknown, b: unknown): boolean {
+export function sameDrawValue(a: SceneValue, b: SceneValue): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (a === undefined || b === undefined) return a === b;
@@ -24,8 +24,9 @@ export function sameDrawValue(a: unknown, b: unknown): boolean {
     for (let i = 0; i < a.length; i++) if (!sameDrawValue(a[i], b[i])) return false;
     return true;
   }
-  const ao = a as Record<string, unknown>;
-  const bo = b as Record<string, unknown>;
+  if (!isSceneBag(a) || !isSceneBag(b)) return false;
+  const ao: SceneBag = a;
+  const bo: SceneBag = b;
   const keys = Object.keys(ao);
   if (keys.length !== Object.keys(bo).length) return false;
   for (const key of keys) {

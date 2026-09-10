@@ -1,6 +1,8 @@
 import { createRoot } from "solid-js";
 import { afterEach, describe, expect, test } from "vitest";
 
+import type { SceneValue } from "#eval/context";
+
 import { createDragHandler } from "./createDragHandler";
 
 type Listener = (event: Event) => void;
@@ -35,7 +37,9 @@ function mockDocument() {
     },
   };
   const previous = globalThis.document;
-  globalThis.document = doc as unknown as Document;
+  // The mock carries the members the engine touches; the rest of the DOM
+  // interface is what a test cannot fake, hence the `Partial` step.
+  globalThis.document = doc as Partial<Document> as Document;
   return {
     doc,
     restore() {
@@ -55,6 +59,11 @@ function pointerEvent(partial: {
   const captured: number[] = [];
   const released: number[] = [];
   const target = {
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {
+      return true;
+    },
     setPointerCapture(id: number) {
       captured.push(id);
     },
@@ -79,10 +88,10 @@ function pointerEvent(partial: {
     captured,
     released,
     ...partial,
-  } as unknown as PointerEvent;
+  } as Partial<PointerEvent> as PointerEvent;
 }
 
-function withHandler<T extends unknown[] = []>(
+function withHandler<T extends SceneValue[] = []>(
   setup: () => (event: PointerEvent, ...args: T) => void,
 ): {
   start: (event: PointerEvent, ...args: T) => void;

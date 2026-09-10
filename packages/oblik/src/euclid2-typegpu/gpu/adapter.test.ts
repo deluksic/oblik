@@ -1,8 +1,12 @@
 import { describe, expect, test } from "vitest";
 
+import type { TraceValue } from "#eval/context";
+import type { Csg2, Region } from "#geom";
+import { isCircleWalk } from "#geom/region";
+
 import type { TraceNode } from "#eval/context";
 import type { Vec2 } from "#geom";
-import type { CsgOperand, PolarRepeat } from "#geom";
+import type { PolarRepeat } from "#geom";
 import { csg2Value, polarRepeatValue } from "#geom/csg2";
 
 import { createAdapter, type AdapterInput, type Rgb } from "./adapter";
@@ -70,8 +74,14 @@ function polygonValue() {
   return { kind: "polygon" as const, boundary, holes: [] };
 }
 
-function node(id: string, value: unknown, bind?: string, editable = false): TraceNode {
-  return { id, occ: 0, kind: "region", value, bind, editable, stack: [] } as TraceNode;
+/** `kind` is derived from `value`, so the pair cannot disagree. */
+function node<V extends TraceValue>(
+  id: string,
+  value: V,
+  bind?: string,
+  editable = false,
+): TraceNode {
+  return { id, occ: 0, kind: value.kind, value, bind, editable, stack: [] } as TraceNode;
 }
 
 /** `diff(circle, region)` — a tree the field compiler takes. */
@@ -185,7 +195,10 @@ describe("adapter fill routing", () => {
       of: [{ kind: "circle", center: { x: 0, y: 0 }, radius: 2 }, squareRegion(0.5)],
     });
     adapter.tick(input([dragged]));
-    (dragged.value as unknown as { of: { radius?: number }[] }).of[0]!.radius = 2.5;
+    const draggedCsg = dragged.value as Csg2;
+    const first = draggedCsg.of[0];
+    if (first?.kind !== "circle") throw new Error("fixture: first operand is a circle");
+    first.radius = 2.5;
     const moved = adapter.tick(input([dragged]));
     // Same shape, new numbers: leaves and the AABB move, the spans do not.
     expect(moved.fields.quads.writes).toHaveLength(1);
@@ -216,8 +229,10 @@ describe("adapter fill routing", () => {
       }),
     ];
     adapter.tick(input(trace));
-    const value = trace[0]!.value as unknown as { outer: { radius: number } };
-    value.outer.radius = 2.5;
+    const value = trace[0]!.value as Region;
+    if (!isCircleWalk(value.outer)) throw new Error("fixture: outer is a circle");
+    const outer = value.outer;
+    outer.radius = 2.5;
     const moved = adapter.tick(input(trace));
     // The carrier moved, the hole did not: half the record kinds re-upload.
     expect(moved.fields.arcs.writes).toHaveLength(1);
@@ -408,7 +423,7 @@ function recordFixture(): TraceNode[] {
       value: { kind: "point", x: 2, y: -2 },
       editable: true,
       stack: [],
-    } as TraceNode,
+    },
     csgNode("o_csg", 0, "pac"),
     node("o_poly", polygonValue(), "shell"),
   ];
@@ -423,7 +438,7 @@ function recordFixture(): TraceNode[] {
 describe("polar repeat fills", () => {
   /** A 24-tooth ring with a bore cut out: the shape the gear scene hands the
    * pane, and the one the fold exists for. */
-  function ringFace(count = 24): { face: CsgOperand; rep: PolarRepeat } {
+  function ringFace(count = 24): { face: Csg2; rep: PolarRepeat } {
     const rep = polarRepeatValue(ringTooth(), count, { x: 0, y: 0 }, 0);
     const face = csg2Value("diff", [rep, { kind: "circle", center: { x: 0, y: 0 }, radius: 0.5 }]);
     return { face, rep };

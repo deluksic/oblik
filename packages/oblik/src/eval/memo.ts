@@ -1,4 +1,12 @@
-import { currentEval, nodeOf, type EvalCtx, type TraceNode } from "#eval/context";
+import {
+  currentEval,
+  isSceneBag,
+  nodeOf,
+  type EvalCtx,
+  type SceneBag,
+  type SceneValue,
+  type TraceNode,
+} from "#eval/context";
 
 /**
  * Per-scene-module memo of constructor results, keyed `${id}:${occ}`.
@@ -14,8 +22,8 @@ export function newEvalMemo(): EvalMemo {
 }
 
 export type MemoEntry = {
-  fingerprint: unknown[];
-  value: object;
+  fingerprint: SceneValue[];
+  value: SceneValue;
   node: TraceNode;
 };
 
@@ -25,11 +33,14 @@ const MAX_FINGERPRINT_DEPTH = 4;
  * Raw constructor args (minus the trailing site id) plus the site's own draft
  * row — the only inputs `draftAt` can fold into the constructed value.
  */
-function fingerprintOf(args: readonly unknown[], draft: readonly number[] | undefined): unknown[] {
+function fingerprintOf(
+  args: readonly SceneValue[],
+  draft: readonly number[] | undefined,
+): SceneValue[] {
   return draft === undefined ? [...args] : [...args, draft];
 }
 
-export function sameFingerprint(a: readonly unknown[], b: readonly unknown[]): boolean {
+export function sameFingerprint(a: readonly SceneValue[], b: readonly SceneValue[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (!fpEq(a[i], b[i], 0)) return false;
@@ -37,7 +48,7 @@ export function sameFingerprint(a: readonly unknown[], b: readonly unknown[]): b
   return true;
 }
 
-function fpEq(a: unknown, b: unknown, depth: number): boolean {
+function fpEq(a: SceneValue, b: SceneValue, depth: number): boolean {
   if (Object.is(a, b)) return true;
   if (depth >= MAX_FINGERPRINT_DEPTH) return false;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
@@ -58,8 +69,9 @@ function fpEq(a: unknown, b: unknown, depth: number): boolean {
   const ka = Object.keys(a);
   const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;
-  const ra = a as Record<string, unknown>;
-  const rb = b as Record<string, unknown>;
+  if (!isSceneBag(a) || !isSceneBag(b)) return false;
+  const ra: SceneBag = a;
+  const rb: SceneBag = b;
   for (const k of ka) {
     if (!Object.hasOwn(rb, k)) return false;
     if (!fpEq(ra[k], rb[k], depth + 1)) return false;
@@ -73,13 +85,14 @@ function fpEq(a: unknown, b: unknown, depth: number): boolean {
  * object. Unstamped calls, ghost evals, and unrecordable results (NaN) fall
  * through to the plain constructor.
  */
-export function memoized<F extends (...args: never[]) => unknown>(fn: F): F {
-  const call = fn as unknown as (...a: unknown[]) => unknown;
-  const wrapped = (...args: unknown[]): unknown => {
+export function memoized<A extends SceneValue[], R extends SceneValue>(
+  fn: (...args: A) => R,
+): (...args: A) => R {
+  const wrapped = (...args: A): R => {
     const ctx = currentEval();
-    if (!ctx || !ctx.memo || args.length === 0) return call(...args);
+    if (!ctx || !ctx.memo || args.length === 0) return fn(...args);
     const last = args[args.length - 1];
-    if (typeof last !== "string") return call(...args);
+    if (typeof last !== "string") return fn(...args);
     const id = last;
     const occ = ctx.occ.get(id) ?? 0;
     const fingerprint = fingerprintOf(args.slice(0, -1), ctx.draft.get(id));
@@ -89,17 +102,17 @@ export function memoized<F extends (...args: never[]) => unknown>(fn: F): F {
       ctx.occ.set(id, occ + 1);
       ctx.trace.push(entry.node);
       ctx.stats.hits++;
-      return entry.value;
+      return entry.value as R;
     }
-    const value = call(...args);
+    const value = fn(...args);
     const node = nodeOf(value);
     if (node) {
-      ctx.memo.entries.set(key, { fingerprint, value: value as object, node });
+      ctx.memo.entries.set(key, { fingerprint, value, node });
       ctx.stats.built++;
     }
     return value;
   };
-  return wrapped as unknown as F;
+  return wrapped;
 }
 
 /**
@@ -149,7 +162,7 @@ export function scheduleSweep(m: EvalMemo, counts: Map<string, number>): void {
 
 // ---- user memo(fn) -----------------------------------------------------------
 
-type UserMemoEntry = { args: unknown[]; result: unknown };
+type UserMemoEntry = { args: SceneValue[]; result: SceneValue };
 
 const userMemos = new WeakMap<object, Map<number, UserMemoEntry>>();
 
@@ -160,11 +173,12 @@ const userMemos = new WeakMap<object, Map<number, UserMemoEntry>>();
  * propagates into downstream constructors. The store is keyed on the function
  * object, so an HMR re-import of the defining module invalidates for free.
  */
-export function memo<F extends (...args: never[]) => unknown>(fn: F): F {
-  const call = fn as unknown as (...a: unknown[]) => unknown;
-  const wrapped = (...args: unknown[]): unknown => {
+export function memo<A extends SceneValue[], R extends SceneValue>(
+  fn: (...args: A) => R,
+): (...args: A) => R {
+  const wrapped = (...args: A): R => {
     const ctx: EvalCtx | undefined = currentEval();
-    if (!ctx) return call(...args);
+    if (!ctx) return fn(...args);
     const occMap = ctx.userMemoOcc ?? new Map<object, number>();
     ctx.userMemoOcc = occMap;
     const occ = occMap.get(fn) ?? 0;
@@ -177,12 +191,12 @@ export function memo<F extends (...args: never[]) => unknown>(fn: F): F {
     const entry = entries.get(occ);
     if (entry && sameFingerprint(entry.args, args)) {
       ctx.stats.hits++;
-      return entry.result;
+      return entry.result as R;
     }
-    const result = call(...args);
+    const result = fn(...args);
     entries.set(occ, { args, result });
     ctx.stats.built++;
     return result;
   };
-  return wrapped as unknown as F;
+  return wrapped;
 }

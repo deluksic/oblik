@@ -2,15 +2,26 @@ import { Portal } from "@solidjs/web";
 import { For, createEffect, createSignal } from "solid-js";
 import type { ParentProps } from "solid-js";
 
-import { ModalContext, type ModalConfig } from "./ModalContext";
+import {
+  ModalContext,
+  type ModalConfig,
+  type ModalResponse,
+} from "./ModalContext";
 
 import { panel } from "../ui/surface.module.css";
 import styles from "./Modal.module.css";
 
+/**
+ * One open dialog. The response type is erased here — the promise `requestModal`
+ * returns is what keeps `T` — so `dismiss` is a method (bivariant) and the
+ * stored content accepts the response the dialog actually sends.
+ */
 type ModalInstance = {
   id: number;
-  config: ModalConfig<unknown>;
-  resolve: (value: unknown) => void;
+  content: ModalConfig<ModalResponse>["content"];
+  className: string | undefined;
+  dismissOnClickOff: boolean;
+  dismiss(value: ModalResponse): void;
 };
 
 export type ModalProps = {
@@ -45,23 +56,22 @@ export function Modal(props: ParentProps<ModalProps>) {
   const [instances, setInstances] = createSignal<ModalInstance[]>([]);
   let nextId = 0;
 
-  function requestModal<T>(config: ModalConfig<T>): Promise<T> {
+  function requestModal<T extends ModalResponse>(config: ModalConfig<T>): Promise<T> {
     let resolve!: (value: T) => void;
     const promise = new Promise<T>((res) => {
       resolve = res;
     });
     const instance: ModalInstance = {
       id: nextId++,
-      config: config as unknown as ModalConfig<unknown>,
-      resolve: resolve as (value: unknown) => void,
+      content: config.content,
+      className: config.class,
+      dismissOnClickOff: config.dismissOnClickOff !== false,
+      // The dialog's response is known to belong to this request's T: that is
+      // what the promise's own resolver type encodes.
+      dismiss: (value) => resolve(value as T),
     };
     setInstances((prev) => [...prev, instance]);
     return promise;
-  }
-
-  function dismiss(instance: ModalInstance, value: unknown) {
-    instance.resolve(value);
-    setInstances((list) => list.filter((it) => it !== instance));
   }
 
   return (
@@ -71,7 +81,13 @@ export function Modal(props: ParentProps<ModalProps>) {
         <div class={styles.root}>
           <For each={instances()}>
             {(instance) => (
-              <ModalDialog instance={instance} onDismiss={(value) => dismiss(instance, value)} />
+              <ModalDialog
+                instance={instance}
+                onDismiss={(value) => {
+                  instance.dismiss(value);
+                  setInstances((list) => list.filter((it) => it !== instance));
+                }}
+              />
             )}
           </For>
         </div>
@@ -80,7 +96,10 @@ export function Modal(props: ParentProps<ModalProps>) {
   );
 }
 
-function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknown) => void }) {
+function ModalDialog(props: {
+  instance: ModalInstance;
+  onDismiss: (value: ModalResponse) => void;
+}) {
   const [el, setEl] = createSignal<HTMLDialogElement | undefined>(undefined);
 
   createEffect(
@@ -91,13 +110,13 @@ function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknow
   );
 
   // Each row of the instances For is keyed by instance identity, so
-  // instance.config.content is stable for this dialog's life; capture once.
+  // instance.content is stable for this dialog's life; capture once.
   // oxlint-disable-next-line solid/reactivity
-  const Content = props.instance.config.content;
+  const Content = props.instance.content;
   return (
     <dialog
       ref={setEl}
-      class={[panel, styles.modal, props.instance.config.class]}
+      class={[panel, styles.modal, props.instance.className]}
       onCancel={(e) => {
         e.preventDefault();
         props.onDismiss(undefined);
@@ -110,7 +129,7 @@ function ModalDialog(props: { instance: ModalInstance; onDismiss: (value: unknow
         // Dismissing at pointerdown (not click) means a press that starts
         // inside the content can never count as click-off on release.
         if (e.button !== 0) return;
-        if (props.instance.config.dismissOnClickOff === false) return;
+        if (!props.instance.dismissOnClickOff) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const inside =
           e.clientX >= rect.left &&

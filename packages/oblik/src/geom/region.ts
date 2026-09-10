@@ -1,7 +1,17 @@
 import { circleUnitAt } from "./gliders";
 import { filletVertices } from "./offset";
 import { lineBasis } from "./ops";
-import type { Along, Branch, Circle, Fillet, LineLike, Loop, LoopEdge, Region } from "./types";
+import type {
+  Along,
+  Branch,
+  Circle,
+  Fillet,
+  LineLike,
+  Loop,
+  LoopEdge,
+  Point,
+  Region,
+} from "./types";
 import {
   add,
   cross2,
@@ -18,11 +28,11 @@ import {
 const { PI, abs, atan2, ceil, cos, max, min, sin } = Math;
 const EPS = 1e-9;
 
-export function isAlong(v: unknown): v is Along {
+export function isAlong(v: WalkItem): v is Along {
   return !!v && typeof v === "object" && (v as { kind?: string }).kind === "along";
 }
 
-export function isFillet(v: unknown): v is Fillet {
+export function isFillet(v: WalkItem): v is Fillet {
   return !!v && typeof v === "object" && (v as { kind?: string }).kind === "fillet";
 }
 
@@ -76,29 +86,32 @@ function isFiniteEdge(e: LoopEdge): boolean {
   return isFiniteVec(origin) && isFiniteVec(dir) && dist(e.a, e.b) > EPS;
 }
 
-function asVec2(v: unknown): Vec2 | undefined {
-  if (!v || typeof v !== "object") return undefined;
-  const p = v as { x?: unknown; y?: unknown; kind?: string };
-  if (
-    p.kind === "along" ||
-    p.kind === "fillet" ||
-    p.kind === "circle" ||
-    p.kind === "line" ||
-    p.kind === "segment" ||
-    p.kind === "parallelLine"
-  ) {
-    return undefined;
-  }
-  if (typeof p.x === "number" && typeof p.y === "number") return { x: p.x, y: p.y };
-  return undefined;
+/** One corner of a cycle: a bare `{x, y}` — usually a traced `point` — or a
+ * fillet witness that rounds the join. */
+export type WalkVertex = Vec2 | Point | Fillet;
+/** One carrier of a cycle: the family the span between two corners runs on. */
+export type WalkSpan = LineLike | Along;
+/** One element of a cycle tape: a corner or the carrier that follows it. */
+export type WalkItem = WalkVertex | WalkSpan;
+/**
+ * A closed cycle as authored: `[vertex, span, vertex, span, …]`, strictly
+ * alternating and at least two pairs long. The projected, walked form is `Loop`.
+ */
+export type WalkCycle = WalkItem[];
+/** What a boundary accepts: a full circle, or a cycle tape. */
+export type WalkInput = Circle | WalkCycle;
+
+/** `{x, y}` and no carrier kind: this element is a corner, not an edge. */
+export function isCorner(v: WalkItem): v is Vec2 {
+  return !!v && typeof v === "object" && "x" in v && "y" in v;
 }
 
-function asLineLike(v: unknown): LineLike | undefined {
-  if (!v || typeof v !== "object") return undefined;
-  const g = v as { kind?: string };
-  if (g.kind === "line" || g.kind === "segment" || g.kind === "parallelLine") return v as LineLike;
-  return undefined;
+/** A carrier element — the edge a cycle runs along between two corners. */
+export function isSpan(v: WalkItem): v is WalkSpan {
+  return !!v && typeof v === "object" && "kind" in v && SPAN_KINDS.has(v.kind);
 }
+
+const SPAN_KINDS: ReadonlySet<string> = new Set(["line", "segment", "parallelLine", "along"]);
 
 export function projectOnLine(geom: LineLike, p: Vec2): Vec2 {
   const { origin, dir } = lineBasis(geom);
@@ -133,67 +146,56 @@ export function circleDelta(c: Circle, a: Vec2, b: Vec2, k: Branch): number {
   return delta;
 }
 
-function asVertex(v: unknown): { at: Vec2; r: number } | undefined {
+function asVertex(v: WalkItem): { at: Vec2; r: number } | undefined {
+  if (!v || typeof v !== "object") return undefined;
   if (isFillet(v)) {
     if (!Number.isFinite(v.r) || v.r < 0) return undefined;
-    const at = asVec2(v.at);
-    if (!at || !isFiniteVec(at)) return undefined;
-    return { at, r: v.r };
+    if (!v.at || typeof v.at !== "object" || !isFiniteVec(v.at)) return undefined;
+    return { at: { x: v.at.x, y: v.at.y }, r: v.r };
   }
-  const at = asVec2(v);
-  if (!at || !isFiniteVec(at)) return undefined;
-  return { at, r: 0 };
+  if (!isCorner(v) || !isFiniteVec(v)) return undefined;
+  return { at: { x: v.x, y: v.y }, r: 0 };
 }
 
-export type WalkInput = Circle | readonly unknown[];
-
-function asCircleWalk(v: unknown): Circle | undefined {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const c = v as { kind?: string; center?: Vec2; radius?: unknown };
-  if (c.kind !== "circle" || !c.center || !isFiniteVec(c.center)) return undefined;
-  if (typeof c.radius !== "number" || !Number.isFinite(c.radius) || abs(c.radius) < EPS) {
-    return undefined;
-  }
+function asCircleWalk(c: Circle): Circle | undefined {
+  const center = c?.center;
+  const radius = c?.radius;
+  if (!center || typeof center !== "object" || !isFiniteVec(center)) return undefined;
+  if (typeof radius !== "number" || abs(radius) < EPS) return undefined;
   return {
     kind: "circle",
-    center: { x: c.center.x, y: c.center.y },
-    radius: abs(c.radius),
+    center: { x: center.x, y: center.y },
+    radius: abs(radius),
   };
 }
 
-export function asWalk(v: unknown): Loop | undefined {
-  const circle = asCircleWalk(v);
-  if (circle) return circle;
-  if (Array.isArray(v)) return walkFromCycle(v);
-  return undefined;
+/** A full circle, or a cycle tape walked into its projected edge loop. */
+export function asWalk(input: WalkInput): Loop | undefined {
+  if (Array.isArray(input)) return walkFromCycle(input);
+  return asCircleWalk(input);
 }
 
 type WalkCorner = { at: Vec2; r: number };
-type WalkCarrier = LineLike | Along;
 /** Parsed tape before projection. `vertices.length === carriers.length + 1`. */
-type ParsedWalk = { vertices: WalkCorner[]; carriers: WalkCarrier[] };
+type ParsedWalk = { vertices: WalkCorner[]; carriers: WalkSpan[] };
 
-function parseWalkTape(cycle: readonly unknown[]): ParsedWalk | undefined {
+function parseWalkTape(cycle: WalkCycle): ParsedWalk | undefined {
   if (!Array.isArray(cycle) || cycle.length < 4 || cycle.length % 2 !== 0) return undefined;
   const n = cycle.length / 2;
   const vertices: WalkCorner[] = [];
-  const carriers: WalkCarrier[] = [];
+  const carriers: WalkSpan[] = [];
   for (let i = 0; i < n; i++) {
-    const vtx = asVertex(cycle[i * 2]);
+    const vtx = asVertex(cycle[i * 2]!);
     if (!vtx) return undefined;
     vertices.push(vtx);
-    const item = cycle[i * 2 + 1];
+    const item = cycle[i * 2 + 1]!;
+    if (!isSpan(item)) return undefined;
     if (isAlong(item)) {
       if (item.carrier.kind !== "circle") return undefined;
       carriers.push({ kind: "along", carrier: item.carrier, k: item.k < 0 ? -1 : 1 });
       continue;
     }
-    const line = asLineLike(item);
-    if (line) {
-      carriers.push(line);
-      continue;
-    }
-    return undefined;
+    carriers.push(item);
   }
   const first = vertices[0]!;
   vertices.push({ at: { x: first.at.x, y: first.at.y }, r: 0 });
@@ -229,13 +231,13 @@ function walkEdgesFromParsed(w: ParsedWalk): { edges: LoopEdge[]; radii: number[
   return { edges, radii };
 }
 
-function parseWalk(cycle: readonly unknown[]): { edges: LoopEdge[]; radii: number[] } | undefined {
+function parseWalk(cycle: WalkCycle): { edges: LoopEdge[]; radii: number[] } | undefined {
   const parsed = parseWalkTape(cycle);
   if (!parsed) return undefined;
   return walkEdgesFromParsed(parsed);
 }
 
-function walkFromCycle(cycle: readonly unknown[]): LoopEdge[] | undefined {
+function walkFromCycle(cycle: WalkCycle): LoopEdge[] | undefined {
   const parsed = parseWalk(cycle);
   if (!parsed) return undefined;
   const sharp: Region = { kind: "region", outer: parsed.edges, holes: [] };

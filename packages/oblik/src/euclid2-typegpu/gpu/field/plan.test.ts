@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
+import { walkEdges } from "#geom/region";
+
 import type { CsgOperand, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { operandAabb, operandSdf, polarRepeatValue } from "#geom/csg2";
@@ -61,9 +63,9 @@ async function csgCases(): Promise<Case[]> {
     };
     for (const n of sceneTrace(mod.default, name)) {
       if (!isFillGeom(n.value) || n.value.kind !== "csg2") continue;
-      const plan = fieldPlan(n.value as CsgOperand);
+      const plan = fieldPlan(n.value);
       if (!plan) continue;
-      cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value as CsgOperand, plan });
+      cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
     }
   }
   return cases;
@@ -102,16 +104,17 @@ function probeRect(plan: FieldPlan, inst: ReturnType<typeof buildFieldInstance>)
 
 /** Mutate every number a field leaf reads (never the tree's shape). */
 function nudgeLeafData(op: CsgOperand): void {
-  const v = op as { kind: string } & Record<string, unknown>;
-  if (v.kind === "circle") v.radius = (v.radius as number) * 1.37;
-  if (v.kind === "offset") v.d = (v.d as number) + 0.21;
-  if (v.kind === "region") {
-    const edges = (v.outer as { a: Vec2 }[]) ?? [];
-    for (const e of edges) e.a = { x: e.a.x + 0.3, y: e.a.y - 0.2 };
+  if (op.kind === "circle") op.radius *= 1.37;
+  if (op.kind === "offset") {
+    op.d += 0.21;
+    nudgeLeafData(op.of);
   }
-  const of = v.of as CsgOperand[] | CsgOperand | undefined;
-  if (Array.isArray(of)) for (const child of of) nudgeLeafData(child);
-  else if (of && typeof of === "object") nudgeLeafData(of);
+  if (op.kind === "region") {
+    for (const e of walkEdges(op.outer)) e.a = { x: e.a.x + 0.3, y: e.a.y - 0.2 };
+  }
+  if (op.kind === "csg2") for (const child of op.of) nudgeLeafData(child);
+  if (op.kind === "pick") nudgeLeafData(op.of);
+  if (op.kind === "polarRepeat") nudgeLeafData(op.of);
 }
 
 const GRID = 21;
@@ -200,7 +203,7 @@ describe("field plan", () => {
   test("leaf data changes never move the shape", async () => {
     const cases = await csgCases();
     for (const c of cases) {
-      const moved = JSON.parse(JSON.stringify(c.value)) as CsgOperand;
+      const moved = JSON.parse(JSON.stringify(c.value));
       nudgeLeafData(moved);
       const replanned = fieldPlan(moved);
       expect(replanned?.shape).toBe(c.plan.shape);

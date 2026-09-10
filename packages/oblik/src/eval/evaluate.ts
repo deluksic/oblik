@@ -1,5 +1,12 @@
 import type { Annotation } from "../source/analyze";
-import { currentEval, nodeOf, withEval, type EvalCtx, type TraceNode } from "./context";
+import {
+  currentEval,
+  nodeOf,
+  withEval,
+  type EvalCtx,
+  type SceneResult,
+  type TraceNode,
+} from "./context";
 import { scheduleSweep, type EvalMemo } from "./memo";
 import type { Scene } from "./scene";
 
@@ -21,7 +28,7 @@ export type EvaluateOpts = {
 export type EvalStats = { built: number; hits: number };
 
 export type EvaluateResult = {
-  value: unknown;
+  value: SceneResult;
   trace: TraceNode[];
   stats: EvalStats;
 };
@@ -66,7 +73,7 @@ export function tryEvaluate(
 }
 
 /** Copy selected traced values onto the current tape (same ids). */
-export function emit(values: unknown | unknown[]): void {
+export function emit(values: SceneResult): void {
   const cur = currentEval();
   if (!cur) return;
   const list = Array.isArray(values) ? values : [values];

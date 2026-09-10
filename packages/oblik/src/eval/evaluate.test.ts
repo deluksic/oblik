@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { isCsg2, isFiniteOperand, offsetOfCsg, operandSdf } from "../geom/csg2";
+import type { CsgOperand } from "../geom/types";
 import { walkEdges } from "../geom/region";
 import { analyze } from "../source/analyze";
 import {
@@ -15,12 +16,14 @@ import {
   intersect,
   csg2,
   diff,
+  pick,
   polarRepeat,
   region,
   roundOffset,
   segment,
   slider,
   style,
+  union,
 } from "./constructors";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
 import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
@@ -566,5 +569,28 @@ describe("polarRepeat", () => {
     expect(isFiniteOperand(polarRepeat([], 12, { x: 0, y: 0 }, 0))).toBe(false);
     expect(isFiniteOperand(polarRepeat(cell(), Number.NaN, { x: 0, y: 0 }, 0))).toBe(false);
     expect(isFiniteOperand(polarRepeat(cell(), 12, { x: Number.NaN, y: 0 }, 0))).toBe(false);
+  });
+});
+
+// Scene source is printed text: the GUI inserts `union([a, b])` and the module
+// loads without a typecheck, so a wrong argument arrives as a value, not as a
+// compile error. These hand the gate what such a call would.
+const authoredOperand = (v: object): CsgOperand => v as CsgOperand;
+const authoredList = (v: object): readonly CsgOperand[] => v as readonly CsgOperand[];
+
+describe("the operand gate", () => {
+  test("a wrong element is NaN geometry, not a throw", () => {
+    const face = union([circle(point(0, 0), 1), authoredOperand({ x: 0, y: 1 })]);
+    expect(isFiniteOperand(face)).toBe(false);
+  });
+
+  test("a non-list argument is NaN geometry, not a throw", () => {
+    expect(isFiniteOperand(union(authoredList({})))).toBe(false);
+    expect(isFiniteOperand(intersect(authoredList({})))).toBe(false);
+    expect(isFiniteOperand(diff(circle(point(0, 0), 1), authoredList({})))).toBe(false);
+  });
+
+  test("a wrong pick probe is NaN geometry, not a throw", () => {
+    expect(isFiniteOperand(pick(authoredOperand({ x: 0, y: 0 }), { x: 1, y: 1 }))).toBe(false);
   });
 });

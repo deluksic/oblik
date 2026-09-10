@@ -1,7 +1,7 @@
 import { printExpr, parsePath, type Expr } from "#source/expr";
 import { hoistIntersections, printHoist, takeBind } from "#source/hoist";
 
-import { nodeByPrint, type SnapFilter, type Vec2 } from "../pick";
+import { nodeByPrint, type SnapFilter, type SnapNode, type Vec2 } from "../pick";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
@@ -97,7 +97,7 @@ export function constructedInsert(p: PlacePoint): InsertJob | undefined {
 
 export function hoverPlace(
   p: PlacePoint,
-  trace: readonly { occ: number; bind?: string; id: string }[],
+  trace: readonly SnapNode[],
 ): string | undefined {
   if (p.kind === "ref") return p.id;
   if (isGliderPlace(p)) return p.id ?? hoverBind(trace, p.bind);
@@ -133,7 +133,7 @@ export function pinnedPointLabel(place: PlaceHit | undefined): string | undefine
 }
 
 export function hoverBind(
-  trace: readonly { occ: number; bind?: string; id: string }[],
+  trace: readonly SnapNode[],
   bind: string,
   filter?: SnapFilter,
 ): string | undefined {

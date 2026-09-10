@@ -2,7 +2,12 @@ import { createContext, useContext } from "solid-js";
 import type { ParentProps } from "solid-js";
 
 import { createStoredRegistry } from "./stored-signals";
-import type { StoredRegistry, StoredSignal, StoredSignalOptions } from "./stored-signals";
+import type {
+  StoredRegistry,
+  StoredSignal,
+  StoredSignalOptions,
+  StoredValue,
+} from "./stored-signals";
 
 /**
  * App-wide registry of localStorage-backed signals. The provider owns a single
@@ -28,6 +33,9 @@ export function useStoredSignals(): StoredRegistry {
  * LocalStorage-backed signal. Same `id` ⇒ same signal (created once, shared by
  * every caller). See `stored-signals.ts` for options.
  */
-export function createStoredSignal<T>(id: string, opts: StoredSignalOptions<T>): StoredSignal<T> {
+export function createStoredSignal<T extends StoredValue>(
+  id: string,
+  opts: StoredSignalOptions<T>,
+): StoredSignal<T> {
   return useStoredSignals().getOrCreate(id, opts);
 }

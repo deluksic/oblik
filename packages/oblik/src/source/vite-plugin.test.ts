@@ -56,8 +56,9 @@ function hotUpdate(
   file: string,
   modules: FakeNode[] = [],
   type: HotUpdateOptions["type"] = "update",
-): unknown {
-  const hook = plugin.hotUpdate as (this: { environment: unknown }, o: HotUpdateOptions) => unknown;
+): FakeNode[] | undefined {
+  const hook = plugin.hotUpdate;
+  if (typeof hook !== "function") throw new Error("oblikPlugin's hotUpdate must be a plain hook");
   const options: HotUpdateOptions = {
     type,
     file,
@@ -66,7 +67,12 @@ function hotUpdate(
     server: {} as HotUpdateOptions["server"],
     modules: modules as HotUpdateOptions["modules"],
   };
-  return hook.call({ environment: { name: envName, moduleGraph: graph } }, options);
+  // Vite builds the hook's `this` (the plugin context); the test hands it the two
+  // fields the plugin reads, through `Reflect.apply` rather than a fake context
+  // object typed as the real one.
+  return Reflect.apply(hook, { environment: { name: envName, moduleGraph: graph } }, [
+    options,
+  ]) as FakeNode[] | undefined;
 }
 
 let tmp = "";
@@ -134,7 +140,7 @@ describe("oblikPlugin hotUpdate", () => {
     for (const type of ["create", "delete"] as const) {
       // Fresh plugin per event type: catalogChanged() fires once per instance.
       const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
-      const result = hotUpdate(plugin, "client", graph, scene, [pruned], type) as FakeNode[];
+      const result = hotUpdate(plugin, "client", graph, scene, [pruned], type);
       expect(result).not.toContain(pruned);
       expect(result).toEqual([bundle, catalog, loaders]);
     }
@@ -159,7 +165,7 @@ describe("oblikPlugin hotUpdate", () => {
     const entry = mkNode(path.join(appRoot, "src/main.ts"));
     importedBy(lib, entry);
     const graph = fakeGraph([bundle, lib, entry]);
-    const result = hotUpdate(plugin, "client", graph, libFile, [lib]) as FakeNode[];
+    const result = hotUpdate(plugin, "client", graph, libFile, [lib]);
     expect(result).toEqual([lib, bundle]);
   });
 });

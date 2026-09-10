@@ -1,7 +1,15 @@
 import { createContext, useContext } from "solid-js";
+
+import type { SceneValue } from "../eval/context";
 import type { Component } from "solid-js";
 
-export type ModalConfig<T> = {
+/**
+ * What a modal can respond with: any scene value, or nothing at all (`respond()`),
+ * which is what a plain confirm/close dialog does.
+ */
+export type ModalResponse = SceneValue | void;
+
+export type ModalConfig<T extends ModalResponse = void> = {
   /** Optional extra class applied to the `<dialog>`. */
   class?: string;
   /**
@@ -16,11 +24,13 @@ export type ModalConfig<T> = {
 };
 
 /** Identity helper so TypeScript can infer a modal's response type at the call site. */
-export function defineModal<T>(modal: ModalConfig<T>): ModalConfig<T> {
+export function defineModal<T extends ModalResponse>(modal: ModalConfig<T>): ModalConfig<T> {
   return modal;
 }
 
-export type RequestModalFn = <T = void>(config: ModalConfig<T>) => Promise<T>;
+export type RequestModalFn = <T extends ModalResponse = void>(
+  config: ModalConfig<T>,
+) => Promise<T>;
 
 /** Default-less context: reading it outside a `<Modal>` throws `ContextNotFoundError`. */
 export const ModalContext = createContext<RequestModalFn>();

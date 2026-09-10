@@ -6,7 +6,38 @@ import {
   originalPositionFor,
   type EncodedSourceMap,
 } from "@jridgewell/trace-mapping";
+import * as v from "valibot";
 import type { ViteDevServer } from "vite";
+
+import type { SceneValue } from "../eval/context";
+
+/**
+ * A V3 source map, as our own build emits one: a base64 inline map, or Vite's
+ * transform result. Tracing reads `mappings`/`sources`/`names`; the rest is
+ * carried so the document stays a whole map. Unknown keys are dropped — nothing
+ * downstream reads them.
+ */
+const sourceMapSchema = v.object({
+  version: v.literal(3),
+  mappings: v.string(),
+  names: v.array(v.string()),
+  sources: v.array(v.nullable(v.string())),
+  file: v.optional(v.nullable(v.string())),
+  sourceRoot: v.optional(v.string()),
+  sourcesContent: v.optional(v.array(v.nullable(v.string()))),
+  ignoreList: v.optional(v.array(v.number())),
+});
+
+/**
+ * Decode a source map, or nothing. The document is foreign in the one way that
+ * matters — it came from `JSON.parse` of a string we did not build in-process —
+ * so it is validated rather than asserted, and a malformed map becomes "no source
+ * map" instead of reaching `TraceMap`.
+ */
+function asSourceMap(text: string): EncodedSourceMap | undefined {
+  const r = v.safeParse(sourceMapSchema, JSON.parse(text));
+  return r.success ? r.output : undefined;
+}
 
 const { max } = Math;
 export type StackLoc = {
@@ -45,7 +76,7 @@ export function sourceMapFromCode(code: string): EncodedSourceMap | undefined {
   );
   if (!m?.[1]) return undefined;
   try {
-    return JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as EncodedSourceMap;
+    return asSourceMap(Buffer.from(m[1], "base64").toString("utf8"));
   } catch {
     return undefined;
   }
@@ -75,7 +106,7 @@ function mapFromTransform(result: {
   const raw = result.map;
   if (raw && typeof raw === "string") {
     try {
-      return JSON.parse(raw) as EncodedSourceMap;
+      return asSourceMap(raw);
     } catch {
       return sourceMapFromCode(result.code);
     }
@@ -84,12 +115,12 @@ function mapFromTransform(result: {
   return sourceMapFromCode(result.code);
 }
 
-export function parseStackLocs(frames: unknown): StackLoc[] {
+export function parseStackLocs(frames: SceneValue): StackLoc[] {
   if (!Array.isArray(frames)) return [];
   const locs: StackLoc[] = [];
   for (const f of frames) {
     if (!f || typeof f !== "object") continue;
-    const rec = f as Record<string, unknown>;
+    const rec = f;
     if (
       typeof rec.file !== "string" ||
       typeof rec.line !== "number" ||

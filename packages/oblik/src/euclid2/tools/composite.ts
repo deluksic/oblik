@@ -1,4 +1,4 @@
-import type { TraceNode } from "#eval/context";
+import type { SceneValue, TraceNode } from "#eval/context";
 import { withEval, type EvalCtx } from "#eval/context";
 import type { Region } from "#geom";
 import { signedDistToRegion } from "#geom/region";
@@ -386,8 +386,8 @@ function argHint(arg: ToolArg): string {
  * placement renders alongside live geometry of the first.
  */
 export function runToolTrace(
-  fn: (...values: unknown[]) => unknown,
-  values: readonly unknown[],
+  fn: (...values: SceneValue[]) => SceneValue,
+  values: readonly SceneValue[],
 ): TraceNode[] {
   const ctx: EvalCtx = {
     draft: new Map(),
@@ -527,9 +527,9 @@ export function compileComposite(reg: RegisteredTool): Tool<CompS> {
         (a) => a.kind === "point" || a.kind === "region" || a.kind === "segment",
       );
       if (hasCanvas && !engaged(session)) return undefined;
-      const values: unknown[] = [];
+      const values: SceneValue[] = [];
       for (const arg of session.tool.args) {
-        let v: unknown;
+        let v: SceneValue;
         if (arg.kind === "point") {
           v = pointValue(session, scope, arg.label);
           if (v === undefined && session.focus === arg.label && place) {

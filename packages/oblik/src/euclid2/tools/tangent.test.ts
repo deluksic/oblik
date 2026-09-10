@@ -106,10 +106,10 @@ describe("tangent tool", () => {
     const s0 = startTool("tangent");
     const c1 = clickTool(s0, hitCircle("C", circleC, { x: 0.5, y: 1.2 }), scope);
     if (!("session" in c1)) throw new Error("expected session");
-    const s1 = c1.session as TSession;
+    const s1 = c1.session;
     const p1 = clickTool(s1, hit(free(2, 0)), scope);
     if (!("session" in p1)) throw new Error("expected session");
-    const s2 = p1.session as TSession;
+    const s2 = p1.session;
     const done = clickTool(s2, hit(free(-4, 3.46)), scope);
     if (!("insert" in done)) throw new Error("expected insert");
     expect(done.insert.from).toBe("tangentPointCircle");
@@ -124,10 +124,10 @@ describe("tangent tool", () => {
     const s0 = startTool("tangent");
     const c1 = clickTool(s0, hitCircle("C", circleC, { x: -1, y: 0 }), scope);
     if (!("session" in c1)) throw new Error("expected session");
-    const s1 = c1.session as TSession;
+    const s1 = c1.session;
     const c2 = clickTool(s1, hitCircle("D", circleD, { x: 5, y: -1 }), scope);
     if (!("session" in c2)) throw new Error("expected session");
-    const s2 = c2.session as TSession;
+    const s2 = c2.session;
 
     const g = ghostOf(s2, hit(free(2.5, 1.4)), scope);
     if (g?.kind !== "tangent") throw new Error("expected tangent ghost");
@@ -164,10 +164,10 @@ describe("tangent tool", () => {
     const s0 = startTool("tangent");
     const p1 = clickTool(s0, hit(free(0.4, 0)), scope);
     if (!("session" in p1)) throw new Error("expected session");
-    const s1 = p1.session as TSession;
+    const s1 = p1.session;
     const c1 = clickTool(s1, hitCircle("C", circleC, { x: 0.5, y: 1.2 }), scope);
     if (!("session" in c1)) throw new Error("expected session");
-    const s2 = c1.session as TSession;
+    const s2 = c1.session;
     expect(ghostOf(s2, hit(free(0.5, 1.2)), scope)).toBeUndefined();
     const step = commitTool(s2, hit(free(0.5, 1.2)), scope);
     expect(step).toBeUndefined();
@@ -179,7 +179,7 @@ describe("tangent tool", () => {
     const s0 = startTool("tangent");
     const p1 = clickTool(s0, hit(free(2, 0)), scope);
     if (!("session" in p1)) throw new Error("expected session");
-    const p2 = clickTool(p1.session as TSession, hit(free(3, 1)), scope);
+    const p2 = clickTool(p1.session, hit(free(3, 1)), scope);
     if (!("session" in p2)) throw new Error("expected session");
     const s = p2.session as TSession;
     const op = s.a;

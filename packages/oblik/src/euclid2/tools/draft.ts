@@ -90,7 +90,7 @@ export function lengthError(raw: string, scope: Scope): string | undefined {
 const REF_TABLES: Record<
   RefLooks,
   {
-    table: (scope: Scope) => Readonly<Record<string, unknown>>;
+    table: (scope: Scope) => Readonly<Record<string, SlotValue[RefLooks]>>;
     names: (scope: Scope) => string[];
     label: string;
   }

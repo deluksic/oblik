@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../eval/context";
+import type { TraceNode, TraceNodeOf } from "../eval/context";
 import {
   hitTest,
   hitsNear,
@@ -11,7 +11,7 @@ import {
   snapStrokeCarrier,
 } from "./pick";
 
-const A = {
+const A: TraceNodeOf<"point"> = {
   id: "o_a",
   occ: 0,
   kind: "point",
@@ -19,16 +19,16 @@ const A = {
   bind: "A",
   editable: true,
   stack: [{ file: "scene.ts", line: 10, column: 4, name: "build" }],
-} as TraceNode;
+};
 
-const SEG = {
+const SEG: TraceNodeOf<"segment"> = {
   id: "o_s",
   occ: 0,
   kind: "segment",
   value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
   editable: false,
   stack: [{ file: "scene.ts", line: 16, column: 4 }],
-} as TraceNode;
+};
 
 const camera = { x: 0, y: 0, scale: 48 };
 const size = { w: 800, h: 600 };
@@ -79,28 +79,28 @@ describe("hitTest", () => {
   });
 
   test("prefers points over overlapping circle and line", () => {
-    const P = {
+    const P: TraceNodeOf<"point"> = {
       ...A,
       id: "o_p",
       bind: "P",
       value: { kind: "point", x: 2, y: 0 },
-    } as TraceNode;
-    const CIRCLE = {
+    };
+    const CIRCLE: TraceNodeOf<"circle"> = {
       id: "o_c",
       occ: 0,
       kind: "circle",
       value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
       editable: false,
       stack: [{ file: "scene.ts", line: 14, column: 4 }],
-    } as TraceNode;
-    const LINE = {
+    };
+    const LINE: TraceNodeOf<"line"> = {
       id: "o_l",
       occ: 0,
       kind: "line",
       value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       editable: false,
       stack: [{ file: "scene.ts", line: 12, column: 4 }],
-    } as TraceNode;
+    };
     const hits = hitsNear([CIRCLE, LINE, P], { x: 2, y: 0 }, camera, size);
     expect(hits[0]?.id).toBe("o_p");
   });
@@ -113,7 +113,7 @@ describe("polygon fills", () => {
     { x: 4, y: 4 },
     { x: 0, y: 4 },
   ];
-  const POLY = {
+  const POLY: TraceNodeOf<"polygon"> = {
     id: "o_pg",
     occ: 0,
     kind: "polygon",
@@ -121,8 +121,8 @@ describe("polygon fills", () => {
     bind: "gear",
     editable: false,
     stack: [{ file: "scene.ts", line: 20, column: 4 }],
-  } as TraceNode;
-  const BORE = {
+  };
+  const BORE: TraceNodeOf<"polygon"> = {
     ...POLY,
     id: "o_pb",
     value: {
@@ -130,7 +130,7 @@ describe("polygon fills", () => {
       boundary,
       holes: [{ kind: "circle", center: { x: 2, y: 2 }, radius: 0.5 }],
     },
-  } as TraceNode;
+  };
 
   test("picks a polygon face inside its fill", () => {
     const hit = hitTest([POLY], { x: 2, y: 1 }, camera, size);
@@ -143,12 +143,12 @@ describe("polygon fills", () => {
   });
 
   test("points and strokes win over a polygon fill", () => {
-    const onFace = {
+    const onFace: TraceNodeOf<"point"> = {
       ...A,
       id: "o_p",
       bind: "P",
       value: { kind: "point", x: 2, y: 2.4 },
-    } as TraceNode;
+    };
     const hits = hitsNear([POLY, onFace], { x: 2, y: 2.4 }, camera, size);
     expect(hits[0]?.id).toBe("o_p");
   });
@@ -156,7 +156,7 @@ describe("polygon fills", () => {
 
 describe("snapLineCarrier", () => {
   test("snaps to the nearest named line-like stroke", () => {
-    const ground = {
+    const ground: TraceNodeOf<"line"> = {
       id: "o_g",
       occ: 0,
       kind: "line",
@@ -164,13 +164,13 @@ describe("snapLineCarrier", () => {
       value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       editable: false,
       stack: [],
-    } as TraceNode;
+    };
     const hit = snapLineCarrier([ground, A], { x: 1, y: 0.05 }, camera, size);
     expect(hit).toEqual({ bind: "ground", geom: ground.value });
   });
 
   test("snaps to parallel offset lines as carriers", () => {
-    const ground = {
+    const ground: TraceNodeOf<"line"> = {
       id: "o_g",
       occ: 0,
       kind: "line",
@@ -178,8 +178,8 @@ describe("snapLineCarrier", () => {
       value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       editable: false,
       stack: [],
-    } as TraceNode;
-    const shelf = {
+    };
+    const shelf: TraceNodeOf<"parallelLine"> = {
       id: "o_par",
       occ: 0,
       kind: "parallelLine",
@@ -191,7 +191,7 @@ describe("snapLineCarrier", () => {
       },
       editable: true,
       stack: [],
-    } as TraceNode;
+    };
     expect(snapLineCarrier([shelf], { x: 2, y: 1.85 }, camera, size)).toEqual({
       bind: "shelf",
       geom: shelf.value,
@@ -208,7 +208,7 @@ describe("region pick", () => {
   const ab = { kind: "segment" as const, a: Pa, b: Pb };
   const bc = { kind: "segment" as const, a: Pb, b: Pc };
   const ca = { kind: "segment" as const, a: Pc, b: Pa };
-  const AB = {
+  const AB: TraceNodeOf<"segment"> = {
     id: "o_ab",
     occ: 0,
     kind: "segment",
@@ -216,8 +216,8 @@ describe("region pick", () => {
     value: ab,
     editable: false,
     stack: [],
-  } as TraceNode;
-  const BC = {
+  };
+  const BC: TraceNodeOf<"segment"> = {
     id: "o_bc",
     occ: 0,
     kind: "segment",
@@ -225,8 +225,8 @@ describe("region pick", () => {
     value: bc,
     editable: false,
     stack: [],
-  } as TraceNode;
-  const CA = {
+  };
+  const CA: TraceNodeOf<"segment"> = {
     id: "o_ca",
     occ: 0,
     kind: "segment",
@@ -234,8 +234,8 @@ describe("region pick", () => {
     value: ca,
     editable: false,
     stack: [],
-  } as TraceNode;
-  const FACE = {
+  };
+  const FACE: TraceNodeOf<"region"> = {
     id: "o_pr",
     occ: 0,
     kind: "region",
@@ -251,7 +251,7 @@ describe("region pick", () => {
     },
     editable: false,
     stack: [],
-  } as TraceNode;
+  };
 
   test("fill is last behind a point and a stroke", () => {
     const hits = hitsNear([FACE, SEG, A], { x: 0.05, y: 0.04 }, camera, size);
@@ -315,7 +315,7 @@ describe("region pick", () => {
       bind: "stock",
       stack: [{ file: "scene.ts", line: 10, column: 4 }],
     };
-    const FACE_CSG = {
+    const FACE_CSG: TraceNodeOf<"csg2"> = {
       id: "o_face",
       occ: 0,
       kind: "csg2",
@@ -327,8 +327,8 @@ describe("region pick", () => {
       },
       editable: false,
       stack: [{ file: "scene.ts", line: 20, column: 4 }],
-    } as TraceNode;
-    const SLICE = {
+    };
+    const SLICE: TraceNodeOf<"csg2"> = {
       id: "o_left",
       occ: 0,
       kind: "csg2",
@@ -347,14 +347,14 @@ describe("region pick", () => {
       },
       editable: false,
       stack: [{ file: "scene.ts", line: 30, column: 4 }],
-    } as TraceNode;
+    };
     const hits = hitsNear([STOCK, FACE_CSG, SLICE], { x: 0.5, y: 1 }, camera, size);
     expect(hits[0]?.id).toBe("o_left");
     expect(hits.some((n) => n.id === "o_face")).toBe(true);
   });
 
   test("region fill picks before the stock region", () => {
-    const FACE_REGION = {
+    const FACE_REGION: TraceNodeOf<"csg2"> = {
       id: "o_face",
       occ: 0,
       kind: "csg2",
@@ -366,7 +366,7 @@ describe("region pick", () => {
       },
       editable: false,
       stack: [{ file: "scene.ts", line: 40, column: 4 }],
-    } as TraceNode;
+    };
     const hits = hitsNear([FACE, FACE_REGION], { x: 1, y: 1 }, camera, size);
     expect(hits[0]?.id).toBe("o_face");
     expect(hits.some((n) => n.id === "o_pr")).toBe(true);

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import type { TraceValue } from "#eval/context";
+
 import type { TraceNode } from "#eval/context";
 
 import {
@@ -11,12 +13,16 @@ import {
   labelBoxAt,
 } from "./labelPlacement";
 
-/** Only the fields the label path reads; the rest is cast away as in pick.test.ts. */
-function node(value: unknown, bind?: string): TraceNode {
+/**
+ * Only the fields the label path reads. `kind` is derived from `value`, so the
+ * pair is consistent by construction; the assertion states that correlation for
+ * a generic `V`.
+ */
+function node<V extends TraceValue>(value: V, bind?: string): TraceNode {
   return {
     id: "o_a",
     occ: 0,
-    kind: (value as { kind: string }).kind,
+    kind: value.kind,
     value,
     bind,
     editable: true,
@@ -30,7 +36,7 @@ const GLIDER = node(
   "g",
 );
 const SEGMENT = node({ kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }, "s");
-const SLIDER = node({ kind: "slider", n: 1 }, "r");
+const SLIDER = node({ kind: "slider", n: 1, min: 0, max: 2, step: 0.1 }, "r");
 const NAN_POINT = node({ kind: "point", x: Number.NaN, y: 3 }, "bad");
 
 describe("isBindLabelNode", () => {

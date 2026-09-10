@@ -2,6 +2,16 @@ import type { Branch, Circle, Line, LineLike, ParallelLine } from "./types";
 import { add, cross2, dist, dot, isFiniteVec, mul, norm, perp, sub, vec, type Vec2 } from "./vec";
 
 const { abs, max, sqrt } = Math;
+
+/**
+ * A stroke on a carrier family. Kind-only, like the other operand guards, so it
+ * narrows a `Geom` — a `Set` membership test reads the same but tells the
+ * compiler nothing, which is why this is a predicate.
+ */
+export function isLineLike(value: { kind: string }): value is LineLike {
+  return value.kind === "segment" || value.kind === "line" || value.kind === "parallelLine";
+}
+
 export function lineBasis(g: LineLike): { origin: Vec2; dir: Vec2 } {
   if (g.kind === "line") return { origin: g.origin, dir: g.direction };
   if (g.kind === "parallelLine") return { origin: g.line.origin, dir: g.line.direction };

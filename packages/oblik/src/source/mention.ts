@@ -1,5 +1,7 @@
 import * as ts from "typescript";
 
+import type { SiteSpec } from "../eval/site";
+
 import { siteSpecs, trailingId } from "./analyze";
 
 export type ReturnField = {
@@ -153,7 +155,7 @@ function unwrap(expr: ts.Expression): ts.Expression {
   return e;
 }
 
-function ctorId(call: ts.CallExpression, specs: Map<string, unknown>): string | undefined {
+function ctorId(call: ts.CallExpression, specs: Map<string, SiteSpec>): string | undefined {
   if (!ts.isIdentifier(call.expression)) return undefined;
   if (!specs.has(call.expression.text)) return undefined;
   const { id } = trailingId(call);
@@ -162,7 +164,7 @@ function ctorId(call: ts.CallExpression, specs: Map<string, unknown>): string | 
 
 function bindToIdInFn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   const body = fnBody(fn);
@@ -196,7 +198,7 @@ function bindToIdInFn(
 
 function idsInFn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): { ids: string[]; onceIds: string[] } {
   const ids: string[] = [];
   const onceIds: string[] = [];
@@ -224,7 +226,7 @@ function idsInFn(
 function fieldFromInit(
   init: ts.Expression,
   bindToId: Record<string, string>,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): Pick<ReturnField, "bind" | "id"> {
   const e = unwrap(init);
   if (ts.isIdentifier(e)) return { bind: e.text, id: bindToId[e.text] };
@@ -238,7 +240,7 @@ function fieldFromInit(
 function analyzeReturn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
   bindToId: Record<string, string>,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): FnReturn {
   const body = fnBody(fn);
   if (!body) {
@@ -278,7 +280,7 @@ function analyzeReturn(
 function bagOf(
   obj: ts.ObjectLiteralExpression,
   bindToId: Record<string, string>,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): FnReturn {
   const fields: ReturnField[] = [];
   for (const p of obj.properties) {
@@ -334,7 +336,7 @@ const GEOM_HELPERS = new Set([
 function callsInFn(
   fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
   sf: ts.SourceFile,
-  specs: Map<string, unknown>,
+  specs: Map<string, SiteSpec>,
 ): HelperCall[] {
   const out: HelperCall[] = [];
   const body = fn.body;

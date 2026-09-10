@@ -106,12 +106,12 @@ export function chainEdges(points: readonly Vec2[]): LoopEdge[] {
  * everything else compiles through `evaluateRegions` (WeakMap-cached). */
 export function islandsOfValue(value: Region | Polygon | CsgOperand): Region[] {
   if (value.kind === "polygon") {
-    const p = value as Polygon;
+    const p = value;
     const outer = chainEdges(p.boundary);
     if (outer.length === 0) return [];
-    return [{ kind: "region", outer, holes: p.holes as Loop[] }];
+    return [{ kind: "region", outer, holes: p.holes  }];
   }
-  return evaluateRegions(value as CsgOperand);
+  return evaluateRegions(value);
 }
 
 /** One island's loops → fill spans, normalized: outer CCW, holes CW. */

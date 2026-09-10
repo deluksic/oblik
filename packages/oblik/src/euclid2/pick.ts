@@ -1,5 +1,5 @@
-import type { TraceNode } from "../eval/context";
-import type { Aabb, Circle, Line, LineLike, ParallelLine, Point, Region, Segment } from "../geom";
+import type { TraceInv, TraceNode } from "../eval/context";
+import { isLineLike, type Aabb, type Circle, type LineLike, type Region } from "../geom";
 import {
   distToCsg,
   distToPolygon,
@@ -28,9 +28,23 @@ export type Vec2 = { x: number; y: number };
 export type SnapPoint = { id: string; bind: string; at: Vec2 };
 
 /** When `keys` is set, only those tape nodes (`id:occ`) are snap-eligible. */
+/**
+ * What a print callback and the print lookups need from a node: its identity
+ * (`id:occ`), its bind, and the invocation it came from. Callers legitimately
+ * reach `nodeByPrint` with either a full trace or an `id`/`occ`/`bind`
+ * projection, so the callbacks are typed against the fields both carry rather
+ * than against the whole node — which is also all `mentionExpr` reads.
+ */
+export type SnapNode = {
+  id: string;
+  occ: number;
+  bind?: string;
+  inv?: TraceInv;
+};
+
 export type SnapFilter = {
   keys?: ReadonlySet<string>;
-  print?: (n: TraceNode) => string | undefined;
+  print?: (n: SnapNode) => string | undefined;
 };
 
 const GEOM_PX = 8;
@@ -46,7 +60,7 @@ export function snapPrint(n: TraceNode, filter?: SnapFilter): string {
   return filter?.print?.(n) ?? n.bind ?? n.id;
 }
 
-export function traceKey(n: TraceNode): string {
+export function traceKey(n: SnapNode): string {
   return `${n.id}:${n.occ}`;
 }
 
@@ -67,14 +81,14 @@ export function nodeByTraceAttr(trace: readonly TraceNode[], attr: string): Trac
 
 /** First named node whose print or tape bind matches `print` (`plate.origin` or `origin`). */
 export function nodeByPrint(
-  trace: readonly { occ: number; bind?: string; id: string }[],
+  trace: readonly SnapNode[],
   print: string,
   filter?: SnapFilter,
 ): { id: string } | undefined {
   const last = print.includes(".") ? print.slice(print.lastIndexOf(".") + 1) : print;
   return trace.find((n) => {
     if (filter?.keys && !filter.keys.has(`${n.id}:${n.occ}`)) return false;
-    const shown = filter?.print?.(n as TraceNode) ?? n.bind;
+    const shown = filter?.print?.(n) ?? n.bind;
     return shown === print || n.bind === print || n.bind === last;
   });
 }
@@ -100,21 +114,21 @@ export function isFiniteTrace(n: TraceNode): boolean {
 function geomDistWorld(world: Vec2, n: TraceNode): number {
   const v = n.value;
   if (v.kind === "slider") return Infinity;
-  if (v.kind === "point") return dist(world, v as Point);
+  if (v.kind === "point") return dist(world, v);
   if (v.kind === "segment") {
-    const s = v as Segment;
+    const s = v;
     return distToSegment(world, s.a, s.b);
   }
   if (v.kind === "line") {
-    const l = v as Line;
+    const l = v;
     return distToLine(world, l.origin, l.direction);
   }
   if (v.kind === "parallelLine") {
-    const { origin, dir } = lineBasis(v as ParallelLine);
+    const { origin, dir } = lineBasis(v);
     return distToLine(world, origin, dir);
   }
   if (v.kind === "circle") {
-    const c = v as Circle;
+    const c = v;
     return abs(dist(world, c.center) - abs(c.radius));
   }
   if (isRegion(v)) return distToRegion(v, world);
@@ -266,8 +280,6 @@ export function movedPastClick(fromX: number, fromY: number, toX: number, toY: n
   return dx * dx + dy * dy >= PICK_CLICK_PX2;
 }
 
-const LINE_LIKE = new Set(["line", "segment", "parallelLine"]);
-
 /** Nearest named line-like stroke under the pointer (ignores points). */
 export function snapLineCarrier(
   trace: readonly TraceNode[],
@@ -280,11 +292,12 @@ export function snapLineCarrier(
   let best: { bind: string; geom: LineLike; d: number } | undefined = undefined;
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
-    if (!LINE_LIKE.has(n.value.kind)) continue;
+    const v = n.value;
+    if (!isLineLike(v)) continue;
     if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: n.value as LineLike, d };
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : undefined;
 }
@@ -329,12 +342,10 @@ export function snapRegion(
   return best ? { bind: best.bind, geom: best.geom, id: best.id } : undefined;
 }
 
-const STROKE = new Set(["line", "segment", "parallelLine", "circle"]);
-
 export type StrokeCarrier = { bind: string; geom: LineLike | Circle };
 
 function isNamedStroke(n: TraceNode, filter?: SnapFilter): boolean {
-  return snapEligible(n, filter) && STROKE.has(n.value.kind);
+  return snapEligible(n, filter) && (isLineLike(n.value) || n.value.kind === "circle");
 }
 
 function strokeWithin(n: TraceNode, at: Vec2, camera: Camera2, maxPx: number): boolean {
@@ -376,8 +387,9 @@ export function snapStrokeCarrier(
     if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d)
-      best = { bind: snapPrint(n, filter), geom: n.value as LineLike | Circle, d };
+    const v = n.value;
+    if (!isLineLike(v) && v.kind !== "circle") continue;
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, d };
   }
   return best ? { bind: best.bind, geom: best.geom } : undefined;
 }

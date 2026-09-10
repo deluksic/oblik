@@ -20,7 +20,16 @@ import {
   walkContains,
   walkEdges,
 } from "./region";
-import type { Branch, Circle, LineLike, Loop, LoopEdge, Region } from "./types";
+import type {
+  Branch,
+  Circle,
+  CsgOperand,
+  LineLike,
+  Loop,
+  LoopEdge,
+  Offset,
+  Region,
+} from "./types";
 import {
   add,
   cross2,
@@ -850,7 +859,7 @@ export function roundOffsetValue(
 }
 
 /** Flatten nested offsets to a region source + net distance, then compile. */
-export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: number }): Region[] {
+export function compileOffsetBoundary(op: Offset): Region[] {
   const hit = offsetBoundaryCache.get(op);
   if (hit) return hit;
   const out = compileOffsetBoundaryFresh(op);
@@ -860,16 +869,15 @@ export function compileOffsetBoundary(op: { kind: "offset"; of: unknown; d: numb
 
 const offsetBoundaryCache = new WeakMap<object, Region[]>();
 
-function compileOffsetBoundaryFresh(op: { kind: "offset"; of: unknown; d: number }): Region[] {
+function compileOffsetBoundaryFresh(op: Offset): Region[] {
   let d = op.d;
-  let node: unknown = op.of;
-  while (node && typeof node === "object" && (node as { kind?: string }).kind === "offset") {
-    const inner = node as { of: unknown; d: number };
-    d += inner.d;
-    node = inner.of;
+  let node: CsgOperand = op.of;
+  while (node && typeof node === "object" && node.kind === "offset") {
+    d += node.d;
+    node = node.of;
   }
-  if (!node || typeof node !== "object" || (node as { kind?: string }).kind !== "region") return [];
-  return roundOffsetValue(node as Region, d);
+  if (!node || typeof node !== "object" || node.kind !== "region") return [];
+  return roundOffsetValue(node, d);
 }
 
 type FilletJoin = { t0: Vec2; t1: Vec2; carrier: Circle; k: Branch };

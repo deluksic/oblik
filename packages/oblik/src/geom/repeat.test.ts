@@ -6,7 +6,7 @@ import {
   operandAabb,
   operandSdf,
   polarRepeatValue,
-  asOperand,
+  isCsgOperand,
   nanPolarRepeat,
   repeatAabb,
 } from "./csg2";
@@ -95,7 +95,7 @@ describe("polarRepeat value", () => {
   test("it is a fill geometry and nests as a CSG operand", () => {
     const rep = polarRepeatValue(tooth, 12, { x: 0, y: 0 }, 0);
     expect(isFillGeom(rep)).toBe(true);
-    expect(asOperand(rep)).toBe(rep);
+    expect(isCsgOperand(rep)).toBe(true);
     // Nested inside a boolean: the repeat's distance is the leaf's.
     const cut: CsgOperand = { kind: "circle", center: { x: 0, y: 0 }, radius: 0.5 };
     const diffed: CsgOperand = { kind: "csg2", op: "diff", of: [rep, cut] };

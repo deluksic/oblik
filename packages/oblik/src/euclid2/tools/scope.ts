@@ -6,7 +6,7 @@ import { gliderAt, isGlider } from "#geom/gliders";
 import { member, printExpr, type Expr } from "#source/expr";
 import { fnNamed, insertPointNames, type MentionFile, type MentionFn } from "#source/mention";
 
-import { isFiniteTrace, traceKey, type SnapFilter } from "../pick";
+import { isFiniteTrace, traceKey, type SnapFilter, type SnapNode } from "../pick";
 import type { Placed, Scope } from "./types";
 
 export const EMPTY_SCOPE: Scope = {
@@ -148,13 +148,13 @@ function put(
     scope.points[key] = { expr, at: gliderAt(n.value) };
   }
   if (n.value.kind === "line" || n.value.kind === "segment" || n.value.kind === "parallelLine") {
-    scope.carriers[key] = { expr, geom: n.value as LineLike };
+    scope.carriers[key] = { expr, geom: n.value  };
   }
   if (n.value.kind === "circle") {
-    scope.circles[key] = { expr, geom: n.value as Circle };
+    scope.circles[key] = { expr, geom: n.value  };
   }
   if (n.value.kind === "region") {
-    scope.regions[key] = { expr, geom: n.value as Region };
+    scope.regions[key] = { expr, geom: n.value  };
   }
   if (n.value.kind === "slider") {
     if (expr.kind === "ref") scope.lengths[expr.name] = n.value.n;
@@ -215,7 +215,7 @@ export function scopeFromTrace(
   return { ...scope, prints: undefined };
 }
 
-export function mentionExpr(scope: Scope, n: TraceNode): Expr | undefined {
+export function mentionExpr(scope: Scope, n: SnapNode): Expr | undefined {
   return (
     scope.prints?.[traceKey(n)] ??
     (n.inv ? scope.byId[`${n.id}@${n.inv.serial}`] : undefined) ??
@@ -223,7 +223,7 @@ export function mentionExpr(scope: Scope, n: TraceNode): Expr | undefined {
   );
 }
 
-export function mentionPrint(scope: Scope, n: TraceNode): string | undefined {
+export function mentionPrint(scope: Scope, n: SnapNode): string | undefined {
   const expr = mentionExpr(scope, n);
   return expr ? printExpr(expr) : undefined;
 }
@@ -246,24 +246,13 @@ export function toolScope(ctx: { scope?: Scope; trace: readonly TraceNode[] }): 
   return ctx.scope ?? scopeFromTrace(ctx.trace);
 }
 
-type LooseScope = {
-  used: readonly string[];
-  points?: Record<string, unknown>;
-  carriers?: Record<string, unknown>;
-  circles?: Record<string, unknown>;
-  regions?: Record<string, unknown>;
-  lengths?: Record<string, number>;
-  byId?: Record<string, unknown>;
-  prints?: Record<string, unknown>;
-  liveKeys?: ReadonlySet<string>;
-};
-
-export type ScopeInput = Scope | readonly string[] | LooseScope;
+/** A full scope, a bare `used` list, or a partial scope for embeds and tests. */
+export type ScopeInput = Scope | readonly string[] | Partial<Scope>;
 
 export function scopeOf(x?: ScopeInput): Scope {
   if (!x) return EMPTY_SCOPE;
   if (Array.isArray(x)) return { ...EMPTY_SCOPE, used: x };
-  return { ...EMPTY_SCOPE, ...(x as Partial<Scope>) };
+  return { ...EMPTY_SCOPE, ...x };
 }
 
 export type { TraceInv };

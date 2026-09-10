@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "./context";
+import type { TraceNode, TraceNodeOf } from "./context";
 import { carryTraceInv, reusePaintStrokes, reuseUnchangedTrace, sameDrawNode } from "./reuse-trace";
 
 function point(id: string, x: number, y = 0, occ = 0): TraceNode {
@@ -42,7 +42,7 @@ describe("reuseUnchangedTrace", () => {
 
   test("reusePaintStrokes keeps wrappers when paint, geom, and style match", () => {
     const geom = point("o_a", 1, 2);
-    const paint = {
+    const paint: TraceNodeOf<"paint"> = {
       id: "o_p",
       occ: 0,
       kind: "paint",
@@ -53,7 +53,7 @@ describe("reuseUnchangedTrace", () => {
       },
       editable: false,
       stack: [],
-    } as TraceNode;
+    };
     const style = { kind: "style" as const, stroke: "#000" };
     const prev = [{ paint, geom, style }];
     const next = [{ paint, geom, style: { kind: "style" as const, stroke: "#000" } }];

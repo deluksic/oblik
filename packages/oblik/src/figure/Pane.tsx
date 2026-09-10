@@ -2,11 +2,11 @@ import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js"
 
 import { traceKey } from "../euclid2/pick";
 import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../euclid2/tool";
-import type { TraceNode } from "../eval/context";
+import type { SceneValue, TraceNode } from "../eval/context";
 import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
 import { newEvalMemo, type EvalMemo } from "../eval/memo";
-import { isPaint, type PaintValue } from "../eval/paint";
+import { isPaint } from "../eval/paint";
 import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
@@ -230,7 +230,7 @@ export function FigurePane(props: FigurePaneProps) {
     },
   );
 
-  async function postJson(url: string, body: unknown): Promise<boolean> {
+  async function postJson(url: string, body: Record<string, SceneValue>): Promise<boolean> {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -260,7 +260,7 @@ export function FigurePane(props: FigurePaneProps) {
 
   function geomForPaint(paint: TraceNode): TraceNode | undefined {
     if (!isPaint(paint.value)) return undefined;
-    const t = (paint.value as PaintValue).targets[0];
+    const t = (paint.value).targets[0];
     if (!t) return undefined;
     return world().trace.find((n) => n.id === t.id && n.occ === t.occ);
   }

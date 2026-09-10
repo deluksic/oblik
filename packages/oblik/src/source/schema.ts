@@ -1,5 +1,6 @@
 import * as v from "valibot";
 
+import type { SceneValue } from "../eval/context";
 import type { Expr } from "./expr";
 
 export const literalPatchSchema = v.object({
@@ -11,7 +12,7 @@ export const literalPatchSchema = v.object({
 
 export type LiteralPatch = v.InferOutput<typeof literalPatchSchema>;
 
-export function parseLiteralPatch(raw: unknown): LiteralPatch | string {
+export function parseLiteralPatch(raw: SceneValue): LiteralPatch | string {
   const r = v.safeParse(literalPatchSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -67,7 +68,7 @@ export const insertSchema = v.object({
 
 export type InsertBody = v.InferOutput<typeof insertSchema>;
 
-export function parseInsert(raw: unknown): InsertBody | string {
+export function parseInsert(raw: SceneValue): InsertBody | string {
   const r = v.safeParse(insertSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -81,7 +82,7 @@ export const paintPatchSchema = v.object({
 
 export type PaintPatchBody = v.InferOutput<typeof paintPatchSchema>;
 
-export function parsePaintPatch(raw: unknown): PaintPatchBody | string {
+export function parsePaintPatch(raw: SceneValue): PaintPatchBody | string {
   const r = v.safeParse(paintPatchSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -94,7 +95,7 @@ export const eraseSchema = v.object({
 
 export type EraseBody = v.InferOutput<typeof eraseSchema>;
 
-export function parseErase(raw: unknown): EraseBody | string {
+export function parseErase(raw: SceneValue): EraseBody | string {
   const r = v.safeParse(eraseSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -112,7 +113,7 @@ export const frameEditSchema = v.object({
 
 export type FrameEditBody = v.InferOutput<typeof frameEditSchema>;
 
-export function parseFrameEdit(raw: unknown): FrameEditBody | string {
+export function parseFrameEdit(raw: SceneValue): FrameEditBody | string {
   const r = v.safeParse(frameEditSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -126,7 +127,7 @@ export const exposeSchema = v.object({
 
 export type ExposeBody = v.InferOutput<typeof exposeSchema>;
 
-export function parseExpose(raw: unknown): ExposeBody | string {
+export function parseExpose(raw: SceneValue): ExposeBody | string {
   const r = v.safeParse(exposeSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
@@ -139,7 +140,7 @@ export const openSchema = v.object({
 
 export type OpenBody = v.InferOutput<typeof openSchema>;
 
-export function parseOpen(raw: unknown): OpenBody | string {
+export function parseOpen(raw: SceneValue): OpenBody | string {
   const r = v.safeParse(openSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
-import type { CsgOperand, Loop, LoopEdge, Region, Vec2 } from "#geom";
+import type { CsgOperand, Loop, LoopEdge, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 
 import { evaluate } from "../../eval/evaluate";
@@ -88,7 +88,7 @@ async function demoFills(): Promise<{
       let segs = 0;
       let arcs = 0;
       // The span path allocates exactly what `islandGeomOf` hands the adapter.
-      for (const block of islandGeomOf(n.value as Region).spans) {
+      for (const block of islandGeomOf(n.value).spans) {
         segs += block.segs.length;
         arcs += block.arcs.length;
       }

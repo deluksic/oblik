@@ -1,5 +1,5 @@
 import type { Geom } from "../geom";
-import { nodeOf, type TraceNode } from "./context";
+import { isSceneBag, nodeOf, type SceneValue, type TraceNode } from "./context";
 
 export type FigurePointMark = "dot" | "open" | "none";
 
@@ -22,23 +22,23 @@ export type PaintValue = {
   style: FigureStyle;
 };
 
-export function isStyle(value: unknown): value is FigureStyle {
+export function isStyle(value: SceneValue): value is FigureStyle {
   return !!value && typeof value === "object" && (value as FigureStyle).kind === "style";
 }
 
 /** A `style()` value or a plain look bag. Not geom. */
-export function isLook(value: unknown): value is FigureStyle | StyleSpec {
+export function isLook(value: SceneValue): value is FigureStyle | StyleSpec {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const kind = (value as { kind?: unknown }).kind;
+  const kind = (value as { kind?: SceneValue }).kind;
   return kind === undefined || kind === "style";
 }
 
-export function lookOf(value: unknown): FigureStyle {
+export function lookOf(value: SceneValue): FigureStyle {
   if (!isLook(value)) throw new Error("paint needs a look object or a style()");
   return cloneStyle(value);
 }
 
-export function isPaint(value: unknown): value is PaintValue {
+export function isPaint(value: SceneValue): value is PaintValue {
   return !!value && typeof value === "object" && (value as PaintValue).kind === "paint";
 }
 
@@ -64,11 +64,10 @@ export function isGeomKind(kind: string): boolean {
   return GEOM_KINDS.has(kind);
 }
 
-function walkPainted(value: unknown, visit: (n: TraceNode) => void, seen: Set<object>): void {
+function walkPainted(value: SceneValue, visit: (n: TraceNode) => void, seen: Set<object>): void {
   if (!value || typeof value !== "object") return;
-  const obj = value as object;
-  if (seen.has(obj)) return;
-  seen.add(obj);
+  if (seen.has(value)) return;
+  seen.add(value);
   if (isStyle(value) || isPaint(value)) return;
   const n = nodeOf(value);
   if (n) {
@@ -79,13 +78,14 @@ function walkPainted(value: unknown, visit: (n: TraceNode) => void, seen: Set<ob
     for (const item of value) walkPainted(item, visit, seen);
     return;
   }
-  for (const item of Object.values(value as Record<string, unknown>)) {
+  if (!isSceneBag(value)) return;
+  for (const item of Object.values(value)) {
     walkPainted(item, visit, seen);
   }
 }
 
 /** Branded geom inside `object` (a bag is fine). Last occurrence of an id:occ wins. */
-export function collectPaintTargets(object: unknown): PaintTarget[] {
+export function collectPaintTargets(object: SceneValue): PaintTarget[] {
   const byKey = new Map<string, PaintTarget>();
   walkPainted(
     object,
@@ -102,7 +102,7 @@ export function paintsFromTrace(trace: readonly TraceNode[]): Map<string, Figure
   const out = new Map<string, FigureStyle>();
   for (const n of trace) {
     if (n.value.kind !== "paint") continue;
-    const p = n.value as PaintValue;
+    const p = n.value;
     for (const t of p.targets) out.set(paintKey(t.id, t.occ), p.style);
   }
   return out;
@@ -124,7 +124,7 @@ export function paintStrokesFromTrace(trace: readonly TraceNode[]): PaintStroke[
   const out: PaintStroke[] = [];
   for (const n of trace) {
     if (n.value.kind !== "paint") continue;
-    const p = n.value as PaintValue;
+    const p = n.value;
     for (const t of p.targets) {
       const g = geom.get(paintKey(t.id, t.occ));
       if (g) out.push({ paint: n, geom: g, style: p.style });
@@ -137,7 +137,7 @@ export function paintsCovering(trace: readonly TraceNode[], geom: TraceNode): Tr
   const key = paintKey(geom.id, geom.occ);
   return trace.filter((n) => {
     if (n.value.kind !== "paint") return false;
-    return (n.value as PaintValue).targets.some((t) => paintKey(t.id, t.occ) === key);
+    return (n.value).targets.some((t) => paintKey(t.id, t.occ) === key);
   });
 }
 

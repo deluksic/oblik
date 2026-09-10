@@ -15,7 +15,7 @@ import {
   stackForNode,
 } from "./selection-detail";
 
-const node = {
+const node: TraceNode = {
   id: "o_a",
   occ: 0,
   kind: "point",
@@ -28,7 +28,7 @@ const node = {
     { file: "node_modules/.vite/deps/dev-DEjxqSxT.js", line: 99, column: 1 },
     { file: "apps/demo/src/scenes/shelf.ts", line: 12, column: 6, name: "build" },
   ],
-} as TraceNode;
+};
 
 describe("stackForNode", () => {
   test("drops vite frames and pins the constructor site", () => {
@@ -513,22 +513,17 @@ export default defineScene({
 }
 `;
     const mentions = [analyzeMentions(helperSrc, helperFile)];
-    const traceNode = {
+    const traceNode: TraceNode = {
       id: "o_inl",
       occ: 0,
       kind: "line",
-      value: {
-        kind: "parallelLine",
-        origin: { x: 0, y: 0 },
-        direction: { x: 1, y: 0 },
-        distance: 0.2,
-      },
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       bind: "hLeft",
       editable: false,
       at: { line: 3, column: 4 },
       module: helperFile,
       stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
-    } as unknown as TraceNode;
+    };
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -562,22 +557,17 @@ export default defineScene({
 }
 `;
     const mentions = [analyzeMentions(helperSrc, helperFile)];
-    const traceNode = {
+    const traceNode: TraceNode = {
       id: "o_inl",
       occ: 0,
       kind: "line",
-      value: {
-        kind: "parallelLine",
-        origin: { x: 0, y: 0 },
-        direction: { x: 1, y: 0 },
-        distance: 0.2,
-      },
+      value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       bind: "hLeft",
       editable: false,
       at: { line: 3, column: 4 },
       module: helperFile,
       stack: [{ file: helperFile, line: 3, column: 4, name: "plate" }],
-    } as unknown as TraceNode;
+    };
     const orig = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);

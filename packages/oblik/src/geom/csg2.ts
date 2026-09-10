@@ -20,12 +20,12 @@ import { dist, isFiniteVec, type Vec2 } from "./vec";
 const { abs, max, min } = Math;
 export type Aabb = { minX: number; minY: number; maxX: number; maxY: number };
 
-export function isHalfPlane(v: unknown): v is HalfPlane {
-  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "halfPlane";
+export function isHalfPlane(v: { kind: string }): v is HalfPlane {
+  return v.kind === "halfPlane";
 }
 
-export function isOffset(v: unknown): v is Offset {
-  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "offset";
+export function isOffset(v: { kind: string }): v is Offset {
+  return v.kind === "offset";
 }
 
 export function isCsg2(v: { kind: string }): v is Csg2 {
@@ -36,18 +36,18 @@ export function isPick(v: { kind: string }): v is Pick {
   return v.kind === "pick";
 }
 
-export function isPolarRepeat(v: unknown): v is PolarRepeat {
-  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "polarRepeat";
+export function isPolarRepeat(v: { kind: string }): v is PolarRepeat {
+  return v.kind === "polarRepeat";
 }
 
 /** Unary CSG wrapping an offset leaf — `roundOffset` result. */
 export function isOffsetCsg(v: Csg2): boolean {
-  return v.of.length === 1 && isOffset(v.of[0]);
+  return offsetOfCsg(v) !== undefined;
 }
 
 export function offsetOfCsg(v: Csg2): Offset | undefined {
   const o = v.of[0];
-  return v.of.length === 1 && isOffset(o) ? o : undefined;
+  return v.of.length === 1 && o !== undefined && isOffset(o) ? o : undefined;
 }
 
 export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick | Polygon | PolarRepeat {
@@ -143,27 +143,33 @@ export function isFinitePick(p: Pick): boolean {
   return isFiniteOperand(p.of) && isFiniteVec(p.at);
 }
 
-export function asOperand(v: unknown): CsgOperand | undefined {
-  if (!v || typeof v !== "object") return undefined;
-  const k = (v as { kind?: string }).kind;
-  if (
-    k === "region" ||
-    k === "circle" ||
-    k === "csg2" ||
-    k === "halfPlane" ||
-    k === "offset" ||
-    k === "pick" ||
-    k === "polarRepeat"
-  )
-    return v as CsgOperand;
-  return undefined;
+/** The seven operand kinds. */
+const OPERAND_KINDS = new Set<CsgOperand["kind"]>([
+  "region",
+  "circle",
+  "csg2",
+  "halfPlane",
+  "offset",
+  "pick",
+  "polarRepeat",
+]);
+
+/**
+ * Gate for one operand. The type says what an authored scene promises; this says
+ * what the tape actually holds — scene source is evaluated as printed text, so a
+ * wrong kind arrives as a value, never as a compile error. A miss is NaN
+ * geometry (which the views omit), not a thrown error.
+ */
+export function isCsgOperand(v: CsgOperand): boolean {
+  return !!v && typeof v === "object" && OPERAND_KINDS.has(v.kind);
 }
 
-function asOperands(values: readonly unknown[]): CsgOperand[] | undefined {
+/** Same gate over a list: undefined unless every element is an operand. */
+function asOperands(operands: readonly CsgOperand[]): CsgOperand[] | undefined {
+  if (!Array.isArray(operands)) return undefined;
   const out: CsgOperand[] = [];
-  for (const item of values) {
-    const op = asOperand(item);
-    if (!op) return undefined;
+  for (const op of operands) {
+    if (!isCsgOperand(op)) return undefined;
     out.push(op);
   }
   return out;
@@ -173,7 +179,7 @@ export function offsetValue(of: CsgOperand, d: number): Offset {
   return { kind: "offset", of, d };
 }
 
-export function csg2Value(op: CsgOp, operands: readonly unknown[]): Csg2 {
+export function csg2Value(op: CsgOp, operands: readonly CsgOperand[]): Csg2 {
   const of = asOperands(operands);
   if (!of || of.length < 1) return nanCsg2();
   const r: Csg2 = { kind: "csg2", op, of };
@@ -185,10 +191,9 @@ export function wrapCsg(operand: CsgOperand): Csg2 {
   return { kind: "csg2", op: "union", of: [operand] };
 }
 
-export function pickValue(of: unknown, at: Vec2): Pick {
-  const op = asOperand(of);
-  if (!op || !isFiniteVec(at)) return nanPick();
-  const p: Pick = { kind: "pick", of: op, at: { x: at.x, y: at.y } };
+export function pickValue(of: CsgOperand, at: Vec2): Pick {
+  if (!isCsgOperand(of) || !at || typeof at !== "object") return nanPick();
+  const p: Pick = { kind: "pick", of, at: { x: at.x, y: at.y } };
   return isFinitePick(p) ? p : nanPick();
 }
 

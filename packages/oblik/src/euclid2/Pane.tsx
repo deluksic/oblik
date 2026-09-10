@@ -19,6 +19,7 @@ import {
 } from "../host/selection-detail";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import type { Annotation } from "../source/analyze";
+import type { InsertJob } from "./tools/types";
 import type { MentionFile } from "../source/mention";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
@@ -278,13 +279,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(undefined);
   }
 
-  async function insert(job: {
-    from: string;
-    args: unknown;
-    bind?: string;
-    patchVertex?: { id: string; index: number };
-    tool?: { module: string; prefix: string };
-  }) {
+  async function insert(job: InsertJob) {
     const dest = focus();
     const res = await fetch("/__oblik-insert", {
       method: "POST",
@@ -360,7 +355,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     const fail = writeError() ?? world().error;
     if (fail) return fail;
     if (tool())
-      return "Type into the prompt. Press , or Tab to advance to the next argument. Enter commits. Escape cancels.";
+      return "Type into the prompt. Press, or Tab to advance to the next argument. Enter commits. Escape cancels.";
     const ids = draftIds();
     if (ids.length > 0) return `Override ${ids.join(", ")} until the next build.`;
     return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";

@@ -9,13 +9,14 @@ import {
   regionContains,
   regionValue,
   walkEdges,
+  type WalkCycle,
 } from "./region";
 import type { Circle, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
 const { PI, cos, sin } = Math;
 function poly(pts: readonly Vec2[]): Region {
-  const cycle: unknown[] = [];
+  const cycle: WalkCycle = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!;
     const b = pts[(i + 1) % pts.length]!;
@@ -28,7 +29,7 @@ function seg(a: Vec2, b: Vec2): Segment {
   return { kind: "segment", a, b };
 }
 
-function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
+function rectCycle(x0: number, y0: number, x1: number, y1: number): WalkCycle {
   const bl = { x: x0, y: y0 };
   const br = { x: x1, y: y0 };
   const tr = { x: x1, y: y1 };
@@ -36,7 +37,7 @@ function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
   return [bl, seg(bl, br), br, seg(br, tr), tr, seg(tr, tl), tl, seg(tl, bl)];
 }
 
-function twoArcCircle(center: Vec2, r: number, k: 1 | -1 = 1): unknown[] {
+function twoArcCircle(center: Vec2, r: number, k: 1 | -1 = 1): WalkCycle {
   const P = { x: center.x + r, y: center.y };
   const Q = { x: center.x - r, y: center.y };
   const c: Circle = { kind: "circle", center, radius: r };
@@ -74,7 +75,7 @@ function roundedSquare(r: number): Region {
     { x: 1, y: 1 },
     { x: 0, y: 1 },
   ];
-  const cycle: unknown[] = [];
+  const cycle: WalkCycle = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!;
     const b = pts[(i + 1) % pts.length]!;
@@ -220,7 +221,7 @@ describe("roundOffsetValue", () => {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
-    const cycle: unknown[] = [];
+    const cycle: WalkCycle = [];
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i]!;
       const b = pts[(i + 1) % pts.length]!;

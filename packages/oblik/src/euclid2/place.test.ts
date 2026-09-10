@@ -1,17 +1,24 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../eval/context";
+import type { TraceNode, TraceValue } from "../eval/context";
 import { gliderOnTraceNode, resolvePlacePoint } from "./place";
 
 const { sqrt } = Math;
-function node(partial: Pick<TraceNode, "id" | "value"> & Partial<TraceNode>): TraceNode {
+/**
+ * A trace node whose `kind` is taken from the value it carries, so a fixture
+ * cannot disagree with itself. The one assertion states the correlation
+ * TypeScript cannot derive for a generic `V`; everything else is checked.
+ */
+function node<V extends TraceValue>(
+  partial: { id: string; value: V } & Partial<Omit<TraceNode, "id" | "value" | "kind">>,
+): TraceNode {
   return {
     occ: 0,
     editable: false,
     stack: [],
-    kind: partial.value.kind,
     ...partial,
-  };
+    kind: partial.value.kind,
+  } as TraceNode;
 }
 
 const A = node({

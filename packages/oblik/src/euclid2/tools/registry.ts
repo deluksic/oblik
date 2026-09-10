@@ -1,3 +1,4 @@
+import type { SceneValue } from "#eval/context";
 import { captureUserStack, isUserSourcePath, normalizeStackFile } from "#eval/stack";
 
 import { compileComposite } from "./composite";
@@ -82,7 +83,10 @@ function argError(def: ToolDef, fnName: string | undefined): string | undefined 
   return undefined;
 }
 
-function toRegistered(fn: (...args: never[]) => unknown, def: ToolDef): RegisteredTool {
+function toRegistered<A extends SceneValue[], R extends SceneValue>(
+  fn: (...args: A) => R,
+  def: ToolDef,
+): RegisteredTool {
   const name = (def.name?.trim() || (fn as { name?: string }).name) ?? "";
   const argErr = argError(def, name);
   if (argErr) throw new Error(argErr);
@@ -92,7 +96,7 @@ function toRegistered(fn: (...args: never[]) => unknown, def: ToolDef): Register
     hint: def.hint ?? "",
     prefix: def.prefix,
     args: def.args,
-    fn: fn as unknown as (...values: unknown[]) => unknown,
+    fn,
     module: def.module ?? callerModule(),
   };
 }
@@ -101,10 +105,10 @@ function toRegistered(fn: (...args: never[]) => unknown, def: ToolDef): Register
  * Register `fn` as a Space tool. Returns `fn` unchanged so the same binding can
  * be called from scene code. Re-registering a name overwrites (HMR-safe).
  */
-export function defineTool<A extends readonly unknown[]>(
-  fn: (...args: A) => unknown,
+export function defineTool<A extends SceneValue[], R extends SceneValue>(
+  fn: (...args: A) => R,
   def: ToolDef,
-): (...args: A) => unknown {
+): (...args: A) => R {
   if (typeof fn !== "function") throw new Error("defineTool expects a function.");
   const reg = toRegistered(fn, def);
   if (!reg.module) {

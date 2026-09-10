@@ -1,3 +1,5 @@
+import type { SceneValue } from "./context";
+
 export const $site = Symbol("oblik.site");
 export const $node = Symbol("oblik.node");
 
@@ -6,7 +8,7 @@ export type SiteSpec = {
   dof: readonly number[];
 };
 
-export type SiteFn = ((...args: never[]) => unknown) & { [$site]?: SiteSpec };
+export type SiteFn = ((...args: never[]) => SceneValue) & { [$site]?: SiteSpec };
 
 export function siteOf(fn: SiteFn): SiteSpec | undefined {
   return fn[$site];

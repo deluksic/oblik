@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "#eval/context";
+import type { TraceNodeOf } from "#eval/context";
 
 import {
   chromePasses,
@@ -14,34 +14,34 @@ import {
   splitChrome,
 } from "./marks";
 
-const A = {
+const A: TraceNodeOf<"point"> = {
   id: "o_a",
   occ: 0,
   kind: "point",
   value: { kind: "point", x: 0, y: 0 },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
-const CIRCLE = {
+const CIRCLE: TraceNodeOf<"circle"> = {
   id: "o_r",
   occ: 0,
   kind: "circle",
   value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
-const SEG = {
+const SEG: TraceNodeOf<"segment"> = {
   id: "o_s",
   occ: 0,
   kind: "segment",
   value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
   editable: false,
   stack: [],
-} as TraceNode;
+};
 
-const OFFSET = {
+const OFFSET: TraceNodeOf<"parallelLine"> = {
   id: "o_par",
   occ: 0,
   kind: "parallelLine",
@@ -52,9 +52,9 @@ const OFFSET = {
   },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
-const OFFSET_REGION = {
+const OFFSET_REGION: TraceNodeOf<"csg2"> = {
   id: "o_off",
   occ: 0,
   kind: "csg2",
@@ -65,7 +65,7 @@ const OFFSET_REGION = {
   },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
 describe("isGrabbable", () => {
   test("editable points, circles, parallel lines, and offset regions", () => {

@@ -66,11 +66,11 @@ describe("stamp", () => {
   });
 
   test("multiline call inside an indented block keeps the closing paren indent", () => {
-    const raw = `function f() {\n  const A = point(\n    1,\n    2,\n  );\n}\n`;
+    const raw = `function f() {\n  const A = point(\n    1,\n    2,\n);\n}\n`;
     const { source, added } = stamp(raw, () => "o_0");
     expect(added).toEqual(["o_0"]);
     expect(source).toBe(
-      `function f() {\n  const A = point(\n    1,\n    2,\n    "o_0",\n  );\n}\n`,
+      `function f() {\n  const A = point(\n    1,\n    2,\n    "o_0",\n);\n}\n`,
     );
   });
 

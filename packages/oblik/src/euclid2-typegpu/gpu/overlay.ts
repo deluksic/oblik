@@ -1,7 +1,7 @@
 import { vec2f, vec3f, vec4f } from "typegpu/data";
 
 import type { TraceNode } from "#eval/context";
-import type { Circle, LoopEdge, Vec2 } from "#geom";
+import type { LoopEdge, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { isGlider } from "#geom/gliders";
 import { infiniteLineAxis, parallelLineValue } from "#geom/ops";
@@ -321,7 +321,7 @@ function dashChain(
 ): void {
   for (const e of edges) {
     if (e.carrier.kind === "circle") {
-      const carrier = e.carrier as Circle;
+      const carrier = e.carrier;
       dashArc(
         circles,
         disks,
@@ -397,10 +397,10 @@ function pushTraceNode(
   const alpha = MUTED_ALPHA * TRACE_BAND;
   const v = node.value;
   if (v.kind === "circle") {
-    const r = Math.abs((v as Circle).radius);
+    const r = Math.abs((v).radius);
     circles.push(
       CircleInst({
-        center: vec2f((v as Circle).center.x, (v as Circle).center.y),
+        center: vec2f((v).center.x, (v).center.y),
         radius: r,
         halfPx: halfStrokePx,
         a0: 0,

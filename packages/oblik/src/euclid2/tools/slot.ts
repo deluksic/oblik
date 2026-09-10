@@ -1,4 +1,4 @@
-import type { TraceNode } from "#eval/context";
+import type { SceneValue, TraceNode } from "#eval/context";
 import { printExpr } from "#source/expr";
 
 import { asPoint, exprOfPrint, hoverBind, hoverPlace } from "./common";
@@ -81,12 +81,20 @@ export type SlotToolDef<S extends ToolSession, Vals> = {
   chrome?(session: S): ToolChrome;
 };
 
-function readRef(s: ToolSession, id: string): string {
-  return (s as unknown as Record<string, string | undefined>)[`${id}Ref`] ?? "";
+/**
+ * The slot-value view of a session: slot ids (and `${id}Ref` texts) are fields on
+ * the session object, so a *dynamic* slot id only typechecks through this record.
+ * `defineSlotTool` requires its session type to be both.
+ */
+export type SlotFields = Record<string, SceneValue | undefined>;
+
+function readRef<S extends ToolSession & SlotFields>(s: S, id: string): string {
+  const ref = s[`${id}Ref`];
+  return typeof ref === "string" ? ref : "";
 }
 
-function readValue(s: ToolSession, id: string): unknown {
-  return (s as unknown as Record<string, unknown>)[id];
+function readValue<S extends ToolSession & SlotFields>(s: S, id: string): SceneValue | undefined {
+  return s[id];
 }
 
 /** The operand the cursor is on: a circle stroke, else a point. */
@@ -121,7 +129,7 @@ export function resolveOperand(
 function defaultAccept(
   kind: RefLooks,
   hit: PlaceHit,
-): { value: unknown; refText: string } | undefined {
+): { value: SceneValue; refText: string } | undefined {
   const carrier = hit.carrier;
   switch (kind) {
     case "point":
@@ -170,7 +178,12 @@ function defaultHover(
   }
 }
 
-function resolveSlotValue(kind: RefLooks, ref: string, value: unknown, scope: Scope): unknown {
+function resolveSlotValue(
+  kind: RefLooks,
+  ref: string,
+  value: SceneValue | undefined,
+  scope: Scope,
+): SceneValue | undefined {
   if (kind === "operand") return resolveOperand(ref, value as TangentOp | undefined, scope);
   return resolveSlot(kind, ref, value as Placed | undefined, scope);
 }
@@ -180,11 +193,14 @@ function resolveSlotValue(kind: RefLooks, ref: string, value: unknown, scope: Sc
  * state, focus cycling, click fill order, hover, hit snapping, and the
  * commit focus jump; the tool declares only its geometry hooks.
  */
-export function defineSlotTool<S extends ToolSession, Vals extends Record<string, unknown>>(
+export function defineSlotTool<
+  S extends ToolSession & SlotFields,
+  Vals extends SlotFields,
+>(
   spec: ToolSpec,
   def: SlotToolDef<S, Vals>,
 ): Tool<S> {
-  const slots = Object.values(def.slots) as SlotDef[];
+  const slots = Object.values(def.slots);
 
   const fields = [
     ...slots.map((slot) =>
@@ -193,14 +209,14 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
         slot.placeholder,
         slot.kind,
         (s) => readRef(s, slot.id),
-        (s, raw) => ({ ...s, [`${slot.id}Ref`]: raw }) as S,
+        (s, raw) => ({ ...s, [`${slot.id}Ref`]: raw }),
       ),
     ),
     nameField(),
   ] as Field<S>[];
 
   function valsOf(session: S, scope: Scope): Vals {
-    const out: Record<string, unknown> = {};
+    const out: SlotFields = {};
     for (const slot of slots) {
       out[slot.id] = resolveSlotValue(
         slot.kind,
@@ -221,7 +237,7 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
   return {
     spec,
     start: () => {
-      const base: Record<string, unknown> = { verb: spec.id, focus: slots[0]!.id, name: "" };
+      const base: SlotFields = { verb: spec.id, focus: slots[0]!.id, name: "" };
       for (const slot of slots) {
         base[`${slot.id}Ref`] = "";
         base[slot.id] = undefined;
@@ -229,8 +245,8 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
       return base as S;
     },
     fields,
-    focus: (s) => (s as unknown as { focus: string }).focus,
-    setFocus: (s, id) => ({ ...s, focus: id }) as S,
+    focus: (s) => s.focus,
+    setFocus: (s, id) => ({ ...s, focus: id }),
     hit(session, hit, ctx) {
       const vals = valsOf(session, toolScope(ctx));
       if (allFilled(vals)) return hit;
@@ -263,9 +279,9 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
       }
       const next = slots[slots.indexOf(slot) + 1]?.id;
       const focus =
-        (session as unknown as { focus: string }).focus === "name"
+        session.focus === "name"
           ? "name"
-          : (next ?? slot.focusAfter ?? (session as unknown as { focus: string }).focus);
+          : (next ?? slot.focusAfter ?? session.focus);
       return {
         session: {
           ...session,
@@ -279,7 +295,7 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
       const vals = valsOf(session, scope);
       if (allFilled(vals)) return def.commit?.(session, place, scope, vals) ?? undefined;
       const need = firstUnfilled(vals).id;
-      const focus = (session as unknown as { focus: string }).focus;
+      const focus = session.focus;
       if (focus === need) return undefined;
       return { session: { ...session, focus: need } as S };
     },

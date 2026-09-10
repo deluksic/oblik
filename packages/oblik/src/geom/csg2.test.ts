@@ -17,7 +17,13 @@ import {
 } from "./csg2";
 import { stampRepeat } from "./evaluate-regions";
 import { roundOffsetValue, compileOffsetBoundary } from "./offset";
-import { alongValue, filletValue, regionContains, regionValue } from "./region";
+import {
+  alongValue,
+  filletValue,
+  regionContains,
+  regionValue,
+  type WalkCycle,
+} from "./region";
 import type { Circle, Line, LoopEdge, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
@@ -26,7 +32,7 @@ function seg(a: Vec2, b: Vec2): Segment {
   return { kind: "segment", a, b };
 }
 
-function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
+function rectCycle(x0: number, y0: number, x1: number, y1: number): WalkCycle {
   const bl = { x: x0, y: y0 };
   const br = { x: x1, y: y0 };
   const tr = { x: x1, y: y1 };
@@ -184,7 +190,7 @@ describe("Csg2 field", () => {
       { x: 2, y: 2 },
       { x: 0, y: 2 },
     ];
-    const cycle: unknown[] = [];
+    const cycle: WalkCycle = [];
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;

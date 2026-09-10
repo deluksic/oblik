@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "#eval/context";
+import type { TraceNodeOf } from "#eval/context";
 
 import { hitSlider, layoutSliders, sliderValueFromPointer } from "./sliderHud";
 
-const SLIDER = {
+const SLIDER: TraceNodeOf<"slider"> = {
   id: "o_sl",
   occ: 0,
   kind: "slider",
@@ -12,7 +12,7 @@ const SLIDER = {
   bind: "reach",
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
 describe("layoutSliders", () => {
   test("stacks panels from the top-left", () => {

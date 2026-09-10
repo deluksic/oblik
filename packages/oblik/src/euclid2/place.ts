@@ -1,5 +1,5 @@
 import type { TraceNode } from "../eval/context";
-import type { Branch, Circle, LineLike, Segment } from "../geom";
+import type { Branch, LineLike } from "../geom";
 import {
   circleUnitAt,
   lineSAt,
@@ -159,7 +159,7 @@ function nearestGlider(
   }
   for (const n of boundOf(trace, CIRCLE, filter)) {
     if (n.value.kind !== "circle") continue;
-    const circle = n.value as Circle;
+    const circle = n.value;
     const d = abs(dist(world, circle.center) - abs(circle.radius));
     if (d > maxDist) continue;
     const { ux, uy } = circleUnitAt(circle, world);
@@ -179,8 +179,8 @@ function nearestGlider(
 
 function gliderOnLine(bind: string, id: string, geom: LineLike, world: Vec2): GliderPlace {
   if (geom.kind === "segment") {
-    const t = segmentTAt(geom as Segment, world);
-    const g = pointOnSegmentValue(geom as Segment, t);
+    const t = segmentTAt(geom, world);
+    const g = pointOnSegmentValue(geom, t);
     return { kind: "pointOnSegment", bind, id, t: g.t, at: { x: g.x, y: g.y } };
   }
   const s = lineSAt(geom, world);
@@ -199,7 +199,7 @@ export function gliderOnTraceNode(
   const geom = asLineLike(n);
   if (geom) return gliderOnLine(bind, n.id, geom, world);
   if (n.value.kind !== "circle") return undefined;
-  const circle = n.value as Circle;
+  const circle = n.value;
   const { ux, uy } = circleUnitAt(circle, world);
   const g = pointOnCircleValue(circle, ux, uy);
   return { kind: "pointOnCircle", bind, id: n.id, ux: g.ux, uy: g.uy, at: { x: g.x, y: g.y } };
@@ -249,7 +249,7 @@ function nearestCircleLine(
   let best: { point: PlacePoint; d: number } | undefined = undefined;
   for (const c of circs) {
     if (c.value.kind !== "circle") continue;
-    const circle = c.value as Circle;
+    const circle = c.value;
     for (const ln of likes) {
       if (c.id === ln.id && c.occ === ln.occ) continue;
       const line = asLineLike(ln);

@@ -1,7 +1,7 @@
 import * as ts from "typescript";
 
 import { constructors } from "../eval/constructors";
-import { siteOf, type SiteFn, type SiteSpec } from "../eval/site";
+import { siteOf, type SiteSpec } from "../eval/site";
 
 export type Annotation = {
   id: string;
@@ -16,7 +16,7 @@ export type Annotation = {
 export function siteSpecs(): Map<string, SiteSpec> {
   const out = new Map<string, SiteSpec>();
   for (const [name, fn] of Object.entries(constructors)) {
-    const spec = siteOf(fn as SiteFn);
+    const spec = siteOf(fn);
     if (spec) out.set(name, spec);
   }
   return out;

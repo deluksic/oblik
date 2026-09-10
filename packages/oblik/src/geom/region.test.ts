@@ -8,6 +8,8 @@ import {
   regionContains,
   regionSvgPath,
   regionValue,
+  type WalkCycle,
+  type WalkItem,
   signedDistToRegion,
   walkEdges,
 } from "./region";
@@ -25,7 +27,7 @@ function seg(a: Vec2, b: Vec2): Segment {
 }
 
 function closed(pts: readonly Vec2[], radii: readonly (number | undefined)[] = []) {
-  const cycle: unknown[] = [];
+  const cycle: WalkCycle = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!;
     const b = pts[(i + 1) % pts.length]!;
@@ -35,7 +37,10 @@ function closed(pts: readonly Vec2[], radii: readonly (number | undefined)[] = [
   return regionValue(cycle, []);
 }
 
-function rectCycle(x0: number, y0: number, x1: number, y1: number): unknown[] {
+/** A cycle element as authored text can deliver it — see `parseWalkTape`. */
+const authoredItem = (v: object): WalkItem => v as WalkItem;
+
+function rectCycle(x0: number, y0: number, x1: number, y1: number): WalkCycle {
   const bl = { x: x0, y: y0 };
   const br = { x: x1, y: y0 };
   const tr = { x: x1, y: y1 };
@@ -76,7 +81,9 @@ describe("regionValue", () => {
   });
 
   test("bare circle is not a carrier", () => {
-    const p = regionValue([A, chord, B, c], []);
+    // The cycle of a scene is printed text, so a wrong element arrives as a
+    // value: the gate has to reject it rather than trust the type.
+    const p = regionValue([A, chord, B, authoredItem(c)], []);
     expect(p.outer).toHaveLength(0);
   });
 
@@ -91,7 +98,7 @@ describe("regionValue", () => {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
-    const cycle: unknown[] = [];
+    const cycle: WalkCycle = [];
     for (let i = 0; i < 4; i++) {
       const a = pts[i]!;
       const b = pts[(i + 1) % 4]!;
@@ -112,7 +119,7 @@ describe("regionValue", () => {
       { x: 1, y: 1 },
       { x: 0, y: 1 },
     ];
-    const cycle: unknown[] = [];
+    const cycle: WalkCycle = [];
     for (let i = 0; i < 4; i++) {
       const a = pts[i]!;
       const b = pts[(i + 1) % 4]!;

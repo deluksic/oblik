@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
+import { walkEdges } from "#geom/region";
+
 import type { CsgOperand, Region, Vec2 } from "#geom";
 import { isFillGeom, polarRepeatValue } from "#geom/csg2";
 
@@ -51,9 +53,9 @@ async function csgCases(): Promise<Case[]> {
     const trace = evaluate(mod.default, { annotations: mergeAnnotationBundle(bundle) }).trace;
     for (const n of trace) {
       if (!isFillGeom(n.value) || n.value.kind !== "csg2") continue;
-      const plan = fieldPlan(n.value as CsgOperand);
+      const plan = fieldPlan(n.value);
       if (plan)
-        cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value as CsgOperand, plan });
+        cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
     }
   }
   return cases;
@@ -76,16 +78,17 @@ function ringTooth(): Region {
 }
 
 function nudgeLeafData(op: CsgOperand, k: number): void {
-  const v = op as { kind: string } & Record<string, unknown>;
-  if (v.kind === "circle") v.radius = (v.radius as number) * k;
-  if (v.kind === "offset") v.d = (v.d as number) + k;
-  if (v.kind === "region") {
-    const edges = (v.outer as { a: Vec2 }[]) ?? [];
-    for (const e of edges) e.a = { x: e.a.x + k, y: e.a.y - k };
+  if (op.kind === "circle") op.radius *= k;
+  if (op.kind === "offset") {
+    op.d += k;
+    nudgeLeafData(op.of, k);
   }
-  const of = v.of as CsgOperand[] | CsgOperand | undefined;
-  if (Array.isArray(of)) for (const child of of) nudgeLeafData(child, k);
-  else if (of && typeof of === "object") nudgeLeafData(of, k);
+  if (op.kind === "region") {
+    for (const e of walkEdges(op.outer)) e.a = { x: e.a.x + k, y: e.a.y - k };
+  }
+  if (op.kind === "csg2") for (const child of op.of) nudgeLeafData(child, k);
+  if (op.kind === "pick") nudgeLeafData(op.of, k);
+  if (op.kind === "polarRepeat") nudgeLeafData(op.of, k);
 }
 
 function countLeaves(node: FieldNodePlan): number {
@@ -202,7 +205,7 @@ describe("compiled field WGSL", () => {
   test("leaf data never reaches the shader", async () => {
     const cases = await csgCases();
     for (const c of cases) {
-      const moved = JSON.parse(JSON.stringify(c.value)) as CsgOperand;
+      const moved = JSON.parse(JSON.stringify(c.value));
       nudgeLeafData(moved, 1.7);
       const replanned = fieldPlan(moved);
       expect(replanned?.shape).toBe(c.plan.shape);

@@ -80,15 +80,20 @@ export function normalizeCallSite(f: CallSite): CallSite {
   return { ...f, file: normalizeStackFile(f.file) };
 }
 
+/**
+ * The slice of a V8 CallSite we read. Accessors are optional and null-able
+ * because the platform declares them that way — a `null` from either side maps
+ * to `undefined` at the read below.
+ */
 type V8CallSite = {
-  getFileName?: () => string | undefined;
-  getLineNumber?: () => number | undefined;
-  getColumnNumber?: () => number | undefined;
-  getFunctionName?: () => string | undefined;
+  getFileName?: () => string | null | undefined;
+  getLineNumber?: () => number | null | undefined;
+  getColumnNumber?: () => number | null | undefined;
+  getFunctionName?: () => string | null | undefined;
 };
 
 const ErrorWithStack = Error as typeof Error & {
-  prepareStackTrace?: (err: Error, sites: V8CallSite[]) => unknown;
+  prepareStackTrace?: (err: Error, sites: V8CallSite[]) => string;
 };
 
 function callSiteFromParts(
@@ -116,11 +121,11 @@ export function parseFrame(raw: string): CallSite | undefined {
 }
 
 function fromV8(site: V8CallSite): CallSite | undefined {
-  const file = site.getFileName?.();
-  const line = site.getLineNumber?.();
-  const column = site.getColumnNumber?.();
+  const file = site.getFileName?.() ?? undefined;
+  const line = site.getLineNumber?.() ?? undefined;
+  const column = site.getColumnNumber?.() ?? undefined;
   if (!file || line === undefined || column === undefined) return undefined;
-  return callSiteFromParts(file, line, column, site.getFunctionName?.());
+  return callSiteFromParts(file, line, column, site.getFunctionName?.() ?? undefined);
 }
 
 function dedupe(frames: CallSite[]): CallSite[] {
@@ -148,10 +153,7 @@ export function captureUserStack(): CallSite[] {
   let structured: V8CallSite[] | undefined;
   try {
     ErrorWithStack.prepareStackTrace = (_err, sites) => {
-      // Node types the callback with its own `CallSite` (methods return
-      // `string | null`); ours are structurally the same minus the platform
-      // null, so cast across the boundary.
-      structured = sites as unknown as V8CallSite[];
+      structured = sites;
       return "";
     };
     const err = new Error();

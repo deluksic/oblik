@@ -13,7 +13,8 @@ import {
   signedDist as signedDistValue,
   alongValue,
   filletValue,
-  asOperand,
+  isCorner,
+  isCsgOperand,
   isFiniteCsg2,
   isFinitePick,
   isFiniteRegion,
@@ -49,13 +50,21 @@ import {
   type PolarRepeat,
   type Polygon,
   type Region,
+  type WalkCycle,
   type WalkInput,
   type Csg2,
   type Pick,
   type Segment,
   type Vec2,
 } from "../geom";
-import { brand, currentEval, type SliderValue, type TraceNode, type TraceValue } from "./context";
+import {
+  brand,
+  currentEval,
+  type SceneValue,
+  type SliderValue,
+  type TraceNode,
+  type TraceValue,
+} from "./context";
 import { memoized } from "./memo";
 import {
   cloneStyle,
@@ -76,6 +85,21 @@ function draftAt(id: string | undefined, i: number, fallback: number): number {
   return v !== undefined && Number.isFinite(v) ? v : fallback;
 }
 
+/**
+ * Pair a recorded value with its node fields. `TraceNode` is a discriminated
+ * union over `kind`, so the two must agree — deriving `kind` from the same
+ * `value` here is what keeps every node consistent, and it is the only place
+ * that pairing is made. TypeScript cannot correlate a generic `T` with the
+ * mapped union on its own, so the one assertion lives here, next to the
+ * correlation it relies on.
+ */
+function traceNodeOf<T extends TraceValue>(
+  value: T,
+  fields: Omit<TraceNode, "kind" | "value">,
+): TraceNode {
+  return { ...fields, kind: value.kind, value } as TraceNode;
+}
+
 function traced<T extends TraceValue>(value: T, id: string | undefined): T {
   const ctx = currentEval();
   if (!ctx || !id) return value;
@@ -83,17 +107,15 @@ function traced<T extends TraceValue>(value: T, id: string | undefined): T {
   const occ = ctx.occ.get(id) ?? 0;
   ctx.occ.set(id, occ + 1);
   const anno = ctx.annotations.get(id);
-  const node: TraceNode = {
+  const node = traceNodeOf(value, {
     id,
     occ,
-    kind: value.kind,
-    value,
     bind: anno?.bind,
     editable: anno?.editable === true,
     at: anno ? { line: anno.line, column: anno.column } : undefined,
     module: anno?.file ?? ctx.module,
     stack: ctx.captureStack ? captureUserStack() : EMPTY_STACK,
-  };
+  });
   ctx.trace.push(node);
   return brand(value, node);
 }
@@ -139,9 +161,12 @@ function isFiniteValue(v: { kind: string }): boolean {
   }
 }
 
-function mark<F extends (...args: never[]) => unknown>(fn: F, spec: SiteSpec): F {
+function mark<A extends SceneValue[], R extends SceneValue>(
+  fn: (...args: A) => R,
+  spec: SiteSpec,
+): (...args: A) => R {
   const wrapped = memoized(fn);
-  (wrapped as F & { [$site]: SiteSpec })[$site] = spec;
+  (wrapped as ((...args: A) => R) & { [$site]?: SiteSpec })[$site] = spec;
   return wrapped;
 }
 
@@ -310,7 +335,11 @@ export function polarRepeat(
   about: Vec2,
   rotation = 0,
 ): PolarRepeat {
-  const op = Array.isArray(cell) ? regionValue(cellChain(cell), []) : asOperand(cell);
+  const op = Array.isArray(cell)
+    ? regionValue(cellChain(cell), [])
+    : isCsgOperand(cell)
+      ? cell
+      : undefined;
   if (!op) return nanPolarRepeat();
   return polarRepeatValue(op, count, about, rotation);
 }
@@ -320,16 +349,28 @@ export function polarRepeat(
  * runs to the *next* vertex. A chain of points is interleaved into that here, so
  * `polarRepeat(points, …)` reads like `polygon(points, …)`; a walk that already
  * carries its own edges is passed straight through. */
-function cellChain(cell: readonly unknown[]): unknown[] {
-  if (cell.length === 0 || !cell.every((v) => isFiniteVec(v as Vec2))) return cell as unknown[];
-  const out: unknown[] = [];
-  for (let i = 0; i < cell.length; i++) {
-    const a = cell[i] as Vec2;
-    const b = cell[(i + 1) % cell.length] as Vec2;
+function cellChain(cell: WalkCycle): WalkCycle {
+  const corners = asCornerChain(cell);
+  if (!corners) return cell;
+  const out: WalkCycle = [];
+  for (let i = 0; i < corners.length; i++) {
+    const a = corners[i]!;
+    const b = corners[(i + 1) % corners.length]!;
     out.push(
       { kind: "point", x: a.x, y: a.y },
       { kind: "segment", a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } },
     );
+  }
+  return out;
+}
+
+/** The cell as a bare point chain — `undefined` when it carries its own edges. */
+function asCornerChain(cell: WalkCycle): Vec2[] | undefined {
+  if (cell.length === 0) return undefined;
+  const out: Vec2[] = [];
+  for (const item of cell) {
+    if (!isCorner(item)) return undefined;
+    out.push(item);
   }
   return out;
 }
@@ -378,25 +419,25 @@ export function rightOf(geom: LineLike): HalfPlane {
 }
 
 /** Unmarked CSG difference. Not a tape node — wrap with `csg2()` to inspect/fill. */
-export function diff(stock: unknown, cutters: readonly unknown[]): Csg2 {
+export function diff(stock: CsgOperand, cutters: readonly CsgOperand[]): Csg2 {
   if (!Array.isArray(cutters)) return nanCsg2();
   return csg2Value("diff", [stock, ...cutters]);
 }
 
 /** Unmarked CSG union. Not a tape node — wrap with `csg2()` to inspect/fill. */
-export function union(operands: readonly unknown[]): Csg2 {
+export function union(operands: readonly CsgOperand[]): Csg2 {
   if (!Array.isArray(operands)) return nanCsg2();
   return csg2Value("union", operands);
 }
 
 /** Unmarked CSG intersection. Not a tape node — wrap with `csg2()` to inspect/fill. */
-export function intersect(operands: readonly unknown[]): Csg2 {
+export function intersect(operands: readonly CsgOperand[]): Csg2 {
   if (!Array.isArray(operands)) return nanCsg2();
   return csg2Value("intersect", operands);
 }
 
 /** Unmarked island pick. Not a tape node — wrap with `csg2()` to inspect/fill. */
-export function pick(of: unknown, at: Vec2): Pick {
+export function pick(of: CsgOperand, at: Vec2): Pick {
   if (!at || typeof at !== "object") return nanPick();
   return pickValue(of, at);
 }
@@ -409,8 +450,7 @@ export const csg2 = mark(
     if (value.kind === "pick" && isFinitePick(value)) return traced(value, id);
     // A bare operand — a repeat, a half-plane, an island pick — is drawn by
     // wrapping it in a one-operand union (see `wrapCsg`).
-    const op = asOperand(value);
-    return op ? traced(wrapCsg(op), id) : traced(nanCsg2(), id);
+    return isCsgOperand(value) ? traced(wrapCsg(value), id) : traced(nanCsg2(), id);
   },
   { dof: [] },
 );
@@ -475,7 +515,7 @@ export const style = mark(
 
 /** Walk branded geom in `object` and record a paint. Look is a `style()` value or a spec object. */
 export const paint = mark(
-  (object: unknown, look: FigureStyle | StyleSpec, id?: string): PaintValue => {
+  (object: SceneValue, look: FigureStyle | StyleSpec, id?: string): PaintValue => {
     const value: PaintValue = {
       kind: "paint",
       targets: collectPaintTargets(object),

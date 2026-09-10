@@ -1,5 +1,4 @@
 import type { TraceNode } from "#eval/context";
-import type { Circle, ParallelLine } from "#geom";
 import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "#source/expr";
 
 import { hitsNear, nodeByPrint, nodeByTraceAttr } from "../pick";
@@ -54,7 +53,7 @@ export function fieldValue(scope: Scope, object: string, field: string): number 
   }
   const carrier = scope.carriers[object];
   if (field === "distance" && carrier?.geom.kind === "parallelLine") {
-    return (carrier.geom as ParallelLine).distance;
+    return (carrier.geom).distance;
   }
   return undefined;
 }
@@ -168,11 +167,11 @@ function lengthFromNode(
   const name = print ?? node.bind;
   if (!name) return undefined;
   if (field === "radius" && node.value.kind === "circle") {
-    const c = node.value as Circle;
+    const c = node.value;
     return { expr: memberExpr(name, "radius"), value: abs(c.radius) };
   }
   if (field === "distance" && node.value.kind === "parallelLine") {
-    const pl = node.value as ParallelLine;
+    const pl = node.value;
     return { expr: memberExpr(name, "distance"), value: pl.distance };
   }
   return undefined;

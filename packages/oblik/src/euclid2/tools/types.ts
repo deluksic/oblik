@@ -1,8 +1,9 @@
-import type { TraceNode } from "#eval/context";
+import type { SceneValue, TraceNode } from "#eval/context";
 import type { Branch, Circle, Loop, LineLike, Region, LoopEdge } from "#geom";
 import type { Expr } from "#source/expr";
 
 import type { Camera2, PaneSize } from "../camera";
+import type { SnapNode } from "../pick";
 import type { Vec2 } from "../pick";
 import type { PlacePoint } from "../place";
 
@@ -81,7 +82,12 @@ export type RegisteredTool = {
   hint: string;
   prefix: string;
   args: readonly ToolArg[];
-  fn: (...values: unknown[]) => unknown;
+  /**
+   * The tool fn, invoked with the slot values it declared. Declared as a method
+   * so a precisely-typed `(...args: A) => R` fn is assignable here without a
+   * cast: method parameters compare bivariantly.
+   */
+  fn(...values: SceneValue[]): SceneValue;
   /** Vite-root URL pathname (dev) or absolute path (node/tests). */
   module: string;
 };
@@ -168,7 +174,7 @@ export type PlaceCtx = {
   target?: EventTarget | undefined;
   /** Mentionable tape keys (`id:occ`). When set, snap only those nodes. */
   keys?: ReadonlySet<string>;
-  print?: (n: TraceNode) => string | undefined;
+  print?: (n: SnapNode) => string | undefined;
   /** Pane scope for this place. Tools must not rebuild occ-0 scope from the tape. */
   scope?: Scope;
 };

@@ -1,11 +1,17 @@
 import type { TraceNode } from "#eval/context";
-import type { Circle, Glider, Line, LineLike, ParallelLine, Point, Segment } from "#geom";
+import type { Circle, Line, LineLike, ParallelLine, Point, Segment } from "#geom";
 import { isCsg2, isOffset, isOffsetCsg, offsetOfCsg, offsetSourceSdf } from "#geom/csg2";
 import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "#geom/gliders";
 import { lineBasis, signedDist } from "#geom/ops";
 import { mul, perp, sub } from "#geom/vec";
 
-import { clientToNdc, ndcToWorld, type Camera2, type PaneSize } from "../camera";
+import {
+  clientToNdc,
+  ndcToWorld,
+  type Camera2,
+  type PaneRect,
+  type PaneSize,
+} from "../camera";
 import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
 import {
   gliderOnTraceNode,
@@ -19,6 +25,20 @@ import { enrichHit, type PlaceHit, type Scope, type ToolSession } from "../tool"
 import { hitSlider, sliderNodes, sliderValueFromPointer } from "./sliderHud";
 
 const { max, round: mathRound, sqrt } = Math;
+/**
+ * The slice of a pointer event this module reads. The pane passes real
+ * `PointerEvent`s, which satisfy it; tests and synthetic events only need to
+ * carry the two coordinates, so nothing here has to assert a full event type.
+ */
+export type PointerInput = { readonly clientX: number; readonly clientY: number };
+
+/**
+ * The slice of a pane element the geometry reads: its box in CSS pixels. A real
+ * `HTMLDivElement` satisfies it, and so does a test double — which is why the
+ * parameter is not spelled `HTMLDivElement`.
+ */
+export type PaneBoxSource = { getBoundingClientRect(): PaneRect };
+
 export type Drag =
   | {
       kind: "pan";
@@ -122,8 +142,8 @@ export function round(n: number): number {
 }
 
 export function worldOf(
-  e: PointerEvent,
-  el: HTMLDivElement | undefined,
+  e: PointerInput,
+  el: PaneBoxSource | undefined,
   camera: Camera2,
   size: PaneSize,
 ): { x: number; y: number } {
@@ -136,7 +156,7 @@ export function worldOf(
 export function pointDrag(
   node: TraceNode,
   w: { x: number; y: number },
-  e: PointerEvent,
+  e: PointerInput,
 ): Extract<Drag, { kind: "point" }> {
   const p = node.value as Point;
   return {
@@ -156,7 +176,7 @@ export function pointDrag(
 export function radiusDrag(
   node: TraceNode,
   w: { x: number; y: number },
-  e: PointerEvent,
+  e: PointerInput,
 ): Extract<Drag, { kind: "radius" }> {
   const c = node.value as Circle;
   return {
@@ -186,7 +206,7 @@ function carrierLine(ol: ParallelLine): Line {
 export function parallelDrag(
   node: TraceNode,
   w: { x: number; y: number },
-  e: PointerEvent,
+  e: PointerInput,
 ): Extract<Drag, { kind: "parallel" }> {
   const ol = node.value as ParallelLine;
   const base = carrierLine(ol);
@@ -206,9 +226,9 @@ export function parallelDrag(
 export function gliderDrag(
   node: TraceNode,
   w: { x: number; y: number },
-  e: PointerEvent,
+  e: PointerInput,
 ): Extract<Drag, { kind: "gliderSegment" | "gliderLine" | "gliderCircle" }> | undefined {
-  const g = node.value as Glider;
+  const g = node.value;
   if (g.kind === "gliderSegment") {
     return {
       kind: "gliderSegment",
@@ -256,7 +276,7 @@ export function gliderDrag(
 export function offsetDrag(
   node: TraceNode,
   w: { x: number; y: number },
-  e: PointerEvent,
+  e: PointerInput,
 ): Extract<Drag, { kind: "offset" }> | undefined {
   if (!isCsg2(node.value) || !isOffsetCsg(node.value)) return undefined;
   const off = offsetOfCsg(node.value);
@@ -276,8 +296,8 @@ export function offsetDrag(
 }
 
 export function editDragOf(
-  e: PointerEvent,
-  el: HTMLDivElement | undefined,
+  e: PointerInput,
+  el: PaneBoxSource | undefined,
   hit: TraceNode,
   camera: Camera2,
   size: PaneSize,
@@ -291,7 +311,7 @@ export function editDragOf(
   return undefined;
 }
 
-export function sliderDrag(node: TraceNode, e: PointerEvent): Extract<Drag, { kind: "slider" }> {
+export function sliderDrag(node: TraceNode, e: PointerInput): Extract<Drag, { kind: "slider" }> {
   const g = node.value;
   const startN = g.kind === "slider" ? g.n : 0;
   return {
@@ -305,7 +325,7 @@ export function sliderDrag(node: TraceNode, e: PointerEvent): Extract<Drag, { ki
   };
 }
 
-export function panDrag(e: PointerEvent, camera: Camera2): Extract<Drag, { kind: "pan" }> {
+export function panDrag(e: PointerInput, camera: Camera2): Extract<Drag, { kind: "pan" }> {
   return {
     kind: "pan",
     x: e.clientX,
@@ -318,7 +338,7 @@ export function panDrag(e: PointerEvent, camera: Camera2): Extract<Drag, { kind:
 
 export function placeFromEvent(
   e: PointerEvent,
-  el: HTMLDivElement | undefined,
+  el: PaneBoxSource | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: TraceNode[],
@@ -407,8 +427,8 @@ export function placeFromEvent(
 
 export function applyDrag(
   drag: Drag,
-  e: PointerEvent,
-  el: HTMLDivElement | undefined,
+  e: PointerInput,
+  el: PaneBoxSource | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: readonly TraceNode[] = [],
@@ -472,15 +492,15 @@ export function applyDrag(
   };
 }
 
-export function dragMoved(drag: Drag, e: PointerEvent): boolean {
+export function dragMoved(drag: Drag, e: PointerInput): boolean {
   const fromX = drag.kind === "pan" ? drag.x : drag.downX;
   const fromY = drag.kind === "pan" ? drag.y : drag.downY;
   return movedPastClick(fromX, fromY, e.clientX, e.clientY);
 }
 
 export function topHit(
-  e: PointerEvent,
-  el: HTMLDivElement | undefined,
+  e: PointerInput,
+  el: PaneBoxSource | undefined,
   camera: Camera2,
   size: PaneSize,
   trace: TraceNode[],

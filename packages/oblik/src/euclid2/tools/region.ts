@@ -1,4 +1,6 @@
 import type { TraceNode } from "#eval/context";
+
+import type { SnapNode } from "../pick";
 import type { Branch, Circle, LineLike, LoopEdge } from "#geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "#geom";
 import { printExpr, parsePath, type Expr } from "#source/expr";
@@ -51,7 +53,7 @@ function vertexOf(hit: PlaceHit, scope: Scope): Placed | undefined {
 
 function placeFromVertex(
   v: Placed,
-  trace: readonly { occ: number; bind?: string; id: string }[],
+  trace: readonly SnapNode[],
   filter?: SnapFilter,
 ): PlacePoint | undefined {
   const e = v.expr;

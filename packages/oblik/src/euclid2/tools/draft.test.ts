@@ -250,7 +250,7 @@ describe("keyTool", () => {
       circles: {},
       regions: {},
       lengths: { reach: 2.5 },
-    };
+    } satisfies Partial<Scope>;
     const mid = asSession(clickTool(startTool("circle"), named("A", 0, 0)));
     expect(keyTool(typeChars(mid, "reach"), { key: "Enter" }, undefined, scope)).toEqual({
       insert: {
@@ -338,7 +338,7 @@ describe("keyTool", () => {
       circles: {},
       regions: {},
       lengths: { reach: 1.25 },
-    };
+    } satisfies Partial<Scope>;
     const mid = asSession(
       clickTool(startTool("parallelLine"), {
         world: { x: 1, y: 0 },
@@ -365,7 +365,7 @@ describe("keyTool", () => {
       circles: {},
       regions: {},
       lengths: { reach: 3 },
-    };
+    } satisfies Partial<Scope>;
     const mid = typeChars(startTool("point"), "reach");
     const y = tabTool(mid);
     expect(keyTool(typeChars(y, "reach"), { key: "Enter" }, undefined, scope)).toEqual({

@@ -1,25 +1,25 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "#eval/context";
+import type { TraceNodeOf } from "#eval/context";
 import type { Region, Segment } from "#geom";
 import { wrapCsg, offsetValue } from "#geom/csg2";
-import { regionValue } from "#geom/region";
+import { regionValue, type WalkCycle } from "#geom/region";
 
 import { applyDrag, offsetDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 
 const camera = { x: 0, y: 0, scale: 48 };
 const size = { w: 800, h: 600 };
 
-const CIRCLE = {
+const CIRCLE: TraceNodeOf<"circle"> = {
   id: "o_r",
   occ: 0,
   kind: "circle",
   value: { kind: "circle", center: { x: 0, y: 0 }, radius: 2.5 },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
-const OFFSET = {
+const OFFSET: TraceNodeOf<"parallelLine"> = {
   id: "o_par",
   occ: 0,
   kind: "parallelLine",
@@ -30,7 +30,7 @@ const OFFSET = {
   },
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
 function squareRegion(): Region {
   const pts = [
@@ -39,7 +39,7 @@ function squareRegion(): Region {
     { x: 1, y: 1 },
     { x: 0, y: 1 },
   ];
-  const cycle: unknown[] = [];
+  const cycle: WalkCycle = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!;
     const b = pts[(i + 1) % pts.length]!;
@@ -48,14 +48,14 @@ function squareRegion(): Region {
   return regionValue(cycle, []);
 }
 
-const OFFSET_REGION = {
+const OFFSET_REGION: TraceNodeOf<"csg2"> = {
   id: "o_off",
   occ: 0,
   kind: "csg2",
   value: wrapCsg(offsetValue(squareRegion(), -0.2)),
   editable: true,
   stack: [],
-} as TraceNode;
+};
 
 describe("round", () => {
   test("keeps two decimals", () => {
@@ -65,12 +65,12 @@ describe("round", () => {
 
 describe("applyDrag", () => {
   test("pans by pointer delta in world units", () => {
-    const e0 = { clientX: 100, clientY: 100 } as PointerEvent;
+    const e0 = { clientX: 100, clientY: 100 };
     const drag = panDrag(e0, camera);
     drag.moved = true;
     const next = applyDrag(
       drag,
-      { clientX: 148, clientY: 100 } as PointerEvent,
+      { clientX: 148, clientY: 100 },
       undefined,
       camera,
       size,
@@ -80,7 +80,7 @@ describe("applyDrag", () => {
   });
 
   test("records the grab distance from the circle center", () => {
-    const drag = radiusDrag(CIRCLE, { x: 2.5, y: 0 }, { clientX: 0, clientY: 0 } as PointerEvent);
+    const drag = radiusDrag(CIRCLE, { x: 2.5, y: 0 }, { clientX: 0, clientY: 0 });
     expect(drag.kind).toBe("radius");
     if (drag.kind !== "radius") return;
     expect(drag.grabDist).toBe(2.5);
@@ -90,8 +90,8 @@ describe("applyDrag", () => {
   test("offsets by signed distance along the carrier normal", () => {
     const el = {
       getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
-    } as HTMLDivElement;
-    const down = { clientX: 400, clientY: 300 - 1.76 * 48 } as PointerEvent;
+    };
+    const down = { clientX: 400, clientY: 300 - 1.76 * 48 };
     const drag = parallelDrag(OFFSET, { x: 0, y: 1.76 }, down);
     expect(drag.kind).toBe("parallel");
     if (drag.kind !== "parallel") return;
@@ -101,7 +101,7 @@ describe("applyDrag", () => {
     expect(same.draft?.values[0]).toBeCloseTo(1.76);
     const pulled = applyDrag(
       drag,
-      { clientX: 400, clientY: 300 - 2.5 * 48 } as PointerEvent,
+      { clientX: 400, clientY: 300 - 2.5 * 48 },
       el,
       camera,
       size,
@@ -113,7 +113,7 @@ describe("applyDrag", () => {
     const drag = offsetDrag(OFFSET_REGION, { x: 0.5, y: 0.2 }, {
       clientX: 0,
       clientY: 0,
-    } as PointerEvent);
+    });
     expect(drag?.kind).toBe("offset");
     if (drag?.kind !== "offset") return;
     expect(drag.grabSdf).toBeCloseTo(-0.2);
@@ -123,8 +123,8 @@ describe("applyDrag", () => {
   test("dragging along the source sdf updates the offset distance", () => {
     const el = {
       getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
-    } as HTMLDivElement;
-    const down = { clientX: 400 + 0.5 * 48, clientY: 300 - 0.2 * 48 } as PointerEvent;
+    };
+    const down = { clientX: 400 + 0.5 * 48, clientY: 300 - 0.2 * 48 };
     const drag = offsetDrag(OFFSET_REGION, { x: 0.5, y: 0.2 }, down);
     expect(drag?.kind).toBe("offset");
     if (!drag) return;
@@ -133,7 +133,7 @@ describe("applyDrag", () => {
     expect(same.draft?.values[0]).toBeCloseTo(-0.2);
     const pulled = applyDrag(
       drag,
-      { clientX: 400 + 0.5 * 48, clientY: 300 - 0.3 * 48 } as PointerEvent,
+      { clientX: 400 + 0.5 * 48, clientY: 300 - 0.3 * 48 },
       el,
       camera,
       size,

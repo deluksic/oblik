@@ -1,14 +1,18 @@
 import { createSignal, onCleanup } from "solid-js";
 
+import type { SceneValue } from "#eval/context";
+
+import type { PointerInput } from "./pointer";
+
 export type DragSession = {
   onPointerMove?: (event: PointerEvent) => void;
-  onDone?: (event?: PointerEvent) => void;
+  onDone?: (event?: PointerInput | undefined) => void;
 };
 
 /** Pointer-session phase. Read `phase()` from JSX. */
 export type DragPhase = "not-started" | "down" | "dragging";
 
-export type CreateDragHandlers<T extends unknown[] = []> = (
+export type CreateDragHandlers<T extends SceneValue[] = []> = (
   event: PointerEvent,
   ...args: T
 ) => DragSession | undefined;
@@ -21,7 +25,7 @@ export type DragHandlerOptions = {
 
 export type DragHandler = {
   phase: () => DragPhase;
-  start: <T extends unknown[]>(
+  start: <T extends SceneValue[]>(
     createHandlers: CreateDragHandlers<T>,
     options?: DragHandlerOptions,
   ) => (event: PointerEvent, ...args: T) => void;
@@ -51,7 +55,20 @@ function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {
 }
 
 function canCapture(target: EventTarget | undefined): target is Element {
-  return !!target && typeof (target as Element).setPointerCapture === "function";
+  return !!target && typeof Reflect.get(target, "setPointerCapture") === "function";
+}
+
+/**
+ * A DOM event carrying pointer coordinates. `finish` may be handed any event —
+ * the up target, or a cancel — so the coordinates are checked rather than
+ * assumed, which is also what keeps the pointer type out of the session API.
+ */
+function isPointerInput(event: Event | undefined): event is Event & PointerInput {
+  return (
+    !!event &&
+    typeof Reflect.get(event, "clientX") === "number" &&
+    typeof Reflect.get(event, "clientY") === "number"
+  );
 }
 
 function captureTarget(event: PointerEvent): Element | undefined {
@@ -75,7 +92,7 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
   const unmount = new AbortController();
   onCleanup(() => unmount.abort());
 
-  function start<T extends unknown[]>(
+  function start<T extends SceneValue[]>(
     createHandlers: CreateDragHandlers<T>,
     options?: DragHandlerOptions,
   ): (event: PointerEvent, ...args: T) => void {
@@ -114,7 +131,7 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
             /* already released */
           }
         }
-        const pointer = event && "clientX" in event ? (event as PointerEvent) : undefined;
+        const pointer = isPointerInput(event) ? event : undefined;
         setPhase("not-started");
         onDone?.(pointer);
       }

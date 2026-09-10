@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
 import { transformSync } from "esbuild";
+
+import type { SceneValue } from "../eval/context";
 import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 
 import {
@@ -81,7 +83,7 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function json(res: ServerResponse, status: number, body: unknown) {
+function json(res: ServerResponse, status: number, body: SceneValue) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
@@ -231,7 +233,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
         next: () => void,
       ): Promise<void> {
         if (req.method === "POST" && req.url === "/__oblik-patch") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -259,7 +261,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-insert") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -289,7 +291,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-expose") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -313,7 +315,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-paint-style") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -337,7 +339,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-frame") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -365,7 +367,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-erase") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -407,7 +409,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__oblik-open") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -433,7 +435,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
           return;
         }
         if (req.method === "POST" && req.url === "/__map-stack") {
-          let body: unknown;
+          let body: SceneValue;
           try {
             body = JSON.parse(await readBody(req));
           } catch {
@@ -441,7 +443,7 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             return;
           }
           const frames = parseStackLocs(
-            body && typeof body === "object" ? (body as { frames?: unknown }).frames : [],
+            body && typeof body === "object" ? (body as { frames?: SceneValue }).frames : [],
           );
           try {
             json(res, 200, {

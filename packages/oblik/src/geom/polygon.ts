@@ -33,7 +33,7 @@ export function normalizeBoundary(pts: readonly Vec2[]): Vec2[] | undefined {
   const out: Vec2[] = [];
   for (const p of pts) {
     if (!p || typeof p !== "object") return undefined;
-    const { x, y } = p as Vec2;
+    const { x, y } = p;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
     const next = { x, y };
     const prev = out[out.length - 1];

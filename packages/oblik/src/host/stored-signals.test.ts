@@ -75,26 +75,29 @@ describe("readStored / writeStored / removeStored", () => {
 });
 
 describe("createStoredRegistry", () => {
-  test("same id returns the same signal; distinct ids do not", () => {
+  test("same id shares one value; distinct ids do not", () => {
     const registry = createStoredRegistry(fakeStorage());
-    const a = registry.getOrCreate("x", { defaultValue: 1 });
-    const b = registry.getOrCreate("x", { defaultValue: 2 });
-    const c = registry.getOrCreate("y", { defaultValue: 3 });
-    expect(b).toBe(a);
-    expect(c).not.toBe(a);
+    const a = registry.getOrCreate<number>("x", { defaultValue: 1 });
+    const b = registry.getOrCreate<number>("x", { defaultValue: 2 });
+    const c = registry.getOrCreate<number>("y", { defaultValue: 3 });
+    a.set(7);
+    expect(b.value()).toBe(7);
+    b.set(9);
+    expect(a.value()).toBe(9);
+    expect(c.value()).toBe(3);
   });
 
   test("first registration's default wins for an id", () => {
     const registry = createStoredRegistry(fakeStorage());
-    registry.getOrCreate("x", { defaultValue: 1 });
-    const later = registry.getOrCreate("x", { defaultValue: 99 });
+    registry.getOrCreate<number>("x", { defaultValue: 1 });
+    const later = registry.getOrCreate<number>("x", { defaultValue: 99 });
     expect(later.value()).toBe(1);
   });
 
   test("set persists to storage and drives the signal", () => {
     const storage = fakeStorage();
     const registry = createStoredRegistry(storage);
-    const width = registry.getOrCreate("w", { defaultValue: 280 });
+    const width = registry.getOrCreate<number>("w", { defaultValue: 280 });
     width.set(420);
     expect(width.value()).toBe(420);
     expect(storage.data.get("w")).toBe("420");
@@ -103,8 +106,8 @@ describe("createStoredRegistry", () => {
   test("resetAll clears storage and restores defaults", () => {
     const storage = fakeStorage();
     const registry = createStoredRegistry(storage);
-    const width = registry.getOrCreate("w", { defaultValue: 280 });
-    const mode = registry.getOrCreate("m", { defaultValue: "light" });
+    const width = registry.getOrCreate<number>("w", { defaultValue: 280 });
+    const mode = registry.getOrCreate<string>("m", { defaultValue: "light" });
     width.set(500);
     mode.set("dark");
     registry.resetAll();
@@ -116,7 +119,7 @@ describe("createStoredRegistry", () => {
   test("set supports function updates", () => {
     const storage = fakeStorage();
     const registry = createStoredRegistry(storage);
-    const width = registry.getOrCreate("w", { defaultValue: 280 });
+    const width = registry.getOrCreate<number>("w", { defaultValue: 280 });
     width.set((prev) => prev + 20);
     expect(width.value()).toBe(300);
     expect(storage.data.get("w")).toBe("300");

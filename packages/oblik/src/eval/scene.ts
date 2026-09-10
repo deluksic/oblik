@@ -1,9 +1,11 @@
+import type { SceneResult } from "./context";
+
 export type Euclid2Scene = {
   kind: "euclid2";
   title: string;
   hint?: string;
   camera?: { x: number; y: number; scale: number };
-  build: () => unknown;
+  build: () => SceneResult;
 };
 
 export type FigureScene = {
@@ -18,7 +20,7 @@ export type FigureScene = {
    * centered on the camera look-at.
    */
   frame?: { width: number; height: number; x?: number; y?: number };
-  build: () => unknown;
+  build: () => SceneResult;
 };
 
 /** Discriminated union. Add a member when a scene kind ships — not a host registry. */

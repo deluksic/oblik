@@ -3,6 +3,9 @@ export type Camera2 = { x: number; y: number; scale: number };
 
 export type PaneSize = { w: number; h: number };
 
+/** The part of a `DOMRect` the coordinate math reads: the pane box. */
+export type PaneRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
+
 export function kWorldToNdc(cam: Camera2, size: PaneSize): number {
   return (2 * cam.scale) / max(1, size.h);
 }
@@ -85,7 +88,7 @@ export function zoomAt(
 
 export function clientToNdc(
   client: { x: number; y: number },
-  rect: DOMRect,
+  rect: PaneRect,
   size: PaneSize,
 ): { x: number; y: number } {
   const aspect = size.w / max(1, size.h);

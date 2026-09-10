@@ -37,7 +37,7 @@ describe("camera", () => {
   });
 
   test("client center maps to camera look-at", () => {
-    const rect = { left: 0, top: 0, width: 800, height: 600 } as DOMRect;
+    const rect = { left: 0, top: 0, width: 800, height: 600 };
     const ndc = clientToNdc({ x: 400, y: 300 }, rect, size);
     const w = ndcToWorld(ndc, cam, size);
     expect(w.x).toBeCloseTo(cam.x, 10);

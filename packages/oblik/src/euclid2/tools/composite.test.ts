@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import type { Region } from "#geom";
+
 import { circle } from "../../eval/constructors";
 import type { PlacePoint } from "../place";
 import type { CompS } from "./composite";
@@ -95,7 +97,7 @@ describe("composite tool sessions", () => {
     if (!("session" in first)) throw new Error("expected session");
     expect(first.session.focus).toBe("w");
     // No ghost while a required number is empty.
-    const ghost = toolById("rectDemo").ghost(first.session as never, hit(free(5, 5)), scope);
+    const ghost = toolById("rectDemo").ghost(first.session, hit(free(5, 5)), scope);
     expect(ghost).toBeUndefined();
   });
 
@@ -127,7 +129,7 @@ describe("composite tool sessions", () => {
     const s0 = start("boltDemo");
     const first = clickTool(s0, hit(free(0, 0)), scope);
     if (!("session" in first)) throw new Error("expected session");
-    const second = clickTool(first.session as CompS, hit(pinned("P", 3, 4)), scope);
+    const second = clickTool(first.session, hit(pinned("P", 3, 4)), scope);
     if (!("insert" in second)) throw new Error("expected insert");
     const job = second.insert;
     expect(job.args[1]).toEqual({
@@ -205,7 +207,7 @@ describe("composite tool sessions", () => {
   });
 
   test("region member mention like rec.face commits a member expr", () => {
-    defineTool((face: unknown) => face, {
+    defineTool((face: Region) => face, {
       name: "faceDemo",
       title: "Face demo",
       prefix: "fd",

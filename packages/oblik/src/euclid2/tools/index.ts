@@ -15,7 +15,6 @@ import { segment } from "./segment";
 import { slider } from "./slider";
 import { tangent } from "./tangent";
 import type {
-  BuiltinToolId,
   PlaceCtx,
   PlaceHit,
   Scope,
@@ -69,7 +68,7 @@ const BUILTINS = {
   region,
   roundOffset,
   fillet,
-} as Record<BuiltinToolId, Tool>;
+};
 
 export const TOOLS: readonly ToolSpec[] = [
   point.spec,
@@ -157,13 +156,13 @@ export function startTool(id: ToolId): ToolSession {
 export function clickTool(session: ToolSession, hit: PlaceHit, scope: ScopeInput = []) {
   const sc = scopeOf(scope);
   const tool = of(session);
-  const next = tool.click(session as never, hit, sc);
-  if ("insert" in next && firstInvalid(tool, session as never, sc)) return { session };
+  const next = tool.click(session, hit, sc);
+  if ("insert" in next && firstInvalid(tool, session, sc)) return { session };
   return next;
 }
 
 export function ghostOf(session: ToolSession, place: PlaceHit | undefined, scope: ScopeInput = []) {
-  return of(session).ghost(session as never, place, scopeOf(scope));
+  return of(session).ghost(session, place, scopeOf(scope));
 }
 
 export function previewOf(
@@ -174,17 +173,17 @@ export function previewOf(
   const tool = of(session);
   const sc = scopeOf(scope);
   return withSlot(
-    tool.preview(session as never, place, sc),
-    focusedDraft(tool, session as never, sc),
+    tool.preview(session, place, sc),
+    focusedDraft(tool, session, sc),
   );
 }
 
 export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {
-  return tabSession(of(session), session as never, dir);
+  return tabSession(of(session), session, dir);
 }
 
 export function typeTool(session: ToolSession, raw: string): ToolSession {
-  return typeSession(of(session), session as never, raw);
+  return typeSession(of(session), session, raw);
 }
 
 export function keyTool(
@@ -193,7 +192,7 @@ export function keyTool(
   place: PlaceHit | undefined = undefined,
   scope: ScopeInput = [],
 ) {
-  const out = keySession(of(session), session as never, e, place, scopeOf(scope));
+  const out = keySession(of(session), session, e, place, scopeOf(scope));
   if ("ignore" in out) return undefined;
   return out;
 }
@@ -205,12 +204,12 @@ export function commitTool(
 ) {
   const sc = scopeOf(scope);
   const tool = of(session);
-  if (firstInvalid(tool, session as never, sc)) return undefined;
-  return tool.commit?.(session as never, place, sc) ?? undefined;
+  if (firstInvalid(tool, session, sc)) return undefined;
+  return tool.commit?.(session, place, sc) ?? undefined;
 }
 
 export function enrichHit(session: ToolSession, hit: PlaceHit, ctx: PlaceCtx): PlaceHit {
-  return of(session).hit?.(session as never, hit, ctx) ?? hit;
+  return of(session).hit?.(session, hit, ctx) ?? hit;
 }
 
 export function hoverTool(
@@ -219,7 +218,7 @@ export function hoverTool(
   trace: readonly TraceNode[],
   scope?: Scope,
 ): string | undefined {
-  return of(session).hover?.(session as never, hit, trace, scope) ?? undefined;
+  return of(session).hover?.(session, hit, trace, scope) ?? undefined;
 }
 
 const CHROME_OFF = {
@@ -231,7 +230,7 @@ const CHROME_OFF = {
 
 export function toolChrome(session: ToolSession | undefined) {
   if (!session) return CHROME_OFF;
-  const c = of(session).chrome?.(session as never);
+  const c = of(session).chrome?.(session);
   return {
     hideFills: !!c?.hideFills,
     muteStrokes: !!c?.muteStrokes,

@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import type { TraceNode } from "../eval/context";
+import type { TraceNodeOf } from "../eval/context";
 import { offsetValue, wrapCsg } from "../geom/csg2";
+import type { LoopEdge, ParallelLine } from "../geom/types";
+import type { SnapNode } from "./pick";
 import type { PlacePoint } from "./place";
+import type { PlaceCtx, Scope } from "./tools/types";
 import {
   clickTool,
   commitTool,
@@ -63,7 +66,7 @@ describe("enrichHit", () => {
   });
 
   test("pending minus on a slider click keeps the negation", () => {
-    const gap = {
+    const gap: TraceNodeOf<"slider"> = {
       id: "o_pie_g",
       occ: 0,
       kind: "slider",
@@ -71,7 +74,7 @@ describe("enrichHit", () => {
       bind: "gap",
       editable: true,
       stack: [],
-    } as TraceNode;
+    };
     const face = {
       kind: "region" as const,
       outer: [
@@ -138,7 +141,7 @@ describe("enrichHit", () => {
   });
 
   test("pending minus on a parallel-line slider click keeps the negation", () => {
-    const reach = {
+    const reach: TraceNodeOf<"slider"> = {
       id: "o_n",
       occ: 0,
       kind: "slider",
@@ -146,7 +149,7 @@ describe("enrichHit", () => {
       bind: "reach",
       editable: true,
       stack: [],
-    } as TraceNode;
+    };
     const ground = { kind: "line" as const, origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
     const session = {
       verb: "parallelLine" as const,
@@ -388,7 +391,7 @@ describe("clickTool", () => {
       circles: {},
       regions: {},
       lengths: { reach: 1.25 },
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -420,7 +423,7 @@ describe("clickTool", () => {
       circles: {},
       regions: {},
       lengths: { reach: 2.5 },
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -457,7 +460,7 @@ describe("clickTool", () => {
       },
       lengths: {},
       byId: {},
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -541,10 +544,9 @@ describe("clickTool", () => {
       origin: { x: 0, y: 0 },
       direction: { x: 1, y: 0 },
     };
-    const shelf = {
-      kind: "parallelLine" as const,
-      origin: { x: 0, y: 1.76 },
-      direction: { x: 1, y: 0 },
+    const shelf: ParallelLine = {
+      kind: "parallelLine",
+      line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
       distance: 1.76,
     };
     const mid = clickTool(startTool("parallelLine"), {
@@ -564,7 +566,7 @@ describe("clickTool", () => {
       regions: {},
       lengths: {},
       byId: {},
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -636,10 +638,9 @@ describe("clickTool", () => {
       origin: { x: 0, y: 0 },
       direction: { x: 1, y: 0 },
     };
-    const shelf = {
-      kind: "parallelLine" as const,
-      origin: { x: 0, y: 1.76 },
-      direction: { x: 1, y: 0 },
+    const shelf: ParallelLine = {
+      kind: "parallelLine",
+      line: { kind: "line", origin: { x: 0, y: 1.76 }, direction: { x: 1, y: 0 } },
       distance: 1.76,
     };
     const scope = {
@@ -653,7 +654,7 @@ describe("clickTool", () => {
       regions: {},
       lengths: {},
       byId: {},
-    };
+    } satisfies Partial<Scope>;
     const mid = clickTool(startTool("parallelLine"), {
       world: { x: 1, y: 0 },
       point: free(1, 0),
@@ -881,7 +882,7 @@ describe("clickTool", () => {
       regions: {},
       lengths: {},
       byId: {},
-    };
+    } satisfies Partial<Scope>;
     const mid = clickTool(startTool("perpendicularLine"), {
       world: { x: 1, y: 0 },
       point: free(1, 0),
@@ -1408,7 +1409,7 @@ describe("region tool", () => {
   });
 
   test("carrier snap ignores a stroke that misses the current vertex", () => {
-    const axis = {
+    const axis: TraceNodeOf<"line"> = {
       id: "o_x",
       occ: 0,
       kind: "line",
@@ -1416,8 +1417,8 @@ describe("region tool", () => {
       value: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
       editable: false,
       stack: [],
-    } as TraceNode;
-    const far = {
+    };
+    const far: TraceNodeOf<"segment"> = {
       id: "o_far",
       occ: 0,
       kind: "segment",
@@ -1425,7 +1426,7 @@ describe("region tool", () => {
       value: { kind: "segment", a: { x: 0, y: 3 }, b: { x: 4, y: 3 } },
       editable: false,
       stack: [],
-    } as TraceNode;
+    };
     const ctx = {
       trace: [axis, far],
       camera: { x: 0, y: 0, scale: 48 },
@@ -1442,7 +1443,7 @@ describe("region tool", () => {
 
   test("region carrier pick follows the focused invocation, not occ 0", () => {
     const namedC0 = { kind: "ref" as const, bind: "c0", id: "o_c0", at: { x: 10, y: 0 } };
-    const bot0 = {
+    const bot0: TraceNodeOf<"segment"> = {
       id: "o_bot",
       occ: 0,
       kind: "segment",
@@ -1450,13 +1451,13 @@ describe("region tool", () => {
       value: { kind: "segment", a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
       editable: false,
       stack: [],
-    } as TraceNode;
-    const bot1 = {
+    };
+    const bot1: TraceNodeOf<"segment"> = {
       ...bot0,
       occ: 1,
       value: { kind: "segment", a: { x: 10, y: 0 }, b: { x: 14, y: 0 } },
-    } as TraceNode;
-    const filter = { keys: new Set(["o_c0:1", "o_bot:1"]), print: (n: TraceNode) => n.bind };
+    };
+    const filter = { keys: new Set(["o_c0:1", "o_bot:1"]), print: (n: SnapNode) => n.bind };
     const ctx = {
       trace: [bot0, bot1],
       camera: { x: 0, y: 0, scale: 48 },
@@ -1541,7 +1542,7 @@ describe("roundOffset tool", () => {
       circles: {},
       regions: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
       lengths: { n: 0.2 },
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -1574,7 +1575,7 @@ describe("roundOffset tool", () => {
       regions: { slice: { expr: { kind: "ref" as const, name: "slice" }, geom: square } },
       lengths: {},
       byId: {},
-    };
+    } satisfies Partial<Scope>;
     expect(
       clickTool(
         mid.session,
@@ -1655,7 +1656,7 @@ describe("roundOffset tool", () => {
       },
     );
     expect(g?.kind).toBe("region");
-    expect((g as { kind: "region"; edges: unknown[] }).edges).toHaveLength(8);
+    expect((g as { kind: "region"; edges: LoopEdge[] }).edges).toHaveLength(8);
   });
 });
 
@@ -1700,7 +1701,7 @@ describe("fillet tool", () => {
     circles: {},
     regions: { mix: { expr: { kind: "ref" as const, name: "mix" }, geom: square } },
     lengths: { r: 0.35 },
-  };
+  } satisfies Partial<Scope>;
 
   test("picks the closest corner then a slider", () => {
     const mid = clickTool(startTool("fillet"), faceHit, scope);
@@ -1742,7 +1743,7 @@ describe("fillet tool", () => {
   });
 
   test("enrichHit sets the closest vertex", () => {
-    const ctx = {
+    const ctx: PlaceCtx = {
       trace: [
         {
           id: "o_fil_mix",
@@ -1752,7 +1753,7 @@ describe("fillet tool", () => {
           value: square,
           editable: false,
           stack: [],
-        } as TraceNode,
+        },
       ],
       camera: { x: 0, y: 0, scale: 48 },
       size: { w: 800, h: 600 },
@@ -1796,7 +1797,7 @@ describe("fillet tool", () => {
       ],
       holes: [],
     };
-    const mix0 = {
+    const mix0: TraceNodeOf<"region"> = {
       id: "o_pr",
       occ: 0,
       kind: "region",
@@ -1804,14 +1805,14 @@ describe("fillet tool", () => {
       value: square,
       editable: false,
       stack: [],
-    } as TraceNode;
-    const mix1 = { ...mix0, occ: 1, value: square1 } as TraceNode;
-    const ctx = {
+    };
+    const mix1: TraceNodeOf<"region"> = { ...mix0, occ: 1, value: square1 };
+    const ctx: PlaceCtx = {
       trace: [mix0, mix1],
       camera: { x: 0, y: 0, scale: 48 },
       size: { w: 800, h: 600 },
       keys: new Set(["o_pr:1"]),
-      print: (n: TraceNode) => n.bind,
+      print: (n: SnapNode) => n.bind,
     };
     const miss = enrichHit(
       startTool("fillet"),
@@ -1879,7 +1880,7 @@ describe("fillet tool", () => {
   });
 
   test("fillet does not pick a roundOffset region", () => {
-    const inset = {
+    const inset: TraceNodeOf<"csg2"> = {
       id: "o_fil_inset",
       occ: 0,
       kind: "csg2",
@@ -1887,7 +1888,7 @@ describe("fillet tool", () => {
       value: wrapCsg(offsetValue(square, -0.2)),
       editable: false,
       stack: [],
-    } as TraceNode;
+    };
     const hit = enrichHit(
       startTool("fillet"),
       { world: { x: 0.5, y: 0.5 }, point: free(0.5, 0.5) },
