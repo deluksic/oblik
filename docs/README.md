@@ -2,6 +2,7 @@
 
 - [Intent](./intent.md) — programs, pure libraries, declared editors
 - [Chrome](./chrome.md) — hover and selection halos (construction + figure)
+- [Refactoring plan](./refactoring-plan.md) — geometry kinds, the GPU renderer, and the euclid2 SVG strip
 - [euclid2 graph](./euclid2-graph.md) — P5-era history: 2D constructors, annotator, potential vs actual
 - [euclid2 worked example](./euclid2-worked.md) — P5-era history: shelf / reach / beam; where the graph fails intent
 
@@ -16,5 +17,8 @@ Prototypes (charter + what we learned):
 - [7 — Loop, Region, Csg2 on the euclid2 tape](./prototypes/7.md) — shipped (language). `region(cycle, holes, id?)`; Space Region tool; `diff` / `union` / `intersect` / `pick` / `roundOffset`. Horizon: paper inks a sketch.
 - [8 — mentionable scopes](./prototypes/8.md) — shipped (learned). Insert and snap print names legal in the focused function + invocation. Pass: `const plate = mountingPlateLayout()`. Remaining: caller-side binding; no remove-from-return.
 - [9 — figure](./prototypes/9.md) — building. `paint` ink objects; Brush/Eraser; Shift-onion. Style swatches later. Export later.
+- [10 — user composite functions as Space tools](./prototypes/10.md)
+- [11 — incremental evaluation](./prototypes/11.md) — site memoization, user `memo()`, pick prefilter
+- [12 — a WebGPU 2D canvas renderer (`euclid2-typegpu`)](./prototypes/12.md) — the GPU view; fills, fields, chrome, picking. [Points plan](./prototypes/12-gpu-points-plan.md) (shipped, historical)
 
 [Critique](./critique.md) records why unmarked-literal CAD and a single kernel were dropped.
