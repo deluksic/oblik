@@ -43,6 +43,8 @@ outline'    = max(outline, knockout' + ring extra)
 
 Points use a fixed wider halo instead of this growth: **14px outline / 9px selected knockout**. Construction points: derived `r=3.5` ink, editable `r=5` accent, hover/select cream. The grab handle is an invisible `r=7` hit target (`HANDLE_R`).
 
+A **named** point or glider also carries its bind label beside the mark: `--oblik-muted`, 12px, baseline at **`(x + 10, y − 8)` CSS px** from the mark's screen position, faded to 0.32 opacity unless it is hot or selected. That offset is the contract both views hold to — the SVG view draws it as `<text>`, the WebGPU view as positioned HTML.
+
 ## Other
 
 - Overlay clip to the **outside of fills** (not circles or points). Regions use the same idea: an inverted luminance mask so the halo sits outside the CSG fill.
