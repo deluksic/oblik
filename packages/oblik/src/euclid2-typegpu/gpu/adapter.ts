@@ -277,6 +277,9 @@ export function createAdapter(): Adapter {
     // selected overlayBands pass is what points/ink chrome share upstream).
     const outlineHalf = overlayBands(strokePx, { selected: true }).outline / 2 / scale;
     const knockoutHalf = overlayBands(strokePx, { selected: true }).knockout / 2 / scale;
+    // A fill's own outline is the construction stroke width, like every edge —
+    // and unlike the halo bands it sits *entirely* inside the silhouette.
+    const edgeWidth = strokePx / scale;
 
     const emitStrokeLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
       const start = strokePool.alloc(n, INK_DISC_COUNT);
@@ -410,6 +413,12 @@ export function createAdapter(): Adapter {
           input.showHalos && hot
             ? haloWrites(selected, colors.ring, colors.paper, outlineHalf, knockoutHalf)
             : NO_HALO;
+        // The fill's own outline carries the same state colors as every other
+        // ink node (`inkClass`): accent while editable, cream while hot.
+        const edge = edgeWrites(
+          hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink,
+          edgeWidth,
+        );
         const plan = fieldPlan(n.value as CsgOperand);
         if (plan) {
           const draw = emitField(
@@ -417,6 +426,7 @@ export function createAdapter(): Adapter {
             plan,
             color,
             alpha,
+            edge,
             halo,
             visible,
             2 / scale,
@@ -461,7 +471,7 @@ export function createAdapter(): Adapter {
           diff(
             lastFillRegion,
             n,
-            encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, halo),
+            encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, edge, halo),
           )
         ) {
           geom.bounds.forEach((bounds, i) => {
@@ -478,6 +488,8 @@ export function createAdapter(): Adapter {
                 color: vec3f(color[0], color[1], color[2]),
                 alpha,
                 flags: 0,
+                edge: edge.color,
+                edgeWidth: edge.half,
                 haloRing: halo.ring,
                 haloKnock: halo.knock,
                 haloHalf: halo.half,
@@ -632,6 +644,7 @@ export function createAdapter(): Adapter {
     plan: FieldPlan,
     color: Rgb,
     alpha: number,
+    edge: EdgeFields,
     halo: HaloFields,
     visible: Box,
     pad: number,
@@ -692,6 +705,8 @@ export function createAdapter(): Adapter {
       leafBase: leafStart,
       color: vec3f(color[0], color[1], color[2]),
       alpha,
+      edge: edge.color,
+      edgeWidth: edge.half,
       haloRing: halo.ring,
       haloKnock: halo.knock,
       haloHalf: halo.half,
@@ -1040,6 +1055,11 @@ function encodeFieldQuad(q: FieldQuadValue): Float64Array {
     q.color[1],
     q.color[2],
     q.alpha,
+    q.edge.x,
+    q.edge.y,
+    q.edge.z,
+    q.edge.w,
+    q.edgeWidth,
     q.haloRing.x,
     q.haloRing.y,
     q.haloRing.z,
@@ -1081,13 +1101,14 @@ function encodeFillRegions(
   arcStart: number,
   color: Rgb,
   alpha: number,
+  edge: EdgeFields,
   halo: HaloFields,
 ): Float64Array {
-  const f = new Float64Array(geom.spans.length * 23);
+  const f = new Float64Array(geom.spans.length * 28);
   for (let i = 0; i < geom.spans.length; i++) {
     const b = geom.bounds[i]!;
     const w = windows[i]!;
-    let j = i * 23;
+    let j = i * 28;
     f[j++] = b.min.x;
     f[j++] = b.min.y;
     f[j++] = b.max.x;
@@ -1101,6 +1122,7 @@ function encodeFillRegions(
     f[j++] = color[2];
     f[j++] = alpha;
     f[j++] = 0;
+    j = encodeEdge(f, j, edge);
     j = encodeHalo(f, j, halo);
   }
   return f;
@@ -1154,7 +1176,26 @@ function encodePoints(discs: readonly PointInstValue[]): Float64Array {
   return f;
 }
 
-// -- halo chrome -------------------------------------------------------------
+// -- edge + halo chrome ------------------------------------------------------
+
+/** The fill's own outline: its state color and half-width (world units). */
+type EdgeFields = { color: v4f; half: number };
+
+/** SVG's `inkClass` for a fill's stroke: `stroke-width: var(--oblik-stroke)`,
+ * screen-space, drawn inside the silhouette here. */
+function edgeWrites(color: Rgb, half: number): EdgeFields {
+  return { color: vec4f(color[0], color[1], color[2], 1), half };
+}
+
+/** Append an outline's floats to a change-check buffer. */
+function encodeEdge(f: Float64Array, at: number, edge: EdgeFields): number {
+  f[at] = edge.color.x;
+  f[at + 1] = edge.color.y;
+  f[at + 2] = edge.color.z;
+  f[at + 3] = edge.color.w;
+  f[at + 4] = edge.half;
+  return at + 5;
+}
 
 /** The halo fields of one fill node, exactly as the records store them. */
 type HaloFields = { ring: v4f; knock: v4f; half: v2f };

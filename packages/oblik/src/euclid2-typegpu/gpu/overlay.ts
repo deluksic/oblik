@@ -291,7 +291,9 @@ function pushFillIsland(
       color: rgbv(color),
       alpha,
       flags: 0,
-      // Ghost previews are never hot, so they never carry chrome.
+      // Ghost previews are never hot and carry no state colors.
+      edge: vec4f(0, 0, 0, 0),
+      edgeWidth: 0,
       haloRing: vec4f(0, 0, 0, 0),
       haloKnock: vec4f(0, 0, 0, 0),
       haloHalf: vec2f(0, 0),

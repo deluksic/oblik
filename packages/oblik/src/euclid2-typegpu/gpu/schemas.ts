@@ -168,6 +168,13 @@ export const FillRegion = struct({
   color: vec3f,
   alpha: f32,
   flags: u32,
+  /** The fill's own outline: rgb = state color (ink → accent when editable →
+   * `selectedPaint` when hot, the SVG `inkClass` mapping), a = opacity (0 = no
+   * outline). Drawn as a band inside the silhouette, like the halo. */
+  edge: vec4f,
+  /** Outline width in world units, all of it inside the silhouette
+   * (`--oblik-stroke` / scale). */
+  edgeWidth: f32,
   /** rgb = ring color (`--oblik-ring`), a = ring opacity (0 = no halo). */
   haloRing: vec4f,
   /** rgb = knockout color (`--oblik-knockout`, the paper), a = opacity of the
@@ -206,6 +213,8 @@ export const FieldQuad = struct({
   leafBase: u32,
   color: vec3f,
   alpha: f32,
+  edge: vec4f,
+  edgeWidth: f32,
   haloRing: vec4f,
   haloKnock: vec4f,
   haloHalf: vec2f,

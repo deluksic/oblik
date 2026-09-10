@@ -64,7 +64,20 @@ two views differ on purpose:
   distance to the nearest boundary for its antialiasing ramp, so `0 .. outlinePx/2` and
   then `knockoutPx/2` are two clamps of that same value — no restroke geometry, no mask,
   no clip. Round joins, hole boundaries and rounded offsets come free.
-- Contract: `gpu/pipelines/halo.ts` (the band math), `halo.test.ts` (pixel semantics),
+- **Every fill also carries its own outline**, the SVG `inkClass` stroke at
+  `--oblik-stroke` (1.5px): the SVG view draws it along a fill's boundary with
+  `stroke: ink`, accent while editable, `--oblik-selected-paint` while hot. WebGPU puts
+  the same line inside the silhouette, at full stroke width. Its alpha is 0 for a cold
+  fill that should have no outline at all.
+- **Chrome over a fill is one antialiased layer per pixel, never two blends.** Both the
+  paint+outline pair and the band pair are areas of one pixel, so the output is the
+  pixel's coverage times the _area-weighted_ mix of the layers: colors mix with the
+  coverages, alpha with the coverages, and the color is divided by the total coverage.
+  Picking a layer's color from its own coverage instead (the obvious `mix(under, over,
+cov)`) cancels the ramp and steps hard at the seam between the knockout and the ring —
+  exactly the bug `halo.test.ts`'s profile sweep exists to catch.
+- Contract: `gpu/pipelines/halo.ts` (the band and outline math), `halo.test.ts` (pixel
+  semantics, including a dense profile sweep with no step over ~0.04 per 0.05px),
   `pipelines/wgsl.test.ts` (shader structure).
 
 ## Other

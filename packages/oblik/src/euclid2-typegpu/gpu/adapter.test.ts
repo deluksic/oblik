@@ -68,8 +68,8 @@ function polygonValue() {
   return { kind: "polygon" as const, boundary, holes: [] };
 }
 
-function node(id: string, value: unknown, bind?: string): TraceNode {
-  return { id, occ: 0, kind: "region", value, bind, editable: false, stack: [] } as TraceNode;
+function node(id: string, value: unknown, bind?: string, editable = false): TraceNode {
+  return { id, occ: 0, kind: "region", value, bind, editable, stack: [] } as TraceNode;
 }
 
 /** `diff(circle, region)` — a tree the field compiler takes. */
@@ -313,5 +313,52 @@ describe("fill halo chrome", () => {
     );
     expect(patch.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
     expect(patch.fields.quads.writes[0]!.value.haloRing.w).toBe(0);
+  });
+});
+
+describe("fill outline (state colors)", () => {
+  /** The fill's own stroke: `inkClass` colors, construction stroke width, and
+   * unlike the halo bands all of it sits inside the silhouette. */
+  const strokeWidth = world(1.5);
+
+  test("every fill carries an outline: ink, accent when editable, cream when hot", () => {
+    const plain = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate")]));
+    const inkEdge = plain.fields.quads.writes[0]!.value;
+    expect([inkEdge.edge.x, inkEdge.edge.y, inkEdge.edge.z]).toEqual([...COLORS.ink]);
+    expect(inkEdge.edge.w).toBe(1);
+    expect(inkEdge.edgeWidth).toBeCloseTo(strokeWidth, 9);
+
+    const editable = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate", true)]));
+    const accentEdge = editable.fields.quads.writes[0]!.value;
+    expect([accentEdge.edge.x, accentEdge.edge.y, accentEdge.edge.z]).toEqual([...COLORS.accent]);
+
+    const hot = createAdapter().tick(
+      input([node("o_flat", squareRegion(1), "plate", true)], { hoverId: "o_flat" }),
+    );
+    const creamEdge = hot.fields.quads.writes[0]!.value;
+    expect([creamEdge.edge.x, creamEdge.edge.y, creamEdge.edge.z]).toEqual([
+      ...COLORS.selectedPaint,
+    ]);
+  });
+
+  test("the span path carries the same outline", () => {
+    const patch = createAdapter().tick(input([node("o_poly", polygonValue(), "shell", true)]));
+    const region = patch.fills.writes[0]!.value;
+    expect([region.edge.x, region.edge.y, region.edge.z]).toEqual([...COLORS.accent]);
+    expect(region.edgeWidth).toBeCloseTo(strokeWidth, 9);
+  });
+
+  test("flipping editability recolors the record without touching the spans", () => {
+    const adapter = createAdapter();
+    const flat = node("o_flat", squareRegion(1), "plate", false);
+    adapter.tick(input([flat]));
+    // Same node identity, new editable flag: the outline is data like any other
+    // state color, so it rides the existing byte diff.
+    (flat as { editable: boolean }).editable = true;
+    const patch = adapter.tick(input([flat]));
+    const quad = patch.fields.quads.writes[0]!.value;
+    expect([quad.edge.x, quad.edge.y, quad.edge.z]).toEqual([...COLORS.accent]);
+    expect(patch.fields.quads.writes).toHaveLength(1);
+    expect(patch.fields.segs.writes).toHaveLength(0);
   });
 });

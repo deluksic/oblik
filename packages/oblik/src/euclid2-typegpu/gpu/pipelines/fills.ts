@@ -1,10 +1,10 @@
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
-import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
+import { abs, atan2, clamp, dot, floor, length, max, min, sign, sqrt } from "typegpu/std";
 
 import { fillLayout } from "../layout";
-import { haloColor } from "./halo";
+import { haloWithEdge, paintWithEdge } from "./halo";
 
 const TAU = 6.283185307179586;
 
@@ -113,23 +113,29 @@ export const fillFragment = tgpu.fragmentFn({
 })(({ p, regionIndex }) => {
   "use gpu";
   const region = fillLayout.$.fills[regionIndex];
-  const d = spanDistance(regionIndex, p);
-  const cov = clamp(0.5 - d / max(fwidth(d), 1e-6), 0, 1);
-  return vec4f(region.color, region.alpha * cov);
+  return paintWithEdge(
+    spanDistance(regionIndex, p),
+    vec4f(region.color, region.alpha),
+    region.edge,
+    region.edgeWidth,
+  );
 });
 
-/** Halo entry: the same region, drawn as the inward chrome band. */
+/** Halo entry: the same region, drawn as the inward chrome band, with the
+ * node's own outline kept above it. */
 export const haloFragment = tgpu.fragmentFn({
   in: { p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
   out: vec4f,
 })(({ p, regionIndex }) => {
   "use gpu";
   const region = fillLayout.$.fills[regionIndex];
-  return haloColor(
+  return haloWithEdge(
     spanDistance(regionIndex, p),
     region.haloRing,
     region.haloKnock,
     region.haloHalf,
+    region.edge,
+    region.edgeWidth,
   );
 });
 

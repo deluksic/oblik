@@ -2,10 +2,10 @@ import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRenderPipeline, TgpuRoot } from "typegpu";
 import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
 import type { v2f } from "typegpu/data";
-import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
+import { abs, atan2, clamp, dot, floor, length, max, min, sign, sqrt } from "typegpu/std";
 
 import { fieldLayout } from "../layout";
-import { haloColor } from "../pipelines/halo";
+import { haloWithEdge, paintWithEdge } from "../pipelines/halo";
 import type { FieldNodePlan, FieldPlan } from "./plan";
 
 const TAU = 6.283185307179586;
@@ -246,7 +246,14 @@ export function fieldFragment(plan: FieldPlan, layer: FieldLayer = "paint") {
     })(({ p, quad }) => {
       "use gpu";
       const q = fieldLayout.$.fieldQuads[quad];
-      return haloColor(evaluate(p, q.leafBase), q.haloRing, q.haloKnock, q.haloHalf);
+      return haloWithEdge(
+        evaluate(p, q.leafBase),
+        q.haloRing,
+        q.haloKnock,
+        q.haloHalf,
+        q.edge,
+        q.edgeWidth,
+      );
     });
   }
   return tgpu.fragmentFn({
@@ -255,9 +262,7 @@ export function fieldFragment(plan: FieldPlan, layer: FieldLayer = "paint") {
   })(({ p, quad }) => {
     "use gpu";
     const q = fieldLayout.$.fieldQuads[quad];
-    const d = evaluate(p, q.leafBase);
-    const cov = clamp(0.5 - d / max(fwidth(d), 1e-6), 0, 1);
-    return vec4f(q.color, q.alpha * cov);
+    return paintWithEdge(evaluate(p, q.leafBase), vec4f(q.color, q.alpha), q.edge, q.edgeWidth);
   });
 }
 
