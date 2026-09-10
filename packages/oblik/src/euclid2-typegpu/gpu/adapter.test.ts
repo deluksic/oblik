@@ -36,7 +36,7 @@ function input(trace: TraceNode[], over: Partial<AdapterInput> = {}): AdapterInp
     size: SIZE,
     colors: COLORS,
     strokePx: 1.5,
-    hoverId: undefined,
+    hoverKey: undefined,
     selectedKey: undefined,
     showHalos: true,
     hideFills: false,
@@ -208,7 +208,7 @@ describe("adapter fill routing", () => {
     const draw = moved.fillDraws[0]!;
     expect(draw.path === "field" && draw.plan.shape).toBe("diff(circle,region)");
 
-    const hovered = adapter.tick(input([dragged], { hoverId: "o_csg" }));
+    const hovered = adapter.tick(input([dragged], { hoverKey: "o_csg:0" }));
     expect(hovered.fields.quads.writes).toHaveLength(1);
     const hoverColor = hovered.fields.quads.writes[0]!.value.color;
     expect([hoverColor.x, hoverColor.y, hoverColor.z]).toEqual([...COLORS.selectedPaint]);
@@ -297,7 +297,7 @@ describe("fill halo chrome", () => {
     // (half = 3.5px), at 50%, and no paper knockout — driven straight off the
     // ink chrome's band widths. The halo draws *after* the paint: it knocks the
     // fill out rather than being washed by it.
-    const hovered = createAdapter().tick(input(trace, { hoverId: "o_csg" }));
+    const hovered = createAdapter().tick(input(trace, { hoverKey: "o_csg:0" }));
     expect(hovered.fillDraws.map((d) => `${d.path}:${d.layer}`)).toEqual([
       "field:paint",
       "field:halo",
@@ -329,7 +329,7 @@ describe("fill halo chrome", () => {
 
   test("the span path carries the same halo fields per island", () => {
     const hovered = createAdapter().tick(
-      input([node("o_poly", polygonValue(), "shell")], { hoverId: "o_poly" }),
+      input([node("o_poly", polygonValue(), "shell")], { hoverKey: "o_poly:0" }),
     );
     expect(hovered.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
     const region = hovered.fills.writes[0]!.value;
@@ -339,7 +339,7 @@ describe("fill halo chrome", () => {
 
   test("dragging drops the halo and keeps the paint", () => {
     const patch = createAdapter().tick(
-      input([csgNode("o_csg", 0, "pac")], { hoverId: "o_csg", showHalos: false }),
+      input([csgNode("o_csg", 0, "pac")], { hoverKey: "o_csg:0", showHalos: false }),
     );
     expect(patch.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
     expect(patch.fields.quads.writes[0]!.value.haloRing.w).toBe(0);
@@ -363,7 +363,7 @@ describe("fill outline (state colors)", () => {
     expect([accentEdge.edge.x, accentEdge.edge.y, accentEdge.edge.z]).toEqual([...COLORS.accent]);
 
     const hot = createAdapter().tick(
-      input([node("o_flat", squareRegion(1), "plate", true)], { hoverId: "o_flat" }),
+      input([node("o_flat", squareRegion(1), "plate", true)], { hoverKey: "o_flat:0" }),
     );
     const creamEdge = hot.fields.quads.writes[0]!.value;
     expect([creamEdge.edge.x, creamEdge.edge.y, creamEdge.edge.z]).toEqual([
@@ -487,7 +487,7 @@ describe("polar repeat fills", () => {
     const ring = node("o_ring", face, "ring");
     const adapter = createAdapter();
     adapter.tick(input([ring]));
-    const hovered = adapter.tick(input([ring], { hoverId: "o_ring" }));
+    const hovered = adapter.tick(input([ring], { hoverKey: "o_ring:0" }));
     expect(hovered.fillDraws.map((d) => `${d.path}:${d.layer}`)).toEqual([
       "field:paint",
       "field:halo",
@@ -527,7 +527,7 @@ describe("zoom and pan write no records", () => {
   test("a pan rewrites no record, hover included", () => {
     const trace = recordFixture();
     const adapter = createAdapter();
-    const hovered = input(trace, { hoverId: "o_csg", selectedKey: "o_seg:0" });
+    const hovered = input(trace, { hoverKey: "o_csg:0", selectedKey: "o_seg:0" });
     adapter.tick(hovered);
     const panned = adapter.tick({ ...hovered, cam: { ...CAM, x: CAM.x + 3, y: CAM.y - 2 } });
     expect(panned.stats.written).toBe(0);

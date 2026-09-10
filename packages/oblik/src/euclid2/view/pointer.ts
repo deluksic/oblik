@@ -366,7 +366,7 @@ export function placeFromEvent(
         point = {
           kind: "ref",
           bind,
-          id: found.id,
+          key: traceKey(found),
           at: { x: at.x, y: at.y },
         };
       }

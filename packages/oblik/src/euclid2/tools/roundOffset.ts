@@ -4,7 +4,7 @@ import { signedDistToRegion, walkEdges } from "#geom/region";
 import { printExpr } from "#source/expr";
 
 import { snapRegion } from "../pick";
-import { exprOfPrint, hoverBind, previewCall, round } from "./common";
+import { exprOfPrint, previewCall, round, snapKey } from "./common";
 import {
   inSlot,
   lengthField,
@@ -94,7 +94,7 @@ export const roundOffset: Tool<OffsetSession> = {
   hover(session, hit, trace, scope) {
     if (!faceOf(session, scope ?? scopeFromTrace(trace))) {
       if (!hit.region) return undefined;
-      return hoverBind(trace, hit.region.bind);
+      return snapKey(hit.region, trace);
     }
     return lengthHover(hit, trace);
   },

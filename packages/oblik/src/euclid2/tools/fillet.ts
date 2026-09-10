@@ -2,7 +2,7 @@ import { filletAtVertex, isFiniteRegion, regionCorners, walkEdges, type Region }
 import { printExpr, type Expr } from "#source/expr";
 
 import { snapRegion } from "../pick";
-import { dist, exprOfPlace, hoverBind, isPinnedPoint, round, sameRef } from "./common";
+import { dist, exprOfPlace, isPinnedPoint, round, sameRef, snapKey } from "./common";
 import { inSlot, lengthField } from "./draft";
 import {
   attachLengthHit,
@@ -153,7 +153,7 @@ export const fillet: Tool<FilletSession> = {
   hover(session, hit, trace) {
     if (!vertexOf(session)) {
       if (!hit.region) return undefined;
-      return hoverBind(trace, hit.region.bind);
+      return snapKey(hit.region, trace);
     }
     return lengthHover(hit, trace);
   },

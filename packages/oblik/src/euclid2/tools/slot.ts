@@ -1,7 +1,7 @@
 import type { SceneValue, TraceNode } from "#eval/context";
 import { printExpr } from "#source/expr";
 
-import { asPoint, exprOfPrint, hoverBind, hoverPlace } from "./common";
+import { asPoint, exprOfPrint, hoverPlace, snapKey } from "./common";
 import { hitRef, nameField, refField, resolveSlot, type RefLooks } from "./draft";
 import { scopeFromTrace, toolScope } from "./scope";
 import type {
@@ -164,15 +164,15 @@ function defaultHover(
 ): string | undefined {
   switch (kind) {
     case "carrier":
-      return hit.carrier ? hoverBind(trace, hit.carrier.bind) : undefined;
+      return hit.carrier ? snapKey(hit.carrier, trace) : undefined;
     case "operand":
     case "circle":
       if (hit.carrier && hit.carrier.geom.kind === "circle") {
-        return hoverBind(trace, hit.carrier.bind);
+        return snapKey(hit.carrier, trace);
       }
       return hoverPlace(hit.point, trace);
     case "region":
-      return hit.region ? hoverBind(trace, hit.region.bind) : hoverPlace(hit.point, trace);
+      return hit.region ? snapKey(hit.region, trace) : hoverPlace(hit.point, trace);
     case "point":
       return hoverPlace(hit.point, trace);
   }

@@ -1,10 +1,10 @@
 import type { TraceNode } from "#eval/context";
 import { printExpr, member, parsePath, rootRef, type Expr, type ProductField } from "#source/expr";
 
-import { hitsNear, nodeByPrint, nodeByTraceAttr } from "../pick";
+import { hitsNear, nodeByTraceAttr } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
-import { round } from "./common";
+import { keyByPrint, round } from "./common";
 import { parseNum } from "./draft";
 import { toolScope } from "./scope";
 import type { Field, PlaceCtx, PlaceHit, Scope, ToolSession } from "./types";
@@ -277,20 +277,20 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
   if (e.kind === "member") {
     const name = rootRef(e);
     return name
-      ? (nodeByPrint(trace, printExpr(e))?.id ?? nodeByPrint(trace, name)?.id ?? undefined)
+      ? (keyByPrint(trace, printExpr(e)) ?? keyByPrint(trace, name) ?? undefined)
       : undefined;
   }
   if (e.kind === "neg" && e.expr.kind === "member") {
     const name = rootRef(e.expr);
     return name
-      ? (nodeByPrint(trace, printExpr(e.expr))?.id ?? nodeByPrint(trace, name)?.id ?? undefined)
+      ? (keyByPrint(trace, printExpr(e.expr)) ?? keyByPrint(trace, name) ?? undefined)
       : undefined;
   }
   if (e.kind === "ref") {
-    return nodeByPrint(trace, e.name)?.id ?? undefined;
+    return keyByPrint(trace, e.name) ?? undefined;
   }
   if (e.kind === "neg" && e.expr.kind === "ref") {
-    return nodeByPrint(trace, e.expr.name)?.id ?? undefined;
+    return keyByPrint(trace, e.expr.name) ?? undefined;
   }
   return undefined;
 }

@@ -7,7 +7,7 @@ import { printExpr, type Expr } from "#source/expr";
 import type { Annotation } from "../../source/analyze";
 import { snapLineCarrier, snapRegion, type Vec2 } from "../pick";
 import { isPinnedPoint } from "../place";
-import { asPoint, dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, round } from "./common";
+import { asPoint, dist, exprOfPlace, exprOfPrint, hoverPlace, round, snapKey } from "./common";
 import { inSlot, nameField, parseNum, previewName, withBind } from "./draft";
 import { attachLengthHit, evalLengthExpr, lengthHover, parseLengthTyped } from "./length";
 import type {
@@ -464,11 +464,11 @@ export function compileComposite(reg: RegisteredTool): Tool<CompS> {
       if (arg.kind === "point") return hoverPlace(hit.point, trace);
       if (arg.kind === "region") {
         if (!hit.region) return undefined;
-        return hoverBind(trace, hit.region.bind);
+        return snapKey(hit.region, trace);
       }
       if (arg.kind === "segment") {
         if (!hit.carrier) return undefined;
-        return hoverBind(trace, hit.carrier.bind);
+        return snapKey(hit.carrier, trace);
       }
       return lengthHover(hit, trace);
     },

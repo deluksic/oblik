@@ -23,6 +23,12 @@ const A: TraceNodeOf<"point"> = {
   stack: [],
 };
 
+const A2: TraceNodeOf<"point"> = {
+  ...A,
+  occ: 1,
+  value: { kind: "point", x: 5, y: 0 },
+};
+
 const CIRCLE: TraceNodeOf<"circle"> = {
   id: "o_r",
   occ: 0,
@@ -187,18 +193,25 @@ describe("liftSelected", () => {
 });
 
 describe("hoverNode", () => {
-  test("resolves the live node for a hover id", () => {
-    expect(hoverNode([SEG, CIRCLE, A], "o_r")?.kind).toBe("circle");
-    expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_r"))).toBe(true);
-    expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_s"))).toBe(false);
+  test("resolves the live node for a hover key", () => {
+    expect(hoverNode([SEG, CIRCLE, A], "o_r:0")?.kind).toBe("circle");
+    expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_r:0"))).toBe(true);
+    expect(isGrabbable(hoverNode([SEG, CIRCLE, A], "o_s:0"))).toBe(false);
     expect(hoverNode([A], undefined)).toBeUndefined();
   });
 
-  test("hot highlight uses the same id", () => {
-    expect(isHot(A, "o_a", undefined)).toBe(true);
-    expect(isHot(CIRCLE, "o_a", undefined)).toBe(false);
-    expect(isHover(A, "o_a", undefined)).toBe(true);
-    expect(isHover(A, "o_a", "o_a:0")).toBe(false);
+  test("hot highlight uses the same key as select", () => {
+    expect(isHot(A, "o_a:0", undefined)).toBe(true);
+    expect(isHot(CIRCLE, "o_a:0", undefined)).toBe(false);
+    expect(isHover(A, "o_a:0", undefined)).toBe(true);
+    expect(isHover(A, "o_a:0", "o_a:0")).toBe(false);
     expect(isSelected(A, "o_a:0")).toBe(true);
+  });
+
+  test("a repeated id lights up one occurrence at a time", () => {
+    expect(isHot(A, "o_a:1", undefined)).toBe(false);
+    expect(isHot(A2, "o_a:1", undefined)).toBe(true);
+    expect(hoverNode([A, A2], "o_a:1")).toBe(A2);
+    expect(isHot(A2, "o_a:0", undefined)).toBe(false);
   });
 });

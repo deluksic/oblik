@@ -13,7 +13,7 @@ const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y }
 const pinned = (bind: string, x: number, y: number): PlacePoint => ({
   kind: "ref",
   bind,
-  id: bind,
+  key: `${bind}:0`,
   at: { x, y },
 });
 

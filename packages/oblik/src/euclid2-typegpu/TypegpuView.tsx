@@ -42,9 +42,10 @@ export type TypegpuViewProps = {
   ghost?: Ghost | undefined;
   place?: PlaceHit | undefined;
   toolSession?: ToolSession | undefined;
-  hoverId?: string | undefined;
+  /** Hovered node's trace key (`id:occ`) — one instance, like `selectedKey`. */
+  hoverKey?: string | undefined;
   selectedKey?: string | undefined;
-  onHoverId?: (id: string | undefined) => void;
+  onHoverKey?: (key: string | undefined) => void;
   onPick?: (hits: TraceNode[]) => void;
   onDraft: (id: string, values: number[]) => void;
   onCommit: (id: string, values: number[]) => void;
@@ -286,7 +287,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       paperEl(),
       ready(),
       props.trace,
-      props.hoverId,
+      props.hoverKey,
       props.selectedKey,
       props.placing ?? false,
       props.toolSession,
@@ -302,7 +303,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       el,
       ,
       trace,
-      hoverId,
+      hoverKey,
       selectedKey,
       placing,
       toolSession,
@@ -340,7 +341,7 @@ export function TypegpuView(props: TypegpuViewProps) {
           ghost: readCssColor(el, "--oblik-ghost"),
         },
         strokePx: CONSTRUCTION_STROKE_PX,
-        hoverId,
+        hoverKey,
         selectedKey,
         // Mirror the SVG view: while a drag is live the chrome paints lift but
         // their halo/knockout rings are suppressed.
@@ -422,7 +423,7 @@ export function TypegpuView(props: TypegpuViewProps) {
   );
 
   /** Grab-cursor while the hovered node is a draggable handle. */
-  const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverId)));
+  const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverKey)));
 
   // Handle editing (points, gliders, radii, parallels, offsets) — same session
   // semantics as the SVG view: live drafts during the drag, a literal commit on
@@ -506,14 +507,14 @@ export function TypegpuView(props: TypegpuViewProps) {
       );
       props.onCursor?.(hit);
       const session = props.toolSession;
-      props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : undefined);
+      props.onHoverKey?.(session ? hoverTool(session, hit, props.trace, props.scope) : undefined);
       return;
     }
     if (drag.phase() === "dragging" || isSliderHudTarget(e)) return;
     const el = paperEl();
     if (!el) return;
     const hit = hitsAt(e, el)[0];
-    props.onHoverId?.(hit?.id);
+    props.onHoverKey?.(hit ? traceKey(hit) : undefined);
   }
 
   function onWheel(e: WheelEvent) {
@@ -556,7 +557,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => {
-        props.onHoverId?.(undefined);
+        props.onHoverKey?.(undefined);
         props.onCursor?.(undefined);
       }}
       onWheel={onWheel}
@@ -569,7 +570,7 @@ export function TypegpuView(props: TypegpuViewProps) {
           trace={props.trace}
           camera={camera()}
           size={size()}
-          hoverId={props.hoverId}
+          hoverKey={props.hoverKey}
           selectedKey={props.selectedKey}
           mutePoints={toolChrome(props.placing ? props.toolSession : undefined).mutePoints}
           scope={props.scope}
@@ -578,9 +579,9 @@ export function TypegpuView(props: TypegpuViewProps) {
       <SliderDock
         nodes={sliders()}
         placing={props.placing}
-        hotId={props.hoverId}
+        hotKey={props.hoverKey}
         selectedKey={props.selectedKey}
-        onHoverId={props.onHoverId}
+        onHoverKey={props.onHoverKey}
         onPick={props.onPick}
         onDraft={props.onDraft}
         onCommit={props.onCommit}

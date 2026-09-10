@@ -16,20 +16,34 @@ import {
   lineIntersectionValue,
 } from "../geom/ops";
 import { dist, distToLine, distToSegment } from "../geom/vec";
-import { snapBoundPoint, snapEligible, snapPrint, type SnapFilter, type Vec2 } from "./pick";
+import {
+  snapBoundPoint,
+  snapEligible,
+  snapPrint,
+  traceKey,
+  type SnapFilter,
+  type Vec2,
+} from "./pick";
 
 const { abs, max } = Math;
 export type GliderPlace =
-  | { kind: "pointOnSegment"; bind: string; id?: string; t: number; at: Vec2 }
-  | { kind: "pointOnLine"; bind: string; id?: string; s: number; at: Vec2 }
-  | { kind: "pointOnCircle"; bind: string; id?: string; ux: number; uy: number; at: Vec2 };
+  | { kind: "pointOnSegment"; bind: string; key?: string; t: number; at: Vec2 }
+  | { kind: "pointOnLine"; bind: string; key?: string; s: number; at: Vec2 }
+  | { kind: "pointOnCircle"; bind: string; key?: string; ux: number; uy: number; at: Vec2 };
 
 export type PlacePoint =
   | { kind: "free"; at: Vec2 }
-  | { kind: "ref"; bind: string; id: string; at: Vec2 }
-  | { kind: "lineIntersection"; a: string; b: string; at: Vec2 }
-  | { kind: "circleLineIntersection"; circle: string; line: string; k: Branch; at: Vec2 }
-  | { kind: "circleCircleIntersection"; a: string; b: string; k: Branch; at: Vec2 }
+  | { kind: "ref"; bind: string; key?: string; at: Vec2 }
+  | { kind: "lineIntersection"; a: string; b: string; key?: string; at: Vec2 }
+  | {
+      kind: "circleLineIntersection";
+      circle: string;
+      line: string;
+      key?: string;
+      k: Branch;
+      at: Vec2;
+    }
+  | { kind: "circleCircleIntersection"; a: string; b: string; key?: string; k: Branch; at: Vec2 }
   | GliderPlace;
 
 export type Crossing =
@@ -87,7 +101,7 @@ export function resolvePlacePoint(
   const filter: SnapFilter | undefined = opts.keys || opts.print ? opts : undefined;
   const named = snapBoundPoint(trace, world, maxDist, filter);
   if (named) {
-    return { kind: "ref", bind: named.bind, id: named.id, at: named.at };
+    return { kind: "ref", bind: named.bind, key: named.key, at: named.at };
   }
   const cands: { point: PlacePoint; d: number; rank: number }[] = [];
   const cc = nearestCircleCircle(trace, world, maxDist, filter);
@@ -101,7 +115,7 @@ export function resolvePlacePoint(
     const best = cands[0]!;
     const atCrossing = snapBoundPoint(trace, best.point.at, maxDist, filter);
     if (atCrossing) {
-      return { kind: "ref", bind: atCrossing.bind, id: atCrossing.id, at: atCrossing.at };
+      return { kind: "ref", bind: atCrossing.bind, key: atCrossing.key, at: atCrossing.at };
     }
     return best.point;
   }
@@ -154,7 +168,7 @@ function nearestGlider(
     if (!geom) continue;
     const d = lineDist(world, geom);
     if (d > maxDist) continue;
-    const point = gliderOnLine(snapPrint(n, filter), n.id, geom, world);
+    const point = gliderOnLine(snapPrint(n, filter), traceKey(n), geom, world);
     if (!best || d < best.d) best = { point, d };
   }
   for (const n of boundOf(trace, CIRCLE, filter)) {
@@ -167,7 +181,7 @@ function nearestGlider(
     const point: GliderPlace = {
       kind: "pointOnCircle",
       bind: snapPrint(n, filter),
-      id: n.id,
+      key: traceKey(n),
       ux: g.ux,
       uy: g.uy,
       at: { x: g.x, y: g.y },
@@ -177,15 +191,15 @@ function nearestGlider(
   return best;
 }
 
-function gliderOnLine(bind: string, id: string, geom: LineLike, world: Vec2): GliderPlace {
+function gliderOnLine(bind: string, key: string, geom: LineLike, world: Vec2): GliderPlace {
   if (geom.kind === "segment") {
     const t = segmentTAt(geom, world);
     const g = pointOnSegmentValue(geom, t);
-    return { kind: "pointOnSegment", bind, id, t: g.t, at: { x: g.x, y: g.y } };
+    return { kind: "pointOnSegment", bind, key, t: g.t, at: { x: g.x, y: g.y } };
   }
   const s = lineSAt(geom, world);
   const g = pointOnLineValue(geom, s);
-  return { kind: "pointOnLine", bind, id, s: g.s, at: { x: g.x, y: g.y } };
+  return { kind: "pointOnLine", bind, key, s: g.s, at: { x: g.x, y: g.y } };
 }
 
 /** Project `world` onto a named line, segment, circle, or parallel offset. */
@@ -197,12 +211,19 @@ export function gliderOnTraceNode(
   const bind = print ?? n.bind;
   if (!bind) return undefined;
   const geom = asLineLike(n);
-  if (geom) return gliderOnLine(bind, n.id, geom, world);
+  if (geom) return gliderOnLine(bind, traceKey(n), geom, world);
   if (n.value.kind !== "circle") return undefined;
   const circle = n.value;
   const { ux, uy } = circleUnitAt(circle, world);
   const g = pointOnCircleValue(circle, ux, uy);
-  return { kind: "pointOnCircle", bind, id: n.id, ux: g.ux, uy: g.uy, at: { x: g.x, y: g.y } };
+  return {
+    kind: "pointOnCircle",
+    bind,
+    key: traceKey(n),
+    ux: g.ux,
+    uy: g.uy,
+    at: { x: g.x, y: g.y },
+  };
 }
 
 function nearestLineLine(
@@ -229,7 +250,13 @@ function nearestLineLine(
       if (d > maxDist) continue;
       if (!best || d < best.d) {
         best = {
-          point: { kind: "lineIntersection", a: snapPrint(a, filter), b: snapPrint(b, filter), at },
+          point: {
+            kind: "lineIntersection",
+            a: snapPrint(a, filter),
+            b: snapPrint(b, filter),
+            key: traceKey(a),
+            at,
+          },
           d,
         };
       }
@@ -266,6 +293,7 @@ function nearestCircleLine(
               kind: "circleLineIntersection",
               circle: snapPrint(c, filter),
               line: snapPrint(ln, filter),
+              key: traceKey(c),
               k,
               at,
             },
@@ -303,6 +331,7 @@ function nearestCircleCircle(
               kind: "circleCircleIntersection",
               a: snapPrint(a, filter),
               b: snapPrint(b, filter),
+              key: traceKey(a),
               k,
               at,
             },

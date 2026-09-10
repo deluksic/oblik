@@ -25,7 +25,7 @@ import type { Camera2, PaneSize } from "./camera";
 const { abs, max, min } = Math;
 export type Vec2 = { x: number; y: number };
 
-export type SnapPoint = { id: string; bind: string; at: Vec2 };
+export type SnapPoint = { key: string; bind: string; at: Vec2 };
 
 /** When `keys` is set, only those tape nodes (`id:occ`) are snap-eligible. */
 /**
@@ -84,7 +84,7 @@ export function nodeByPrint(
   trace: readonly SnapNode[],
   print: string,
   filter?: SnapFilter,
-): { id: string } | undefined {
+): SnapNode | undefined {
   const last = print.includes(".") ? print.slice(print.lastIndexOf(".") + 1) : print;
   return trace.find((n) => {
     if (filter?.keys && !filter.keys.has(`${n.id}:${n.occ}`)) return false;
@@ -155,7 +155,9 @@ export function snapBoundPoint(
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     const d2 = (p.x - world.x) * (p.x - world.x) + (p.y - world.y) * (p.y - world.y);
     if (d2 > maxD2) continue;
-    if (!best || d2 < best.d2) best = { snap: { id: n.id, bind, at: { x: p.x, y: p.y } }, d2 };
+    if (!best || d2 < best.d2) {
+      best = { snap: { key: traceKey(n), bind, at: { x: p.x, y: p.y } }, d2 };
+    }
   }
   return best?.snap ?? undefined;
 }
@@ -288,8 +290,8 @@ export function snapLineCarrier(
   _size: PaneSize,
   maxPx = GEOM_PX,
   filter?: SnapFilter,
-): { bind: string; geom: LineLike } | undefined {
-  let best: { bind: string; geom: LineLike; d: number } | undefined = undefined;
+): { bind: string; geom: LineLike; key: string } | undefined {
+  let best: { bind: string; geom: LineLike; key: string; d: number } | undefined = undefined;
   for (const n of trace) {
     if (!snapEligible(n, filter)) continue;
     const v = n.value;
@@ -297,9 +299,9 @@ export function snapLineCarrier(
     if (aabbCulls(n, world, pickRadiusWorld(n, camera, maxPx))) continue;
     const d = geomDistWorld(world, n);
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
-    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, d };
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, key: traceKey(n), d };
   }
-  return best ? { bind: best.bind, geom: best.geom } : undefined;
+  return best ? { bind: best.bind, geom: best.geom, key: best.key } : undefined;
 }
 
 /** Nearest named region under the pointer (ignores points and strokes). Inside a fill always wins. */
@@ -310,12 +312,13 @@ export function snapRegion(
   _size: PaneSize,
   maxPx = GEOM_PX,
   filter?: SnapFilter,
-): { bind: string; geom: Region; id: string } | undefined {
+): { bind: string; geom: Region; id: string; key: string } | undefined {
   let best:
     | {
         bind: string;
         geom: Region;
         id: string;
+        key: string;
         inside: boolean;
         d: number;
         i: number;
@@ -336,13 +339,21 @@ export function snapRegion(
       (inside === best.inside && d < best.d) ||
       (inside === best.inside && d === best.d && idx > best.i)
     ) {
-      best = { bind: snapPrint(n, filter), geom: n.value, id: n.id, inside, d, i: idx };
+      best = {
+        bind: snapPrint(n, filter),
+        geom: n.value,
+        id: n.id,
+        key: traceKey(n),
+        inside,
+        d,
+        i: idx,
+      };
     }
   }
-  return best ? { bind: best.bind, geom: best.geom, id: best.id } : undefined;
+  return best ? { bind: best.bind, geom: best.geom, id: best.id, key: best.key } : undefined;
 }
 
-export type StrokeCarrier = { bind: string; geom: LineLike | Circle };
+export type StrokeCarrier = { bind: string; geom: LineLike | Circle; key: string };
 
 function isNamedStroke(n: TraceNode, filter?: SnapFilter): boolean {
   return snapEligible(n, filter) && (isLineLike(n.value) || n.value.kind === "circle");
@@ -380,7 +391,8 @@ export function snapStrokeCarrier(
 ): StrokeCarrier | undefined {
   const maxPx = opts?.maxPx ?? GEOM_PX;
   const filter = opts?.filter;
-  let best: { bind: string; geom: LineLike | Circle; d: number } | undefined = undefined;
+  let best: { bind: string; geom: LineLike | Circle; key: string; d: number } | undefined =
+    undefined;
   for (const n of trace) {
     if (!isNamedStroke(n, filter)) continue;
     if (opts?.through && !strokeWithin(n, opts.through, camera, maxPx)) continue;
@@ -389,7 +401,7 @@ export function snapStrokeCarrier(
     if (d > pickRadiusWorld(n, camera, maxPx)) continue;
     const v = n.value;
     if (!isLineLike(v) && v.kind !== "circle") continue;
-    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, d };
+    if (!best || d < best.d) best = { bind: snapPrint(n, filter), geom: v, key: traceKey(n), d };
   }
-  return best ? { bind: best.bind, geom: best.geom } : undefined;
+  return best ? { bind: best.bind, geom: best.geom, key: best.key } : undefined;
 }

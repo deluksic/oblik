@@ -16,7 +16,7 @@ const free = (x: number, y: number): PlaceHit => ({
 });
 const named = (bind: string, x: number, y: number): PlaceHit => ({
   world: { x, y },
-  point: { kind: "ref", bind, id: `o_${bind}`, at: { x, y } },
+  point: { kind: "ref", bind, key: `o_${bind}:0`, at: { x, y } },
 });
 
 function asSession(step: ToolStep | undefined): ToolSession {

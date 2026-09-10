@@ -57,7 +57,7 @@ describe("snapBoundPoint", () => {
       keys,
       print: (n) => (n.id === "o_a" ? "plate.origin" : n.bind),
     });
-    expect(s).toMatchObject({ bind: "plate.origin", id: "o_a" });
+    expect(s).toMatchObject({ bind: "plate.origin", key: "o_a:0" });
     expect(snapBoundPoint([hidden], { x: 0.05, y: 0 }, 0.3, { keys })).toBeUndefined();
   });
 });
@@ -166,7 +166,7 @@ describe("snapLineCarrier", () => {
       stack: [],
     };
     const hit = snapLineCarrier([ground, A], { x: 1, y: 0.05 }, camera, size);
-    expect(hit).toEqual({ bind: "ground", geom: ground.value });
+    expect(hit).toEqual({ bind: "ground", geom: ground.value, key: "o_g:0" });
   });
 
   test("snaps to parallel offset lines as carriers", () => {
@@ -195,9 +195,10 @@ describe("snapLineCarrier", () => {
     expect(snapLineCarrier([shelf], { x: 2, y: 1.85 }, camera, size)).toEqual({
       bind: "shelf",
       geom: shelf.value,
+      key: "o_par:0",
     });
     const hit = snapLineCarrier([ground, shelf], { x: 2, y: 0.05 }, camera, size);
-    expect(hit).toEqual({ bind: "ground", geom: ground.value });
+    expect(hit).toEqual({ bind: "ground", geom: ground.value, key: "o_g:0" });
   });
 });
 

@@ -24,8 +24,8 @@ import { regionEligibleCarriers } from "./tools/region";
 
 const { sqrt } = Math;
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
-const namedA: PlacePoint = { kind: "ref", bind: "A", id: "o_a", at: { x: 0, y: 0 } };
-const namedP: PlacePoint = { kind: "ref", bind: "P", id: "o_p", at: { x: 2, y: 0 } };
+const namedA: PlacePoint = { kind: "ref", bind: "A", key: "o_a:0", at: { x: 0, y: 0 } };
+const namedP: PlacePoint = { kind: "ref", bind: "P", key: "o_p:0", at: { x: 2, y: 0 } };
 const ll: PlacePoint = {
   kind: "lineIntersection",
   a: "ground",
@@ -119,7 +119,7 @@ describe("enrichHit", () => {
       expr: { kind: "neg", expr: { kind: "ref", name: "gap" } },
       value: -0.12,
     });
-    expect(hoverTool(session, next, [gap])).toBe("o_pie_g");
+    expect(hoverTool(session, next, [gap])).toBe("o_pie_g:0");
     expect(
       clickTool(session, next, {
         used: ["one", "gap"],
@@ -1262,7 +1262,7 @@ describe("slider tool", () => {
 });
 
 describe("region tool", () => {
-  const namedB: PlacePoint = { kind: "ref", bind: "B", id: "o_b", at: { x: 0, y: 2 } };
+  const namedB: PlacePoint = { kind: "ref", bind: "B", key: "o_b:0", at: { x: 0, y: 2 } };
   const chord = { kind: "segment" as const, a: { x: 2, y: 0 }, b: { x: 0, y: 2 } };
   const reach = { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 2 };
 
@@ -1442,7 +1442,7 @@ describe("region tool", () => {
   });
 
   test("region carrier pick follows the focused invocation, not occ 0", () => {
-    const namedC0 = { kind: "ref" as const, bind: "c0", id: "o_c0", at: { x: 10, y: 0 } };
+    const namedC0 = { kind: "ref" as const, bind: "c0", key: "o_c0:0", at: { x: 10, y: 0 } };
     const bot0: TraceNodeOf<"segment"> = {
       id: "o_bot",
       occ: 0,

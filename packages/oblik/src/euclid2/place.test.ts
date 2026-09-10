@@ -64,7 +64,7 @@ describe("resolvePlacePoint", () => {
 
   test("snaps to a named bound point", () => {
     const p = resolvePlacePoint([A, ground], { x: 0.1, y: 0 }, 0.3);
-    expect(p).toMatchObject({ kind: "ref", bind: "A", id: "o_a" });
+    expect(p).toMatchObject({ kind: "ref", bind: "A", key: "o_a:0" });
   });
 
   test("snaps to a line-line crossing", () => {
@@ -340,7 +340,7 @@ describe("resolvePlacePoint", () => {
       keys,
       print: (n) => (n.id === "o_origin" ? "plate.origin" : n.bind),
     });
-    expect(hit).toMatchObject({ kind: "ref", bind: "plate.origin", id: "o_origin" });
+    expect(hit).toMatchObject({ kind: "ref", bind: "plate.origin", key: "o_origin:0" });
     const miss = resolvePlacePoint([hidden], { x: 0.05, y: 0 }, 0.3, 0.3, {
       keys,
       print: (n) => (n.id === "o_origin" ? "plate.origin" : n.bind),

@@ -4,12 +4,15 @@ import { isGlider } from "#geom/gliders";
 
 import { traceKey } from "../pick";
 
+/** Hover and select both name a node by its trace key (`id:occ`), so a repeated
+ * node lights up one instance at a time. */
 export function isHot(
   node: TraceNode,
-  hoverId: string | undefined,
+  hoverKey: string | undefined,
   selectedKey: string | undefined,
 ): boolean {
-  return hoverId === node.id || traceKey(node) === selectedKey;
+  const key = traceKey(node);
+  return (hoverKey !== undefined && key === hoverKey) || key === selectedKey;
 }
 
 export function isSelected(node: TraceNode, selectedKey: string | undefined): boolean {
@@ -18,10 +21,10 @@ export function isSelected(node: TraceNode, selectedKey: string | undefined): bo
 
 export function isHover(
   node: TraceNode,
-  hoverId: string | undefined,
+  hoverKey: string | undefined,
   selectedKey: string | undefined,
 ): boolean {
-  return isHot(node, hoverId, selectedKey) && !isSelected(node, selectedKey);
+  return isHot(node, hoverKey, selectedKey) && !isSelected(node, selectedKey);
 }
 
 export type ChromeSplit<T> = { rest: T[]; hover: T[]; lifted: T[] };
@@ -100,8 +103,8 @@ export function isGrabbable(node: TraceNode | undefined): boolean {
 
 export function hoverNode(
   trace: readonly TraceNode[],
-  hoverId: string | undefined,
+  hoverKey: string | undefined,
 ): TraceNode | undefined {
-  if (!hoverId) return undefined;
-  return trace.find((n) => n.id === hoverId) ?? undefined;
+  if (!hoverKey) return undefined;
+  return trace.find((n) => traceKey(n) === hoverKey) ?? undefined;
 }

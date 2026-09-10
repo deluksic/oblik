@@ -125,7 +125,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [picker, setPicker] = createSignal(() => (props.scene, false));
   const [tool, setTool] = createSignal<ToolSession | undefined>(() => (props.scene, undefined));
   const [place, setPlace] = createSignal<PlaceHit | undefined>(() => (props.scene, undefined));
-  const [hoverId, setHoverId] = createSignal<string | undefined>(() => (props.scene, undefined));
+  const [hoverKey, setHoverKey] = createSignal<string | undefined>(() => (props.scene, undefined));
   const [selectedKey, setSelectedKey] = createSignal<string | undefined>(
     () => (props.file, undefined),
   );
@@ -373,10 +373,10 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             ghost={ghost()}
             place={place()}
             toolSession={tool()}
-            hoverId={hoverId()}
+            hoverKey={hoverKey()}
             selectedKey={selectedKey()}
             scope={scope()}
-            onHoverId={setHoverId}
+            onHoverKey={setHoverKey}
             onPick={onPick}
             onDraft={mergeDraft}
             onCommit={(id, values) => void commit(id, values)}

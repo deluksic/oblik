@@ -14,7 +14,7 @@ export type BindLabelsProps = {
   trace: TraceNode[];
   camera: Camera2;
   size: PaneSize;
-  hoverId?: string | undefined;
+  hoverKey?: string | undefined;
   selectedKey?: string | undefined;
   /** Mute for the point band — mirrors the SVG view's `chrome().mutePoints`. */
   mutePoints?: boolean;
@@ -39,7 +39,7 @@ export function BindLabels(props: BindLabelsProps) {
             camera={props.camera}
             size={props.size}
             muted={muted(n())}
-            hot={isHot(n(), props.hoverId, props.selectedKey)}
+            hot={isHot(n(), props.hoverKey, props.selectedKey)}
           />
         )}
       </For>

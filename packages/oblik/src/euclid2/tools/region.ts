@@ -1,14 +1,19 @@
 import type { TraceNode } from "#eval/context";
-
-import type { SnapNode } from "../pick";
 import type { Branch, Circle, LineLike, LoopEdge } from "#geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "#geom";
 import { printExpr, parsePath, type Expr } from "#source/expr";
 
 import type { Camera2 } from "../camera";
-import { namedStrokesThrough, nodeByPrint, snapStrokeCarrier, type SnapFilter } from "../pick";
+import type { SnapNode } from "../pick";
+import {
+  namedStrokesThrough,
+  nodeByPrint,
+  snapStrokeCarrier,
+  traceKey,
+  type SnapFilter,
+} from "../pick";
 import { isCrossing, type PlacePoint } from "../place";
-import { dist, exprOfPlace, exprOfPrint, hoverBind, hoverPlace, previewCall } from "./common";
+import { dist, exprOfPlace, exprOfPrint, hoverPlace, previewCall, snapKey } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
 
@@ -60,7 +65,7 @@ function placeFromVertex(
   if (e.kind === "ref" || e.kind === "member") {
     const print = printExpr(e);
     const node = nodeByPrint(trace, print, filter);
-    return { kind: "ref", bind: print, id: node?.id ?? print, at: v.at };
+    return { kind: "ref", bind: print, key: node ? traceKey(node) : undefined, at: v.at };
   }
   if (e.kind !== "call") return undefined;
   const refs = e.args
@@ -220,7 +225,7 @@ export const region: Tool<RegionSession> = {
     return hit;
   },
   hover(session, hit, trace) {
-    if (needCarrier(session) && hit.carrier) return hoverBind(trace, hit.carrier.bind);
+    if (needCarrier(session) && hit.carrier) return snapKey(hit.carrier, trace);
     return hoverPlace(hit.point, trace);
   },
   click(session, hit, scope) {

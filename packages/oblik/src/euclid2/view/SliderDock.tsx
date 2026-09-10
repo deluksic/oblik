@@ -19,9 +19,9 @@ const { max, min, round } = Math;
 export type SliderDockProps = {
   nodes: readonly TraceNode[];
   placing?: boolean;
-  hotId?: string | undefined;
+  hotKey?: string | undefined;
   selectedKey?: string | undefined;
-  onHoverId?: (id: string | undefined) => void;
+  onHoverKey?: (key: string | undefined) => void;
   onPick?: (hits: TraceNode[]) => void;
   onDraft?: (id: string, values: number[]) => void;
   onCommit?: (id: string, values: number[]) => void;
@@ -38,7 +38,7 @@ export function SliderDock(props: SliderDockProps) {
   // so hover/selection/placing must reach each row through these signals (read
   // via the per-row getters below) rather than through props captured at map
   // time.
-  const [hotId] = createSignal(() => props.hotId);
+  const [hotKey] = createSignal(() => props.hotKey);
   const [selectedKey] = createSignal(() => props.selectedKey);
   const [placing] = createSignal(() => props.placing ?? false);
 
@@ -46,7 +46,7 @@ export function SliderDock(props: SliderDockProps) {
     const el = document.elementFromPoint(clientX, clientY);
     const attr = (el as Element | null)?.closest?.("[data-slider]")?.getAttribute("data-slider");
     const node = attr ? props.nodes.find((n) => traceKey(n) === attr) : undefined;
-    props.onHoverId?.(node ? node.id : undefined);
+    props.onHoverKey?.(node ? traceKey(node) : undefined);
   }
 
   return (
@@ -69,10 +69,10 @@ export function SliderDock(props: SliderDockProps) {
         {(node) => (
           <SliderRow
             node={node}
-            hot={() => hotId() === node().id}
+            hot={() => hotKey() === traceKey(node())}
             selected={() => selectedKey()?.startsWith(`${node().id}:`) ?? false}
             placing={() => placing()}
-            onHoverId={props.onHoverId}
+            onHoverKey={props.onHoverKey}
             onPick={props.onPick}
             onDraft={props.onDraft}
             onCommit={props.onCommit}
@@ -90,7 +90,7 @@ function SliderRow(props: {
   hot: () => boolean;
   selected: () => boolean;
   placing: () => boolean;
-  onHoverId?: (id: string | undefined) => void;
+  onHoverKey?: (key: string | undefined) => void;
   onPick?: (hits: TraceNode[]) => void;
   onDraft?: (id: string, values: number[]) => void;
   onCommit?: (id: string, values: number[]) => void;
@@ -176,10 +176,10 @@ function SliderRow(props: {
       onPointerUp={end}
       onPointerCancel={end}
       onPointerEnter={() => {
-        if (!props.placing() && !dragging()) props.onHoverId?.(props.node().id);
+        if (!props.placing() && !dragging()) props.onHoverKey?.(traceKey(props.node()));
       }}
       onPointerLeave={() => {
-        if (!props.placing() && !dragging()) props.onHoverId?.(undefined);
+        if (!props.placing() && !dragging()) props.onHoverKey?.(undefined);
       }}
     >
       <div class={styles.head}>

@@ -5,11 +5,11 @@ import { snapLineCarrier } from "../pick";
 import {
   exprOfPlace,
   exprOfPrint,
-  hoverBind,
   hoverPlace,
   isPinnedPoint,
   previewCall,
   round,
+  snapKey,
 } from "./common";
 import {
   inSlot,
@@ -110,7 +110,7 @@ export const parallelLine: Tool<ParallelSession> = {
   hover(session, hit, trace, scope) {
     if (!carrierOf(session, scope ?? scopeFromTrace(trace))) {
       if (!hit.carrier) return undefined;
-      return hoverBind(trace, hit.carrier.bind);
+      return snapKey(hit.carrier, trace);
     }
     return lengthHover(hit, trace) ?? hoverPlace(hit.point, trace);
   },

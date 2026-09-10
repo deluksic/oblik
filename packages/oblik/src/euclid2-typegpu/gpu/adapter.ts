@@ -85,7 +85,8 @@ export type AdapterInput = {
   colors: { ink: Rgb; accent: Rgb; selectedPaint: Rgb; ring: Rgb; paper: Rgb; ghost: Rgb };
   /** Construction paint width in CSS px (half of it is the ctrl radius). */
   strokePx: number;
-  hoverId: string | undefined;
+  /** Hovered node's trace key (`id:occ`); select uses the same identity. */
+  hoverKey: string | undefined;
   selectedKey: string | undefined;
   /** False while dragging: omit halo rings and knockouts (the paint still
    * lifts), mirroring the SVG view's chrome passes during a drag. */
@@ -264,7 +265,7 @@ export function createAdapter(): Adapter {
     fieldSegPool.sync(present);
     fieldArcPool.sync(present);
 
-    const white = (n: TraceNode) => isHot(n, input.hoverId, input.selectedKey);
+    const white = (n: TraceNode) => isHot(n, input.hoverKey, input.selectedKey);
 
     // --- strokes + circles (ink band). Five draw-order bands per kind mirror
     // --- the SVG chrome passes: rest paints, hover halos, hover paints,
@@ -532,7 +533,7 @@ export function createAdapter(): Adapter {
     const pointBand = splitChrome(
       points,
       (n) => isSelected(n, input.selectedKey),
-      (n) => isHot(n, input.hoverId, input.selectedKey),
+      (n) => isHot(n, input.hoverKey, input.selectedKey),
     );
     /** Allocate a node's 4 disc slots, write changed discs, and queue the
      * back-to-front subset `layers` (only active discs reach the order). */
@@ -542,9 +543,9 @@ export function createAdapter(): Adapter {
       const discs = pointDiscsOf(
         n,
         input.colors,
-        isHot(n, input.hoverId, input.selectedKey),
+        isHot(n, input.hoverKey, input.selectedKey),
         isSelected(n, input.selectedKey),
-        input.muted(n) && !isHot(n, input.hoverId, input.selectedKey),
+        input.muted(n) && !isHot(n, input.hoverKey, input.selectedKey),
       );
       if (diff(lastPoint, nodeKey(n), encodePoints(discs))) {
         for (let i = 0; i < POINT_DISC_COUNT; i++) {

@@ -160,8 +160,9 @@ export type TangentOp =
 export type PlaceHit = {
   world: Vec2;
   point: PlacePoint;
-  carrier?: { bind: string; geom: LineLike | Circle };
-  region?: { bind: string; geom: Region; id?: string };
+  /** `key` is the snapped node's trace key (`id:occ`) — the exact occurrence. */
+  carrier?: { bind: string; geom: LineLike | Circle; key?: string };
+  region?: { bind: string; geom: Region; id?: string; key?: string };
   corner?: { index: number; at: Vec2 };
   length?: { expr: Expr; value: number };
 };

@@ -1,7 +1,7 @@
 import { printExpr, parsePath, type Expr } from "#source/expr";
 import { hoistIntersections, printHoist, takeBind } from "#source/hoist";
 
-import { nodeByPrint, type SnapFilter, type SnapNode, type Vec2 } from "../pick";
+import { nodeByPrint, traceKey, type SnapFilter, type SnapNode, type Vec2 } from "../pick";
 import { isConstructed, isGliderPlace, isPinnedPoint, type PlacePoint } from "../place";
 import type { InsertJob, PlaceHit, Placed } from "./types";
 
@@ -99,11 +99,11 @@ export function hoverPlace(
   p: PlacePoint,
   trace: readonly SnapNode[],
 ): string | undefined {
-  if (p.kind === "ref") return p.id;
-  if (isGliderPlace(p)) return p.id ?? hoverBind(trace, p.bind);
-  if (p.kind === "lineIntersection") return hoverBind(trace, p.a);
-  if (p.kind === "circleLineIntersection") return hoverBind(trace, p.circle);
-  if (p.kind === "circleCircleIntersection") return hoverBind(trace, p.a);
+  if (p.kind === "ref") return p.key ?? keyByPrint(trace, p.bind);
+  if (isGliderPlace(p)) return p.key ?? keyByPrint(trace, p.bind);
+  if (p.kind === "lineIntersection") return p.key ?? keyByPrint(trace, p.a);
+  if (p.kind === "circleLineIntersection") return p.key ?? keyByPrint(trace, p.circle);
+  if (p.kind === "circleCircleIntersection") return p.key ?? keyByPrint(trace, p.a);
   return undefined;
 }
 
@@ -132,12 +132,27 @@ export function pinnedPointLabel(place: PlaceHit | undefined): string | undefine
   return p && isPinnedPoint(p) ? printExpr(exprOfPlace(p)) : undefined;
 }
 
-export function hoverBind(
+/** Trace key (`id:occ`) of the first tape node a printed path names. */
+export function keyByPrint(
   trace: readonly SnapNode[],
-  bind: string,
+  print: string,
   filter?: SnapFilter,
 ): string | undefined {
-  return nodeByPrint(trace, bind, filter)?.id ?? undefined;
+  const n = nodeByPrint(trace, print, filter);
+  return n ? traceKey(n) : undefined;
+}
+
+/**
+ * Hover identity of a snapped node. The snap records the occurrence it landed
+ * on; the print lookup is the fallback for place points rebuilt from a scope
+ * expression (region cycle vertices), which never saw a tape node. Highlighting
+ * matches on `id:occ`, so a bare id would light up every repeated instance.
+ */
+export function snapKey(
+  pick: { bind: string; key?: string },
+  trace: readonly SnapNode[],
+): string | undefined {
+  return pick.key ?? keyByPrint(trace, pick.bind);
 }
 
 export function dist(a: Vec2, b: Vec2): number {
