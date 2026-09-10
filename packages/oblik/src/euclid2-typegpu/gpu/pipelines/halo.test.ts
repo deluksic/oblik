@@ -44,13 +44,17 @@ function haloAt(inward: number, ring: Rgba, knock: Rgba, knockHalf: number, outH
   };
 }
 
-/** Mirror of `paintWithEdge`: the fill plus its state-colored outline. */
+/** Mirror of `paintWithEdge`: the fill plus its state-colored outline, which
+ * straddles the boundary. */
 function paintAt(inward: number, fill: Rgba, edge: Rgba, edgeWidth: number): Layer {
   const cov = Math.min(1, Math.max(0, 0.5 + inward));
-  const t = Math.min(1, band(inward, 0, edgeWidth) / Math.max(cov, 1e-6)) * edge[3];
+  const line = band(inward, -edgeWidth / 2, edgeWidth / 2) * edge[3];
+  const ea = line;
+  const fa = Math.max(cov - line, 0) * fill[3];
+  const alpha = ea + fa;
   return {
-    rgb: fill.slice(0, 3).map((c, i) => c + (edge[i]! - c) * t),
-    alpha: cov * (fill[3] + (edge[3] - fill[3]) * t),
+    rgb: edge.slice(0, 3).map((c, i) => (c * ea + fill[i]! * fa) / Math.max(alpha, 1e-6)),
+    alpha,
   };
 }
 
@@ -87,24 +91,34 @@ describe("fill halo bands", () => {
     expect(haloAt(6, SELECTED, PAPER_ON, knockHalf, ringHalf).alpha).toBe(0);
   });
 
-  test("every fill carries its own state-colored outline inside the edge", () => {
+  test("every fill carries its own state-colored outline, centred on the edge", () => {
     const fill: Rgba = [0.86, 0.86, 0.86, 0.16];
     const blue: Rgba = [...ACCENT, 1];
-    // The construction stroke width (1.5px), all of it inside.
+    // The construction stroke width (1.5px), straddling the boundary like SVG's
+    // stroke, so it lands on the edge that defined the region rather than
+    // doubling it just inside.
     const edgeWidth = 1.5;
-    // Inside the line the outline owns the pixel outright: the editable fill's
-    // blue edge, at full opacity despite the fill's 16%.
-    const onEdge = paintAt(0.75, fill, blue, edgeWidth);
+    // On the boundary the line owns the pixel outright, at full opacity despite
+    // the fill's 16%.
+    const onEdge = paintAt(0, fill, blue, edgeWidth);
     onEdge.rgb.forEach((c, i) => expect(c).toBeCloseTo(ACCENT[i]!, 6));
     expect(onEdge.alpha).toBe(1);
-    // Past it the paint resumes, at its own opacity.
+    // Its outer half reaches *outside* the fill …
+    const outside = paintAt(-0.3, fill, blue, edgeWidth);
+    expect(outside.alpha).toBeGreaterThan(0.5);
+    outside.rgb.forEach((c, i) => expect(c).toBeCloseTo(ACCENT[i]!, 6));
+    // … and stops there: beyond the stroke's outer edge (and its antialiasing
+    // tail) outside the fill there is nothing at all.
+    expect(paintAt(-1.2, fill, blue, edgeWidth).alpha).toBeLessThan(0.1);
+    expect(paintAt(-1.5, fill, blue, edgeWidth).alpha).toBe(0);
+    // Past the line's inner edge the paint resumes, at its own opacity.
     const inside = paintAt(3, fill, blue, edgeWidth);
     inside.rgb.forEach((c, i) => expect(c).toBeCloseTo(fill[i]!, 6));
     expect(inside.alpha).toBeCloseTo(0.16, 6);
-    // Half covered exactly at the silhouette, and the line reaches full
-    // strength within the shape's own antialiasing ramp.
-    expect(paintAt(0, fill, blue, edgeWidth).alpha).toBeCloseTo(0.5, 6);
-    expect(paintAt(0.25, fill, blue, edgeWidth).alpha).toBeCloseTo(0.75, 6);
+    // A fill with no outline of its own is unchanged: its silhouette alpha is
+    // the fill's own opacity scaled by the shape's antialiasing coverage.
+    expect(paintAt(0, fill, [0, 0, 0, 0], edgeWidth).alpha).toBeCloseTo(0.08, 6);
+    expect(paintAt(1, fill, [0, 0, 0, 0], edgeWidth).alpha).toBeCloseTo(0.16, 6);
   });
 
   test("no hard step anywhere in the profile", () => {

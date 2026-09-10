@@ -66,27 +66,32 @@ export const haloColor = tgpu.fn(
   return vec4f((ringColor * ringCov + knock.xyz * paperCov) / max(total, 1e-6), clamp(total, 0, 1));
 });
 
-/** Where the fill's own outline sits: a line hugging the inside of the
- * silhouette, in the node's state color — the SVG `inkClass` stroke (`ink`,
- * accent when editable, `selectedPaint` when hot) that the SVG view draws along
- * a fill's boundary. The whole stroke width goes inside (`-d` is the inward
- * distance), so the line reads at full strength instead of as a half-pixel
- * sliver at the very edge. */
+/** Where the fill's own outline sits: a line straddling the boundary, in the
+ * node's state color — the SVG `inkClass` stroke (`ink`, accent when editable,
+ * `selectedPaint` when hot) the SVG view draws along a fill's boundary. It is
+ * centred like that stroke, so on the straight runs it lands exactly on the edge
+ * that defined the region (and under the ink drawn there) instead of doubling it
+ * with a second line just inside; where the boundary pulls away from the ink —
+ * an offset's rounded corners, a hole — it shows on its own. */
 const edgeCoverage = tgpu.fn(
   [f32, f32],
   f32,
 )((d, edgeWidth) => {
   "use gpu";
-  return bandCoverage(-d, 0, edgeWidth, max(fwidth(d), 1e-6));
+  const half = edgeWidth * 0.5;
+  return bandCoverage(d, -half, half, max(fwidth(d), 1e-6));
 });
 
 /**
  * Fill paint plus its state-colored outline, from one distance — the paint
- * layer's whole output. Both sit inside the silhouette, so this is one layer,
- * not two: the pixel's coverage times the area-weighted mix of the two
- * opacities, with the matching mix of their colors. Compositing them as two
- * layers would double-count the edge pixel and harden the silhouette instead of
- * keeping the shape's own antialiasing ramp.
+ * layer's whole output. A pixel at the boundary is part line, part fill, or
+ * both, so this is one area-weighted layer rather than two stacked blends:
+ * compositing them separately double-counts the boundary pixel and hardens the
+ * silhouette instead of keeping the shape's own antialiasing ramp.
+ *
+ * The line straddles the boundary (and so reaches outside the fill), which is
+ * why the fill's own alpha gives way to it where they overlap: `line * edge.w`
+ * is the part of the pixel the line claims.
  */
 export const paintWithEdge = tgpu.fn(
   [f32, vec4f, vec4f, f32],
@@ -94,10 +99,11 @@ export const paintWithEdge = tgpu.fn(
 )((d, fill, edge, edgeWidth) => {
   "use gpu";
   const cov = clamp(0.5 - d / max(fwidth(d), 1e-6), 0, 1);
-  // Share of the covered part of this pixel that is outline, so the line fades
-  // into the paint instead of stepping.
-  const t = clamp(edgeCoverage(d, edgeWidth) / max(cov, 1e-6), 0, 1) * edge.w;
-  return vec4f(mix(fill.xyz, edge.xyz, t), cov * mix(fill.w, edge.w, t));
+  const line = edgeCoverage(d, edgeWidth) * edge.w;
+  const ea = line;
+  const fa = max(cov - line, 0) * fill.w;
+  const alpha = ea + fa;
+  return vec4f((edge.xyz * ea + fill.xyz * fa) / max(alpha, 1e-6), alpha);
 });
 
 /** Halo band plus the outline over it: SVG draws a fill's stroke above its own

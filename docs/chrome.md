@@ -66,9 +66,13 @@ two views differ on purpose:
   no clip. Round joins, hole boundaries and rounded offsets come free.
 - **Every fill also carries its own outline**, the SVG `inkClass` stroke at
   `--oblik-stroke` (1.5px): the SVG view draws it along a fill's boundary with
-  `stroke: ink`, accent while editable, `--oblik-selected-paint` while hot. WebGPU puts
-  the same line inside the silhouette, at full stroke width. Its alpha is 0 for a cold
-  fill that should have no outline at all.
+  `stroke: ink`, accent while editable, `--oblik-selected-paint` while hot. WebGPU draws
+  the same line **centred on the boundary**, like that stroke — on the straight runs it
+  lands exactly on the edge that defined the region (and under the ink drawn there), so
+  it reinforces that edge instead of doubling it with a second line just inside; where
+  the boundary pulls away from the ink — an offset's rounded corners, a hole — it shows
+  on its own. Its alpha is 0 for a cold fill that should have no outline at all.
+  The halo bands below are the opposite: measured **inside** from the edge.
 - **Chrome over a fill is one antialiased layer per pixel, never two blends.** Both the
   paint+outline pair and the band pair are areas of one pixel, so the output is the
   pixel's coverage times the _area-weighted_ mix of the layers: colors mix with the
