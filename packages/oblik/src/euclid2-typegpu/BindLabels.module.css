@@ -1,0 +1,27 @@
+/* Bind-label overlay: world-anchored text as positioned HTML over the canvas.
+ * The layer copies the paper box so labels clip at the pane edge the way the
+ * SVG hud viewBox does; it never takes pointer events. */
+.layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Positioned by `transform` from `labelBoxAt`: `left`/`top` stay at the layer
+ * origin so a camera move only recomposites, never re-lays-out. */
+.label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--oblik-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.muted {
+  opacity: 0.32;
+}

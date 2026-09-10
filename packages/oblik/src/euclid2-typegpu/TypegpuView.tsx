@@ -27,6 +27,7 @@ import {
 import { SliderDock } from "../euclid2/view/SliderDock";
 import { sliderNodes } from "../euclid2/view/sliderHud";
 import { resolveTheme, type ResolvedTheme } from "../host/theme";
+import { BindLabels } from "./BindLabels";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
 import { clearToPaper, createRenderer, type GpuRenderer, type Rgba } from "./gpu/renderer";
@@ -561,6 +562,19 @@ export function TypegpuView(props: TypegpuViewProps) {
       onWheel={onWheel}
     >
       <canvas ref={setCanvasEl} class={styles.canvas} />
+      {/* Bind labels are HTML (never GPU glyphs); hidden until the first frame
+          lands so they never float over a blank canvas. */}
+      <Show when={gpu() === "ok"}>
+        <BindLabels
+          trace={props.trace}
+          camera={camera()}
+          size={size()}
+          hoverId={props.hoverId}
+          selectedKey={props.selectedKey}
+          mutePoints={toolChrome(props.placing ? props.toolSession : undefined).mutePoints}
+          scope={props.scope}
+        />
+      </Show>
       <SliderDock
         nodes={sliders()}
         placing={props.placing}
