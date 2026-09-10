@@ -95,11 +95,13 @@ describe("adapter fill routing", () => {
     expect(field?.path === "field" && field.plan.shape).toBe("diff(circle,region)");
     expect(spans).toEqual({ path: "spans", first: 0, count: 1 });
 
-    // One quad, two leaves (circle + region spans), four span edges.
+    // One quad, two leaves (circle + region spans), four straight spans — and
+    // no arc record at all: the split keeps the segment array branch-free.
     expect(patch.fields.quads.count).toBe(1);
     expect(patch.fields.quads.writes).toHaveLength(1);
     expect(patch.fields.leaves.writes).toHaveLength(2);
-    expect(patch.fields.edges.writes).toHaveLength(4);
+    expect(patch.fields.segs.writes).toHaveLength(4);
+    expect(patch.fields.arcs.writes).toHaveLength(0);
     const quad = patch.fields.quads.writes[0]!.value;
     expect(quad.leafBase).toBe(0);
     expect(quad.alpha).toBeCloseTo(0.16);
@@ -110,7 +112,8 @@ describe("adapter fill routing", () => {
 
     // The polygon still lands in the span buffers.
     expect(patch.fills.count).toBe(1);
-    expect(patch.fillEdges.writes).toHaveLength(3);
+    expect(patch.fillSegs.writes).toHaveLength(3);
+    expect(patch.fillArcs.writes).toHaveLength(0);
   });
 
   test("a region node compiles as a single spans leaf", () => {
@@ -119,7 +122,37 @@ describe("adapter fill routing", () => {
     const draw = patch.fillDraws[0]!;
     expect(draw.path === "field" && draw.plan.shape).toBe("region");
     expect(patch.fields.leaves.writes).toHaveLength(1);
-    expect(patch.fields.edges.writes).toHaveLength(4);
+    expect(patch.fields.segs.writes).toHaveLength(4);
+  });
+
+  test("arc carriers get their own records and their own window", () => {
+    // Outer loop is a full circle carrier (one arc), the hole is a square walk
+    // (four segments): one region, two windows, two independently packed arrays.
+    const ring = (id: string) =>
+      node(
+        id,
+        {
+          kind: "region",
+          outer: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
+          holes: [squareRegion(1).outer],
+        },
+        "ring",
+      );
+    const patch = createAdapter().tick(input([ring("o_a"), ring("o_b")]));
+    const [first, second] = patch.fields.leaves.writes.map((w) => w.value);
+    expect(first!.arcCount).toBe(1);
+    expect(first!.segCount).toBe(4);
+    expect(first!.segOffset).toBe(0);
+    expect(first!.arcOffset).toBe(0);
+    // The second node's windows move in each array by that array's own count.
+    expect(second!.segOffset).toBe(4);
+    expect(second!.arcOffset).toBe(1);
+    expect(patch.fields.arcs.writes.map((w) => w.idx)).toEqual([0, 1]);
+    expect(patch.fields.segs.writes.map((w) => w.idx)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    // The arc record carries the carrier; the hole's spans carry none.
+    const arc = patch.fields.arcs.writes[0]!.value;
+    expect(arc.radius).toBeCloseTo(2, 6);
+    expect(Math.abs(arc.span)).toBeCloseTo(Math.PI * 2, 6);
   });
 
   test("an unchanged tick re-uploads nothing but still draws", () => {
@@ -130,7 +163,8 @@ describe("adapter fill routing", () => {
 
     expect(patch.fields.quads.writes).toHaveLength(0);
     expect(patch.fields.leaves.writes).toHaveLength(0);
-    expect(patch.fields.edges.writes).toHaveLength(0);
+    expect(patch.fields.segs.writes).toHaveLength(0);
+    expect(patch.fields.arcs.writes).toHaveLength(0);
     expect(patch.fillDraws).toHaveLength(1);
   });
 
@@ -144,12 +178,13 @@ describe("adapter fill routing", () => {
       of: [{ kind: "circle", center: { x: 0, y: 0 }, radius: 2 }, squareRegion(0.5)],
     });
     adapter.tick(input([dragged]));
-    (dragged.value as { of: { radius?: number }[] }).of[0]!.radius = 2.5;
+    (dragged.value as unknown as { of: { radius?: number }[] }).of[0]!.radius = 2.5;
     const moved = adapter.tick(input([dragged]));
     // Same shape, new numbers: leaves and the AABB move, the spans do not.
     expect(moved.fields.quads.writes).toHaveLength(1);
     expect(moved.fields.leaves.writes).toHaveLength(2);
-    expect(moved.fields.edges.writes).toHaveLength(0);
+    expect(moved.fields.segs.writes).toHaveLength(0);
+    expect(moved.fields.arcs.writes).toHaveLength(0);
     const draw = moved.fillDraws[0]!;
     expect(draw.path === "field" && draw.plan.shape).toBe("diff(circle,region)");
 
@@ -160,7 +195,26 @@ describe("adapter fill routing", () => {
     expect(hovered.fields.quads.writes[0]!.value.alpha).toBeCloseTo(0.28);
     // Chrome is data too: no leaf or span traffic for a hover.
     expect(hovered.fields.leaves.writes).toHaveLength(0);
-    expect(hovered.fields.edges.writes).toHaveLength(0);
+    expect(hovered.fields.segs.writes).toHaveLength(0);
+    expect(hovered.fields.arcs.writes).toHaveLength(0);
+  });
+
+  test("a dragged arc leaf rewrites only the arc array", () => {
+    const adapter = createAdapter();
+    const trace = [
+      node("o_ring", {
+        kind: "region",
+        outer: { kind: "circle", center: { x: 0, y: 0 }, radius: 2 },
+        holes: [squareRegion(1).outer],
+      }),
+    ];
+    adapter.tick(input(trace));
+    const value = trace[0]!.value as unknown as { outer: { radius: number } };
+    value.outer.radius = 2.5;
+    const moved = adapter.tick(input(trace));
+    // The carrier moved, the hole did not: half the record kinds re-upload.
+    expect(moved.fields.arcs.writes).toHaveLength(1);
+    expect(moved.fields.segs.writes).toHaveLength(0);
   });
 
   test("a fresh node identity re-uploads its field", () => {

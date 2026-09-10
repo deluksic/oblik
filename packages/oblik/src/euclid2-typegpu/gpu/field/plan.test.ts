@@ -121,7 +121,8 @@ const GRID = 21;
 const JITTER = 0.371;
 
 /** Probes: a nudged grid over the node's box, plus both sides of every span's
- * midpoint — the boundary sign that actually matters. */
+ * midpoint — the boundary sign that actually matters. Segments and arcs share
+ * the probe (an arc's chord midpoint is still a boundary neighbourhood). */
 function probesFor(rect: { min: Vec2; max: Vec2 }, inst: FieldInstance): Vec2[] {
   const out: Vec2[] = [];
   const w = rect.max.x - rect.min.x;
@@ -134,7 +135,7 @@ function probesFor(rect: { min: Vec2; max: Vec2 }, inst: FieldInstance): Vec2[] 
       });
     }
   }
-  for (const e of inst.spans) {
+  for (const e of [...inst.spans.segs, ...inst.spans.arcs]) {
     const mx = (e.a.x + e.b.x) / 2;
     const my = (e.a.y + e.b.y) / 2;
     const tx = e.b.x - e.a.x;
@@ -158,7 +159,7 @@ const BAND_FACTOR = 0.005;
 
 function arcBand(inst: FieldInstance): number {
   let r = 0;
-  for (const e of inst.spans) if (e.radius > r) r = e.radius;
+  for (const e of inst.spans.arcs) if (e.radius > r) r = e.radius;
   return r > 0 ? BAND_FACTOR * r : 1e-9;
 }
 

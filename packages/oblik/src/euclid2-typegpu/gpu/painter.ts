@@ -41,23 +41,27 @@ import {
   CircleInst,
   FieldLeaf,
   FieldQuad,
-  FillEdge,
+  FillArc,
   FillRegion,
+  FillSeg,
   Frame,
   GridSpan,
   MarkerInst,
   MAX_CIRCLES,
-  MAX_FIELD_EDGES,
+  MAX_FIELD_ARCS,
   MAX_FIELD_LEAVES,
   MAX_FIELD_QUADS,
-  MAX_FILL_EDGES,
+  MAX_FIELD_SEGS,
+  MAX_FILL_ARCS,
   MAX_FILL_REGIONS,
+  MAX_FILL_SEGS,
   MAX_MARKERS,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
   PointInst,
   StrokeDraw,
 } from "./schemas";
+import { spanWrites } from "./spanRecords";
 
 export type Painter = {
   /** Write the Frame uniform and recount the visible grid lines for the new view
@@ -136,12 +140,14 @@ export function createPainter(opts: {
   const pointOrderBuffer = root.createBuffer(arrayOf(u32, MAX_POINTS)).$usage("storage");
   const fillBuffer = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const fillOrderBuffer = root.createBuffer(arrayOf(u32, MAX_FILL_REGIONS)).$usage("storage");
-  const fillEdgeBuffer = root.createBuffer(arrayOf(FillEdge, MAX_FILL_EDGES)).$usage("storage");
-  /** Compiled CSG fields: one AABB quad per fill node plus its leaf/edge windows. */
+  const fillSegBuffer = root.createBuffer(arrayOf(FillSeg, MAX_FILL_SEGS)).$usage("storage");
+  const fillArcBuffer = root.createBuffer(arrayOf(FillArc, MAX_FILL_ARCS)).$usage("storage");
+  /** Compiled CSG fields: one AABB quad per fill node plus its leaf/span windows. */
   const fieldQuadBuffer = root.createBuffer(arrayOf(FieldQuad, MAX_FIELD_QUADS)).$usage("storage");
   const fieldOrderBuffer = root.createBuffer(arrayOf(u32, MAX_FIELD_QUADS)).$usage("storage");
   const fieldLeafBuffer = root.createBuffer(arrayOf(FieldLeaf, MAX_FIELD_LEAVES)).$usage("storage");
-  const fieldEdgeBuffer = root.createBuffer(arrayOf(FillEdge, MAX_FIELD_EDGES)).$usage("storage");
+  const fieldSegBuffer = root.createBuffer(arrayOf(FillSeg, MAX_FIELD_SEGS)).$usage("storage");
+  const fieldArcBuffer = root.createBuffer(arrayOf(FillArc, MAX_FIELD_ARCS)).$usage("storage");
 
   // Tool overlay (ghost previews + snap markers). Rebuilt and rewritten every
   // tick, so each phase owns a full data buffer and an identity order list
@@ -168,8 +174,10 @@ export function createPainter(opts: {
   const overPointsBuf = root.createBuffer(arrayOf(PointInst, MAX_POINTS)).$usage("storage");
   const underFillsBuf = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const overFillsBuf = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
-  const underEdgesBuf = root.createBuffer(arrayOf(FillEdge, MAX_FILL_EDGES)).$usage("storage");
-  const overEdgesBuf = root.createBuffer(arrayOf(FillEdge, MAX_FILL_EDGES)).$usage("storage");
+  const underEdgesBuf = root.createBuffer(arrayOf(FillSeg, MAX_FILL_SEGS)).$usage("storage");
+  const underArcsBuf = root.createBuffer(arrayOf(FillArc, MAX_FILL_ARCS)).$usage("storage");
+  const overEdgesBuf = root.createBuffer(arrayOf(FillSeg, MAX_FILL_SEGS)).$usage("storage");
+  const overArcsBuf = root.createBuffer(arrayOf(FillArc, MAX_FILL_ARCS)).$usage("storage");
   // Screen-space square markers (snap diamonds): one instanced quad each,
   // rewritten per tick like the rest of the overlay.
   const markerBuffer = root.createBuffer(arrayOf(MarkerInst, MAX_MARKERS)).$usage("storage");
@@ -250,14 +258,16 @@ export function createPainter(opts: {
     frame: frameBuffer,
     fills: fillBuffer,
     fillOrder: fillOrderBuffer,
-    fillEdges: fillEdgeBuffer,
+    fillSegs: fillSegBuffer,
+    fillArcs: fillArcBuffer,
   });
   const fieldGroup = root.createBindGroup(fieldLayout, {
     frame: frameBuffer,
     fieldQuads: fieldQuadBuffer,
     fieldOrder: fieldOrderBuffer,
     fieldLeaves: fieldLeafBuffer,
-    fieldEdges: fieldEdgeBuffer,
+    fieldSegs: fieldSegBuffer,
+    fieldArcs: fieldArcBuffer,
   });
   const diskGroup = root.createBindGroup(diskLayout, {
     frame: frameBuffer,
@@ -293,13 +303,15 @@ export function createPainter(opts: {
     frame: frameBuffer,
     fills: underFillsBuf,
     fillOrder: fillOrderId,
-    fillEdges: underEdgesBuf,
+    fillSegs: underEdgesBuf,
+    fillArcs: underArcsBuf,
   });
   const overFillGroup = root.createBindGroup(fillLayout, {
     frame: frameBuffer,
     fills: overFillsBuf,
     fillOrder: fillOrderId,
-    fillEdges: overEdgesBuf,
+    fillSegs: overEdgesBuf,
+    fillArcs: overArcsBuf,
   });
   const markerGroup = root.createBindGroup(markerLayout, {
     frame: frameBuffer,
@@ -441,11 +453,13 @@ export function createPainter(opts: {
       pointCount = patch.points.count;
       fillBuffer.writePartial(patch.fills.writes);
       fillOrderBuffer.write(patch.fills.order);
-      fillEdgeBuffer.writePartial(patch.fillEdges.writes);
+      fillSegBuffer.writePartial(patch.fillSegs.writes);
+      fillArcBuffer.writePartial(patch.fillArcs.writes);
       fieldQuadBuffer.writePartial(patch.fields.quads.writes);
       fieldOrderBuffer.write(patch.fields.quads.order);
       fieldLeafBuffer.writePartial(patch.fields.leaves.writes);
-      fieldEdgeBuffer.writePartial(patch.fields.edges.writes);
+      fieldSegBuffer.writePartial(patch.fields.segs.writes);
+      fieldArcBuffer.writePartial(patch.fields.arcs.writes);
       fillDraws = patch.fillDraws;
       // Tool overlay: phase buffers are rewritten wholesale each tick (small
       // counts; the static identity order arrays need no writes). Sliced to
@@ -456,7 +470,9 @@ export function createPainter(opts: {
       underCirclesBuf.writePartial(seqWrites(ov.under.circles, MAX_CIRCLES));
       underCircleCount = Math.min(MAX_CIRCLES, ov.under.circles.length);
       underFillsBuf.writePartial(seqWrites(ov.under.fills, MAX_FILL_REGIONS));
-      underEdgesBuf.writePartial(seqWrites(ov.under.edges, MAX_FILL_EDGES));
+      const underSpans = spanWrites(ov.under.spans, MAX_FILL_SEGS, MAX_FILL_ARCS);
+      underEdgesBuf.writePartial(underSpans.segs);
+      underArcsBuf.writePartial(underSpans.arcs);
       underFillCount = Math.min(MAX_FILL_REGIONS, ov.under.fills.length);
       overStrokesBuf.writePartial(seqWrites(ov.over.strokes, MAX_STROKE_DRAWS));
       overStrokeCount = Math.min(MAX_STROKE_DRAWS, ov.over.strokes.length);
@@ -465,7 +481,9 @@ export function createPainter(opts: {
       overPointsBuf.writePartial(seqWrites(ov.over.disks, MAX_POINTS));
       overDiskCount = Math.min(MAX_POINTS, ov.over.disks.length);
       overFillsBuf.writePartial(seqWrites(ov.over.fills, MAX_FILL_REGIONS));
-      overEdgesBuf.writePartial(seqWrites(ov.over.edges, MAX_FILL_EDGES));
+      const overSpans = spanWrites(ov.over.spans, MAX_FILL_SEGS, MAX_FILL_ARCS);
+      overEdgesBuf.writePartial(overSpans.segs);
+      overArcsBuf.writePartial(overSpans.arcs);
       overFillCount = Math.min(MAX_FILL_REGIONS, ov.over.fills.length);
       markerBuffer.writePartial(seqWrites(ov.over.markers, MAX_MARKERS));
       markerCount = Math.min(MAX_MARKERS, ov.over.markers.length);
@@ -590,11 +608,13 @@ export function createPainter(opts: {
       pointOrderBuffer.destroy();
       fillBuffer.destroy();
       fillOrderBuffer.destroy();
-      fillEdgeBuffer.destroy();
+      fillSegBuffer.destroy();
+      fillArcBuffer.destroy();
       fieldQuadBuffer.destroy();
       fieldOrderBuffer.destroy();
       fieldLeafBuffer.destroy();
-      fieldEdgeBuffer.destroy();
+      fieldSegBuffer.destroy();
+      fieldArcBuffer.destroy();
       strokeOrderId.destroy();
       circleOrderId.destroy();
       pointOrderId.destroy();
@@ -607,7 +627,9 @@ export function createPainter(opts: {
       underFillsBuf.destroy();
       overFillsBuf.destroy();
       underEdgesBuf.destroy();
+      underArcsBuf.destroy();
       overEdgesBuf.destroy();
+      overArcsBuf.destroy();
       markerBuffer.destroy();
       markerOrderId.destroy();
       gridSpanBuffer.destroy();

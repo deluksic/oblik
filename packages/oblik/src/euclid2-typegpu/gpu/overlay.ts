@@ -10,9 +10,9 @@ import { circleDelta } from "#geom/region";
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isCrossing } from "../../euclid2/place";
 import { SNAP_DIAMOND_R, SNAP_R } from "../../euclid2/view/pointMark";
+import { emptySpans, growSpanBox, newBox, pushLoopSpan, type SpanSet } from "./fillSpans";
 import {
   CircleInst,
-  FillEdge,
   FillRegion,
   MarkerInst,
   PointInst,
@@ -51,24 +51,25 @@ const PAPER_STROKE_PX = 2;
 export type Rgb = readonly [number, number, number];
 
 export type CircleInstValue = ReturnType<typeof CircleInst>;
-export type FillEdgeValue = ReturnType<typeof FillEdge>;
 export type FillRegionValue = ReturnType<typeof FillRegion>;
 export type PointInstValue = ReturnType<typeof PointInst>;
 export type StrokeDrawValue = ReturnType<typeof StrokeDraw>;
 export type MarkerInstValue = ReturnType<typeof MarkerInst>;
 
 /** Per-frame ghost/snap geometry. `under` sits between the grid and the world
- * (registered-tool trace previews); `over` renders above the world. */
+ * (registered-tool trace previews); `over` renders above the world. Ghost fill
+ * spans are plain records (`fillSpans.ts`); the painter maps them to the GPU
+ * structs, the same way the adapter maps the world fills. */
 export type OverlayPatch = {
   under: {
     fills: FillRegionValue[];
-    edges: FillEdgeValue[];
+    spans: SpanSet;
     strokes: StrokeDrawValue[];
     circles: CircleInstValue[];
   };
   over: {
     fills: FillRegionValue[];
-    edges: FillEdgeValue[];
+    spans: SpanSet;
     strokes: StrokeDrawValue[];
     circles: CircleInstValue[];
     disks: PointInstValue[];
@@ -256,75 +257,42 @@ function disc(
 /** Convert a closed world chain into one normalized (CCW) fill island. */
 function pushFillIsland(
   fills: FillRegionValue[],
-  edgesOut: FillEdgeValue[],
+  spans: SpanSet,
   chain: readonly LoopEdge[],
   color: Rgb,
   alpha: number,
   scale: number,
 ): void {
   if (chain.length < 3) return;
-  const area = chainArea(chain);
-  const ordered = chain.map((e) => loopEdgeFill(e));
-  if (area < 0) {
-    for (let i = 0; i < ordered.length; i++) {
-      const e = ordered[i]!;
-      ordered[i] = { ...e, a: e.b, b: e.a, span: -e.span };
-    }
-    ordered.reverse();
+  const reversed = chainArea(chain) < 0;
+  const segOffset = spans.segs.length;
+  const arcOffset = spans.arcs.length;
+  for (const e of chain) pushLoopSpan(spans, e, reversed);
+  const segCount = spans.segs.length - segOffset;
+  const arcCount = spans.arcs.length - arcOffset;
+  const box = newBox();
+  growSpanBox(box, spans, { segOffset, segCount, arcOffset, arcCount });
+  if (!Number.isFinite(box.min.x)) {
+    // A non-finite chain contributes no island quad, so it must not leave its
+    // spans behind for the next island's window to swallow.
+    spans.segs.length = segOffset;
+    spans.arcs.length = arcOffset;
+    return;
   }
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  const grow = (p: Vec2) => {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  };
-  for (const e of ordered) {
-    grow(e.a);
-    grow(e.b);
-    if (e.radius > 0) {
-      grow({ x: e.center.x - e.radius, y: e.center.y - e.radius });
-      grow({ x: e.center.x + e.radius, y: e.center.y + e.radius });
-    }
-  }
-  if (!Number.isFinite(minX)) return;
   const pad = 2 / scale;
-  const edgeStart = edgesOut.length;
-  for (const e of ordered) edgesOut.push(e);
   fills.push(
     FillRegion({
-      aabbMin: vec2f(minX - pad, minY - pad),
-      aabbMax: vec2f(maxX + pad, maxY + pad),
-      edgeOffset: edgeStart,
-      edgeCount: ordered.length,
+      aabbMin: vec2f(box.min.x - pad, box.min.y - pad),
+      aabbMax: vec2f(box.max.x + pad, box.max.y + pad),
+      segOffset,
+      segCount,
+      arcOffset,
+      arcCount,
       color: rgbv(color),
       alpha,
       flags: 0,
     }),
   );
-}
-
-function loopEdgeFill(e: LoopEdge): FillEdgeValue {
-  if (e.carrier.kind === "circle") {
-    const carrier = e.carrier as Circle;
-    return FillEdge({
-      a: vec2f(e.a.x, e.a.y),
-      b: vec2f(e.b.x, e.b.y),
-      center: vec2f(carrier.center.x, carrier.center.y),
-      radius: Math.abs(carrier.radius),
-      span: circleDelta(carrier, e.a, e.b, e.k ?? 1),
-    });
-  }
-  return FillEdge({
-    a: vec2f(e.a.x, e.a.y),
-    b: vec2f(e.b.x, e.b.y),
-    center: vec2f(0, 0),
-    radius: -1,
-    span: 0,
-  });
 }
 
 /** Shoelace over the chain's endpoint polygon (arcs approximated). */
@@ -374,7 +342,7 @@ function dashChain(
 function pushArrow(
   strokes: StrokeDrawValue[],
   fills: FillRegionValue[],
-  edgesOut: FillEdgeValue[],
+  spans: SpanSet,
   arrow: { at: Vec2; tx: number; ty: number },
   ghost: Rgb,
   halfArrowWidth: number,
@@ -398,7 +366,7 @@ function pushArrow(
   };
   pushFillIsland(
     fills,
-    edgesOut,
+    spans,
     [
       { a: tip, b: left, carrier: { kind: "segment", a: tip, b: left } },
       { a: left, b: right, carrier: { kind: "segment", a: left, b: right } },
@@ -476,8 +444,8 @@ function nodeEnds(node: TraceNode, cam: Camera2, size: PaneSize): { a: Vec2; b: 
 export function buildOverlay(args: OverlayArgs): OverlayPatch {
   const { cam, size, scale, strokePx, colors, ghost, snap } = args;
   const patch: OverlayPatch = {
-    under: { fills: [], edges: [], strokes: [], circles: [] },
-    over: { fills: [], edges: [], strokes: [], circles: [], disks: [], markers: [] },
+    under: { fills: [], spans: emptySpans(), strokes: [], circles: [] },
+    over: { fills: [], spans: emptySpans(), strokes: [], circles: [], disks: [], markers: [] },
   };
   const halfStroke = px(strokePx / 2, scale);
 
@@ -513,7 +481,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
         : ghost.edges;
       pushFillIsland(
         patch.over.fills,
-        patch.over.edges,
+        patch.over.spans,
         closed,
         colors.ghost,
         GHOST_FILL_ALPHA,
@@ -534,7 +502,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
       pushArrow(
         patch.over.strokes,
         patch.over.fills,
-        patch.over.edges,
+        patch.over.spans,
         ghost.arrow,
         colors.ghost,
         px(ARROW_STROKE_PX / 2, scale),

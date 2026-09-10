@@ -126,55 +126,59 @@ function assembleLeaf(plan: FieldPlan, index: number): FieldFn {
     f32,
   )((p, base) => {
     "use gpu";
-    const leaf = fieldLayout.$.fieldLeaves[base + u32(index)];
-    return spanWalk(leaf.spanOffset, leaf.spanCount, p);
+    return spanWalk(base + u32(index), p);
   });
 }
 
-/** Winding + nearest-boundary walk over a span window — the same loop the span
- * fill pass runs in `pipelines/fills.ts` (segments and arcs, non-zero rule). */
+/** Winding + nearest-boundary walk over a leaf's span window — the same loops
+ * the span fill pass runs in `pipelines/fills.ts` (non-zero rule). Segments and
+ * arcs are separate arrays with separate windows, so neither loop carries a
+ * carrier it cannot use: the segment loop is 16 B records end to end. */
 const spanWalk = tgpu.fn(
-  [u32, u32, vec2f],
+  [u32, vec2f],
   f32,
-)((start, count, p) => {
+)((leafIndex, p) => {
   "use gpu";
+  const leaf = fieldLayout.$.fieldLeaves[leafIndex];
   let winding = 0;
   let dmin = f32(FAR);
-  for (let i = u32(0); i < count; i += 1) {
-    const e = fieldLayout.$.fieldEdges[start + i];
-    if (e.radius <= 0) {
-      const ab = e.b - e.a;
-      const ap = p - e.a;
-      const denom = dot(ab, ab);
-      const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
-      dmin = min(dmin, length(ap - ab * t));
-      if (e.a.y > p.y !== e.b.y > p.y) {
-        const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
-        if (xint > p.x) winding += e.b.y > e.a.y ? 1 : -1;
-      }
+  const segEnd = leaf.segOffset + leaf.segCount;
+  for (let i = leaf.segOffset; i < segEnd; i += 1) {
+    const e = fieldLayout.$.fieldSegs[i];
+    const ab = e.b - e.a;
+    const ap = p - e.a;
+    const denom = dot(ab, ab);
+    const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
+    dmin = min(dmin, length(ap - ab * t));
+    if (e.a.y > p.y !== e.b.y > p.y) {
+      const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
+      if (xint > p.x) winding += e.b.y > e.a.y ? 1 : -1;
+    }
+  }
+  const arcEnd = leaf.arcOffset + leaf.arcCount;
+  for (let i = leaf.arcOffset; i < arcEnd; i += 1) {
+    const e = fieldLayout.$.fieldArcs[i];
+    const k = sign(e.span);
+    const absSpan = abs(e.span);
+    const full = absSpan >= TAU;
+    const a0 = atan2(e.a.y - e.center.y, e.a.x - e.center.x);
+    const v = p - e.center;
+    const dist = length(v);
+    if (withinArc(atan2(v.y, v.x), k, a0, absSpan, full)) {
+      dmin = min(dmin, abs(dist - e.radius));
     } else {
-      const k = sign(e.span);
-      const absSpan = abs(e.span);
-      const full = absSpan >= TAU;
-      const a0 = atan2(e.a.y - e.center.y, e.a.x - e.center.x);
-      const v = p - e.center;
-      const dist = length(v);
-      if (withinArc(atan2(v.y, v.x), k, a0, absSpan, full)) {
-        dmin = min(dmin, abs(dist - e.radius));
-      } else {
-        dmin = min(dmin, min(length(p - e.a), length(p - e.b)));
-      }
-      if (abs(v.y) < e.radius) {
-        const dx = sqrt(e.radius * e.radius - v.y * v.y);
-        let s = f32(-1);
-        while (true) {
-          const cx = e.center.x + s * dx;
-          if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
-            winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
-          }
-          if (s === f32(1)) break;
-          s = f32(1);
+      dmin = min(dmin, min(length(p - e.a), length(p - e.b)));
+    }
+    if (abs(v.y) < e.radius) {
+      const dx = sqrt(e.radius * e.radius - v.y * v.y);
+      let s = f32(-1);
+      while (true) {
+        const cx = e.center.x + s * dx;
+        if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
+          winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
         }
+        if (s === f32(1)) break;
+        s = f32(1);
       }
     }
   }

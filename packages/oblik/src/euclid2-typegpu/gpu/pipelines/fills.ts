@@ -48,7 +48,7 @@ const fillVertex = tgpu.vertexFn({
   return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), regionIndex: slot };
 });
 
-const fillFragment = tgpu.fragmentFn({
+export const fillFragment = tgpu.fragmentFn({
   in: { p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
   out: vec4f,
 })(({ p, regionIndex }) => {
@@ -56,43 +56,47 @@ const fillFragment = tgpu.fragmentFn({
   const region = fillLayout.$.fills[regionIndex];
   let winding = 0;
   let dmin = 1e30;
-  for (let i = u32(0); i < region.edgeCount; i += 1) {
-    const e = fillLayout.$.fillEdges[region.edgeOffset + i];
-    if (e.radius <= 0) {
-      const ab = e.b - e.a;
-      const ap = p - e.a;
-      const denom = dot(ab, ab);
-      const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
-      dmin = min(dmin, length(ap - ab * t));
-      if (e.a.y > p.y !== e.b.y > p.y) {
-        const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
-        if (xint > p.x) {
-          winding += e.b.y > e.a.y ? 1 : -1;
-        }
+  // Segments and arcs are separate arrays with separate windows: the segment
+  // loop reads 16 B records and never branches on a carrier it cannot have.
+  const segEnd = region.segOffset + region.segCount;
+  for (let i = region.segOffset; i < segEnd; i += 1) {
+    const e = fillLayout.$.fillSegs[i];
+    const ab = e.b - e.a;
+    const ap = p - e.a;
+    const denom = dot(ab, ab);
+    const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
+    dmin = min(dmin, length(ap - ab * t));
+    if (e.a.y > p.y !== e.b.y > p.y) {
+      const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
+      if (xint > p.x) {
+        winding += e.b.y > e.a.y ? 1 : -1;
       }
+    }
+  }
+  const arcEnd = region.arcOffset + region.arcCount;
+  for (let i = region.arcOffset; i < arcEnd; i += 1) {
+    const e = fillLayout.$.fillArcs[i];
+    const k = sign(e.span);
+    const absSpan = abs(e.span);
+    const full = absSpan >= TAU;
+    const a0 = atan2(e.a.y - e.center.y, e.a.x - e.center.x);
+    const v = p - e.center;
+    const dist = length(v);
+    if (withinArc(atan2(v.y, v.x), k, a0, absSpan, full)) {
+      dmin = min(dmin, abs(dist - e.radius));
     } else {
-      const k = sign(e.span);
-      const absSpan = abs(e.span);
-      const full = absSpan >= TAU;
-      const a0 = atan2(e.a.y - e.center.y, e.a.x - e.center.x);
-      const v = p - e.center;
-      const dist = length(v);
-      if (withinArc(atan2(v.y, v.x), k, a0, absSpan, full)) {
-        dmin = min(dmin, abs(dist - e.radius));
-      } else {
-        dmin = min(dmin, min(length(p - e.a), length(p - e.b)));
-      }
-      if (abs(v.y) < e.radius) {
-        const dx = sqrt(e.radius * e.radius - v.y * v.y);
-        let s = f32(-1);
-        while (true) {
-          const cx = e.center.x + s * dx;
-          if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
-            winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
-          }
-          if (s === f32(1)) break;
-          s = f32(1);
+      dmin = min(dmin, min(length(p - e.a), length(p - e.b)));
+    }
+    if (abs(v.y) < e.radius) {
+      const dx = sqrt(e.radius * e.radius - v.y * v.y);
+      let s = f32(-1);
+      while (true) {
+        const cx = e.center.x + s * dx;
+        if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
+          winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
         }
+        if (s === f32(1)) break;
+        s = f32(1);
       }
     }
   }

@@ -109,11 +109,23 @@ describe("compiled field WGSL", () => {
       // A fragment entry plus its helpers, with no unresolved placeholders.
       expect(code).toContain("@fragment fn");
       expect(code).not.toContain("undefined");
-      // Every leaf is read at a literal offset from the node's leaf window.
-      expect(occurrences(code, "fieldLeaves[(base + ")).toBe(countLeaves(c.plan.root));
-      // The only runtime loop is the shared span walk; the tree itself is
-      // straight-line calls, which is the whole point of compiling it.
-      expect(occurrences(code, "for (var")).toBe(countSpanLeaves(c.plan) > 0 ? 1 : 0);
+      // Scalar leaves are read at a literal offset from the node's leaf window;
+      // a `spans` leaf hands that same offset to the shared walk instead.
+      const spanLeaves = countSpanLeaves(c.plan);
+      expect(occurrences(code, "fieldLeaves[(base + ")).toBe(countLeaves(c.plan.root) - spanLeaves);
+      expect(occurrences(code, "spanWalk((base + ")).toBe(spanLeaves);
+      // The only runtime loops are the shared span walk's two — one per record
+      // kind; the tree itself is straight-line calls, which is the whole point
+      // of compiling it.
+      const spanLoops = spanLeaves > 0 ? 2 : 0;
+      expect(occurrences(code, "for (var")).toBe(spanLoops);
+      expect(occurrences(code, "fieldSegs[")).toBe(spanLoops > 0 ? 1 : 0);
+      expect(occurrences(code, "fieldArcs[")).toBe(spanLoops > 0 ? 1 : 0);
+      // The segment loop is endpoints only: no carrier, no trigonometry, no
+      // square root — that is what the split buys on the heaviest fills. An
+      // empty slice (no spans leaf at all) passes vacuously.
+      const segLoop = code.slice(code.indexOf("fieldSegs["), code.indexOf("fieldArcs["));
+      expect(segLoop).not.toMatch(/atan2|sqrt|radius/);
     }
     expect(seen.size).toBeGreaterThan(5);
   });

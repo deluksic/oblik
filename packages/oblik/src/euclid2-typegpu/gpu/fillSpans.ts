@@ -1,16 +1,31 @@
-import type { CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
+import type { Circle, CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
 import { evaluateRegions } from "#geom/evaluate-regions";
 import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/region";
 
-/** One fill boundary span, in world space: an arc on a circle carrier when
- * `radius > 0` (signed sweep `span`), a straight segment when `radius <= 0`.
- * Field-compatible with the GPU `FillEdge` struct — same names, plain `Vec2`s. */
-export type SpanEdge = {
-  a: Vec2;
-  b: Vec2;
-  center: Vec2;
-  radius: number;
-  span: number;
+const TAU = Math.PI * 2;
+
+/** One straight boundary span: `a → b`. 16 B on the GPU, and nothing to test —
+ * the record the fill walks spend nearly all their bandwidth on. */
+export type SpanSeg = { a: Vec2; b: Vec2 };
+
+/** One arc boundary span on a circle carrier: signed sweep `span`, `radius > 0`. */
+export type SpanArc = { a: Vec2; b: Vec2; center: Vec2; radius: number; span: number };
+
+/**
+ * A fill's boundary, split by record kind — the two arrays the shaders loop
+ * over. Neither the winding sum nor the nearest-boundary `min` depends on the
+ * order spans are visited in, and nothing couples a segment to an arc, so the
+ * split is free: a segment loop reads 16 B records and never branches on a
+ * carrier it does not have.
+ */
+export type SpanSet = { segs: SpanSeg[]; arcs: SpanArc[] };
+
+/** A window into a `SpanSet`'s arrays — exactly the GPU window fields. */
+export type SpanWindow = {
+  segOffset: number;
+  segCount: number;
+  arcOffset: number;
+  arcCount: number;
 };
 
 export type Box = {
@@ -18,13 +33,61 @@ export type Box = {
   max: { x: number; y: number };
 };
 
-export type IslandGeom = { edges: SpanEdge[][]; bounds: Box[] };
+export type IslandGeom = { spans: SpanSet[]; bounds: Box[] };
+
+export function emptySpans(): SpanSet {
+  return { segs: [], arcs: [] };
+}
+
+/** An empty box (`min` above `max`); `grow` fills it in. */
+export function newBox(): Box {
+  return { min: { x: Infinity, y: Infinity }, max: { x: -Infinity, y: -Infinity } };
+}
 
 export function grow(box: Box, p: Vec2): void {
   box.min.x = Math.min(box.min.x, p.x);
   box.min.y = Math.min(box.min.y, p.y);
   box.max.x = Math.max(box.max.x, p.x);
   box.max.y = Math.max(box.max.y, p.y);
+}
+
+/** Grow `box` over a span set — or one window of it. An arc covers its whole
+ * carrier disc, which is what the fill quad has to enclose. */
+export function growSpanBox(box: Box, spans: SpanSet, window?: SpanWindow): void {
+  const segStart = window?.segOffset ?? 0;
+  const segEnd = segStart + (window?.segCount ?? spans.segs.length);
+  for (let i = segStart; i < segEnd; i++) {
+    const e = spans.segs[i]!;
+    grow(box, e.a);
+    grow(box, e.b);
+  }
+  const arcStart = window?.arcOffset ?? 0;
+  const arcEnd = arcStart + (window?.arcCount ?? spans.arcs.length);
+  for (let i = arcStart; i < arcEnd; i++) {
+    const e = spans.arcs[i]!;
+    grow(box, e.a);
+    grow(box, e.b);
+    grow(box, { x: e.center.x - e.radius, y: e.center.y - e.radius });
+    grow(box, { x: e.center.x + e.radius, y: e.center.y + e.radius });
+  }
+}
+
+/** Push one loop edge as a fill span; `reversed` flips the record's direction
+ * (outer CCW vs hole CW) and leaves the carrier alone. */
+export function pushLoopSpan(out: SpanSet, e: LoopEdge, reversed = false): void {
+  if (e.carrier.kind === "circle") {
+    const carrier = e.carrier;
+    const span = circleDelta(carrier, e.a, e.b, e.k ?? 1);
+    out.arcs.push({
+      a: reversed ? e.b : e.a,
+      b: reversed ? e.a : e.b,
+      center: carrier.center,
+      radius: Math.abs(carrier.radius),
+      span: reversed ? -span : span,
+    });
+    return;
+  }
+  out.segs.push(reversed ? { a: e.b, b: e.a } : { a: e.a, b: e.b });
 }
 
 /** Points of a polygon boundary as a closed chain of segment edges. */
@@ -52,73 +115,77 @@ export function islandsOfValue(value: Region | Polygon | CsgOperand): Region[] {
 }
 
 /** One island's loops → fill spans, normalized: outer CCW, holes CW. */
-export function islandSpans(island: Region): SpanEdge[] {
+export function islandSpans(island: Region): SpanSet {
+  const out = emptySpans();
   const loops = [island.outer, ...island.holes];
-  const out: SpanEdge[] = [];
-  for (let i = 0; i < loops.length; i++) out.push(...normalizedLoop(loops[i]!, i > 0));
+  for (let i = 0; i < loops.length; i++) pushLoop(out, loops[i]!, i > 0);
   return out;
 }
 
 /** Normalized spans (outer CCW, holes CW) + padded AABB per island. */
 export function islandGeomOf(value: Region | Polygon | CsgOperand, pad: number): IslandGeom {
-  const edges: SpanEdge[][] = [];
+  const spans: SpanSet[] = [];
   const bounds: Box[] = [];
   for (const island of islandsOfValue(value)) {
-    const spans = islandSpans(island);
-    if (spans.length === 0) continue;
-    const box: Box = {
-      min: { x: Infinity, y: Infinity },
-      max: { x: -Infinity, y: -Infinity },
-    };
-    for (const edge of spans) {
-      grow(box, edge.a);
-      grow(box, edge.b);
-      if (edge.radius > 0) {
-        grow(box, { x: edge.center.x - edge.radius, y: edge.center.y - edge.radius });
-        grow(box, { x: edge.center.x + edge.radius, y: edge.center.y + edge.radius });
-      }
-    }
+    const islandSet = islandSpans(island);
+    if (islandSet.segs.length === 0 && islandSet.arcs.length === 0) continue;
+    const box = newBox();
+    growSpanBox(box, islandSet);
     if (!Number.isFinite(box.min.x)) continue;
-    edges.push(spans);
+    spans.push(islandSet);
     bounds.push({
       min: { x: box.min.x - pad, y: box.min.y - pad },
       max: { x: box.max.x + pad, y: box.max.y + pad },
     });
   }
-  return { edges, bounds };
+  return { spans, bounds };
 }
 
-/** Running edge count before block `i` — the GPU `edgeOffset` of each island. */
-export function blockOffset(blocks: readonly SpanEdge[][], i: number): number {
-  let at = 0;
-  for (let k = 0; k < i; k++) at += blocks[k]!.length;
-  return at;
+/** Window of each block in the concatenation of the blocks per kind — the GPU
+ * `segOffset`/`arcOffset` pair an island's region record carries. */
+export function blockWindows(blocks: readonly SpanSet[]): SpanWindow[] {
+  const out: SpanWindow[] = [];
+  let seg = 0;
+  let arc = 0;
+  for (const block of blocks) {
+    out.push({
+      segOffset: seg,
+      segCount: block.segs.length,
+      arcOffset: arc,
+      arcCount: block.arcs.length,
+    });
+    seg += block.segs.length;
+    arc += block.arcs.length;
+  }
+  return out;
 }
 
 // -- loop normalization ------------------------------------------------------
 
 /** One island loop → fill spans, normalized: outer CCW, holes CW. */
-export function normalizedLoop(loop: Loop, wantCw: boolean): SpanEdge[] {
+function pushLoop(out: SpanSet, loop: Loop, wantCw: boolean): void {
   if (isCircleWalk(loop)) {
-    const r = Math.abs(loop.radius);
-    const anchor = { x: loop.center.x + r, y: loop.center.y };
-    // Full circle: positive sweep = CCW outer, negative = CW hole.
-    return [
-      {
-        a: anchor,
-        b: anchor,
-        center: loop.center,
-        radius: r,
-        span: wantCw ? -Math.PI * 2 : Math.PI * 2,
-      },
-    ];
+    pushCircleWalk(out, loop, wantCw);
+    return;
   }
   const edges = walkEdges(loop);
-  if (edges.length === 0) return [];
+  if (edges.length === 0) return;
   const area = shoelace(tessellateWalk(loop));
   const reversed = area < 0 !== wantCw;
-  const ordered = reversed ? reverseLoop(edges) : edges;
-  return ordered.map((e) => spanOf(e));
+  for (const e of edges) pushLoopSpan(out, e, reversed);
+}
+
+/** Full circle: positive sweep = CCW outer, negative = CW hole. */
+function pushCircleWalk(out: SpanSet, circle: Circle, wantCw: boolean): void {
+  const radius = Math.abs(circle.radius);
+  const anchor = { x: circle.center.x + radius, y: circle.center.y };
+  out.arcs.push({
+    a: anchor,
+    b: anchor,
+    center: circle.center,
+    radius,
+    span: wantCw ? -TAU : TAU,
+  });
 }
 
 /** CCW-positive polygon area of a closed walk. */
@@ -130,27 +197,4 @@ function shoelace(points: readonly Vec2[]): number {
     sum += a.x * b.y - a.y * b.x;
   }
   return sum / 2;
-}
-
-function reverseLoop(edges: readonly LoopEdge[]): LoopEdge[] {
-  return edges.toReversed().map((e) => ({
-    a: e.b,
-    b: e.a,
-    carrier: e.carrier,
-    k: e.k === undefined ? undefined : e.k === 1 ? -1 : 1,
-  }));
-}
-
-function spanOf(e: LoopEdge): SpanEdge {
-  if (e.carrier.kind === "circle") {
-    const carrier = e.carrier;
-    return {
-      a: e.a,
-      b: e.b,
-      center: carrier.center,
-      radius: Math.abs(carrier.radius),
-      span: circleDelta(carrier, e.a, e.b, e.k ?? 1),
-    };
-  }
-  return { a: e.a, b: e.b, center: { x: 0, y: 0 }, radius: -1, span: 0 };
 }

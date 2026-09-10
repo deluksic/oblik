@@ -10,7 +10,13 @@ export const MAX_CIRCLES = 512;
 /** Fan pieces per circle/arc instance; verts = 2·(pieces+1) ≤ 258. */
 export const MAX_CIRCLE_PIECES = 128;
 export const MAX_FILL_REGIONS = 256;
-export const MAX_FILL_EDGES = 4096;
+/** Straight boundary spans of the span-pass fills — the record the fill
+ * fragment walk reads most: 16 B per span, so doubling the old combined cap
+ * (4096 fat records) still costs less memory. The demo's span path holds ~3 k. */
+export const MAX_FILL_SEGS = 8192;
+/** Arc boundary spans of the span-pass fills; rare (≤ 50 in the demo) because
+ * arcs are their own record kind now, so they get their own gate. */
+export const MAX_FILL_ARCS = 1024;
 /** Instanced disc slots (up to 4 per point node: halo ring, knockout, paper
  * outline, paint); shared by all layered discs of a point. */
 export const MAX_POINTS = 4096;
@@ -22,7 +28,8 @@ export const MAX_FIELD_QUADS = 512;
 export const MAX_FIELD_LEAVES = 4096;
 /** Boundary spans inside compiled fields. Region fills compile to a single
  * `spans` leaf, so this pool carries the region load the span pass used to. */
-export const MAX_FIELD_EDGES = 8192;
+export const MAX_FIELD_SEGS = 8192;
+export const MAX_FIELD_ARCS = 2048;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -127,24 +134,35 @@ export const CircleInst = struct({
 });
 export type CircleInstValue = Infer<typeof CircleInst>;
 
-/** One fill boundary span: a circle-carrier arc (radius > 0, signed sweep
- * `span`) or a straight segment (radius <= 0, a→b). */
-export const FillEdge = struct({
+/** One straight fill boundary span, `a → b`: 16 B, and the fragment's segment
+ * loop needs nothing else — no carrier, no branch. */
+export const FillSeg = struct({
+  a: vec2f,
+  b: vec2f,
+});
+export type FillSegValue = Infer<typeof FillSeg>;
+
+/** One arc fill boundary span on a circle carrier, swept `span` from `a` to `b`
+ * (signed: negative sweeps clockwise). Kept out of `FillSeg` so the segment
+ * loop never pays for the carrier a straight edge cannot have. */
+export const FillArc = struct({
   a: vec2f,
   b: vec2f,
   center: vec2f,
   radius: f32,
-  /** Signed sweep in radians for arcs; segment edges carry 0. */
   span: f32,
 });
-export type FillEdgeValue = Infer<typeof FillEdge>;
+export type FillArcValue = Infer<typeof FillArc>;
 
-/** SDF fragment quad covering one fill island; edges live in a shared array. */
+/** SDF fragment quad covering one fill island; spans live in shared arrays, one
+ * window per record kind. */
 export const FillRegion = struct({
   aabbMin: vec2f,
   aabbMax: vec2f,
-  edgeOffset: u32,
-  edgeCount: u32,
+  segOffset: u32,
+  segCount: u32,
+  arcOffset: u32,
+  arcCount: u32,
   color: vec3f,
   alpha: f32,
   flags: u32,
@@ -153,14 +171,16 @@ export type FillRegionValue = Infer<typeof FillRegion>;
 
 /** One leaf of a GPU-compiled CSG field, addressed by a comptime index: a
  * circle (centre + radius), a half-plane (origin + pre-rotated inside normal),
- * an offset distance (`r`), or a window into `fieldEdges` (a region boundary
- * walk). Which fields are live is decided by the field's compiled shape. */
+ * an offset distance (`r`), or a window into the field's span arrays (a region
+ * boundary walk). Which fields are live is decided by the compiled shape. */
 export const FieldLeaf = struct({
   a: vec2f,
   b: vec2f,
   r: f32,
-  spanOffset: u32,
-  spanCount: u32,
+  segOffset: u32,
+  segCount: u32,
+  arcOffset: u32,
+  arcCount: u32,
 });
 export type FieldLeafValue = Infer<typeof FieldLeaf>;
 

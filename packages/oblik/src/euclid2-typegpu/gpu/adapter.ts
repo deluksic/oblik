@@ -13,15 +13,24 @@ import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euc
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
 import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
-import { blockOffset, islandGeomOf, type Box, type IslandGeom, type SpanEdge } from "./fillSpans";
+import {
+  blockWindows,
+  islandGeomOf,
+  type Box,
+  type IslandGeom,
+  type SpanArc,
+  type SpanSeg,
+  type SpanWindow,
+} from "./fillSpans";
 import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
 import type {
   CircleInstValue,
   FieldLeafValue,
   FieldQuadValue,
-  FillEdgeValue,
+  FillArcValue,
   FillRegionValue,
+  FillSegValue,
   PointInstValue,
   StrokeDrawValue,
 } from "./schemas";
@@ -29,11 +38,13 @@ import {
   CircleInst,
   FieldLeaf,
   FieldQuad,
-  FillEdge,
   FillRegion,
-  MAX_FIELD_EDGES,
+  MAX_FIELD_ARCS,
   MAX_FIELD_LEAVES,
   MAX_FIELD_QUADS,
+  MAX_FIELD_SEGS,
+  MAX_FILL_ARCS,
+  MAX_FILL_SEGS,
   MAX_POINTS,
   PointInst,
   RUN_GEOM_TWO_POINT,
@@ -43,6 +54,7 @@ import {
   StrokeRun,
 } from "./schemas";
 import { createSlotPool } from "./slots";
+import { pushArcWrites, pushSegWrites, type SpanWrite } from "./spanRecords";
 
 const TAU = Math.PI * 2;
 /** Muted (chrome.mutePoints/scope) opacity — matches the SVG `.muted` rule. */
@@ -124,14 +136,17 @@ export type TickPatch = {
   strokes: { writes: { idx: number; value: StrokeDrawValue }[]; bands: InkBands };
   circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
   fills: SlotPatch<FillRegionValue>;
-  /** Edge blocks back the fill regions; no draw list of their own. */
-  fillEdges: { writes: { idx: number; value: FillEdgeValue }[] };
+  /** Boundary spans backing the fill regions — one array per record kind, so the
+   * fragment's segment loop never touches a carrier. No draws of their own. */
+  fillSegs: { writes: SpanWrite<FillSegValue>[] };
+  fillArcs: { writes: SpanWrite<FillArcValue>[] };
   /** CSG fills compiled to GPU fields: an AABB quad per node, the leaf records
    * it reads, and the boundary spans of its region leaves. */
   fields: {
     quads: SlotPatch<FieldQuadValue>;
     leaves: { writes: { idx: number; value: FieldLeafValue }[] };
-    edges: { writes: { idx: number; value: FillEdgeValue }[] };
+    segs: { writes: SpanWrite<FillSegValue>[] };
+    arcs: { writes: SpanWrite<FillArcValue>[] };
   };
   /** World fill draws, in band order (span fills and compiled fields mixed). */
   fillDraws: FillDraw[];
@@ -170,21 +185,25 @@ export function createAdapter(): Adapter {
   const strokePool = createSlotPool(4096);
   const circlePool = createSlotPool(512);
   const fillPool = createSlotPool(256);
-  const edgePool = createSlotPool(4096);
+  const fillSegPool = createSlotPool(MAX_FILL_SEGS);
+  const fillArcPool = createSlotPool(MAX_FILL_ARCS);
   const pointPool = createSlotPool(MAX_POINTS);
   const fieldQuadPool = createSlotPool(MAX_FIELD_QUADS);
   const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES);
-  const fieldEdgePool = createSlotPool(MAX_FIELD_EDGES);
+  const fieldSegPool = createSlotPool(MAX_FIELD_SEGS);
+  const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
   const lastStroke = new Map<object, Float64Array>();
   const lastCircle = new Map<object, Float64Array>();
   const lastFillRegion = new Map<object, Float64Array>();
-  const lastFillEdges = new Map<object, Float64Array>();
+  const lastFillSegs = new Map<object, Float64Array>();
+  const lastFillArcs = new Map<object, Float64Array>();
   const lastPoint = new Map<object, Float64Array>();
   const lastFieldQuad = new Map<object, Float64Array>();
   const lastFieldLeaf = new Map<object, Float64Array>();
-  const lastFieldEdge = new Map<object, Float64Array>();
+  const lastFieldSegs = new Map<object, Float64Array>();
+  const lastFieldArcs = new Map<object, Float64Array>();
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
@@ -220,11 +239,13 @@ export function createAdapter(): Adapter {
     strokePool.sync(present);
     circlePool.sync(present);
     fillPool.sync(present);
-    edgePool.sync(present);
+    fillSegPool.sync(present);
+    fillArcPool.sync(present);
     pointPool.sync(present);
     fieldQuadPool.sync(present);
     fieldLeafPool.sync(present);
-    fieldEdgePool.sync(present);
+    fieldSegPool.sync(present);
+    fieldArcPool.sync(present);
 
     const white = (n: TraceNode) => isHot(n, input.hoverId, input.selectedKey);
 
@@ -360,11 +381,13 @@ export function createAdapter(): Adapter {
     // --- two passes are drawn per node in band order (see `fillDraws`).
     const fillWrites: { idx: number; value: FillRegionValue }[] = [];
     const fillOrder: number[] = [];
-    const fillEdgeWrites: { idx: number; value: FillEdgeValue }[] = [];
+    const fillSegWrites: SpanWrite<FillSegValue>[] = [];
+    const fillArcWrites: SpanWrite<FillArcValue>[] = [];
     const fieldQuadWrites: { idx: number; value: FieldQuadValue }[] = [];
     const fieldOrder: number[] = [];
     const fieldLeafWrites: { idx: number; value: FieldLeafValue }[] = [];
-    const fieldEdgeWrites: { idx: number; value: FillEdgeValue }[] = [];
+    const fieldSegWrites: SpanWrite<FillSegValue>[] = [];
+    const fieldArcWrites: SpanWrite<FillArcValue>[] = [];
     const fillDraws: FillDraw[] = [];
     const visible = visibleWorldBox(cam, size);
 
@@ -384,7 +407,8 @@ export function createAdapter(): Adapter {
           2 / scale,
           fieldQuadWrites,
           fieldLeafWrites,
-          fieldEdgeWrites,
+          fieldSegWrites,
+          fieldArcWrites,
         );
         if (draw) {
           fieldOrder.push(draw.slot);
@@ -393,43 +417,51 @@ export function createAdapter(): Adapter {
         continue;
       }
       const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
-      if (geom.edges.length === 0) {
+      if (geom.spans.length === 0) {
         fillPool.alloc(n, 0);
-        edgePool.alloc(n, 0);
+        fillSegPool.alloc(n, 0);
+        fillArcPool.alloc(n, 0);
         continue;
       }
-      const edgeTotal = geom.edges.reduce((sum, block) => sum + block.length, 0);
-      const edgeStart = edgePool.alloc(n, edgeTotal);
-      const regionStart = fillPool.alloc(n, geom.edges.length);
-      if (edgeStart === undefined || regionStart === undefined) continue;
-      if (diff(lastFillEdges, n, encodeFillEdges(geom.edges.flat()))) {
-        let at = edgeStart;
-        for (const block of geom.edges) {
-          for (const e of block) {
-            fillEdgeWrites.push({ idx: at, value: toEdgeValue(e) });
-            at++;
-          }
-        }
+      // Blocks concatenate in order, so the per-island windows of one kind are
+      // contiguous runs: one pool allocation per kind, one write sequence.
+      const windows = blockWindows(geom.spans);
+      const segs = geom.spans.flatMap((block) => block.segs);
+      const arcs = geom.spans.flatMap((block) => block.arcs);
+      const segStart = fillSegPool.alloc(n, segs.length);
+      const arcStart = fillArcPool.alloc(n, arcs.length);
+      const regionStart = fillPool.alloc(n, geom.spans.length);
+      if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
+      if (diff(lastFillSegs, n, encodeSpanSegs(segs))) {
+        pushSegWrites(fillSegWrites, segStart, segs);
       }
-      if (diff(lastFillRegion, n, encodeFillRegions(geom, color, alpha, edgeStart))) {
-        geom.bounds.forEach((bounds, i) =>
+      if (diff(lastFillArcs, n, encodeSpanArcs(arcs))) {
+        pushArcWrites(fillArcWrites, arcStart, arcs);
+      }
+      if (
+        diff(lastFillRegion, n, encodeFillRegions(geom, windows, segStart, arcStart, color, alpha))
+      ) {
+        geom.bounds.forEach((bounds, i) => {
+          const w = windows[i]!;
           fillWrites.push({
             idx: regionStart + i,
             value: FillRegion({
               aabbMin: vec2f(bounds.min.x, bounds.min.y),
               aabbMax: vec2f(bounds.max.x, bounds.max.y),
-              edgeOffset: edgeStart + blockOffset(geom.edges, i),
-              edgeCount: geom.edges[i]!.length,
+              segOffset: segStart + w.segOffset,
+              segCount: w.segCount,
+              arcOffset: arcStart + w.arcOffset,
+              arcCount: w.arcCount,
               color: vec3f(color[0], color[1], color[2]),
               alpha,
               flags: 0,
             }),
-          }),
-        );
+          });
+        });
       }
       const first = fillOrder.length;
-      for (let i = 0; i < geom.edges.length; i++) fillOrder.push(regionStart + i);
-      fillDraws.push({ path: "spans", first, count: geom.edges.length });
+      for (let i = 0; i < geom.spans.length; i++) fillOrder.push(regionStart + i);
+      fillDraws.push({ path: "spans", first, count: geom.spans.length });
     }
 
     // --- points (SVG PointMark passes: rest dots, hover halo, hover dot,
@@ -505,7 +537,8 @@ export function createAdapter(): Adapter {
         order: Uint32Array.from(fillOrder),
         count: fillOrder.length,
       },
-      fillEdges: { writes: fillEdgeWrites },
+      fillSegs: { writes: fillSegWrites },
+      fillArcs: { writes: fillArcWrites },
       fields: {
         quads: {
           writes: fieldQuadWrites,
@@ -513,7 +546,8 @@ export function createAdapter(): Adapter {
           count: fieldOrder.length,
         },
         leaves: { writes: fieldLeafWrites },
-        edges: { writes: fieldEdgeWrites },
+        segs: { writes: fieldSegWrites },
+        arcs: { writes: fieldArcWrites },
       },
       fillDraws,
       points: {
@@ -527,10 +561,12 @@ export function createAdapter(): Adapter {
           strokeWrites.length +
           circleWrites.length +
           fillWrites.length +
-          fillEdgeWrites.length +
+          fillSegWrites.length +
+          fillArcWrites.length +
           fieldQuadWrites.length +
           fieldLeafWrites.length +
-          fieldEdgeWrites.length +
+          fieldSegWrites.length +
+          fieldArcWrites.length +
           pointWrites.length +
           overlay.under.strokes.length +
           overlay.under.circles.length +
@@ -544,11 +580,13 @@ export function createAdapter(): Adapter {
           strokePool.used +
           circlePool.used +
           fillPool.used +
-          edgePool.used +
+          fillSegPool.used +
+          fillArcPool.used +
           pointPool.used +
           fieldQuadPool.used +
           fieldLeafPool.used +
-          fieldEdgePool.used,
+          fieldSegPool.used +
+          fieldArcPool.used,
       },
     };
   }
@@ -565,7 +603,8 @@ export function createAdapter(): Adapter {
     pad: number,
     quadWrites: { idx: number; value: FieldQuadValue }[],
     leafWrites: { idx: number; value: FieldLeafValue }[],
-    edgeWrites: { idx: number; value: FillEdgeValue }[],
+    segWrites: SpanWrite<FillSegValue>[],
+    arcWrites: SpanWrite<FillArcValue>[],
   ): { slot: number } | undefined {
     const instance = buildFieldInstance(plan);
     // The superset box (a half-plane makes it unbounded) clipped to the pane and
@@ -574,31 +613,44 @@ export function createAdapter(): Adapter {
     if (!box) {
       fieldQuadPool.alloc(n, 0);
       fieldLeafPool.alloc(n, 0);
-      fieldEdgePool.alloc(n, 0);
+      fieldSegPool.alloc(n, 0);
+      fieldArcPool.alloc(n, 0);
       return undefined;
     }
     const leafStart = fieldLeafPool.alloc(n, instance.leaves.length);
-    const edgeStart = fieldEdgePool.alloc(n, instance.spans.length);
+    const segStart = fieldSegPool.alloc(n, instance.spans.segs.length);
+    const arcStart = fieldArcPool.alloc(n, instance.spans.arcs.length);
     const slot = fieldQuadPool.alloc(n, 1);
-    if (leafStart === undefined || edgeStart === undefined || slot === undefined) return undefined;
+    if (
+      leafStart === undefined ||
+      segStart === undefined ||
+      arcStart === undefined ||
+      slot === undefined
+    ) {
+      return undefined;
+    }
     const leaves = instance.leaves.map((leaf) =>
       FieldLeaf({
         a: vec2f(leaf.a.x, leaf.a.y),
         b: vec2f(leaf.b.x, leaf.b.y),
         r: leaf.r,
-        // Span windows are rebased onto the shared edge array; the diff below
-        // rewrites them when the pool moves the run.
-        spanOffset: edgeStart + leaf.spanOffset,
-        spanCount: leaf.spanCount,
+        // Span windows are rebased onto the shared arrays; the diff below
+        // rewrites them when the pools move the runs.
+        segOffset: segStart + leaf.segOffset,
+        segCount: leaf.segCount,
+        arcOffset: arcStart + leaf.arcOffset,
+        arcCount: leaf.arcCount,
       }),
     );
     if (diff(lastFieldLeaf, n, encodeFieldLeaves(leaves))) {
       leaves.forEach((value, i) => leafWrites.push({ idx: leafStart + i, value }));
     }
-    if (instance.spans.length > 0 && diff(lastFieldEdge, n, encodeFillEdges(instance.spans))) {
-      instance.spans.forEach((e, i) =>
-        edgeWrites.push({ idx: edgeStart + i, value: toEdgeValue(e) }),
-      );
+    const { segs, arcs } = instance.spans;
+    if (segs.length > 0 && diff(lastFieldSegs, n, encodeSpanSegs(segs))) {
+      pushSegWrites(segWrites, segStart, segs);
+    }
+    if (arcs.length > 0 && diff(lastFieldArcs, n, encodeSpanArcs(arcs))) {
+      pushArcWrites(arcWrites, arcStart, arcs);
     }
     const quad = FieldQuad({
       aabbMin: vec2f(box.min.x, box.min.y),
@@ -615,19 +667,23 @@ export function createAdapter(): Adapter {
     lastStroke.clear();
     lastCircle.clear();
     lastFillRegion.clear();
-    lastFillEdges.clear();
+    lastFillSegs.clear();
+    lastFillArcs.clear();
     lastPoint.clear();
     lastFieldQuad.clear();
     lastFieldLeaf.clear();
-    lastFieldEdge.clear();
+    lastFieldSegs.clear();
+    lastFieldArcs.clear();
     strokePool.reset();
     circlePool.reset();
     fillPool.reset();
-    edgePool.reset();
+    fillSegPool.reset();
+    fillArcPool.reset();
     pointPool.reset();
     fieldQuadPool.reset();
     fieldLeafPool.reset();
-    fieldEdgePool.reset();
+    fieldSegPool.reset();
+    fieldArcPool.reset();
   }
 
   return { tick, destroy };
@@ -950,40 +1006,47 @@ function encodeFieldQuad(q: FieldQuadValue): Float64Array {
   );
 }
 
-/** Byte-encoded leaf records for the change check (a, b, r, span window). */
+/** Byte-encoded leaf records for the change check (a, b, r, span windows). */
 function encodeFieldLeaves(leaves: readonly FieldLeafValue[]): Float64Array {
-  const f = new Float64Array(leaves.length * 7);
+  const f = new Float64Array(leaves.length * 9);
   for (let i = 0; i < leaves.length; i++) {
     const leaf = leaves[i]!;
-    let j = i * 7;
+    let j = i * 9;
     f[j++] = leaf.a.x;
     f[j++] = leaf.a.y;
     f[j++] = leaf.b.x;
     f[j++] = leaf.b.y;
     f[j++] = leaf.r;
-    f[j++] = leaf.spanOffset;
-    f[j] = leaf.spanCount;
+    f[j++] = leaf.segOffset;
+    f[j++] = leaf.segCount;
+    f[j++] = leaf.arcOffset;
+    f[j] = leaf.arcCount;
   }
   return f;
 }
 
-/** Byte-encoded fill regions for the change check: AABB, edge window, color. */
+/** Byte-encoded fill regions for the change check: AABB, both span windows, color. */
 function encodeFillRegions(
   geom: IslandGeom,
+  windows: readonly SpanWindow[],
+  segStart: number,
+  arcStart: number,
   color: Rgb,
   alpha: number,
-  edgeStart: number,
 ): Float64Array {
-  const f = new Float64Array(geom.edges.length * 11);
-  for (let i = 0; i < geom.edges.length; i++) {
+  const f = new Float64Array(geom.spans.length * 13);
+  for (let i = 0; i < geom.spans.length; i++) {
     const b = geom.bounds[i]!;
-    let j = i * 11;
+    const w = windows[i]!;
+    let j = i * 13;
     f[j++] = b.min.x;
     f[j++] = b.min.y;
     f[j++] = b.max.x;
     f[j++] = b.max.y;
-    f[j++] = edgeStart + blockOffset(geom.edges, i);
-    f[j++] = geom.edges[i]!.length;
+    f[j++] = segStart + w.segOffset;
+    f[j++] = w.segCount;
+    f[j++] = arcStart + w.arcOffset;
+    f[j++] = w.arcCount;
     f[j++] = color[0];
     f[j++] = color[1];
     f[j++] = color[2];
@@ -993,21 +1056,25 @@ function encodeFillRegions(
   return f;
 }
 
-/** Plain span → GPU struct (the shared span builder works in `#geom` types). */
-function toEdgeValue(e: SpanEdge): FillEdgeValue {
-  return FillEdge({
-    a: vec2f(e.a.x, e.a.y),
-    b: vec2f(e.b.x, e.b.y),
-    center: vec2f(e.center.x, e.center.y),
-    radius: e.radius,
-    span: e.span,
-  });
+/** Byte-encoded segment records (a, b) — half the doubles the old combined
+ * `FillEdge` encode walked, since a segment has no carrier to compare. */
+function encodeSpanSegs(segs: readonly SpanSeg[]): Float64Array {
+  const f = new Float64Array(segs.length * 4);
+  for (let i = 0; i < segs.length; i++) {
+    const e = segs[i]!;
+    let j = i * 4;
+    f[j++] = e.a.x;
+    f[j++] = e.a.y;
+    f[j++] = e.b.x;
+    f[j] = e.b.y;
+  }
+  return f;
 }
 
-function encodeFillEdges(edges: readonly SpanEdge[]): Float64Array {
-  const f = new Float64Array(edges.length * 8);
-  for (let i = 0; i < edges.length; i++) {
-    const e = edges[i]!;
+function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
+  const f = new Float64Array(arcs.length * 8);
+  for (let i = 0; i < arcs.length; i++) {
+    const e = arcs[i]!;
     let j = i * 8;
     f[j++] = e.a.x;
     f[j++] = e.a.y;

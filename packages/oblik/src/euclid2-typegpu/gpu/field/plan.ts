@@ -2,7 +2,15 @@ import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Region, Vec2 } from "
 import { lineBasis } from "#geom/ops";
 import { mul, perp } from "#geom/vec";
 
-import { islandSpans, type Box, type SpanEdge } from "../fillSpans";
+import {
+  emptySpans,
+  growSpanBox,
+  islandSpans,
+  newBox,
+  type Box,
+  type SpanSet,
+  type SpanWindow,
+} from "../fillSpans";
 
 /**
  * A compiled CSG field: the tree *shape* is baked into the shader, every number
@@ -36,22 +44,22 @@ export type FieldPlan = {
 };
 
 /** One leaf's parameters, exactly as the GPU stores them. */
-export type FieldLeafData = {
+export type FieldLeafData = SpanWindow & {
   /** Circle centre | half-plane origin. */
   a: Vec2;
   /** Half-plane inside normal (`perp(dir) · −side`); unused otherwise. */
   b: Vec2;
   /** Circle radius | offset distance. */
   r: number;
-  spanOffset: number;
-  spanCount: number;
 };
 
-/** The data behind one compiled field: leaf records plus the span array that
- * `spans` leaves window into — the same two buffers the adapter writes. */
-export type FieldInstance = { leaves: FieldLeafData[]; spans: SpanEdge[] };
+/** The data behind one compiled field: leaf records plus the split span arrays
+ * `spans` leaves window into — the same buffers the adapter writes. */
+export type FieldInstance = { leaves: FieldLeafData[]; spans: SpanSet };
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+/** Scalar leaves (no `spans` window) read nothing from the span arrays. */
+const NO_SPANS: SpanWindow = { segOffset: 0, segCount: 0, arcOffset: 0, arcCount: 0 };
 
 /** Plan a fill tree for GPU evaluation. `undefined` when the tree holds
  * anything that is not a single scalar field — a `pick` (island-restricted), a
@@ -110,34 +118,32 @@ function addLeaf(leaves: FieldLeafPlan[], leaf: FieldLeafPlan): FieldNodePlan {
 
 /** Leaf data for a plan — the CPU twin of what the adapter uploads. */
 export function buildFieldInstance(plan: FieldPlan): FieldInstance {
-  const spans: SpanEdge[] = [];
+  const spans = emptySpans();
   const leaves = plan.leaves.map((leaf): FieldLeafData => {
     if (leaf.kind === "spans") {
       const block = islandSpans(leaf.operand);
-      const spanOffset = spans.length;
-      spans.push(...block);
-      return { a: ORIGIN, b: ORIGIN, r: 0, spanOffset, spanCount: block.length };
+      const segOffset = spans.segs.length;
+      const arcOffset = spans.arcs.length;
+      spans.segs.push(...block.segs);
+      spans.arcs.push(...block.arcs);
+      return {
+        a: ORIGIN,
+        b: ORIGIN,
+        r: 0,
+        segOffset,
+        segCount: block.segs.length,
+        arcOffset,
+        arcCount: block.arcs.length,
+      };
     }
     if (leaf.kind === "circle") {
-      return {
-        a: leaf.operand.center,
-        b: ORIGIN,
-        r: Math.abs(leaf.operand.radius),
-        spanOffset: 0,
-        spanCount: 0,
-      };
+      return { a: leaf.operand.center, b: ORIGIN, r: Math.abs(leaf.operand.radius), ...NO_SPANS };
     }
     if (leaf.kind === "halfPlane") {
       const { origin, dir } = lineBasis(leaf.operand.line);
-      return {
-        a: origin,
-        b: mul(perp(dir), -leaf.operand.side),
-        r: 0,
-        spanOffset: 0,
-        spanCount: 0,
-      };
+      return { a: origin, b: mul(perp(dir), -leaf.operand.side), r: 0, ...NO_SPANS };
     }
-    return { a: ORIGIN, b: ORIGIN, r: leaf.operand.d, spanOffset: 0, spanCount: 0 };
+    return { a: ORIGIN, b: ORIGIN, r: leaf.operand.d, ...NO_SPANS };
   });
   return { leaves, spans };
 }
@@ -166,7 +172,7 @@ function nodeBox(node: FieldNodePlan, plan: FieldPlan, inst: FieldInstance): Box
   return box ?? UNBOUNDED;
 }
 
-function leafBox(leaf: FieldLeafPlan, data: FieldLeafData, spans: readonly SpanEdge[]): Box {
+function leafBox(leaf: FieldLeafPlan, data: FieldLeafData, spans: SpanSet): Box {
   if (leaf.kind === "halfPlane") return UNBOUNDED;
   if (leaf.kind === "circle") {
     const r = data.r;
@@ -175,32 +181,15 @@ function leafBox(leaf: FieldLeafPlan, data: FieldLeafData, spans: readonly SpanE
       max: { x: data.a.x + r, y: data.a.y + r },
     };
   }
-  let box: Box | undefined;
-  for (let i = 0; i < data.spanCount; i++) {
-    box = unionBox(box, spanBox(spans[data.spanOffset + i]!));
-  }
-  return box ?? EMPTY;
+  const box = newBox();
+  growSpanBox(box, spans, data);
+  return box;
 }
 
 const UNBOUNDED: Box = {
   min: { x: -Infinity, y: -Infinity },
   max: { x: Infinity, y: Infinity },
 };
-const EMPTY: Box = { min: { x: Infinity, y: Infinity }, max: { x: -Infinity, y: -Infinity } };
-
-function spanBox(e: SpanEdge): Box {
-  const box: Box = {
-    min: { x: Math.min(e.a.x, e.b.x), y: Math.min(e.a.y, e.b.y) },
-    max: { x: Math.max(e.a.x, e.b.x), y: Math.max(e.a.y, e.b.y) },
-  };
-  if (e.radius > 0) {
-    box.min.x = Math.min(box.min.x, e.center.x - e.radius);
-    box.min.y = Math.min(box.min.y, e.center.y - e.radius);
-    box.max.x = Math.max(box.max.x, e.center.x + e.radius);
-    box.max.y = Math.max(box.max.y, e.center.y + e.radius);
-  }
-  return box;
-}
 
 function unionBox(a: Box | undefined, b: Box): Box {
   if (!a) return b;
