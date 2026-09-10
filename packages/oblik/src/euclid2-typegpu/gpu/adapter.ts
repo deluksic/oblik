@@ -169,8 +169,19 @@ export type Adapter = {
 /** Fill geometry for one node: edge blocks (one per island) plus the island
  * AABB quad each block is drawn in. */
 
+/**
+ * Stable identity of a trace node across ticks: the same `id:occ` the reuse pass
+ * matches on (`reuse-trace.ts`). Pools and byte diffs are keyed by this, not by
+ * the node object — a node whose value changed comes back as a *new* object, and
+ * keying on it would re-upload everything the node owns: rotating a gear rewrote
+ * 106 of the scene's 128 records when only 10 of them had actually changed.
+ */
+function nodeKey(n: TraceNode): string {
+  return `${n.id}:${n.occ}`;
+}
+
 /** Track the last uploaded payload per key; true when the bytes changed. */
-function diff(map: Map<object, Float64Array>, key: object, next: Float64Array): boolean {
+function diff(map: Map<string, Float64Array>, key: string, next: Float64Array): boolean {
   const prev = map.get(key);
   if (prev && prev.length === next.length) {
     let same = true;
@@ -199,16 +210,16 @@ export function createAdapter(): Adapter {
   const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
-  const lastStroke = new Map<object, Float64Array>();
-  const lastCircle = new Map<object, Float64Array>();
-  const lastFillRegion = new Map<object, Float64Array>();
-  const lastFillSegs = new Map<object, Float64Array>();
-  const lastFillArcs = new Map<object, Float64Array>();
-  const lastPoint = new Map<object, Float64Array>();
-  const lastFieldQuad = new Map<object, Float64Array>();
-  const lastFieldLeaf = new Map<object, Float64Array>();
-  const lastFieldSegs = new Map<object, Float64Array>();
-  const lastFieldArcs = new Map<object, Float64Array>();
+  const lastStroke = new Map<string, Float64Array>();
+  const lastCircle = new Map<string, Float64Array>();
+  const lastFillRegion = new Map<string, Float64Array>();
+  const lastFillSegs = new Map<string, Float64Array>();
+  const lastFillArcs = new Map<string, Float64Array>();
+  const lastPoint = new Map<string, Float64Array>();
+  const lastFieldQuad = new Map<string, Float64Array>();
+  const lastFieldLeaf = new Map<string, Float64Array>();
+  const lastFieldSegs = new Map<string, Float64Array>();
+  const lastFieldArcs = new Map<string, Float64Array>();
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
@@ -241,7 +252,7 @@ export function createAdapter(): Adapter {
     );
     // Mirrors the SVG view's `points()` memo: point nodes and gliders, never sliders.
     const points = finite.filter((n) => n.kind === "point" || isGlider(n.value));
-    const present = new Set<object>([...ink, ...fills, ...points]);
+    const present = new Set<string>([...ink, ...fills, ...points].map(nodeKey));
     strokePool.sync(present);
     circlePool.sync(present);
     fillPool.sync(present);
@@ -287,7 +298,7 @@ export function createAdapter(): Adapter {
     const edgeWidthPx = strokePx;
 
     const emitStrokeLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
-      const start = strokePool.alloc(n, INK_DISC_COUNT);
+      const start = strokePool.alloc(nodeKey(n), INK_DISC_COUNT);
       if (start === undefined) return;
       const hot = white(n);
       const selected = isSelected(n, input.selectedKey);
@@ -304,7 +315,7 @@ export function createAdapter(): Adapter {
         input.muted(n) && !hot,
       );
       if (!discs) return;
-      if (diff(lastStroke, n, encodeStrokes(discs))) {
+      if (diff(lastStroke, nodeKey(n), encodeStrokes(discs))) {
         for (let i = 0; i < INK_DISC_COUNT; i++) {
           strokeWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -314,7 +325,7 @@ export function createAdapter(): Adapter {
       }
     };
     const emitCircleLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
-      const start = circlePool.alloc(n, INK_DISC_COUNT);
+      const start = circlePool.alloc(nodeKey(n), INK_DISC_COUNT);
       if (start === undefined) return;
       const hot = white(n);
       const selected = isSelected(n, input.selectedKey);
@@ -328,7 +339,7 @@ export function createAdapter(): Adapter {
         selected,
         input.muted(n) && !hot,
       );
-      if (diff(lastCircle, n, encodeCircles(discs))) {
+      if (diff(lastCircle, nodeKey(n), encodeCircles(discs))) {
         for (let i = 0; i < INK_DISC_COUNT; i++) {
           circleWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -452,9 +463,9 @@ export function createAdapter(): Adapter {
         // the shader) is world geometry the camera cannot move.
         const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand);
         if (geom.spans.length === 0) {
-          fillPool.alloc(n, 0);
-          fillSegPool.alloc(n, 0);
-          fillArcPool.alloc(n, 0);
+          fillPool.alloc(nodeKey(n), 0);
+          fillSegPool.alloc(nodeKey(n), 0);
+          fillArcPool.alloc(nodeKey(n), 0);
           continue;
         }
         // Blocks concatenate in order, so the per-island windows of one kind are
@@ -462,20 +473,20 @@ export function createAdapter(): Adapter {
         const windows = blockWindows(geom.spans);
         const segs = geom.spans.flatMap((block) => block.segs);
         const arcs = geom.spans.flatMap((block) => block.arcs);
-        const segStart = fillSegPool.alloc(n, segs.length);
-        const arcStart = fillArcPool.alloc(n, arcs.length);
-        const regionStart = fillPool.alloc(n, geom.spans.length);
+        const segStart = fillSegPool.alloc(nodeKey(n), segs.length);
+        const arcStart = fillArcPool.alloc(nodeKey(n), arcs.length);
+        const regionStart = fillPool.alloc(nodeKey(n), geom.spans.length);
         if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
-        if (diff(lastFillSegs, n, encodeSpanSegs(segs))) {
+        if (diff(lastFillSegs, nodeKey(n), encodeSpanSegs(segs))) {
           pushSegWrites(fillSegWrites, segStart, segs);
         }
-        if (diff(lastFillArcs, n, encodeSpanArcs(arcs))) {
+        if (diff(lastFillArcs, nodeKey(n), encodeSpanArcs(arcs))) {
           pushArcWrites(fillArcWrites, arcStart, arcs);
         }
         if (
           diff(
             lastFillRegion,
-            n,
+            nodeKey(n),
             encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, edge, halo),
           )
         ) {
@@ -526,7 +537,7 @@ export function createAdapter(): Adapter {
     /** Allocate a node's 4 disc slots, write changed discs, and queue the
      * back-to-front subset `layers` (only active discs reach the order). */
     const emitPointLayers = (n: TraceNode, layers: readonly number[]) => {
-      const start = pointPool.alloc(n, POINT_DISC_COUNT);
+      const start = pointPool.alloc(nodeKey(n), POINT_DISC_COUNT);
       if (start === undefined) return;
       const discs = pointDiscsOf(
         n,
@@ -535,7 +546,7 @@ export function createAdapter(): Adapter {
         isSelected(n, input.selectedKey),
         input.muted(n) && !isHot(n, input.hoverId, input.selectedKey),
       );
-      if (diff(lastPoint, n, encodePoints(discs))) {
+      if (diff(lastPoint, nodeKey(n), encodePoints(discs))) {
         for (let i = 0; i < POINT_DISC_COUNT; i++) {
           pointWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -666,16 +677,16 @@ export function createAdapter(): Adapter {
     const raw = fieldBox(plan, instance);
     const box = Number.isFinite(raw.min.x) ? raw : clipBox(raw, visible);
     if (!box || !overlaps(box, visible)) {
-      fieldQuadPool.alloc(n, 0);
-      fieldLeafPool.alloc(n, 0);
-      fieldSegPool.alloc(n, 0);
-      fieldArcPool.alloc(n, 0);
+      fieldQuadPool.alloc(nodeKey(n), 0);
+      fieldLeafPool.alloc(nodeKey(n), 0);
+      fieldSegPool.alloc(nodeKey(n), 0);
+      fieldArcPool.alloc(nodeKey(n), 0);
       return undefined;
     }
-    const leafStart = fieldLeafPool.alloc(n, instance.leaves.length);
-    const segStart = fieldSegPool.alloc(n, instance.spans.segs.length);
-    const arcStart = fieldArcPool.alloc(n, instance.spans.arcs.length);
-    const slot = fieldQuadPool.alloc(n, 1);
+    const leafStart = fieldLeafPool.alloc(nodeKey(n), instance.leaves.length);
+    const segStart = fieldSegPool.alloc(nodeKey(n), instance.spans.segs.length);
+    const arcStart = fieldArcPool.alloc(nodeKey(n), instance.spans.arcs.length);
+    const slot = fieldQuadPool.alloc(nodeKey(n), 1);
     if (
       leafStart === undefined ||
       segStart === undefined ||
@@ -697,14 +708,14 @@ export function createAdapter(): Adapter {
         arcCount: leaf.arcCount,
       }),
     );
-    if (diff(lastFieldLeaf, n, encodeFieldLeaves(leaves))) {
+    if (diff(lastFieldLeaf, nodeKey(n), encodeFieldLeaves(leaves))) {
       leaves.forEach((value, i) => leafWrites.push({ idx: leafStart + i, value }));
     }
     const { segs, arcs } = instance.spans;
-    if (segs.length > 0 && diff(lastFieldSegs, n, encodeSpanSegs(segs))) {
+    if (segs.length > 0 && diff(lastFieldSegs, nodeKey(n), encodeSpanSegs(segs))) {
       pushSegWrites(segWrites, segStart, segs);
     }
-    if (arcs.length > 0 && diff(lastFieldArcs, n, encodeSpanArcs(arcs))) {
+    if (arcs.length > 0 && diff(lastFieldArcs, nodeKey(n), encodeSpanArcs(arcs))) {
       pushArcWrites(arcWrites, arcStart, arcs);
     }
     const quad = FieldQuad({
@@ -719,7 +730,8 @@ export function createAdapter(): Adapter {
       haloKnock: halo.knock,
       haloHalfPx: halo.halfPx,
     });
-    if (diff(lastFieldQuad, n, encodeFieldQuad(quad))) quadWrites.push({ idx: slot, value: quad });
+    if (diff(lastFieldQuad, nodeKey(n), encodeFieldQuad(quad)))
+      quadWrites.push({ idx: slot, value: quad });
     return { slot };
   }
 

@@ -224,12 +224,23 @@ describe("adapter fill routing", () => {
     expect(moved.fields.segs.writes).toHaveLength(0);
   });
 
-  test("a fresh node identity re-uploads its field", () => {
+  test("slots are keyed by the node, not by the object it arrives in", () => {
     const adapter = createAdapter();
     adapter.tick(input([csgNode("o_csg")]));
+    // Eval hands over a *fresh* node object every tick — the reuse pass only
+    // keeps the old one when the drawn value is unchanged — so keying on the
+    // object would re-upload everything a node owns on every edit (rotating the
+    // demo's gear cost 106 of its 128 records that way, 10 of which had moved).
     const again = adapter.tick(input([csgNode("o_csg")]));
-    expect(again.fields.quads.writes).toHaveLength(1);
-    expect(again.fields.leaves.writes).toHaveLength(2);
+    expect(again.fields.quads.writes).toHaveLength(0);
+    expect(again.fields.leaves.writes).toHaveLength(0);
+    expect(again.stats.written).toBe(0);
+    // The same key with new numbers: that node's payload, and nothing else.
+    const moved = adapter.tick(input([csgNode("o_csg", 1.5)]));
+    expect(moved.fields.quads.writes).toHaveLength(1);
+    expect(moved.fields.leaves.writes).toHaveLength(2);
+    expect(moved.fields.segs.writes).toHaveLength(0);
+    expect(moved.stats.total).toBe(again.stats.total);
   });
 
   test("an off-screen field is culled; hideFills drops every draw", () => {
