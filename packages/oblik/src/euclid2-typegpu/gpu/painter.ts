@@ -514,14 +514,17 @@ export function createPainter(opts: {
         underCircles.circles(pass).draw(CIRCLE_VERTEX_COUNT, underCircleCount);
       }
       // World fills, in the band order the adapter emitted: each node is one
-      // draw (a compiled field and a span fill are different pipelines), which
-      // keeps translucent overlap compositing in SVG order.
+      // draw per layer (halo chrome under its own paint) and a compiled field
+      // and a span fill are different pipelines — which keeps translucent
+      // overlap compositing in SVG order.
       for (const draw of fillDraws) {
         if (draw.count === 0) continue;
+        const halo = draw.layer === "halo";
         if (draw.path === "spans") {
-          fills.fills(pass).draw(FILL_QUAD_VERTICES, draw.count, 0, draw.first);
+          const pipeline = halo ? fills.halos(pass) : fills.fills(pass);
+          pipeline.draw(FILL_QUAD_VERTICES, draw.count, 0, draw.first);
         } else {
-          fieldPipeline(root, fieldGroup, draw.plan, opts.format, MSAA_SAMPLES)
+          fieldPipeline(root, fieldGroup, draw.plan, opts.format, MSAA_SAMPLES, draw.layer)
             .with(pass)
             .draw(FIELD_QUAD_VERTICES, draw.count, 0, draw.first);
         }

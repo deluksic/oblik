@@ -90,10 +90,13 @@ describe("adapter fill routing", () => {
     const trace = [csgNode("o_csg", 0, "pac"), node("o_poly", polygonValue(), "shell")];
     const patch = createAdapter().tick(input(trace));
 
-    expect(patch.fillDraws.map((d) => d.path)).toEqual(["field", "spans"]);
+    expect(patch.fillDraws.map((d) => `${d.path}:${d.layer}`)).toEqual([
+      "field:paint",
+      "spans:paint",
+    ]);
     const [field, spans] = patch.fillDraws;
     expect(field?.path === "field" && field.plan.shape).toBe("diff(circle,region)");
-    expect(spans).toEqual({ path: "spans", first: 0, count: 1 });
+    expect(spans).toEqual({ path: "spans", layer: "paint", first: 0, count: 1 });
 
     // One quad, two leaves (circle + region spans), four straight spans — and
     // no arc record at all: the split keeps the segment array branch-free.
@@ -245,5 +248,70 @@ describe("adapter fill routing", () => {
     const patch = createAdapter().tick(input([pick]));
     expect(patch.fillDraws.map((d) => d.path)).toEqual(["spans"]);
     expect(patch.fields.quads.writes).toHaveLength(0);
+  });
+});
+
+/** CSS px → world units, the chrome convention (see `docs/chrome.md`). */
+const world = (px: number) => px / CAM.scale;
+
+describe("fill halo chrome", () => {
+  test("a hot fill draws its halo under its own paint, cold ones do not", () => {
+    const trace = [csgNode("o_csg", 0, "pac")];
+    const cold = createAdapter().tick(input(trace));
+    expect(cold.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
+    const coldQuad = cold.fields.quads.writes[0]!.value;
+    expect(coldQuad.haloRing.w).toBe(0);
+    expect(coldQuad.haloHalf.x).toBe(0);
+
+    // Hover: the accent outline alone, 7px wide from the fill's edge inward
+    // (half = 3.5px), at 50%, and no paper knockout — driven straight off the
+    // ink chrome's band widths. The halo draws *after* the paint: it knocks the
+    // fill out rather than being washed by it.
+    const hovered = createAdapter().tick(input(trace, { hoverId: "o_csg" }));
+    expect(hovered.fillDraws.map((d) => `${d.path}:${d.layer}`)).toEqual([
+      "field:paint",
+      "field:halo",
+    ]);
+    // Both runs are the node's one quad slot, so the halo costs no extra state.
+    expect(hovered.fillDraws.map((d) => d.first)).toEqual([0, 0]);
+    const hoverQuad = hovered.fields.quads.writes[0]!.value;
+    expect([hoverQuad.haloRing.x, hoverQuad.haloRing.y, hoverQuad.haloRing.z]).toEqual([
+      ...COLORS.ring,
+    ]);
+    expect(hoverQuad.haloRing.w).toBeCloseTo(0.5, 6);
+    expect(hoverQuad.haloKnock.w).toBe(0);
+    expect(hoverQuad.haloHalf.x).toBe(0);
+    expect(hoverQuad.haloHalf.y).toBeCloseTo(world(3.5), 6);
+
+    // Selected: the same outline opaque, plus the 2px paper knockout band just
+    // inside it.
+    const selected = createAdapter().tick(input(trace, { selectedKey: "o_csg:0" }));
+    expect(selected.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
+    const liftedQuad = selected.fields.quads.writes[0]!.value;
+    expect(liftedQuad.haloRing.w).toBe(1);
+    expect([liftedQuad.haloKnock.x, liftedQuad.haloKnock.y, liftedQuad.haloKnock.z]).toEqual([
+      ...COLORS.paper,
+    ]);
+    expect(liftedQuad.haloKnock.w).toBe(1);
+    expect(liftedQuad.haloHalf.x).toBeCloseTo(world(2), 6);
+    expect(liftedQuad.haloHalf.y).toBeCloseTo(world(3.5), 6);
+  });
+
+  test("the span path carries the same halo fields per island", () => {
+    const hovered = createAdapter().tick(
+      input([node("o_poly", polygonValue(), "shell")], { hoverId: "o_poly" }),
+    );
+    expect(hovered.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
+    const region = hovered.fills.writes[0]!.value;
+    expect(region.haloRing.w).toBeCloseTo(0.5, 6);
+    expect(region.haloHalf.y).toBeCloseTo(world(3.5), 6);
+  });
+
+  test("dragging drops the halo and keeps the paint", () => {
+    const patch = createAdapter().tick(
+      input([csgNode("o_csg", 0, "pac")], { hoverId: "o_csg", showHalos: false }),
+    );
+    expect(patch.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
+    expect(patch.fields.quads.writes[0]!.value.haloRing.w).toBe(0);
   });
 });

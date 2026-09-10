@@ -1,4 +1,4 @@
-import { vec2f, vec3f } from "typegpu/data";
+import { vec2f, vec3f, vec4f } from "typegpu/data";
 
 import type { TraceNode } from "#eval/context";
 import type { Circle, LoopEdge, Vec2 } from "#geom";
@@ -291,6 +291,10 @@ function pushFillIsland(
       color: rgbv(color),
       alpha,
       flags: 0,
+      // Ghost previews are never hot, so they never carry chrome.
+      haloRing: vec4f(0, 0, 0, 0),
+      haloKnock: vec4f(0, 0, 0, 0),
+      haloHalf: vec2f(0, 0),
     }),
   );
 }

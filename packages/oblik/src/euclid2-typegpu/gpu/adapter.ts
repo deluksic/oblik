@@ -1,4 +1,5 @@
-import { vec2f, vec3f } from "typegpu/data";
+import { vec2f, vec3f, vec4f } from "typegpu/data";
+import type { v2f, v4f } from "typegpu/data";
 
 import type { TraceNode } from "#eval/context";
 import type { Circle, CsgOperand, Polygon, Region, Vec2 } from "#geom";
@@ -125,12 +126,16 @@ export type InkBands = {
   liftedPaint: Uint32Array;
 };
 
-/** One world fill draw. Fills are translucent, so paint order is the SVG's
- * band order; a compiled field and a span fill are different pipelines, so the
- * adapter emits a run per node and the painter plays them in that order. */
+/** One world fill draw: a node's fill or its halo chrome. Fills are
+ * translucent, so paint order is the SVG's band order; a compiled field and a
+ * span fill are different pipelines, so the adapter emits a run per node — and
+ * per layer, halo before paint — and the painter plays them in that order. */
 export type FillDraw =
-  | { path: "spans"; first: number; count: number }
-  | { path: "field"; first: number; count: number; plan: FieldPlan };
+  | { path: "spans"; layer: FillLayer; first: number; count: number }
+  | { path: "field"; layer: FillLayer; first: number; count: number; plan: FieldPlan };
+
+/** Which fragment draws a fill run. */
+export type FillLayer = "paint" | "halo";
 
 export type TickPatch = {
   strokes: { writes: { idx: number; value: StrokeDrawValue }[]; bands: InkBands };
@@ -378,7 +383,9 @@ export function createAdapter(): Adapter {
     // --- single scalar fields is drawn by the compiled-field pass (no island
     // --- resolution, exact arcs, data-only uploads); everything else — regions,
     // --- polygons, picks — keeps the span pass. Fills are translucent, so the
-    // --- two passes are drawn per node in band order (see `fillDraws`).
+    // --- two passes are drawn per node in band order (see `fillDraws`), and a
+    // --- hot node's halo run is queued *after* its paint run: the halo band
+    // --- knocks the fill out rather than being washed by it.
     const fillWrites: { idx: number; value: FillRegionValue }[] = [];
     const fillOrder: number[] = [];
     const fillSegWrites: SpanWrite<FillSegValue>[] = [];
@@ -392,77 +399,103 @@ export function createAdapter(): Adapter {
     const visible = visibleWorldBox(cam, size);
 
     const fillBand = splitChrome(fills, (n) => isSelected(n, input.selectedKey), white);
-    for (const n of [...fillBand.rest, ...fillBand.hover, ...fillBand.lifted]) {
-      const lifted = white(n);
-      const color = lifted ? colors.selectedPaint : colors.ink;
-      const alpha = lifted ? 0.28 : 0.16;
-      const plan = fieldPlan(n.value as CsgOperand);
-      if (plan) {
-        const draw = emitField(
-          n,
-          plan,
-          color,
-          alpha,
-          visible,
-          2 / scale,
-          fieldQuadWrites,
-          fieldLeafWrites,
-          fieldSegWrites,
-          fieldArcWrites,
-        );
-        if (draw) {
-          fieldOrder.push(draw.slot);
-          fillDraws.push({ path: "field", first: fieldOrder.length - 1, count: 1, plan });
+    /** Paint runs of one band, each preceded by its halo run when it has one. */
+    const emitFillBand = (nodes: readonly TraceNode[]) => {
+      for (const n of nodes) {
+        const hot = white(n);
+        const selected = isSelected(n, input.selectedKey);
+        const color = hot ? colors.selectedPaint : colors.ink;
+        const alpha = hot ? 0.28 : 0.16;
+        const halo =
+          input.showHalos && hot
+            ? haloWrites(selected, colors.ring, colors.paper, outlineHalf, knockoutHalf)
+            : NO_HALO;
+        const plan = fieldPlan(n.value as CsgOperand);
+        if (plan) {
+          const draw = emitField(
+            n,
+            plan,
+            color,
+            alpha,
+            halo,
+            visible,
+            2 / scale,
+            fieldQuadWrites,
+            fieldLeafWrites,
+            fieldSegWrites,
+            fieldArcWrites,
+          );
+          if (draw) {
+            fieldOrder.push(draw.slot);
+            const first = fieldOrder.length - 1;
+            fillDraws.push({ path: "field", layer: "paint", first, count: 1, plan });
+            if (halo.ring.w > 0) {
+              fillDraws.push({ path: "field", layer: "halo", first, count: 1, plan });
+            }
+          }
+          continue;
         }
-        continue;
-      }
-      const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
-      if (geom.spans.length === 0) {
-        fillPool.alloc(n, 0);
-        fillSegPool.alloc(n, 0);
-        fillArcPool.alloc(n, 0);
-        continue;
-      }
-      // Blocks concatenate in order, so the per-island windows of one kind are
-      // contiguous runs: one pool allocation per kind, one write sequence.
-      const windows = blockWindows(geom.spans);
-      const segs = geom.spans.flatMap((block) => block.segs);
-      const arcs = geom.spans.flatMap((block) => block.arcs);
-      const segStart = fillSegPool.alloc(n, segs.length);
-      const arcStart = fillArcPool.alloc(n, arcs.length);
-      const regionStart = fillPool.alloc(n, geom.spans.length);
-      if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
-      if (diff(lastFillSegs, n, encodeSpanSegs(segs))) {
-        pushSegWrites(fillSegWrites, segStart, segs);
-      }
-      if (diff(lastFillArcs, n, encodeSpanArcs(arcs))) {
-        pushArcWrites(fillArcWrites, arcStart, arcs);
-      }
-      if (
-        diff(lastFillRegion, n, encodeFillRegions(geom, windows, segStart, arcStart, color, alpha))
-      ) {
-        geom.bounds.forEach((bounds, i) => {
-          const w = windows[i]!;
-          fillWrites.push({
-            idx: regionStart + i,
-            value: FillRegion({
-              aabbMin: vec2f(bounds.min.x, bounds.min.y),
-              aabbMax: vec2f(bounds.max.x, bounds.max.y),
-              segOffset: segStart + w.segOffset,
-              segCount: w.segCount,
-              arcOffset: arcStart + w.arcOffset,
-              arcCount: w.arcCount,
-              color: vec3f(color[0], color[1], color[2]),
-              alpha,
-              flags: 0,
-            }),
+        const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
+        if (geom.spans.length === 0) {
+          fillPool.alloc(n, 0);
+          fillSegPool.alloc(n, 0);
+          fillArcPool.alloc(n, 0);
+          continue;
+        }
+        // Blocks concatenate in order, so the per-island windows of one kind are
+        // contiguous runs: one pool allocation per kind, one write sequence.
+        const windows = blockWindows(geom.spans);
+        const segs = geom.spans.flatMap((block) => block.segs);
+        const arcs = geom.spans.flatMap((block) => block.arcs);
+        const segStart = fillSegPool.alloc(n, segs.length);
+        const arcStart = fillArcPool.alloc(n, arcs.length);
+        const regionStart = fillPool.alloc(n, geom.spans.length);
+        if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
+        if (diff(lastFillSegs, n, encodeSpanSegs(segs))) {
+          pushSegWrites(fillSegWrites, segStart, segs);
+        }
+        if (diff(lastFillArcs, n, encodeSpanArcs(arcs))) {
+          pushArcWrites(fillArcWrites, arcStart, arcs);
+        }
+        if (
+          diff(
+            lastFillRegion,
+            n,
+            encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, halo),
+          )
+        ) {
+          geom.bounds.forEach((bounds, i) => {
+            const w = windows[i]!;
+            fillWrites.push({
+              idx: regionStart + i,
+              value: FillRegion({
+                aabbMin: vec2f(bounds.min.x, bounds.min.y),
+                aabbMax: vec2f(bounds.max.x, bounds.max.y),
+                segOffset: segStart + w.segOffset,
+                segCount: w.segCount,
+                arcOffset: arcStart + w.arcOffset,
+                arcCount: w.arcCount,
+                color: vec3f(color[0], color[1], color[2]),
+                alpha,
+                flags: 0,
+                haloRing: halo.ring,
+                haloKnock: halo.knock,
+                haloHalf: halo.half,
+              }),
+            });
           });
-        });
+        }
+        const first = fillOrder.length;
+        for (let i = 0; i < geom.spans.length; i++) fillOrder.push(regionStart + i);
+        fillDraws.push({ path: "spans", layer: "paint", first, count: geom.spans.length });
+        if (halo.ring.w > 0) {
+          fillDraws.push({ path: "spans", layer: "halo", first, count: geom.spans.length });
+        }
       }
-      const first = fillOrder.length;
-      for (let i = 0; i < geom.spans.length; i++) fillOrder.push(regionStart + i);
-      fillDraws.push({ path: "spans", first, count: geom.spans.length });
-    }
+    };
+    emitFillBand(fillBand.rest);
+    emitFillBand(fillBand.hover);
+    emitFillBand(fillBand.lifted);
 
     // --- points (SVG PointMark passes: rest dots, hover halo, hover dot,
     // --- lifted halos, lifted dots — each node's discs stack back-to-front)
@@ -599,6 +632,7 @@ export function createAdapter(): Adapter {
     plan: FieldPlan,
     color: Rgb,
     alpha: number,
+    halo: HaloFields,
     visible: Box,
     pad: number,
     quadWrites: { idx: number; value: FieldQuadValue }[],
@@ -658,6 +692,9 @@ export function createAdapter(): Adapter {
       leafBase: leafStart,
       color: vec3f(color[0], color[1], color[2]),
       alpha,
+      haloRing: halo.ring,
+      haloKnock: halo.knock,
+      haloHalf: halo.half,
     });
     if (diff(lastFieldQuad, n, encodeFieldQuad(quad))) quadWrites.push({ idx: slot, value: quad });
     return { slot };
@@ -991,7 +1028,7 @@ function clipBox(box: Box, clip: Box): Box | undefined {
   return out.min.x >= out.max.x || out.min.y >= out.max.y ? undefined : out;
 }
 
-/** Byte-encoded field quad for the change check: AABB, leaf window, color. */
+/** Byte-encoded field quad for the change check: AABB, leaf window, color, halo. */
 function encodeFieldQuad(q: FieldQuadValue): Float64Array {
   return Float64Array.of(
     q.aabbMin.x,
@@ -1003,6 +1040,16 @@ function encodeFieldQuad(q: FieldQuadValue): Float64Array {
     q.color[1],
     q.color[2],
     q.alpha,
+    q.haloRing.x,
+    q.haloRing.y,
+    q.haloRing.z,
+    q.haloRing.w,
+    q.haloKnock.x,
+    q.haloKnock.y,
+    q.haloKnock.z,
+    q.haloKnock.w,
+    q.haloHalf.x,
+    q.haloHalf.y,
   );
 }
 
@@ -1025,7 +1072,8 @@ function encodeFieldLeaves(leaves: readonly FieldLeafValue[]): Float64Array {
   return f;
 }
 
-/** Byte-encoded fill regions for the change check: AABB, both span windows, color. */
+/** Byte-encoded fill regions for the change check: AABB, both span windows,
+ * color and halo (a hover recolors the fill *and* lights its ring). */
 function encodeFillRegions(
   geom: IslandGeom,
   windows: readonly SpanWindow[],
@@ -1033,12 +1081,13 @@ function encodeFillRegions(
   arcStart: number,
   color: Rgb,
   alpha: number,
+  halo: HaloFields,
 ): Float64Array {
-  const f = new Float64Array(geom.spans.length * 13);
+  const f = new Float64Array(geom.spans.length * 23);
   for (let i = 0; i < geom.spans.length; i++) {
     const b = geom.bounds[i]!;
     const w = windows[i]!;
-    let j = i * 13;
+    let j = i * 23;
     f[j++] = b.min.x;
     f[j++] = b.min.y;
     f[j++] = b.max.x;
@@ -1051,7 +1100,8 @@ function encodeFillRegions(
     f[j++] = color[1];
     f[j++] = color[2];
     f[j++] = alpha;
-    f[j] = 0;
+    f[j++] = 0;
+    j = encodeHalo(f, j, halo);
   }
   return f;
 }
@@ -1102,4 +1152,60 @@ function encodePoints(discs: readonly PointInstValue[]): Float64Array {
     f[j] = v.alpha;
   }
   return f;
+}
+
+// -- halo chrome -------------------------------------------------------------
+
+/** The halo fields of one fill node, exactly as the records store them. */
+type HaloFields = { ring: v4f; knock: v4f; half: v2f };
+
+/** Cold nodes carry no halo: the bands' alphas are 0, so a stray halo run would
+ * still draw nothing — this is only about not emitting the run at all. */
+const NO_HALO: HaloFields = {
+  ring: vec4f(0, 0, 0, 0),
+  knock: vec4f(0, 0, 0, 0),
+  half: vec2f(0, 0),
+};
+
+/**
+ * Halo chrome of one hot fill node, mirroring `chromeLayers()`: hover is the
+ * accent outline alone at 50%, selection is the same outline opaque plus the
+ * paper knockout band just inside it. Widths are the ink chrome's — `outlinePx`
+ * from the fill's edge inward, then `knockoutPx` — so a hot fill carries the
+ * same weight as a hot edge, and the halo layer itself is opaque (it knocks the
+ * fill's paint out from under the ring instead of being tinted by it).
+ */
+function haloWrites(
+  selected: boolean,
+  ring: Rgb,
+  paper: Rgb,
+  outlineHalf: number,
+  knockoutHalf: number,
+): HaloFields {
+  const alpha = selected
+    ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
+    : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
+  return {
+    ring: vec4f(ring[0], ring[1], ring[2], alpha),
+    // The paper color is always carried: the outline band is paper-backed (that
+    // is the knockout), and only the band *inside* the ring is conditional.
+    knock: vec4f(paper[0], paper[1], paper[2], selected ? 1 : 0),
+    half: vec2f(selected ? knockoutHalf : 0, outlineHalf),
+  };
+}
+
+/** Append a halo's floats to a change-check buffer. */
+function encodeHalo(f: Float64Array, at: number, halo: HaloFields): number {
+  let j = at;
+  f[j++] = halo.ring.x;
+  f[j++] = halo.ring.y;
+  f[j++] = halo.ring.z;
+  f[j++] = halo.ring.w;
+  f[j++] = halo.knock.x;
+  f[j++] = halo.knock.y;
+  f[j++] = halo.knock.z;
+  f[j++] = halo.knock.w;
+  f[j++] = halo.half.x;
+  f[j] = halo.half.y;
+  return j + 1;
 }

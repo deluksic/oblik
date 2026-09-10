@@ -101,31 +101,43 @@ describe("compiled field WGSL", () => {
     const cases = await csgCases();
     const seen = new Map<string, string>();
     for (const c of cases) {
-      let code = seen.get(c.plan.shape);
-      if (code === undefined) {
-        code = tgpu.resolve([fieldFragment(c.plan)]);
-        seen.set(c.plan.shape, code);
+      // Both layers of every shape: the halo is the same compiled evaluation
+      // with a band output, so it must inherit the whole structure below.
+      for (const layer of ["paint", "halo"] as const) {
+        const key = `${c.plan.shape}|${layer}`;
+        let code = seen.get(key);
+        if (code === undefined) {
+          code = tgpu.resolve([fieldFragment(c.plan, layer)]);
+          seen.set(key, code);
+        }
+        // A fragment entry plus its helpers, with no unresolved placeholders.
+        expect(code).toContain("@fragment fn");
+        expect(code).not.toContain("undefined");
+        // Scalar leaves are read at a literal offset from the node's leaf window;
+        // a `spans` leaf hands that same offset to the shared walk instead.
+        const spanLeaves = countSpanLeaves(c.plan);
+        expect(occurrences(code, "fieldLeaves[(base + ")).toBe(
+          countLeaves(c.plan.root) - spanLeaves,
+        );
+        expect(occurrences(code, "spanWalk((base + ")).toBe(spanLeaves);
+        // The only runtime loops are the shared span walk's two — one per record
+        // kind; the tree itself is straight-line calls, which is the whole point
+        // of compiling it.
+        const spanLoops = spanLeaves > 0 ? 2 : 0;
+        expect(occurrences(code, "for (var")).toBe(spanLoops);
+        expect(occurrences(code, "fieldSegs[")).toBe(spanLoops > 0 ? 1 : 0);
+        expect(occurrences(code, "fieldArcs[")).toBe(spanLoops > 0 ? 1 : 0);
+        // The segment loop is endpoints only: no carrier, no trigonometry, no
+        // square root — that is what the split buys on the heaviest fills. An
+        // empty slice (no spans leaf at all) passes vacuously.
+        const segLoop = code.slice(code.indexOf("fieldSegs["), code.indexOf("fieldArcs["));
+        expect(segLoop).not.toMatch(/atan2|sqrt|radius/);
+        // The halo layer samples the node's band; the paint layer never does.
+        const haloReads = layer === "halo" ? 1 : 0;
+        expect(occurrences(code, "(*q).haloRing")).toBe(haloReads);
+        expect(occurrences(code, "(*q).haloKnock")).toBe(haloReads);
+        expect(occurrences(code, "(*q).haloHalf")).toBe(haloReads);
       }
-      // A fragment entry plus its helpers, with no unresolved placeholders.
-      expect(code).toContain("@fragment fn");
-      expect(code).not.toContain("undefined");
-      // Scalar leaves are read at a literal offset from the node's leaf window;
-      // a `spans` leaf hands that same offset to the shared walk instead.
-      const spanLeaves = countSpanLeaves(c.plan);
-      expect(occurrences(code, "fieldLeaves[(base + ")).toBe(countLeaves(c.plan.root) - spanLeaves);
-      expect(occurrences(code, "spanWalk((base + ")).toBe(spanLeaves);
-      // The only runtime loops are the shared span walk's two — one per record
-      // kind; the tree itself is straight-line calls, which is the whole point
-      // of compiling it.
-      const spanLoops = spanLeaves > 0 ? 2 : 0;
-      expect(occurrences(code, "for (var")).toBe(spanLoops);
-      expect(occurrences(code, "fieldSegs[")).toBe(spanLoops > 0 ? 1 : 0);
-      expect(occurrences(code, "fieldArcs[")).toBe(spanLoops > 0 ? 1 : 0);
-      // The segment loop is endpoints only: no carrier, no trigonometry, no
-      // square root — that is what the split buys on the heaviest fills. An
-      // empty slice (no spans leaf at all) passes vacuously.
-      const segLoop = code.slice(code.indexOf("fieldSegs["), code.indexOf("fieldArcs["));
-      expect(segLoop).not.toMatch(/atan2|sqrt|radius/);
     }
     expect(seen.size).toBeGreaterThan(5);
   });
@@ -140,6 +152,10 @@ describe("compiled field WGSL", () => {
       // Same shape, wildly different numbers → byte-identical WGSL. This is the
       // guarantee that a drag can never trigger a recompile.
       expect(tgpu.resolve([fieldFragment(replanned!)])).toBe(tgpu.resolve([fieldFragment(c.plan)]));
+      // The halo layer holds the same guarantee: it is the same evaluation.
+      expect(tgpu.resolve([fieldFragment(replanned!, "halo")])).toBe(
+        tgpu.resolve([fieldFragment(c.plan, "halo")]),
+      );
     }
   });
 

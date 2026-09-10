@@ -45,9 +45,31 @@ Points use a fixed wider halo instead of this growth: **14px outline / 9px selec
 
 A **named** point or glider also carries its bind label beside the mark: `--oblik-muted`, 12px, baseline at **`(x + 10, y − 8)` CSS px** from the mark's screen position, faded to 0.32 opacity unless it is hot or selected. That offset is the contract both views hold to — the SVG view draws it as `<text>`, the WebGPU view as positioned HTML.
 
+## Fills
+
+Regions and CSG fills carry the same weights as edges, but placed differently, and the
+two views differ on purpose:
+
+- **SVG** strokes the region path (outer plus holes, even-odd) and clips it to the
+  **outside** of the fill — an inverted luminance mask — so the halo sits outside the
+  silhouette, _under_ the paint.
+- **WebGPU** measures the band **inward from the fill's own edge** and draws it **over**
+  the paint: `outlinePx` in the ring color from the edge inward, then `knockoutPx` of
+  paper inside that, as one **opaque, paper-backed** band. The outline is therefore
+  flush against the silhouette and keeps full strength — hover is a clean 50% accent,
+  selection a solid one — instead of being washed by the fill's own cream paint, and
+  the paper band is a real hole in the fill. It never spills onto the grid or
+  neighbouring geometry; the cost is saturating on shapes thinner than the band.
+- The WebGPU band is a distance-field band: the fill pass already has the signed
+  distance to the nearest boundary for its antialiasing ramp, so `0 .. outlinePx/2` and
+  then `knockoutPx/2` are two clamps of that same value — no restroke geometry, no mask,
+  no clip. Round joins, hole boundaries and rounded offsets come free.
+- Contract: `gpu/pipelines/halo.ts` (the band math), `halo.test.ts` (pixel semantics),
+  `pipelines/wgsl.test.ts` (shader structure).
+
 ## Other
 
-- Overlay clip to the **outside of fills** (not circles or points). Regions use the same idea: an inverted luminance mask so the halo sits outside the CSG fill.
+- Overlay clip to the **outside of fills** in the SVG view (not circles or points).
 - Figure Shift-onion draws construction **on top** of faded ink.
 
 ## Tokens

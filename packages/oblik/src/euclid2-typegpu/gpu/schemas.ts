@@ -1,4 +1,4 @@
-import { f32, struct, u32, vec2f, vec2u, vec3f } from "typegpu/data";
+import { f32, struct, u32, vec2f, vec2u, vec3f, vec4f } from "typegpu/data";
 import type { Infer } from "typegpu/data";
 
 /** Vertex layout of the vendored polyline expander (2 core + 4 per join triangle). */
@@ -155,7 +155,9 @@ export const FillArc = struct({
 export type FillArcValue = Infer<typeof FillArc>;
 
 /** SDF fragment quad covering one fill island; spans live in shared arrays, one
- * window per record kind. */
+ * window per record kind. The halo fields are the node's chrome (see
+ * `FieldQuad`): a halo run reads the same record with the boundary band
+ * fragment, so no second record or window is needed. */
 export const FillRegion = struct({
   aabbMin: vec2f,
   aabbMax: vec2f,
@@ -166,6 +168,15 @@ export const FillRegion = struct({
   color: vec3f,
   alpha: f32,
   flags: u32,
+  /** rgb = ring color (`--oblik-ring`), a = ring opacity (0 = no halo). */
+  haloRing: vec4f,
+  /** rgb = knockout color (`--oblik-knockout`, the paper), a = opacity of the
+   * paper band inside the ring (0 = none). The ring band itself is always
+   * paper-backed: that is what knocks the fill's own paint out. */
+  haloKnock: vec4f,
+  /** (knockout width, ring width) in world units, both measured inward from the
+   * fill's edge: the ring covers the first `y`, the paper the next `x`. */
+  haloHalf: vec2f,
 });
 export type FillRegionValue = Infer<typeof FillRegion>;
 
@@ -186,12 +197,17 @@ export type FieldLeafValue = Infer<typeof FieldLeaf>;
 
 /** One compiled-field draw: the tree's AABB quad, the leaf window it reads
  * (`leafBase + comptime index`), and the flat fill color/alpha. Everything a
- * drag changes lives here or in the leaves — never in the shader. */
+ * drag changes lives here or in the leaves — never in the shader. The halo
+ * fields mirror `FillRegion`: the same quad drawn by the halo fragment paints
+ * the SVG outside-clipped ring/knockout band instead of the fill. */
 export const FieldQuad = struct({
   aabbMin: vec2f,
   aabbMax: vec2f,
   leafBase: u32,
   color: vec3f,
   alpha: f32,
+  haloRing: vec4f,
+  haloKnock: vec4f,
+  haloHalf: vec2f,
 });
 export type FieldQuadValue = Infer<typeof FieldQuad>;

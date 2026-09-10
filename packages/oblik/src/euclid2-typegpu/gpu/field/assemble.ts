@@ -5,6 +5,7 @@ import type { v2f } from "typegpu/data";
 import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
 
 import { fieldLayout } from "../layout";
+import { haloColor } from "../pipelines/halo";
 import type { FieldNodePlan, FieldPlan } from "./plan";
 
 const TAU = 6.283185307179586;
@@ -229,9 +230,25 @@ const fieldVertex = tgpu.vertexFn({
 /** Corner vertices per field quad instance. */
 export const FIELD_QUAD_VERTICES = 4;
 
-/** Fragment entry for a plan — builds (does not cache) the compiled artifact. */
-export function fieldFragment(plan: FieldPlan) {
+/** Which layer a compiled field is drawn as: the fill, or its inward halo band
+ * (the same evaluated distance, a different output — see `pipelines/halo.ts`). */
+export type FieldLayer = "paint" | "halo";
+
+/** Fragment entry for a plan in a given layer — builds (does not cache) the
+ * compiled artifact. Both layers share one `assembleField` result, so the tree
+ * is evaluated once per shape however many layers the cache asks for. */
+export function fieldFragment(plan: FieldPlan, layer: FieldLayer = "paint") {
   const evaluate = assembleField(plan);
+  if (layer === "halo") {
+    return tgpu.fragmentFn({
+      in: { p: interpolate("linear", vec2f), quad: interpolate("flat", u32) },
+      out: vec4f,
+    })(({ p, quad }) => {
+      "use gpu";
+      const q = fieldLayout.$.fieldQuads[quad];
+      return haloColor(evaluate(p, q.leafBase), q.haloRing, q.haloKnock, q.haloHalf);
+    });
+  }
   return tgpu.fragmentFn({
     in: { p: interpolate("linear", vec2f), quad: interpolate("flat", u32) },
     out: vec4f,
@@ -249,19 +266,21 @@ export function fieldFragment(plan: FieldPlan) {
 /** The compiled fragment's type, inferred from the entry point itself. */
 export type FieldFragment = ReturnType<typeof fieldFragment>;
 
-/** Fragment entry per shape: the TGSL assembly and its WGSL, built once. */
+/** Fragment entry per (shape, layer): the TGSL assembly and its WGSL, once. */
 const fragments = new Map<string, FieldFragment>();
 
-export function fieldFragmentFor(plan: FieldPlan): FieldFragment {
-  const hit = fragments.get(plan.shape);
+export function fieldFragmentFor(plan: FieldPlan, layer: FieldLayer = "paint"): FieldFragment {
+  const key = `${plan.shape}|${layer}`;
+  const hit = fragments.get(key);
   if (hit) return hit;
-  const built = fieldFragment(plan);
-  fragments.set(plan.shape, built);
+  const built = fieldFragment(plan, layer);
+  fragments.set(key, built);
   return built;
 }
 
-/** Pipelines per (bind group, shape, target): the shape picks the fragment, the
- * bind group picks the buffers, so a band and a shape each pay once. */
+/** Pipelines per (bind group, shape, layer, target): the shape and layer pick
+ * the fragment, the bind group picks the buffers, so a band, a shape and a
+ * layer each pay once. */
 const pipelines = new WeakMap<TgpuBindGroup, Map<string, TgpuRenderPipeline>>();
 
 export function fieldPipeline(
@@ -270,8 +289,9 @@ export function fieldPipeline(
   plan: FieldPlan,
   format: GPUTextureFormat,
   samples: number,
+  layer: FieldLayer = "paint",
 ): TgpuRenderPipeline {
-  const key = `${plan.shape}|${format}|${samples}`;
+  const key = `${plan.shape}|${layer}|${format}|${samples}`;
   let perGroup = pipelines.get(bindGroup);
   if (!perGroup) {
     perGroup = new Map();
@@ -286,7 +306,7 @@ export function fieldPipeline(
   const pipeline = root
     .createRenderPipeline({
       vertex: fieldVertex,
-      fragment: fieldFragmentFor(plan),
+      fragment: fieldFragmentFor(plan, layer),
       targets: { format, blend },
       primitive: { topology: "triangle-strip" },
       multisample: { count: samples },

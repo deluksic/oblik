@@ -1,13 +1,14 @@
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
-import { fillFragment } from "./fills";
+import { fillFragment, haloFragment } from "./fills";
 
 /**
- * The span-pass fragment, resolved device-free. The interesting property is
+ * The span-pass fragments, resolved device-free. The interesting property is
  * structural: segments and arcs are separate arrays with separate windows, so
  * the segment loop — the one a 350-span polygon fill spends its time in — reads
- * 16 B endpoint records and contains no carrier work at all.
+ * 16 B endpoint records and contains no carrier work at all. The halo fragment
+ * draws a band of that same distance field, so it must reuse one walk.
  */
 
 function occurrences(haystack: string, needle: string): number {
@@ -16,6 +17,8 @@ function occurrences(haystack: string, needle: string): number {
 
 describe("span fill WGSL", () => {
   const code = tgpu.resolve([fillFragment]);
+  /** Both layers in one resolution: the walk is emitted once, not twice. */
+  const bothLayers = tgpu.resolve([fillFragment, haloFragment]);
 
   test("both record kinds are walked, each from its own window", () => {
     expect(code).toContain("@fragment fn");
@@ -41,5 +44,21 @@ describe("span fill WGSL", () => {
     expect(arcLoop).toContain("atan2");
     expect(arcLoop).toContain("sqrt");
     expect(arcLoop).toContain("radius");
+  });
+
+  test("the halo layer rides the same walk and samples the halo fields", () => {
+    // Two fragments, one boundary walk: the halo is a band of the fill's own
+    // distance, not a second pass over the spans.
+    expect(occurrences(bothLayers, "@fragment fn")).toBe(2);
+    expect(occurrences(bothLayers, "for (var")).toBe(2);
+    expect(occurrences(bothLayers, "fillSegs[")).toBe(1);
+    expect(occurrences(bothLayers, "fillArcs[")).toBe(1);
+    // Paint reads the fill color; the halo reads its band, from `haloHalf`
+    // (knockout, ring) and the two halo colors. One read each: the other
+    // occurrence of those names is the record declaration itself.
+    expect(occurrences(bothLayers, "(*region).haloRing")).toBe(1);
+    expect(occurrences(bothLayers, "(*region).haloKnock")).toBe(1);
+    expect(occurrences(bothLayers, "(*region).haloHalf")).toBe(1);
+    expect(bothLayers).toContain("fwidth");
   });
 });

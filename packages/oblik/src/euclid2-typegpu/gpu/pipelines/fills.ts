@@ -4,6 +4,7 @@ import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data
 import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
 
 import { fillLayout } from "../layout";
+import { haloColor } from "./halo";
 
 const TAU = 6.283185307179586;
 
@@ -48,10 +49,13 @@ const fillVertex = tgpu.vertexFn({
   return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), regionIndex: slot };
 });
 
-export const fillFragment = tgpu.fragmentFn({
-  in: { p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
-  out: vec4f,
-})(({ p, regionIndex }) => {
+/** Signed distance to one span region's boundary (negative inside): winding for
+ * the sign, nearest boundary for the magnitude. Shared by the paint and halo
+ * fragments — the halo is a band of this same field. */
+const spanDistance = tgpu.fn(
+  [u32, vec2f],
+  f32,
+)((regionIndex, p) => {
   "use gpu";
   const region = fillLayout.$.fills[regionIndex];
   let winding = 0;
@@ -100,9 +104,33 @@ export const fillFragment = tgpu.fragmentFn({
       }
     }
   }
-  const d = winding === 0 ? dmin : -dmin;
+  return winding === 0 ? dmin : -dmin;
+});
+
+export const fillFragment = tgpu.fragmentFn({
+  in: { p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
+  out: vec4f,
+})(({ p, regionIndex }) => {
+  "use gpu";
+  const region = fillLayout.$.fills[regionIndex];
+  const d = spanDistance(regionIndex, p);
   const cov = clamp(0.5 - d / max(fwidth(d), 1e-6), 0, 1);
   return vec4f(region.color, region.alpha * cov);
+});
+
+/** Halo entry: the same region, drawn as the inward chrome band. */
+export const haloFragment = tgpu.fragmentFn({
+  in: { p: interpolate("linear", vec2f), regionIndex: interpolate("flat", u32) },
+  out: vec4f,
+})(({ p, regionIndex }) => {
+  "use gpu";
+  const region = fillLayout.$.fills[regionIndex];
+  return haloColor(
+    spanDistance(regionIndex, p),
+    region.haloRing,
+    region.haloKnock,
+    region.haloHalf,
+  );
 });
 
 const alphaBlend: GPUBlendState = {
@@ -117,6 +145,15 @@ export type FillPipelines = {
   fills: (pass: GPURenderPassEncoder) => {
     /** `firstInstance` picks a run's start in the shared order array, which is
      * how the painter interleaves span fills with compiled fields. */
+    draw(
+      vertexCount: number,
+      instanceCount: number,
+      firstVertex?: number,
+      firstInstance?: number,
+    ): void;
+  };
+  /** The same regions drawn as the inward halo band (see `halo.ts`). */
+  halos: (pass: GPURenderPassEncoder) => {
     draw(
       vertexCount: number,
       instanceCount: number,
@@ -141,9 +178,19 @@ export function createFillPipelines(
       multisample: { count: 4 },
     })
     .with(bindGroup);
+  const haloPipeline = root
+    .createRenderPipeline({
+      vertex: fillVertex,
+      fragment: haloFragment,
+      targets: { format, blend: alphaBlend },
+      primitive: { topology: "triangle-strip" },
+      multisample: { count: 4 },
+    })
+    .with(bindGroup);
 
   return {
     fills: (pass) => fillPipeline.with(pass),
+    halos: (pass) => haloPipeline.with(pass),
     destroy: () => {},
   };
 }
