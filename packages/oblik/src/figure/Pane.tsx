@@ -10,8 +10,8 @@ import { isPaint, type PaintValue } from "../eval/paint";
 import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
-import { ResizableSidebar } from "../host/ResizableSidebar";
 import { openInEditor } from "../host/editor";
+import { ResizableSidebar } from "../host/ResizableSidebar";
 import {
   emptyScopeDetail,
   selectionDetailForScope,

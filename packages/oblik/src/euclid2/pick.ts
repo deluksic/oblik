@@ -171,7 +171,12 @@ function aabbOf(n: TraceNode): Aabb | undefined {
     };
   } else if (v.kind === "circle") {
     const r = abs(v.radius);
-    box = { minX: v.center.x - r, minY: v.center.y - r, maxX: v.center.x + r, maxY: v.center.y + r };
+    box = {
+      minX: v.center.x - r,
+      minY: v.center.y - r,
+      maxX: v.center.x + r,
+      maxY: v.center.y + r,
+    };
   } else if (isPolygon(v)) {
     let minX = Infinity;
     let minY = Infinity;

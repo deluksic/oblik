@@ -60,7 +60,12 @@ export type SlotToolDef<S extends ToolSession, Vals> = {
     scope: Scope,
   ): S | undefined;
   /** Hover while every slot is filled (default: nothing). */
-  hoverReady?(session: S, hit: PlaceHit, trace: readonly TraceNode[], vals: Vals): string | undefined;
+  hoverReady?(
+    session: S,
+    hit: PlaceHit,
+    trace: readonly TraceNode[],
+    vals: Vals,
+  ): string | undefined;
   ghost?(
     session: S,
     place: PlaceHit | undefined,
@@ -123,10 +128,16 @@ function defaultAccept(
       return { value: asPoint(hit), refText: hitRef(hit) };
     case "carrier":
       if (!carrier || carrier.geom.kind === "circle") return undefined;
-      return { value: { expr: exprOfPrint(carrier.bind), geom: carrier.geom }, refText: carrier.bind };
+      return {
+        value: { expr: exprOfPrint(carrier.bind), geom: carrier.geom },
+        refText: carrier.bind,
+      };
     case "circle":
       if (!carrier || carrier.geom.kind !== "circle") return undefined;
-      return { value: { expr: exprOfPrint(carrier.bind), geom: carrier.geom }, refText: carrier.bind };
+      return {
+        value: { expr: exprOfPrint(carrier.bind), geom: carrier.geom },
+        refText: carrier.bind,
+      };
     case "region":
       if (!hit.region) return undefined;
       return {
@@ -240,7 +251,14 @@ export function defineSlotTool<S extends ToolSession, Vals extends Record<string
       const picked = defaultAccept(slot.kind, hit);
       if (!picked) return { session };
       if (def.fill) {
-        const custom = def.fill(session, slot.id, picked.value as Vals[keyof Vals], picked.refText, hit, scope);
+        const custom = def.fill(
+          session,
+          slot.id,
+          picked.value as Vals[keyof Vals],
+          picked.refText,
+          hit,
+          scope,
+        );
         if (custom) return { session: custom };
       }
       const next = slots[slots.indexOf(slot) + 1]?.id;

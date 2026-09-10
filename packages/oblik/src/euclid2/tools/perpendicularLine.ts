@@ -1,7 +1,7 @@
-import type { Expr } from "#source/expr";
 import type { LineLike } from "#geom";
 import { lineBasis } from "#geom/ops";
 import { add, perp } from "#geom/vec";
+import type { Expr } from "#source/expr";
 
 import { snapLineCarrier } from "../pick";
 import { asPoint, exprOfPlace, isPinnedPoint, pinnedPointLabel, previewCall } from "./common";

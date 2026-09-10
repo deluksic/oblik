@@ -4,10 +4,5 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": [
-    "src/icons.d.ts",
-    "src/css-side-effect.d.ts",
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx"
-  ]
+  "include": ["src/icons.d.ts", "src/css-side-effect.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
 }

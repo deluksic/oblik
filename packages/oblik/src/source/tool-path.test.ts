@@ -18,9 +18,7 @@ describe("tool path mapping", () => {
   });
 
   test("computes a relative specifier from the dest file", () => {
-    expect(moduleRefToSpecifier(scene, "/src/layout/tools.ts", root)).toBe(
-      "../layout/tools",
-    );
+    expect(moduleRefToSpecifier(scene, "/src/layout/tools.ts", root)).toBe("../layout/tools");
   });
 
   test("same-file modules yield no specifier", () => {

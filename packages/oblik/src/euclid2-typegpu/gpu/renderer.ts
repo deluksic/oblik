@@ -65,9 +65,7 @@ export function createRenderer(opts: {
   function resize(entries?: ResizeObserverEntry[]) {
     // devicePixelContentBoxSize gives the exact device-pixel box (no rounding
     // drift from CSS px * dpr); fall back to the rect when unsupported.
-    const box = entries
-      ?.find((e) => e.target === canvas)
-      ?.devicePixelContentBoxSize?.[0];
+    const box = entries?.find((e) => e.target === canvas)?.devicePixelContentBoxSize?.[0];
     let width: number;
     let height: number;
     if (box) {
@@ -131,7 +129,11 @@ export function createRenderer(opts: {
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
     const encoder = root.device.createCommandEncoder();
-    encoder.copyTextureToBuffer({ texture: resolve }, { buffer: staging, bytesPerRow }, [width, height, 1]);
+    encoder.copyTextureToBuffer({ texture: resolve }, { buffer: staging, bytesPerRow }, [
+      width,
+      height,
+      1,
+    ]);
     root.device.queue.submit([encoder.finish()]);
     await staging.mapAsync(GPUMapMode.READ);
     const mapped = new Uint8Array(staging.getMappedRange());

@@ -93,14 +93,20 @@ describe("defineTool registry", () => {
   });
 
   test("re-registering a name overwrites", () => {
-    const a = defineTool(
-      (x: number) => x,
-      { name: "dup", title: "A", prefix: "d", args: [], module: "/src/a.ts" },
-    );
-    const b = defineTool(
-      (x: number) => x,
-      { name: "dup", title: "B", prefix: "d", args: [], module: "/src/b.ts" },
-    );
+    const a = defineTool((x: number) => x, {
+      name: "dup",
+      title: "A",
+      prefix: "d",
+      args: [],
+      module: "/src/a.ts",
+    });
+    const b = defineTool((x: number) => x, {
+      name: "dup",
+      title: "B",
+      prefix: "d",
+      args: [],
+      module: "/src/b.ts",
+    });
     expect(a).not.toBe(b);
     expect(registeredSpecs().filter((s) => s.id === "dup")).toHaveLength(1);
     expect(registeredSpecs().find((s) => s.id === "dup")?.title).toBe("B");

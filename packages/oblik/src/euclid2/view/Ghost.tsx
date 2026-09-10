@@ -18,7 +18,12 @@ function screenOf(world: { x: number; y: number }, camera: Camera2, size: PaneSi
   return worldToScreen(world, camera, size);
 }
 
-function screenEnds(a: { x: number; y: number }, b: { x: number; y: number }, camera: Camera2, size: PaneSize) {
+function screenEnds(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  camera: Camera2,
+  size: PaneSize,
+) {
   return { a: screenOf(a, camera, size), b: screenOf(b, camera, size) };
 }
 

@@ -56,7 +56,11 @@ export function SelectionInspector(props: {
     <>
       <SidebarIdentity crumb={detail().crumb} meta={detail().meta} />
       <p class={[kicker, styles.kicker]}>Origin</p>
-      <Origin origin={detail().origin} onPickScope={props.onPickScope} onOpenFile={props.onOpenFile} />
+      <Origin
+        origin={detail().origin}
+        onPickScope={props.onPickScope}
+        onOpenFile={props.onOpenFile}
+      />
       <Show when={detail().expose}>
         {(note) => <SidebarExpose note={note()} onExpose={props.onExpose} />}
       </Show>
@@ -99,7 +103,11 @@ export function Origin(props: {
       <p class={[styles.emptyOrigin, { [styles.hidden]: !empty() }]}>{message()}</p>
       <For each={frames()}>
         {(frame) => (
-          <OriginFrameBox frame={frame} onPickScope={props.onPickScope} onOpenFile={props.onOpenFile} />
+          <OriginFrameBox
+            frame={frame}
+            onPickScope={props.onPickScope}
+            onOpenFile={props.onOpenFile}
+          />
         )}
       </For>
     </div>
@@ -187,10 +195,7 @@ function OriginLine(props: {
             [styles.current]: !!props.row.current,
           }}
         >
-          <Show
-            when={props.onOpenFile}
-            fallback={<span class={styles.ln}>{props.row.line}</span>}
-          >
+          <Show when={props.onOpenFile} fallback={<span class={styles.ln}>{props.row.line}</span>}>
             <span
               class={[styles.ln, styles.lnOpen]}
               title="Open in editor"

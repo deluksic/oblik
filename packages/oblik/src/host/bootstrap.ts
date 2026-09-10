@@ -10,9 +10,9 @@ import { scenes as initialScenes } from "virtual:oblik-catalog";
 import { sceneLoaders as initialLoaders } from "virtual:oblik-loaders";
 
 import type { DuplicateId, OblikSceneEntry } from "../source/catalog";
+import { batchHmr } from "./hmr-batch";
 import type { AnnotationBundle, MentionBundle, SceneLoaderMap } from "./Host";
 import { mountOblik } from "./Host";
-import { batchHmr } from "./hmr-batch";
 import { sceneLoaderKeys } from "./loader-keys";
 
 export type BootstrapOpts = {
@@ -47,11 +47,7 @@ export function bootstrap(opts: BootstrapOpts = {}): void {
       lastScenes = next;
       batchHmr(() => host.setScenes(scenes));
     });
-    let lastAnnotations = JSON.stringify([
-      initialAnnotations,
-      initialMentions,
-      initialCollisions,
-    ]);
+    let lastAnnotations = JSON.stringify([initialAnnotations, initialMentions, initialCollisions]);
     import.meta.hot.accept("virtual:oblik-annotations", (mod) => {
       if (!mod) return;
       const fresh = mod as unknown as {

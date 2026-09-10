@@ -2,8 +2,8 @@ import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
-import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 import { transformSync } from "esbuild";
+import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 
 import {
   scanAnnotationsBundle,
@@ -15,9 +15,9 @@ import {
 import { patchFrame } from "./frame-edit";
 import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
+import { EDITOR_OPEN_DEFAULT, editorArgv, spawnEditor } from "./open-editor.server";
 import { patchPaintStyle, removePaintCall } from "./paint-edit";
 import { patchLiterals } from "./patch";
-import { EDITOR_OPEN_DEFAULT, editorArgv, spawnEditor } from "./open-editor.server";
 import { resolveSceneFileAbs } from "./scene-path.server";
 import {
   parseErase,

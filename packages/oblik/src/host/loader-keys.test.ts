@@ -4,7 +4,9 @@ import { sceneLoaderKeys } from "./loader-keys";
 
 describe("sceneLoaderKeys", () => {
   test("key set is order-independent", () => {
-    expect(sceneLoaderKeys({ b: () => Promise.resolve() as never, a: () => Promise.resolve() as never })).toBe(
+    expect(
+      sceneLoaderKeys({ b: () => Promise.resolve() as never, a: () => Promise.resolve() as never }),
+    ).toBe(
       sceneLoaderKeys({ a: () => Promise.resolve() as never, b: () => Promise.resolve() as never }),
     );
   });

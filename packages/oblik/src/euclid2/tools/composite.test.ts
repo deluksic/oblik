@@ -2,10 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import { circle } from "../../eval/constructors";
 import type { PlacePoint } from "../place";
+import type { CompS } from "./composite";
 import { clickTool, commitTool, toolById } from "./index";
 import { arg, defineTool } from "./registry";
 import type { Scope } from "./types";
-import type { CompS } from "./composite";
 
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });
 const pinned = (bind: string, x: number, y: number): PlacePoint => ({
@@ -57,16 +57,13 @@ function withText(s: CompS, label: string, raw: string): CompS {
 }
 
 function registerRect() {
-  defineTool(
-    (origin: { x: number; y: number }, w: number, h: number) => ({ w, h, origin }),
-    {
-      name: "rectDemo",
-      title: "Rect demo",
-      prefix: "rd",
-      args: [arg.point("origin"), arg.number("w"), arg.number("h")],
-      module: "/src/demo.ts",
-    },
-  );
+  defineTool((origin: { x: number; y: number }, w: number, h: number) => ({ w, h, origin }), {
+    name: "rectDemo",
+    title: "Rect demo",
+    prefix: "rd",
+    args: [arg.point("origin"), arg.number("w"), arg.number("h")],
+    module: "/src/demo.ts",
+  });
 }
 
 function registerBolt() {
@@ -74,11 +71,7 @@ function registerBolt() {
     name: "boltDemo",
     title: "Bolt demo",
     prefix: "bd",
-    args: [
-      arg.point("center"),
-      arg.length("r", { anchor: "center" }),
-      arg.number("n", { def: 6 }),
-    ],
+    args: [arg.point("center"), arg.length("r", { anchor: "center" }), arg.number("n", { def: 6 })],
     module: "/src/demo.ts",
   });
 }

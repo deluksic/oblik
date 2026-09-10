@@ -31,10 +31,6 @@ export function relativeModuleSpecifier(destAbs: string, toolAbs: string): strin
 }
 
 /** One-stop mapping used by the `/__oblik-insert` handler. */
-export function moduleRefToSpecifier(
-  destAbs: string,
-  moduleRef: string,
-  rootAbs: string,
-): string {
+export function moduleRefToSpecifier(destAbs: string, moduleRef: string, rootAbs: string): string {
   return relativeModuleSpecifier(destAbs, toolModuleAbs(moduleRef, rootAbs));
 }

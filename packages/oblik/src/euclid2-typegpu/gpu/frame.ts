@@ -1,6 +1,6 @@
-import type { Camera2, PaneSize } from "../../euclid2/camera";
 import { vec2f } from "typegpu/data";
 
+import type { Camera2, PaneSize } from "../../euclid2/camera";
 import { Frame, type FrameValue } from "./schemas";
 
 export const DASH_A_PX = 5;

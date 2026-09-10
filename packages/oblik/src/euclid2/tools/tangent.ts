@@ -105,7 +105,10 @@ const snapCircle = (hit: PlaceHit, ctx: PlaceCtx): PlaceHit => {
   return { ...hit, carrier: picked };
 };
 
-export const tangent: Tool<TangentSession> = defineSlotTool<TangentSession, { a: TangentOp; b: TangentOp }>(
+export const tangent: Tool<TangentSession> = defineSlotTool<
+  TangentSession,
+  { a: TangentOp; b: TangentOp }
+>(
   {
     id: "tangent",
     title: "Tangent",
@@ -116,7 +119,13 @@ export const tangent: Tool<TangentSession> = defineSlotTool<TangentSession, { a:
   {
     slots: {
       a: { id: "a", kind: "operand", placeholder: "<point or circle>", snap: snapCircle },
-      b: { id: "b", kind: "operand", placeholder: "<point or circle>", focusAfter: "a", snap: snapCircle },
+      b: {
+        id: "b",
+        kind: "operand",
+        placeholder: "<point or circle>",
+        focusAfter: "a",
+        snap: snapCircle,
+      },
     },
     fill(session, slotId, picked, _refText, _hit, scope) {
       // A second point click just re-places the first point; anything else

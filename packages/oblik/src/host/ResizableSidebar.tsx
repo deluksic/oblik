@@ -1,13 +1,11 @@
 import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
-
 import IconPanelBottomClose from "~icons/lucide/panel-bottom-close";
 import IconPanelBottomOpen from "~icons/lucide/panel-bottom-open";
 import IconPanelRightClose from "~icons/lucide/panel-right-close";
 import IconPanelRightOpen from "~icons/lucide/panel-right-open";
 
 import { createDragHandler } from "../euclid2/view/createDragHandler";
-import { icon } from "../ui/button.module.css";
 import {
   clampSidebarHeight,
   clampSidebarWidth,
@@ -19,6 +17,7 @@ import {
 } from "./resizable";
 import { createStoredSignal } from "./StoredSignalsContext";
 
+import { icon } from "../ui/button.module.css";
 import styles from "./ResizableSidebar.module.css";
 
 /**

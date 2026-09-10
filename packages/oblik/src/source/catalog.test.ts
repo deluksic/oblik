@@ -39,7 +39,11 @@ describe("parseOblikSceneSource", () => {
   });
 
   test("a nested scene gets a path-based id unique across folders", () => {
-    const e = parseOblikSceneSource(src, "apps/demo/src/scenes/gear/tree.ts", `gear${path.sep}tree.ts`);
+    const e = parseOblikSceneSource(
+      src,
+      "apps/demo/src/scenes/gear/tree.ts",
+      `gear${path.sep}tree.ts`,
+    );
     expect(e).toEqual({
       id: "gear/tree",
       file: "gear/tree.ts",
@@ -66,7 +70,11 @@ export default defineScene({
   build() {},
 });
 `;
-    const e = parseOblikSceneSource(figure, "apps/demo/src/scenes/plate-figure.ts", "plate-figure.ts");
+    const e = parseOblikSceneSource(
+      figure,
+      "apps/demo/src/scenes/plate-figure.ts",
+      "plate-figure.ts",
+    );
     expect(e).toEqual({
       id: "plate-figure",
       file: "plate-figure.ts",

@@ -89,7 +89,11 @@ export function lengthError(raw: string, scope: Scope): string | undefined {
 
 const REF_TABLES: Record<
   RefLooks,
-  { table: (scope: Scope) => Readonly<Record<string, unknown>>; names: (scope: Scope) => string[]; label: string }
+  {
+    table: (scope: Scope) => Readonly<Record<string, unknown>>;
+    names: (scope: Scope) => string[];
+    label: string;
+  }
 > = {
   point: { table: (s) => s.points, names: (s) => Object.keys(s.points), label: "point" },
   carrier: { table: (s) => s.carriers, names: (s) => Object.keys(s.carriers), label: "line" },
