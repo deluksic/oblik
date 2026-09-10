@@ -9,7 +9,7 @@ import { traceKey } from "../pick";
 import { isCrossing, type PlacePoint } from "../place";
 import { POINT_STROKE_PX, chromeLayers, layerStrokeWidth } from "./chrome";
 import { readChromeMetrics } from "./chrome-metrics";
-import { HANDLE_R, SNAP_R, pointMarkRadius } from "./pointMark";
+import { HANDLE_R, SNAP_DIAMOND_R, SNAP_R, pointMarkRadius } from "./pointMark";
 
 import styles from "./View.module.css";
 
@@ -115,7 +115,7 @@ export function PlaceSnap(props: { point: PlacePoint; camera: Camera2; size: Pan
       {crossing() ? (
         <polygon
           class={styles.snapDiamond}
-          points={`${pos().x},${pos().y - SNAP_R} ${pos().x + SNAP_R},${pos().y} ${pos().x},${pos().y + SNAP_R} ${pos().x - SNAP_R},${pos().y}`}
+          points={`${pos().x},${pos().y - SNAP_DIAMOND_R} ${pos().x + SNAP_DIAMOND_R},${pos().y} ${pos().x},${pos().y + SNAP_DIAMOND_R} ${pos().x - SNAP_DIAMOND_R},${pos().y}`}
         />
       ) : (
         <circle class={styles.snapPoint} cx={pos().x} cy={pos().y} r={SNAP_R - 2} />

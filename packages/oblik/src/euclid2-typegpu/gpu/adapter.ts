@@ -10,9 +10,12 @@ import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/regi
 
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
+import type { Ghost, PlaceHit } from "../../euclid2/tool";
 import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
+import { buildOverlay } from "./overlay";
+import type { OverlayPatch } from "./overlay";
 import type {
   CircleInstValue,
   FillEdgeValue,
@@ -59,7 +62,7 @@ export type AdapterInput = {
   trace: readonly TraceNode[];
   cam: Camera2;
   size: PaneSize;
-  colors: { ink: Rgb; accent: Rgb; selectedPaint: Rgb; ring: Rgb; paper: Rgb };
+  colors: { ink: Rgb; accent: Rgb; selectedPaint: Rgb; ring: Rgb; paper: Rgb; ghost: Rgb };
   /** Construction paint width in CSS px (half of it is the ctrl radius). */
   strokePx: number;
   hoverId: string | undefined;
@@ -69,6 +72,14 @@ export type AdapterInput = {
   showHalos: boolean;
   hideFills: boolean;
   muted: (n: TraceNode) => boolean;
+  /** Active placement tool ghost preview (SVG GhostMark/RegionGhost/TraceGhost). */
+  ghost: Ghost | undefined;
+  /** Placement cursor under the pointer; feeds the snap marker. */
+  place: PlaceHit | undefined;
+  /** Whether a placement tool is live (snap markers only render then). */
+  placing: boolean;
+  /** Hide snap markers while this tool is active (toolChrome.hideSnap). */
+  hideSnap: boolean;
 };
 
 export type SlotPatch<T> = {
@@ -102,6 +113,8 @@ export type TickPatch = {
   /** Edge blocks back the fill regions; no draw list of their own. */
   fillEdges: { writes: { idx: number; value: FillEdgeValue }[] };
   points: SlotPatch<PointInstValue>;
+  /** Tool overlay (ghost previews + snap markers), rebuilt every tick. */
+  overlay: OverlayPatch;
   stats: { written: number; total: number };
 };
 
@@ -149,6 +162,24 @@ export function createAdapter(): Adapter {
     const { cam, size, colors, strokePx } = input;
     const scale = cam.scale;
     const halfStroke = strokePx / 2 / scale;
+
+    const overlay = buildOverlay({
+      ghost: input.ghost,
+      snap:
+        input.placing && !input.hideSnap && input.place && input.place.point.kind !== "free"
+          ? input.place
+          : undefined,
+      cam,
+      size,
+      scale,
+      strokePx,
+      colors: {
+        ink: colors.ink,
+        ghost: colors.ghost,
+        paper: colors.paper,
+        accent: colors.accent,
+      },
+    });
 
     const finite = input.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider");
     const fills = input.hideFills ? [] : finite.filter((n) => isFillGeom(n.value));
@@ -418,13 +449,22 @@ export function createAdapter(): Adapter {
         order: Uint32Array.from(pointOrder),
         count: pointOrder.length,
       },
+      overlay,
       stats: {
         written:
           strokeWrites.length +
           circleWrites.length +
           fillWrites.length +
           fillEdgeWrites.length +
-          pointWrites.length,
+          pointWrites.length +
+          overlay.under.strokes.length +
+          overlay.under.circles.length +
+          overlay.under.fills.length +
+          overlay.over.strokes.length +
+          overlay.over.circles.length +
+          overlay.over.disks.length +
+          overlay.over.markers.length +
+          overlay.over.fills.length,
         total: strokePool.used + circlePool.used + fillPool.used + edgePool.used + pointPool.used,
       },
     };

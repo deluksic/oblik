@@ -14,6 +14,8 @@ export const MAX_FILL_EDGES = 4096;
 /** Instanced disc slots (up to 4 per point node: halo ring, knockout, paper
  * outline, paint); shared by all layered discs of a point. */
 export const MAX_POINTS = 4096;
+/** Screen-space square markers (snap diamonds and friends). */
+export const MAX_MARKERS = 256;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -87,6 +89,21 @@ export const PointInst = struct({
   alpha: f32,
 });
 export type PointInstValue = Infer<typeof PointInst>;
+
+/** One screen-space square marker: `center` is world, the extents are CSS px
+ * along the square's local axes, `angle` rotates in screen space (π/4 draws a
+ * diamond). The band between `halfInner` and `halfOuter` paints `stroke`, the
+ * inside paints `fill`. */
+export const MarkerInst = struct({
+  center: vec2f,
+  halfInner: f32,
+  halfOuter: f32,
+  angle: f32,
+  fill: vec3f,
+  stroke: vec3f,
+  alpha: f32,
+});
+export type MarkerInstValue = Infer<typeof MarkerInst>;
 
 /** Analytic stroked circle/arc: annulus band r0→r1 swept a0→a1 (a1 < a0 = CW). */
 export const CircleInst = struct({

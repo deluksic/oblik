@@ -1,6 +1,7 @@
 import { Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
+import { isGlider } from "#geom/gliders";
 
 import {
   screenToWorld,
@@ -9,13 +10,20 @@ import {
   type Camera2,
   type PaneSize,
 } from "../euclid2/camera";
-import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX } from "../euclid2/pick";
-import { mutedForScope, toolChrome } from "../euclid2/tool";
+import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX, traceKey } from "../euclid2/pick";
+import { hoverTool, mutedForScope, snapFilterOf, toolChrome } from "../euclid2/tool";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
 import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
 import { createDragHandler, type DragSession } from "../euclid2/view/createDragHandler";
 import { isGrabbable, hoverNode } from "../euclid2/view/marks";
-import { applyDrag, editDragOf, panDrag, type EditDrag } from "../euclid2/view/pointer";
+import {
+  applyDrag,
+  editDragOf,
+  panDrag,
+  placeFromEvent,
+  topHit,
+  type EditDrag,
+} from "../euclid2/view/pointer";
 import { SliderDock } from "../euclid2/view/SliderDock";
 import { sliderNodes } from "../euclid2/view/sliderHud";
 import { resolveTheme, type ResolvedTheme } from "../host/theme";
@@ -269,6 +277,8 @@ export function TypegpuView(props: TypegpuViewProps) {
       Scope | undefined,
       ResolvedTheme,
       string,
+      Ghost | undefined,
+      PlaceHit | undefined,
     ] => [
       camera(),
       size(),
@@ -282,8 +292,25 @@ export function TypegpuView(props: TypegpuViewProps) {
       props.scope,
       resolvedTheme(),
       drag.phase(),
+      props.ghost,
+      props.place,
     ],
-    ([cam, sz, el, , trace, hoverId, selectedKey, placing, toolSession, scope, , phase]) => {
+    ([
+      cam,
+      sz,
+      el,
+      ,
+      trace,
+      hoverId,
+      selectedKey,
+      placing,
+      toolSession,
+      scope,
+      ,
+      phase,
+      ghost,
+      place,
+    ]) => {
       if (!gpuRenderer || !world || !adapter || !el) return;
       // Theme-derived colors the painter bakes in (paper clear + grid/axis
       // pipelines): swap them only when the resolved theme actually moves them.
@@ -309,6 +336,7 @@ export function TypegpuView(props: TypegpuViewProps) {
           selectedPaint: readCssColor(el, "--oblik-selected-paint"),
           ring: readCssColor(el, "--oblik-ring"),
           paper: readCssColor(el, "--oblik-paper"),
+          ghost: readCssColor(el, "--oblik-ghost"),
         },
         strokePx: CONSTRUCTION_STROKE_PX,
         hoverId,
@@ -317,7 +345,15 @@ export function TypegpuView(props: TypegpuViewProps) {
         // their halo/knockout rings are suppressed.
         showHalos: phase !== "dragging",
         hideFills: chrome.hideFills ?? false,
-        muted: (n) => chrome.muteStrokes === true || (!!scope && mutedForScope(n, scope)),
+        muted: (n) =>
+          (n.kind === "point" || isGlider(n.value)
+            ? chrome.mutePoints === true
+            : chrome.muteStrokes === true) ||
+          (!!scope && mutedForScope(n, scope)),
+        ghost,
+        place,
+        placing,
+        hideSnap: chrome.hideSnap ?? false,
       });
       world.applyPatch(patch);
       setPatchStats({ written: patch.stats.written, total: patch.stats.total });
@@ -334,6 +370,32 @@ export function TypegpuView(props: TypegpuViewProps) {
     return hitsNear(props.trace, screenToWorld(screen, cam, size()), cam, size()).filter(
       isDrawnNode,
     );
+  }
+
+  /** Placement tools: resolve the snap under the pointer and hand it to the
+   * pane's click handler — mirrors the SVG view's placing branch. */
+  function placeAt(e: PointerEvent, el: HTMLDivElement) {
+    const filter = props.scope ? snapFilterOf(props.scope) : undefined;
+    const hit = placeFromEvent(
+      e,
+      el,
+      camera(),
+      size(),
+      props.trace,
+      props.toolSession,
+      filter,
+      props.scope,
+    );
+    const nearest = topHit(e, el, camera(), size(), props.trace)[0];
+    if (
+      nearest &&
+      filter?.keys &&
+      !filter.keys.has(traceKey(nearest)) &&
+      hit.point.kind === "free"
+    ) {
+      return;
+    }
+    props.onPlace?.(hit);
   }
 
   // Mirrors the SVG view's pan gesture: a drag pans; releasing without having
@@ -404,7 +466,10 @@ export function TypegpuView(props: TypegpuViewProps) {
     if (e.button !== 0) return;
     const el = paperEl();
     if (!el) return;
-    if (props.placing) return; // placement tools are a later cut (the SVG view also does not pan while placing).
+    if (props.placing) {
+      placeAt(e, el);
+      return;
+    }
     // The HTML slider dock handles its own drags (live draft → commit on
     // release, click picks); don't also start a pan here.
     if (isSliderHudTarget(e)) return;
@@ -420,10 +485,30 @@ export function TypegpuView(props: TypegpuViewProps) {
     startPan(e, hits);
   }
 
-  /** Hover lift: update while idle, never mid-drag; cleared on pointer leave.
-   * The slider dock drives its own hover lift (panel highlights). */
+  /** While placing: keep the cursor snap and tool-hover lift current. Idle:
+   * hover lift, never mid-drag; cleared on pointer leave. The slider dock
+   * drives its own hover lift (panel highlights). */
   function onPointerMove(e: PointerEvent) {
-    if (props.placing || drag.phase() === "dragging" || isSliderHudTarget(e)) return;
+    if (props.placing) {
+      const filter = props.scope ? snapFilterOf(props.scope) : undefined;
+      const el = paperEl();
+      if (!el) return;
+      const hit = placeFromEvent(
+        e,
+        el,
+        camera(),
+        size(),
+        props.trace,
+        props.toolSession,
+        filter,
+        props.scope,
+      );
+      props.onCursor?.(hit);
+      const session = props.toolSession;
+      props.onHoverId?.(session ? hoverTool(session, hit, props.trace, props.scope) : undefined);
+      return;
+    }
+    if (drag.phase() === "dragging" || isSliderHudTarget(e)) return;
     const el = paperEl();
     if (!el) return;
     const hit = hitsAt(e, el)[0];
@@ -469,7 +554,10 @@ export function TypegpuView(props: TypegpuViewProps) {
       ]}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerLeave={() => props.onHoverId?.(undefined)}
+      onPointerLeave={() => {
+        props.onHoverId?.(undefined);
+        props.onCursor?.(undefined);
+      }}
       onWheel={onWheel}
     >
       <canvas ref={setCanvasEl} class={styles.canvas} />

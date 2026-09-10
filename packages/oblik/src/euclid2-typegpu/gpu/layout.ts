@@ -7,9 +7,11 @@ import {
   FillRegion,
   Frame,
   GridSpan,
+  MarkerInst,
   MAX_CIRCLES,
   MAX_FILL_EDGES,
   MAX_FILL_REGIONS,
+  MAX_MARKERS,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
   PointInst,
@@ -49,4 +51,11 @@ export const diskLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
   points: { storage: arrayOf(PointInst, MAX_POINTS) },
   pointOrder: { storage: arrayOf(u32, MAX_POINTS) },
+});
+
+/** Screen-space square markers (snap diamonds); one instanced quad each. */
+export const markerLayout = tgpu.bindGroupLayout({
+  frame: { uniform: Frame },
+  marks: { storage: arrayOf(MarkerInst, MAX_MARKERS) },
+  markOrder: { storage: arrayOf(u32, MAX_MARKERS) },
 });
