@@ -115,12 +115,40 @@ function at(local: Vec2, center: Vec2, rot: number): Vec2 {
   return add(center, rotate(local, rot));
 }
 
-/** Closed outer tooth loop, CCW, as boundary points for `polygon`. */
-export function gearOutline(opts: SpurGearOpts, flankSamples = 12): Vec2[] {
+export type GearToothShape = {
+  /** One cell of the gear: the tooth plus its wedge of root disc down to the
+   * axis, angularly centred on `+X` about `center` and spanning exactly
+   * `±π/teeth` — cell 0 for `polarRepeat`, which wants its copy authored exactly
+   * like this. The cells of a ring tile the face, so the repeat is the whole
+   * gear outside the hub. */
+  cell: Vec2[];
+  /** The root disc the cells stand on, as a plain operand.
+   *
+   * It is handed over as a literal rather than built with `circle(...)` on
+   * purpose: a constructor call would be stamped with an id and drawn as a
+   * second node, and this disc is *structure*, not a shape anyone picks. It also
+   * does real work — the cell's radial edges run through the disc, so unioning
+   * it in puts the field's zero level on the teeth and the root circle only.
+   * That is what keeps the repeat's seams from showing as spokes. */
+  hub: { kind: "circle"; center: Vec2; radius: number };
+  /** Root radius (dedendum circle) — the hub's radius, and where the cells'
+   * root arcs lie, so the two meet exactly. */
+  rootRadius: number;
+  /** Tip radius (addendum circle). */
+  tipRadius: number;
+};
+
+/**
+ * One cell of a spur gear, authored for `polarRepeat`: the tooth, plus the wedge
+ * of root disc it stands on, running from the tip down to the axis so the
+ * copies tile the face exactly. The involute flanks are sampled (`flankSamples`
+ * each) and the tip/root arcs are sampled too, so a cell is a straight-span loop
+ * the field walk can chew.
+ */
+export function gearTooth(opts: SpurGearOpts, flankSamples = 16): GearToothShape {
   const z = max(8, round(opts.teeth));
   const pitchR = max(0.4, abs(opts.pitchRadius));
   const alpha = min(0.5, max(0.2, opts.pressureAngle));
-  const rot = opts.rotation ?? 0;
   const c = opts.center;
   const tooth = toothParts(pitchR, z, alpha, flankSamples);
   const step = (PI * 2) / z;
@@ -144,20 +172,20 @@ export function gearOutline(opts: SpurGearOpts, flankSamples = 12): Vec2[] {
     }
   };
 
-  for (let i = 0; i < z; i++) {
-    const a = rot + i * step;
-    const leftOut = tooth.left.map((p) => at(p, c, a)).toReversed();
-    const rightIn = tooth.right.map((p) => at(p, c, a)).toReversed();
-    if (tooth.needsRadial) {
-      append([at(polar(tooth.rootR, tooth.root0), c, a)]);
-    }
-    append(leftOut);
-    append(sampleArc(tooth.addR, a + tooth.add0, a + tooth.add1));
-    append(rightIn);
-    if (tooth.needsRadial) {
-      append([at(polar(tooth.rootR, tooth.root1), c, a)]);
-    }
-    append(sampleArc(tooth.rootR, a + tooth.root1, a + step + tooth.root0));
-  }
-  return ring;
+  // Walked in the ring's direction and symmetric about +X: half the root gap on
+  // each side, then in to the axis along the cell's own radial edges (the
+  // implicit close is the other one), so the loop spans exactly its cell.
+  const half = step / 2;
+  append(sampleArc(tooth.rootR, -half, tooth.root0));
+  append(tooth.left.map((p) => at(p, c, 0)).toReversed());
+  append(sampleArc(tooth.addR, tooth.add0, tooth.add1));
+  append(tooth.right.map((p) => at(p, c, 0)).toReversed());
+  append(sampleArc(tooth.rootR, tooth.root1, half));
+  append([c]);
+  return {
+    cell: ring,
+    hub: { kind: "circle", center: { x: c.x, y: c.y }, radius: tooth.rootR },
+    rootRadius: tooth.rootR,
+    tipRadius: tooth.addR,
+  };
 }

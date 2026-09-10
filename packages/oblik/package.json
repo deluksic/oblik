@@ -22,6 +22,7 @@
     "#geom/ops": "./src/geom/ops.ts",
     "#geom/polygon": "./src/geom/polygon.ts",
     "#geom/region": "./src/geom/region.ts",
+    "#geom/repeat": "./src/geom/repeat.ts",
     "#geom/vec": "./src/geom/vec.ts",
     "#source/expr": "./src/source/expr.ts",
     "#source/hoist": "./src/source/hoist.ts",

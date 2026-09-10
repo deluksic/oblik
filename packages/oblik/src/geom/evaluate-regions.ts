@@ -15,7 +15,21 @@ import {
   regionSvgPath,
   signedDistToRegion,
 } from "./region";
-import type { Circle, Csg2, CsgOp, CsgOperand, HalfPlane, Loop, LoopEdge, Region } from "./types";
+import { repeatStep, rotateRegion } from "./repeat";
+/** Distance below which two seam endpoints are the same point. */
+const EPS = 1e-9;
+
+import type {
+  Circle,
+  Csg2,
+  CsgOp,
+  CsgOperand,
+  HalfPlane,
+  Loop,
+  LoopEdge,
+  PolarRepeat,
+  Region,
+} from "./types";
 import { add, dist, isFiniteVec, mul, norm, perp, type Vec2 } from "./vec";
 
 const { abs, max, min } = Math;
@@ -381,7 +395,84 @@ function compileOperand(op: CsgOperand): Region[] {
   if (op.kind === "pick") {
     return evaluateRegions(op.of).filter((r) => regionContains(r, op.at));
   }
+  if (op.kind === "polarRepeat") return stampRepeat(op);
   return evaluateCsg(op);
+}
+
+/**
+ * The copies of a repeat, stamped out as real islands: the cell once, turned
+ * `count` times about the axis. Cheap (no CSG compile) and exact — a rotation is
+ * rigid, so the copies are the child's own spans turned, and disjoint because
+ * the child fits its sector. This is what the SVG view paints (one even-odd
+ * path, the union for disjoint copies, no boolean) and what island queries test.
+ *
+ * The *field* never comes through here: the fill shader folds one copy per pixel
+ * (see `geom/repeat.ts`).
+ */
+export function stampRepeat(op: PolarRepeat): Region[] {
+  const inner = evaluateRegions(op.of);
+  if (inner.length === 0) return [];
+  const out: Region[] = [];
+  const step = repeatStep(op.count);
+  for (let k = 0; k < op.count; k++) {
+    const ang = op.rotation + k * step;
+    for (const island of inner) out.push(rotateRegion(island, op.about, ang));
+  }
+  return out;
+}
+
+/**
+ * The copies' *union outline*: the edges two copies share are the seams between
+ * them — interior to the union, not boundary — so they drop out, and the edges
+ * that survive chain across copies into the ring's own loop.
+ *
+ * This is what a painter needs, because a stroke follows every subpath: stamping
+ * the cells verbatim would trace each seam and draw the repeat's joins as radial
+ * spokes. The field does not need it — there the seams are covered by the hub
+ * disc the fill unions in (see `layout/gear.ts`) — but the SVG view strokes its
+ * path, so the merge has to happen in the geometry.
+ *
+ * Copies that share no edges (a ring of separated teeth) come back one island
+ * per copy, which is what they are. So does a copy whose outer loop is a whole
+ * circle, where there is no vertex to merge on.
+ */
+export function mergeRepeatOutline(op: PolarRepeat): Region[] {
+  const islands = stampRepeat(op);
+  if (islands.length <= 1) return islands;
+  const loops = islands.map((island) => island.outer);
+  if (loops.some((loop) => !Array.isArray(loop))) return islands;
+  const seen = new Map<string, number>();
+  for (const loop of loops) {
+    for (const e of loop as LoopEdge[]) seen.set(edgeKey(e), (seen.get(edgeKey(e)) ?? 0) + 1);
+  }
+  const out: Region[] = [];
+  let run: LoopEdge[] = [];
+  const flush = () => {
+    if (run.length > 0) out.push({ kind: "region", outer: run, holes: [] });
+    run = [];
+  };
+  for (const loop of loops) {
+    for (const e of loop as LoopEdge[]) {
+      // Shared with a neighbouring copy: interior, so it is not boundary.
+      if ((seen.get(edgeKey(e)) ?? 0) > 1) continue;
+      // A run continues while the next surviving edge starts where the last
+      // one ended: copies that tile chain into one loop, copies that do not
+      // start a fresh one.
+      const prev = run[run.length - 1];
+      if (prev && dist(prev.b, e.a) > EPS) flush();
+      run.push(e);
+    }
+  }
+  flush();
+  return out.length > 0 ? out : islands;
+}
+
+/** Undirected edge identity: two copies sharing a seam carry it in opposite
+ * directions, so the key ignores direction. */
+function edgeKey(e: LoopEdge): string {
+  const a = `${e.a.x.toFixed(9)},${e.a.y.toFixed(9)}`;
+  const b = `${e.b.x.toFixed(9)},${e.b.y.toFixed(9)}`;
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 /** True when every probe's CSG membership matches some compiled island. */

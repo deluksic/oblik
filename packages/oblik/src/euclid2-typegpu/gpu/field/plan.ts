@@ -1,9 +1,11 @@
-import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Region, Vec2 } from "#geom";
+import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, PolarRepeat, Region, Vec2 } from "#geom";
 import { lineBasis } from "#geom/ops";
+import { repeatStep } from "#geom/repeat";
 import { mul, perp } from "#geom/vec";
 
 import {
   emptySpans,
+  grow,
   growSpanBox,
   islandSpans,
   newBox,
@@ -22,17 +24,20 @@ import {
  * reference, and `eval.ts` is its TS twin for `field/plan.test.ts` parity runs.
  */
 
-export type FieldLeafKind = "circle" | "halfPlane" | "spans" | "offset";
+export type FieldLeafKind = "circle" | "halfPlane" | "spans" | "offset" | "repeat";
 
 export type FieldLeafPlan =
   | { kind: "circle"; operand: Circle }
   | { kind: "halfPlane"; operand: HalfPlane }
   | { kind: "spans"; operand: Region }
-  | { kind: "offset"; operand: Offset };
+  | { kind: "offset"; operand: Offset }
+  | { kind: "repeat"; operand: PolarRepeat };
 
 export type FieldNodePlan =
   | { kind: "leaf"; leaf: number }
   | { kind: "offset"; leaf: number; of: FieldNodePlan }
+  /** Fold the point into the nearest copy, then evaluate the child there. */
+  | { kind: "repeat"; leaf: number; of: FieldNodePlan }
   | { kind: "union" | "intersect" | "diff"; of: FieldNodePlan[] };
 
 export type FieldPlan = {
@@ -45,11 +50,13 @@ export type FieldPlan = {
 
 /** One leaf's parameters, exactly as the GPU stores them. */
 export type FieldLeafData = SpanWindow & {
-  /** Circle centre | half-plane origin. */
+  /** Circle centre | half-plane origin | repeat axis. */
   a: Vec2;
-  /** Half-plane inside normal (`perp(dir) · −side`); unused otherwise. */
+  /** Half-plane inside normal (`perp(dir) · −side`); `(rotation, step)` for a
+   * repeat; unused otherwise. */
   b: Vec2;
-  /** Circle radius | offset distance. */
+  /** Circle radius | offset distance | repeat copy count (the shader folds with
+   * `b` alone; the count is what the CPU twin and the docs read). */
   r: number;
 };
 
@@ -90,6 +97,17 @@ function planOf(op: CsgOperand, leaves: FieldLeafPlan[]): Planned | undefined {
     return {
       node: { kind: "offset", leaf, of: inner.node },
       shape: `offset(${inner.shape})`,
+    };
+  }
+  if (op.kind === "polarRepeat") {
+    // The copies stay implicit: one leaf of numbers, the child planned once.
+    const inner = planOf(op.of, leaves);
+    if (!inner) return undefined;
+    const leaf = leaves.length;
+    leaves.push({ kind: "repeat", operand: op });
+    return {
+      node: { kind: "repeat", leaf, of: inner.node },
+      shape: `polarRepeat(${inner.shape})`,
     };
   }
   if (isCsgOperand(op)) {
@@ -143,6 +161,17 @@ export function buildFieldInstance(plan: FieldPlan): FieldInstance {
       const { origin, dir } = lineBasis(leaf.operand.line);
       return { a: origin, b: mul(perp(dir), -leaf.operand.side), r: 0, ...NO_SPANS };
     }
+    if (leaf.kind === "repeat") {
+      const rep = leaf.operand;
+      return {
+        a: rep.about,
+        // The fold only needs the spin and the spacing; the count rides along
+        // because the box and the CPU twin read it.
+        b: { x: rep.rotation, y: repeatStep(rep.count) },
+        r: rep.count,
+        ...NO_SPANS,
+      };
+    }
     return { a: ORIGIN, b: ORIGIN, r: leaf.operand.d, ...NO_SPANS };
   });
   return { leaves, spans };
@@ -158,6 +187,12 @@ export function fieldBox(plan: FieldPlan, inst: FieldInstance): Box {
 function nodeBox(node: FieldNodePlan, plan: FieldPlan, inst: FieldInstance): Box {
   if (node.kind === "leaf") {
     return leafBox(plan.leaves[node.leaf]!, inst.leaves[node.leaf]!, inst.spans);
+  }
+  if (node.kind === "repeat") {
+    const inner = nodeBox(node.of, plan, inst);
+    if (!Number.isFinite(inner.min.x)) return UNBOUNDED;
+    const leaf = inst.leaves[node.leaf]!;
+    return repeatBox(inner, leaf.a, leaf.b.x, leaf.b.y, leaf.r);
   }
   if (node.kind === "offset") {
     const inner = nodeBox(node.of, plan, inst);
@@ -185,6 +220,45 @@ function leafBox(leaf: FieldLeafPlan, data: FieldLeafData, spans: SpanSet): Box 
   growSpanBox(box, spans, data);
   return box;
 }
+
+/** Box of the copies: every rotated corner of the child's box, unioned. Exact
+ * for the copies' *boxes* (the shapes inside only get closer to the axis), and a
+ * superset of the field. Above `MAX_BOX_COPIES` the disc through the farthest
+ * corner stands in, which is also a superset — the quad is only a rasterization
+ * hint, so a superset costs fragments and never correctness. */
+function repeatBox(box: Box, about: Vec2, rotation: number, step: number, count: number): Box {
+  if (!(count > MAX_BOX_COPIES)) {
+    const out = newBox();
+    for (let k = 0; k < count; k++) {
+      const ang = rotation + k * step;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      for (const corner of [
+        { x: box.min.x, y: box.min.y },
+        { x: box.max.x, y: box.min.y },
+        { x: box.max.x, y: box.max.y },
+        { x: box.min.x, y: box.max.y },
+      ]) {
+        const vx = corner.x - about.x;
+        const vy = corner.y - about.y;
+        grow(out, { x: about.x + vx * c - vy * s, y: about.y + vx * s + vy * c });
+      }
+    }
+    if (Number.isFinite(out.min.x)) return out;
+  }
+  const r = Math.max(
+    Math.hypot(box.min.x - about.x, box.min.y - about.y),
+    Math.hypot(box.max.x - about.x, box.min.y - about.y),
+    Math.hypot(box.max.x - about.x, box.max.y - about.y),
+    Math.hypot(box.min.x - about.x, box.max.y - about.y),
+  );
+  return {
+    min: { x: about.x - r, y: about.y - r },
+    max: { x: about.x + r, y: about.y + r },
+  };
+}
+
+const MAX_BOX_COPIES = 64;
 
 const UNBOUNDED: Box = {
   min: { x: -Infinity, y: -Infinity },

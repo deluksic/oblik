@@ -11,6 +11,8 @@ import {
   isFinitePolygon,
   isFiniteRegion,
   isCsg2,
+  isFinitePolarRepeat,
+  isPolarRepeat,
   isPick,
   isPolygon,
   isRegion,
@@ -89,6 +91,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (isRegion(v)) return isFiniteRegion(v);
   if (isPolygon(v)) return isFinitePolygon(v);
   if (isCsg2(v)) return isFiniteCsg2(v);
+  if (isPolarRepeat(v)) return isFinitePolarRepeat(v);
   if (isPick(v)) return isFinitePick(v);
   if (isGlider(v)) return Number.isFinite(v.x) && Number.isFinite(v.y);
   return false;
@@ -116,7 +119,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
   }
   if (isRegion(v)) return distToRegion(v, world);
   if (isPolygon(v)) return distToPolygon(v, world);
-  if (isCsg2(v) || isPick(v)) return distToCsg(v, world);
+  if (isCsg2(v) || isPick(v) || isPolarRepeat(v)) return distToCsg(v, world);
   if (isGlider(v)) return dist(world, gliderAt(v));
   return Infinity;
 }
@@ -189,7 +192,7 @@ function aabbOf(n: TraceNode): Aabb | undefined {
       maxY = max(maxY, p.y);
     }
     box = Number.isFinite(minX) ? { minX, minY, maxX, maxY } : undefined;
-  } else if (isRegion(v) || isCsg2(v) || isPick(v)) {
+  } else if (isRegion(v) || isCsg2(v) || isPick(v) || isPolarRepeat(v)) {
     box = fillAabb(v);
   }
   // line/parallelLine are unbounded — no box, never culled.
@@ -211,7 +214,7 @@ function aabbCulls(n: TraceNode, world: Vec2, r: number): boolean {
 
 function pickRank(n: TraceNode): number {
   if (n.value.kind === "point" || isGlider(n.value)) return 0;
-  if (isCsg2(n.value) || isPick(n.value)) return 2;
+  if (isCsg2(n.value) || isPick(n.value) || isPolarRepeat(n.value)) return 2;
   if (isRegion(n.value) || isPolygon(n.value)) return 3;
   return 1;
 }

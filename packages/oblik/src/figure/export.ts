@@ -5,7 +5,7 @@ import { fillAabb } from "../geom/csg2";
 import { isGlider } from "../geom/gliders";
 import { infiniteLineAxis } from "../geom/ops";
 import { isCircleWalk, regionSvgPath, walkEdges } from "../geom/region";
-import type { Csg2, Pick } from "../geom/types";
+import type { Csg2, Pick, PolarRepeat } from "../geom/types";
 import type { Vec2 } from "../geom/vec";
 import { frameRect, type FigureFrame } from "./frame";
 
@@ -109,7 +109,7 @@ function boundsOfStrokes(strokes: readonly PaintStroke[]): Rect | undefined {
           inc(e.b.x, e.b.y);
         }
       }
-    } else if (v.kind === "csg2" || v.kind === "pick") {
+    } else if (v.kind === "csg2" || v.kind === "pick" || v.kind === "polarRepeat") {
       const box = fillAabb(v);
       if (box) {
         inc(box.minX, box.minY);
@@ -156,7 +156,7 @@ function drawOpEl(op: DrawOp, attrs: string): string {
   return `<path d="${op.d}" fill-rule="evenodd" ${attrs}/>`;
 }
 
-function regionToSvg(r: Csg2 | Pick, style: FigureStyle, id: string): string {
+function regionToSvg(r: Csg2 | Pick | PolarRepeat, style: FigureStyle, id: string): string {
   const p = fillPaint(r);
   if (p.empty) return "";
   const key = id.replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -215,7 +215,7 @@ function strokeToSvg(s: PaintStroke, bounds: Rect, pointRadius: number): string 
     if (!d) return "";
     return `<path d="${d}" fill-rule="evenodd" ${styleAttrs(s.style, true)}/>`;
   }
-  if (v.kind === "csg2" || v.kind === "pick") {
+  if (v.kind === "csg2" || v.kind === "pick" || v.kind === "polarRepeat") {
     return regionToSvg(v, s.style, `${s.geom.id}-${s.geom.occ}`);
   }
   const point = v.kind === "point" || isGlider(v) ? { x: v.x, y: v.y } : undefined;

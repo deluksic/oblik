@@ -2,7 +2,21 @@ import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRenderPipeline, TgpuRoot } from "typegpu";
 import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
 import type { v2f } from "typegpu/data";
-import { abs, atan2, clamp, dot, floor, length, max, min, sign, sqrt } from "typegpu/std";
+import {
+  abs,
+  atan2,
+  clamp,
+  cos,
+  dot,
+  floor,
+  length,
+  max,
+  min,
+  round,
+  sign,
+  sin,
+  sqrt,
+} from "typegpu/std";
 
 import { QUAD_PAD_PX, worldPerPx } from "../frame";
 import { fieldLayout } from "../layout";
@@ -42,6 +56,33 @@ function assembleNode(plan: FieldPlan, node: FieldNodePlan): FieldFn {
       "use gpu";
       // Round joins fall out of the SDF shift, exactly like `roundOffsetValue`.
       return inner(p, base) - fieldLayout.$.fieldLeaves[base + u32(index)].r;
+    });
+  }
+  if (node.kind === "repeat") {
+    const inner = assembleNode(plan, node.of);
+    const index = node.leaf;
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      // Fold into the nearest copy of the ring and evaluate the child there:
+      // the copies are never expanded, so a 40-tooth gear costs one tooth per
+      // pixel. The spin and the spacing are leaf data, which is why dragging the
+      // tooth count rewrites a number instead of rebuilding geometry.
+      //
+      // The cell index is measured from the spin — `(θ − rotation) / step` — not
+      // from the raw angle: the cell the fold assumes sits at `rotation + k·step`,
+      // so dropping that subtraction lands the pattern on the wrong copies and
+      // the ring disappears for every spin but zero. `field/eval.ts` mirrors this
+      // expression line for line, and `plan.test.ts` holds it to `foldPolar`.
+      const leaf = fieldLayout.$.fieldLeaves[base + u32(index)];
+      const ang =
+        leaf.b.x + round((atan2(p.y - leaf.a.y, p.x - leaf.a.x) - leaf.b.x) / leaf.b.y) * leaf.b.y;
+      const c = cos(ang);
+      const s = sin(ang);
+      const v = p - leaf.a;
+      return inner(leaf.a + vec2f(v.x * c + v.y * s, v.y * c - v.x * s), base);
     });
   }
   const kids = node.of.map((child) => assembleNode(plan, child));
@@ -114,7 +155,8 @@ function assembleLeaf(plan: FieldPlan, index: number): FieldFn {
       return dot(p - leaf.a, leaf.b);
     });
   }
-  if (kind === "offset") {
+  // `offset` and `repeat` are node wrappers; the leaf itself has no field.
+  if (kind === "offset" || kind === "repeat") {
     return tgpu.fn(
       [vec2f, u32],
       f32,

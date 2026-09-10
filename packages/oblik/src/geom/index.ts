@@ -6,5 +6,6 @@ export * from "./region";
 export * from "./polygon";
 export * from "./offset";
 export * from "./csg2";
+export * from "./repeat";
 export * from "./csg-draw";
 export * from "./evaluate-regions";

@@ -65,7 +65,32 @@ export type Csg2 = {
  */
 export type Pick = { kind: "pick"; of: CsgOperand; at: Vec2 };
 
-export type CsgOperand = Region | Circle | HalfPlane | Offset | Csg2 | Pick;
+/**
+ * `count` rotated copies of `of` about `about`, `2π/count` apart, the whole ring
+ * spun by `rotation`.
+ *
+ * `of` is authored **once, unrotated**: it is cell 0, the copy lying on the `+x`
+ * side of `about`. `rotation` spins the whole ring, so turning a gear is flipping
+ * a number rather than rebuilding a tooth.
+ *
+ * Membership is a union — negative inside any copy — but nothing expands: the
+ * fold takes the query point into the *nearest* copy's frame (rigid, so the
+ * distance is preserved) and evaluates `of` once there, which is what makes a
+ * 40-tooth gear one tooth of work per pixel. Exact under the recurrence's usual
+ * preconditions, all of them about how `of` is authored: it must be centred on
+ * its own cell (`+x` from `about`), fit inside that cell (half-sector `π/count`),
+ * and not straddle the axis — see `repeat.test.ts`, which pins both the exact
+ * cases and the three ways to break it.
+ */
+export type PolarRepeat = {
+  kind: "polarRepeat";
+  of: CsgOperand;
+  count: number;
+  about: Vec2;
+  rotation: number;
+};
+
+export type CsgOperand = Region | Circle | HalfPlane | Offset | Csg2 | Pick | PolarRepeat;
 
 export type Geom =
   | Point
@@ -77,4 +102,5 @@ export type Geom =
   | Region
   | Polygon
   | Csg2
-  | Pick;
+  | Pick
+  | PolarRepeat;

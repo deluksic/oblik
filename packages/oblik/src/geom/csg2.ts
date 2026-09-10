@@ -1,6 +1,7 @@
 import { evaluateRegions, islandsAabb, islandsSdf } from "./evaluate-regions";
 import { signedDist } from "./ops";
 import { isFiniteRegion, regionContains, signedDistToRegion, tessellateRegion } from "./region";
+import { foldIntoCopy, repeatStep } from "./repeat";
 import type {
   Circle,
   Csg2,
@@ -10,6 +11,7 @@ import type {
   LineLike,
   Offset,
   Pick,
+  PolarRepeat,
   Polygon,
   Region,
 } from "./types";
@@ -34,6 +36,10 @@ export function isPick(v: { kind: string }): v is Pick {
   return v.kind === "pick";
 }
 
+export function isPolarRepeat(v: unknown): v is PolarRepeat {
+  return !!v && typeof v === "object" && (v as { kind?: string }).kind === "polarRepeat";
+}
+
 /** Unary CSG wrapping an offset leaf — `roundOffset` result. */
 export function isOffsetCsg(v: Csg2): boolean {
   return v.of.length === 1 && isOffset(v.of[0]);
@@ -44,8 +50,14 @@ export function offsetOfCsg(v: Csg2): Offset | undefined {
   return v.of.length === 1 && isOffset(o) ? o : undefined;
 }
 
-export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick | Polygon {
-  return v.kind === "region" || v.kind === "polygon" || v.kind === "csg2" || v.kind === "pick";
+export function isFillGeom(v: { kind: string }): v is Region | Csg2 | Pick | Polygon | PolarRepeat {
+  return (
+    v.kind === "region" ||
+    v.kind === "polygon" ||
+    v.kind === "csg2" ||
+    v.kind === "pick" ||
+    v.kind === "polarRepeat"
+  );
 }
 
 export function leftOfValue(line: LineLike): HalfPlane {
@@ -62,6 +74,33 @@ export function nanCsg2(): Csg2 {
 
 export function nanPick(): Pick {
   return { kind: "pick", of: nanCsg2(), at: { x: Number.NaN, y: Number.NaN } };
+}
+
+export function nanPolarRepeat(): PolarRepeat {
+  return {
+    kind: "polarRepeat",
+    of: { kind: "region", outer: [], holes: [] },
+    count: Number.NaN,
+    about: { x: Number.NaN, y: Number.NaN },
+    rotation: 0,
+  };
+}
+
+/** `count` copies of `of` about `about`, `2π/count` apart, spun by `rotation`. */
+export function polarRepeatValue(
+  of: CsgOperand,
+  count: number,
+  about: Vec2,
+  rotation: number,
+): PolarRepeat {
+  const rep: PolarRepeat = {
+    kind: "polarRepeat",
+    of,
+    count: Number.isFinite(count) ? Math.max(1, Math.round(count)) : Number.NaN,
+    about: { x: about.x, y: about.y },
+    rotation,
+  };
+  return isFinitePolarRepeat(rep) ? rep : nanPolarRepeat();
 }
 
 function isFiniteCircle(c: Circle): boolean {
@@ -82,7 +121,18 @@ export function isFiniteOperand(op: CsgOperand): boolean {
   if (op.kind === "halfPlane") return isFiniteHalfPlane(op);
   if (op.kind === "offset") return isFiniteOperand(op.of) && Number.isFinite(op.d);
   if (op.kind === "pick") return isFiniteOperand(op.of) && isFiniteVec(op.at);
+  if (op.kind === "polarRepeat") return isFinitePolarRepeat(op);
   return isFiniteCsg2(op);
+}
+
+export function isFinitePolarRepeat(r: PolarRepeat): boolean {
+  return (
+    Number.isFinite(r.count) &&
+    r.count >= 1 &&
+    Number.isFinite(r.rotation) &&
+    isFiniteVec(r.about) &&
+    isFiniteOperand(r.of)
+  );
 }
 
 export function isFiniteCsg2(r: Csg2): boolean {
@@ -102,7 +152,8 @@ export function asOperand(v: unknown): CsgOperand | undefined {
     k === "csg2" ||
     k === "halfPlane" ||
     k === "offset" ||
-    k === "pick"
+    k === "pick" ||
+    k === "polarRepeat"
   )
     return v as CsgOperand;
   return undefined;
@@ -150,6 +201,9 @@ export function operandSdf(op: CsgOperand, p: Vec2): number {
   }
   if (op.kind === "offset") return operandSdf(op.of, p) - op.d;
   if (op.kind === "pick") return islandsSdf(evaluateRegions(op), p);
+  // The nearest copy wins: a rotation is rigid, so folding `p` into that copy's
+  // frame leaves the distance alone and only one copy is ever evaluated.
+  if (op.kind === "polarRepeat") return operandSdf(op.of, foldIntoCopy(p, op));
   return csgSdf(op, p);
 }
 
@@ -251,8 +305,69 @@ export function operandAabb(op: CsgOperand): Aabb | undefined {
     };
   }
   if (op.kind === "pick") return islandsAabb(evaluateRegions(op));
+  if (op.kind === "polarRepeat") return repeatAabb(op);
   return csgAabb(op);
 }
+
+/** A repeat's box: every rotated corner of the copy's box, unioned — exact for
+ * the copies' *boxes* (the shapes inside them only get closer to the axis). A
+ * huge count falls back to the disc through the farthest corner, which is a
+ * superset and costs one `hypot` per corner. */
+function rotateAabb(box: Aabb, about: Vec2, ang: number): Aabb {
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const corner of [
+    { x: box.minX, y: box.minY },
+    { x: box.maxX, y: box.minY },
+    { x: box.maxX, y: box.maxY },
+    { x: box.minX, y: box.maxY },
+  ]) {
+    const vx = corner.x - about.x;
+    const vy = corner.y - about.y;
+    const x = about.x + vx * c - vy * s;
+    const y = about.y + vx * s + vy * c;
+    minX = min(minX, x);
+    minY = min(minY, y);
+    maxX = max(maxX, x);
+    maxY = max(maxY, y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+export function repeatAabb(rep: PolarRepeat): Aabb | undefined {
+  if (!Number.isFinite(rep.count) || rep.count < 1) return undefined;
+  const first = operandAabb(rep.of);
+  if (!first) return undefined;
+  if (rep.count > MAX_AABB_COPIES) {
+    const r = max(
+      dist({ x: first.minX, y: first.minY }, rep.about),
+      dist({ x: first.maxX, y: first.minY }, rep.about),
+      dist({ x: first.maxX, y: first.maxY }, rep.about),
+      dist({ x: first.minX, y: first.maxY }, rep.about),
+    );
+    return {
+      minX: rep.about.x - r,
+      minY: rep.about.y - r,
+      maxX: rep.about.x + r,
+      maxY: rep.about.y + r,
+    };
+  }
+  let box: Aabb | undefined;
+  const step = repeatStep(rep.count);
+  for (let k = 0; k < rep.count; k++) {
+    const turned = rotateAabb(first, rep.about, rep.rotation + k * step);
+    box = box ? expand(box, turned) : turned;
+  }
+  return box;
+}
+
+/** Above this many copies a repeat's box is taken as the disc through the
+ * copy's corners instead of unioning rotated boxes. */
+const MAX_AABB_COPIES = 64;
 
 export function csgAabb(r: Csg2): Aabb | undefined {
   if (r.op === "intersect") {
@@ -274,9 +389,9 @@ export function csgAabb(r: Csg2): Aabb | undefined {
   return box;
 }
 
-export function fillAabb(v: Region | Csg2 | Pick): Aabb | undefined {
+export function fillAabb(v: Region | Csg2 | Pick | PolarRepeat): Aabb | undefined {
   if (v.kind === "region") return regionAabb(v);
-  if (v.kind === "pick") return operandAabb(v);
+  if (v.kind === "pick" || v.kind === "polarRepeat") return operandAabb(v);
   return csgAabb(v);
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { csgPaint, fillPaint, REGION_MASK } from "./csg-draw";
+import { csgPaint, fillPaint, paintSvgPath, REGION_MASK } from "./csg-draw";
 import {
   csg2Value,
   csgContains,
@@ -11,12 +11,14 @@ import {
   offsetSourceSdf,
   offsetValue,
   pickValue,
+  polarRepeatValue,
   rightOfValue,
   wrapCsg,
 } from "./csg2";
+import { stampRepeat } from "./evaluate-regions";
 import { roundOffsetValue, compileOffsetBoundary } from "./offset";
 import { alongValue, filletValue, regionContains, regionValue } from "./region";
-import type { Circle, Line, Region, Segment } from "./types";
+import type { Circle, Line, LoopEdge, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
 
 const { max } = Math;
@@ -363,5 +365,124 @@ describe("offset operand", () => {
     expect(paint.empty).toBe(false);
     if (paint.stock.kind !== "path") throw new Error("expected path stock");
     expect((paint.stock.d.match(/Z/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("a polar repeat paints its stamped copies", () => {
+  /** A ring of small boxes, the shape `gearTooth` hands `polarRepeat`. */
+  function ring(count = 40) {
+    return polarRepeatValue(
+      regionValue(rectCycle(1.8, -0.3, 2.2, 0.3), []),
+      count,
+      { x: 0, y: 0 },
+      0,
+    );
+  }
+
+  /** A cell that tiles the disc: a sector with radial edges to the axis, which
+   * is what makes the copies share seams. */
+  function hubCell(count: number): Region {
+    const step = (Math.PI * 2) / count;
+    const half = step / 2;
+    const radius = 2.2;
+    const at = (ang: number): Vec2 => ({ x: radius * Math.cos(ang), y: radius * Math.sin(ang) });
+    const edges: LoopEdge[] = [];
+    for (let i = 0; i < 4; i++) {
+      const a = -half + (2 * half * i) / 4;
+      const b = -half + (2 * half * (i + 1)) / 4;
+      edges.push({
+        a: at(a),
+        b: at(b),
+        carrier: { kind: "circle", center: { x: 0, y: 0 }, radius },
+        k: 1,
+      });
+    }
+    edges.push({ a: at(half), b: { x: 0, y: 0 }, carrier: seg(at(half), { x: 0, y: 0 }) });
+    edges.push({ a: { x: 0, y: 0 }, b: at(-half), carrier: seg({ x: 0, y: 0 }, at(-half)) });
+    return { kind: "region", outer: edges, holes: [] };
+  }
+
+  test("the paint is the copies' paths plus the cut, and it does not compile", () => {
+    const rep = ring();
+    const face = csg2Value("diff", [rep, { kind: "circle", center: { x: 0, y: 0 }, radius: 0.5 }]);
+    const started = performance.now();
+    const paint = csgPaint(face);
+    const elapsed = performance.now() - started;
+    // The boolean islands for a 40-tooth ring take seconds and the paint is
+    // rebuilt on every trace tick, so this path must never reach the compiler:
+    // the copies are disjoint, and their paths concatenated under even-odd *are*
+    // the union.
+    expect(elapsed).toBeLessThan(50);
+    expect(paint.empty).toBe(false);
+    expect(paint.tree).toBeUndefined();
+    // Holes ride in the stock path (see the hub case below), never beside it.
+    expect(paint.holes).toHaveLength(0);
+    expect(paint.stock.kind === "path").toBe(true);
+
+    const d = paintSvgPath(paint);
+    // One subpath per copy, plus the bore's hole path, all one path.
+    expect(paint.holes).toHaveLength(0);
+    expect(
+      paint.stock.kind === "path" && paint.stock.d.split("Z").length - 1,
+    ).toBeGreaterThanOrEqual(41);
+    expect(d.split("Z").length - 1).toBeGreaterThanOrEqual(41);
+    // Same path as stamping the copies by hand, and covering the whole ring.
+    expect(d.length).toBeGreaterThan(2000);
+    const islands = stampRepeat(rep);
+    expect(islands).toHaveLength(40);
+    expect(d.startsWith(paintSvgPath({ ...paint, holes: [] }))).toBe(true);
+    expect(paint.box.maxX).toBeGreaterThan(2);
+    expect(paint.box.minX).toBeLessThan(-2);
+  });
+
+  test("a hub union paints the copies' merged outline and drops the hub", () => {
+    // The gear's shape: the cells running to the axis, plus the root disc they
+    // stand on, minus the bore. The disc is inside the copies, so the paint is
+    // the copies' *merged* outline — one loop for the whole ring, with the
+    // seams between cells gone, so a stroke cannot draw them as spokes.
+    const cell = polarRepeatValue(hubCell(40), 40, { x: 0, y: 0 }, 0);
+    const hub = { kind: "circle" as const, center: { x: 0, y: 0 }, radius: 1.8 };
+    const face = csg2Value("diff", [
+      csg2Value("union", [hub, cell]),
+      { kind: "circle", center: { x: 0, y: 0 }, radius: 0.5 },
+    ]);
+    const started = performance.now();
+    const paint = csgPaint(face);
+    expect(performance.now() - started).toBeLessThan(50);
+    // The bore is *in* the stock path, not beside it: the SVG view masks the
+    // stock alone, so a hole left in `holes` would not be punched at all.
+    expect(paint.holes).toHaveLength(0);
+    expect(paint.stock.kind === "path" && paint.stock.d.split("M").length - 1).toBe(2);
+    // The stock is the ring's own loop, not 40 cell loops; the bore is its
+    // second subpath, which is what makes the mask punch it.
+    const stock = paint.stock.kind === "path" ? paint.stock.d : "";
+    // The ring's loop plus the bore: two subpaths, one even-odd path.
+    expect(stock.split("M").length - 1).toBe(2);
+    expect(stock.split("Z").length - 1).toBe(2);
+    const d = paintSvgPath(paint);
+    expect(d.split("M").length - 1).toBe(2);
+    expect(d.length).toBeGreaterThan(2000);
+    // A hub that is *not* inside the copies is a real union: the fast path backs
+    // off rather than painting a wrong outline.
+    const bigger = csg2Value("union", [
+      { kind: "circle", center: { x: 0, y: 0 }, radius: 9 },
+      cell,
+    ]);
+    const slow = csgPaint(bigger);
+    expect(slow.empty).toBe(false);
+    expect(slow.tree ?? slow.stock).toBeDefined();
+  });
+
+  test("a bare repeat paints the same way, and a boolean around it falls back", () => {
+    const rep = ring(12);
+    expect(csgPaint(rep).stock.kind).toBe("path");
+    // `union(repeat, circle)` is not a stamped shape: the compiler takes it.
+    const unioned = csg2Value("union", [
+      rep,
+      { kind: "circle", center: { x: 0, y: 0 }, radius: 1 },
+    ]);
+    const paint = csgPaint(unioned);
+    expect(paint.empty).toBe(false);
+    expect(paintSvgPath(paint).length).toBeGreaterThan(0);
   });
 });

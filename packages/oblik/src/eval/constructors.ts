@@ -13,6 +13,7 @@ import {
   signedDist as signedDistValue,
   alongValue,
   filletValue,
+  asOperand,
   isFiniteCsg2,
   isFinitePick,
   isFiniteRegion,
@@ -20,6 +21,7 @@ import {
   leftOfValue,
   nanCsg2,
   nanPick,
+  nanPolarRepeat,
   nanRegion,
   regionValue,
   isFinitePolygon,
@@ -29,6 +31,7 @@ import {
   wrapCsg,
   offsetValue,
   pickValue,
+  polarRepeatValue,
   rightOfValue,
   tangentLineValue,
   commonTangentLineValue,
@@ -41,7 +44,9 @@ import {
   type Line,
   type LineLike,
   type ParallelLine,
+  type CsgOperand,
   type Point,
+  type PolarRepeat,
   type Polygon,
   type Region,
   type WalkInput,
@@ -283,6 +288,52 @@ export function fillet(at: Vec2, r: number): Fillet {
   return filletValue(at, r);
 }
 
+/**
+ * `count` copies of `cell` about `about`, `2π/count` apart, the ring spun by
+ * `rotation` — a gear tooth, a bolt hole, a spoke.
+ *
+ * `cell` is authored **once, unrotated**: cell 0, the copy on the `+X` side of
+ * `about`. It is either a closed walk (points and edges, the common case — the
+ * ring of it is built here) or any CSG operand. Nothing expands: the field folds
+ * the query point into the *nearest* copy and evaluates the cell once there, so
+ * a 40-tooth gear costs one tooth per pixel and its record holds one tooth's
+ * spans — which is why the cell has to be centred on its own sector and fit
+ * inside it (`±π/count`, and never straddling the axis).
+ *
+ * An operand helper like `diff`/`leftOf`, not a tape node: nothing here is
+ * drawn by itself. Hand it to `csg2(...)` (or to `roundOffset`, `pick`, a
+ * boolean) to fill or inspect it.
+ */
+export function polarRepeat(
+  cell: WalkInput | CsgOperand,
+  count: number,
+  about: Vec2,
+  rotation = 0,
+): PolarRepeat {
+  const op = Array.isArray(cell) ? regionValue(cellChain(cell), []) : asOperand(cell);
+  if (!op) return nanPolarRepeat();
+  return polarRepeatValue(op, count, about, rotation);
+}
+
+/** A generated outline arrives as a chain of vertices, while `region` wants its
+ * walked form — `[vertex, edge, vertex, edge, …]`, each edge the carrier that
+ * runs to the *next* vertex. A chain of points is interleaved into that here, so
+ * `polarRepeat(points, …)` reads like `polygon(points, …)`; a walk that already
+ * carries its own edges is passed straight through. */
+function cellChain(cell: readonly unknown[]): unknown[] {
+  if (cell.length === 0 || !cell.every((v) => isFiniteVec(v as Vec2))) return cell as unknown[];
+  const out: unknown[] = [];
+  for (let i = 0; i < cell.length; i++) {
+    const a = cell[i] as Vec2;
+    const b = cell[(i + 1) % cell.length] as Vec2;
+    out.push(
+      { kind: "point", x: a.x, y: a.y },
+      { kind: "segment", a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } },
+    );
+  }
+  return out;
+}
+
 export const region = mark(
   (cycle: WalkInput, holes: readonly WalkInput[], id?: string): Region => {
     if (!Array.isArray(holes)) return traced(nanRegion(), id);
@@ -352,11 +403,14 @@ export function pick(of: unknown, at: Vec2): Pick {
 
 /** Record a CSG field or pick on the tape for inspect/fill. */
 export const csg2 = mark(
-  (value: Csg2 | Pick, id?: string): Csg2 | Pick => {
+  (value: CsgOperand | Pick, id?: string): Csg2 | Pick => {
     if (!value || typeof value !== "object") return traced(nanCsg2(), id);
     if (value.kind === "csg2" && isFiniteCsg2(value)) return traced(value, id);
     if (value.kind === "pick" && isFinitePick(value)) return traced(value, id);
-    return traced(nanCsg2(), id);
+    // A bare operand — a repeat, a half-plane, an island pick — is drawn by
+    // wrapping it in a one-operand union (see `wrapCsg`).
+    const op = asOperand(value);
+    return op ? traced(wrapCsg(op), id) : traced(nanCsg2(), id);
   },
   { dof: [] },
 );

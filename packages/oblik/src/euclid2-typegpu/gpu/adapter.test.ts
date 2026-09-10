@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import type { TraceNode } from "#eval/context";
 import type { Vec2 } from "#geom";
+import type { CsgOperand, PolarRepeat } from "#geom";
+import { csg2Value, polarRepeatValue } from "#geom/csg2";
 
 import { createAdapter, type AdapterInput, type Rgb } from "./adapter";
 
@@ -365,6 +367,21 @@ describe("fill outline (state colors)", () => {
   });
 });
 
+/** A tooth-like box on the `+x` side of the origin: cell 0 of a repeat. */
+function ringTooth() {
+  const corners: Vec2[] = [
+    { x: 1.8, y: -0.3 },
+    { x: 2.2, y: -0.3 },
+    { x: 2.2, y: 0.3 },
+    { x: 1.8, y: 0.3 },
+  ];
+  const outer = corners.map((a, i) => {
+    const b = corners[(i + 1) % corners.length]!;
+    return { a, b, carrier: { kind: "segment" as const, a, b } };
+  });
+  return { kind: "region" as const, outer, holes: [] };
+}
+
 /** One node of every record kind — a stroke, a circle, a point, a compiled
  * field and a span-path fill. Between them they carry every width a zoom used
  * to rewrite: ctrl radii, annulus bands, disc radii, the fill outline and the
@@ -392,6 +409,68 @@ function recordFixture(): TraceNode[] {
  * zoom therefore re-uploads nothing while still reprojecting the world — the
  * whole point of storing px instead of world units (see `schemas.ts`).
  */
+describe("polar repeat fills", () => {
+  /** A 24-tooth ring with a bore cut out: the shape the gear scene hands the
+   * pane, and the one the fold exists for. */
+  function ringFace(count = 24): { face: CsgOperand; rep: PolarRepeat } {
+    const rep = polarRepeatValue(ringTooth(), count, { x: 0, y: 0 }, 0);
+    const face = csg2Value("diff", [rep, { kind: "circle", center: { x: 0, y: 0 }, radius: 0.5 }]);
+    return { face, rep };
+  }
+
+  test("a 24-tooth ring compiles to one tooth, on the field path", () => {
+    const { face } = ringFace();
+    const patch = createAdapter().tick(input([node("o_ring", face, "ring")]));
+    // The compiled field, never the span path: 24 copies on the span path would
+    // be 96 boundary spans walking every pixel, against 4 for the folded tooth.
+    expect(patch.fillDraws.map((d) => d.path)).toEqual(["field"]);
+    expect(patch.fields.quads.writes).toHaveLength(1);
+    expect(patch.fields.segs.writes).toHaveLength(4);
+    expect(patch.fills.writes).toHaveLength(0);
+    const draw = patch.fillDraws[0]!;
+    // The shape key names the structure, not the numbers: one tooth, a ring.
+    expect(draw.path === "field" && draw.plan.shape).toBe("diff(polarRepeat(region),circle)");
+    expect(draw.path === "field" && draw.plan.leaves.map((l) => l.kind)).toEqual([
+      "spans",
+      "repeat",
+      "circle",
+    ]);
+  });
+
+  test("dragging the tooth count rewrites numbers, never the spans", () => {
+    const { face, rep } = ringFace();
+    // One node object across both ticks, like eval's reused trace.
+    const ring = node("o_ring", face, "ring");
+    const adapter = createAdapter();
+    adapter.tick(input([ring]));
+    // A slider drag: same operand identity, new count. The teeth are implied by
+    // the fold, so only bean-count numbers move — the tooth's spans, the ring's
+    // boundary in the record, never re-upload.
+    rep.count = 40;
+    const patch = adapter.tick(input([ring]));
+    // The node's whole leaf payload re-uploads (the tooth's window, the spacing
+    // and the bore) — a handful of floats either way.
+    expect(patch.fields.leaves.writes).toHaveLength(3);
+    expect(patch.fields.quads.writes).toHaveLength(1);
+    expect(patch.fields.segs.writes).toHaveLength(0);
+    expect(patch.fills.writes).toHaveLength(0);
+  });
+
+  test("a repeat recolors on hover like any other fill", () => {
+    const { face } = ringFace();
+    const ring = node("o_ring", face, "ring");
+    const adapter = createAdapter();
+    adapter.tick(input([ring]));
+    const hovered = adapter.tick(input([ring], { hoverId: "o_ring" }));
+    expect(hovered.fillDraws.map((d) => `${d.path}:${d.layer}`)).toEqual([
+      "field:paint",
+      "field:halo",
+    ]);
+    expect(hovered.fields.quads.writes).toHaveLength(1);
+    expect(hovered.fields.segs.writes).toHaveLength(0);
+  });
+});
+
 describe("zoom and pan write no records", () => {
   test("the first tick uploads everything, the second nothing", () => {
     const trace = recordFixture();

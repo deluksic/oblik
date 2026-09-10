@@ -40,6 +40,7 @@ export {
   union,
   intersect,
   pick,
+  polarRepeat,
   csg2,
   style,
   paint,

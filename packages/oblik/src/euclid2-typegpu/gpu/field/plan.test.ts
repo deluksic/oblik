@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
-import type { CsgOperand, Vec2 } from "#geom";
+import type { CsgOperand, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
-import { operandSdf } from "#geom/csg2";
+import { operandAabb, operandSdf, polarRepeatValue } from "#geom/csg2";
 
 import { evaluate } from "../../../eval/evaluate";
 import type { Scene } from "../../../eval/scene";
@@ -76,7 +76,7 @@ function probeRect(plan: FieldPlan, inst: ReturnType<typeof buildFieldInstance>)
   let max = { x: -Infinity, y: -Infinity };
   const seen = new Set<number>();
   const walk = (node: FieldPlan["root"]): void => {
-    if (node.kind === "offset") return walk(node.of);
+    if (node.kind === "offset" || node.kind === "repeat") return walk(node.of);
     if (node.kind !== "leaf") {
       for (const child of node.of) walk(child);
       return;
@@ -157,6 +157,21 @@ function probesFor(rect: { min: Vec2; max: Vec2 }, inst: FieldInstance): Vec2[] 
  * the band must agree to the tolerance below. */
 const BAND_FACTOR = 0.005;
 
+/** A tooth-like box on the `+x` side of the origin: cell 0 for `polarRepeat`. */
+function ringTooth(): Region {
+  const corners: Vec2[] = [
+    { x: 1.8, y: -0.3 },
+    { x: 2.2, y: -0.3 },
+    { x: 2.2, y: 0.3 },
+    { x: 1.8, y: 0.3 },
+  ];
+  const outer = corners.map((a, i) => {
+    const b = corners[(i + 1) % corners.length]!;
+    return { a, b, carrier: { kind: "segment" as const, a, b } };
+  });
+  return { kind: "region", outer, holes: [] };
+}
+
 function arcBand(inst: FieldInstance): number {
   let r = 0;
   for (const e of inst.spans.arcs) if (e.radius > r) r = e.radius;
@@ -190,6 +205,60 @@ describe("field plan", () => {
       const replanned = fieldPlan(moved);
       expect(replanned?.shape).toBe(c.plan.shape);
     }
+  });
+
+  test("a polar repeat compiles to one leaf of numbers over the child's tree", () => {
+    const rep = polarRepeatValue(ringTooth(), 12, { x: 0, y: 0 }, 0.4);
+    const plan = fieldPlan(rep)!;
+    expect(plan).toBeDefined();
+    // Structure only: the count and the spin are data, so the cache key holds
+    // neither, and a slider drag cannot recompile the shader.
+    expect(plan.shape).toBe("polarRepeat(region)");
+    // The child is planned first (like `offset`), so the wrapper's leaf is last.
+    expect(plan.leaves.map((l) => l.kind)).toEqual(["spans", "repeat"]);
+    const other = fieldPlan(polarRepeatValue(ringTooth(), 37, { x: 5, y: -2 }, -1.7))!;
+    expect(other.shape).toBe(plan.shape);
+    expect(other.leaves).toHaveLength(2);
+
+    // Leaf data is where those numbers live: `a` is the axis, `b` the spin and
+    // the spacing, `r` the count the CPU twin and the box read.
+    const inst = buildFieldInstance(plan);
+    const rep2 = inst.leaves[1]!;
+    expect(rep2.a).toEqual({ x: 0, y: 0 });
+    expect(rep2.b.x).toBeCloseTo(0.4, 12);
+    expect(rep2.b.y).toBeCloseTo((2 * Math.PI) / 12, 12);
+    expect(rep2.r).toBe(12);
+    // One window into the span arrays: the tooth, not the ring.
+    expect(inst.leaves[0]!.segCount).toBe(4);
+    expect(inst.spans.segs).toHaveLength(4);
+  });
+
+  test("the compiled fold matches the reference across the ring", () => {
+    const rep = polarRepeatValue(ringTooth(), 12, { x: 0, y: 0 }, 0.4);
+    const plan = fieldPlan(rep)!;
+    const inst = buildFieldInstance(plan);
+    let worst = 0;
+    let at: Vec2 = { x: 0, y: 0 };
+    for (let i = 0; i <= 120; i++) {
+      for (let j = 0; j <= 120; j++) {
+        const p = { x: -3.4 + (6.8 * i) / 120, y: -3.4 + (6.8 * j) / 120 };
+        const delta = Math.abs(evaluateField(plan, inst, p) - operandSdf(rep, p));
+        if (delta > worst) {
+          worst = delta;
+          at = p;
+        }
+      }
+    }
+    expect(worst, `worst Δ at ${JSON.stringify(at)}`).toBeLessThan(1e-9);
+
+    // The quad covers every copy, and agrees with the CPU box.
+    const box = fieldBox(plan, inst);
+    const want = operandAabb(rep)!;
+    expect(box.min.x).toBeCloseTo(want.minX, 9);
+    expect(box.min.y).toBeCloseTo(want.minY, 9);
+    expect(box.max.x).toBeCloseTo(want.maxX, 9);
+    expect(box.max.y).toBeCloseTo(want.maxY, 9);
+    expect(box.max.x).toBeGreaterThan(2);
   });
 
   test("parity with operandSdf on every demo CSG tree", async () => {

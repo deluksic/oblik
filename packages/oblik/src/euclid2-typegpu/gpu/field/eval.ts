@@ -23,6 +23,24 @@ function evalNode(plan: FieldPlan, node: FieldNodePlan, inst: FieldInstance, p: 
   if (node.kind === "offset") {
     return evalNode(plan, node.of, inst, p) - inst.leaves[node.leaf]!.r;
   }
+  if (node.kind === "repeat") {
+    // Fold into the nearest copy, then evaluate the child there. Transcribed from
+    // the shader's own fold (`../assemble.ts`) rather than calling the shared
+    // helper, on purpose: this file is the shader's mirror, so the parity run
+    // against `operandSdf` has to see the shader's arithmetic, not a second copy
+    // of the reference. (`geom/repeat.ts`'s `foldPolar` is that reference.)
+    const leaf = inst.leaves[node.leaf]!;
+    const theta = Math.atan2(p.y - leaf.a.y, p.x - leaf.a.x);
+    const ang = leaf.b.x + Math.round((theta - leaf.b.x) / leaf.b.y) * leaf.b.y;
+    const c = Math.cos(ang);
+    const s = Math.sin(ang);
+    const vx = p.x - leaf.a.x;
+    const vy = p.y - leaf.a.y;
+    return evalNode(plan, node.of, inst, {
+      x: leaf.a.x + vx * c + vy * s,
+      y: leaf.a.y + vy * c - vx * s,
+    });
+  }
   const first = node.of[0];
   if (!first) return Number.NaN;
   if (node.kind === "diff") {
@@ -48,7 +66,8 @@ function evalLeaf(plan: FieldPlan, index: number, inst: FieldInstance, p: Vec2):
   if (leaf.kind === "halfPlane") {
     return (p.x - data.a.x) * data.b.x + (p.y - data.a.y) * data.b.y;
   }
-  if (leaf.kind === "offset") return 0;
+  // `offset` and `repeat` are node wrappers: the leaf contributes no field.
+  if (leaf.kind === "offset" || leaf.kind === "repeat") return 0;
   return spanField(inst, data, p);
 }
 

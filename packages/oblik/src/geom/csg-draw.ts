@@ -4,17 +4,33 @@ import {
   isFiniteCsg2,
   isFiniteOperand,
   isFinitePick,
+  isFinitePolarRepeat,
   operandAabb,
+  repeatAabb,
   type Aabb,
 } from "./csg2";
-import { evaluateRegions, islandsAabb, islandsSvgPath } from "./evaluate-regions";
+import {
+  evaluateRegions,
+  islandsAabb,
+  islandsSvgPath,
+  mergeRepeatOutline,
+} from "./evaluate-regions";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
 import { regionSvgPath } from "./region";
-import type { Circle, Csg2, CsgOperand, HalfPlane, Offset, Pick, Region } from "./types";
+import type {
+  Circle,
+  Csg2,
+  CsgOperand,
+  HalfPlane,
+  Offset,
+  Pick,
+  PolarRepeat,
+  Region,
+} from "./types";
 import { lerp, type Vec2 } from "./vec";
 
-const { abs, max, round } = Math;
+const { abs, hypot, max, min, round } = Math;
 export type DrawOp =
   | { kind: "path"; d: string }
   | { kind: "circle"; cx: number; cy: number; r: number };
@@ -208,6 +224,13 @@ function drawOf(op: CsgOperand, box: Aabb): CsgDraw | undefined {
     if (!d) return undefined;
     return { kind: "solid", op: { kind: "path", d } };
   }
+  if (node.kind === "polarRepeat") {
+    // Stamped, not compiled, and merged: the copies come back as the ring's own
+    // outline, so a stroke follows the union rather than every cell seam.
+    const d = repeatOutlSvgPath(node);
+    if (!d) return undefined;
+    return { kind: "solid", op: { kind: "path", d } };
+  }
   if (node.kind !== "csg2") return undefined;
   const kids: CsgDraw[] = [];
   for (const child of node.of) {
@@ -219,6 +242,105 @@ function drawOf(op: CsgOperand, box: Aabb): CsgDraw | undefined {
   if (node.op === "union") return kids.length === 1 ? kids[0]! : { kind: "union", kids };
   if (node.op === "intersect") return kids.length === 1 ? kids[0]! : { kind: "intersect", kids };
   return { kind: "diff", stock: kids[0]!, cut: kids.slice(1) };
+}
+
+/**
+ * A repeat — alone, or with solids subtracted — painted straight from its copies.
+ *
+ * The copies are disjoint by construction (the cell fits its sector), so their
+ * paths concatenated under even-odd *are* the union: no boolean, no CSG compile.
+ * That matters: `evaluateRegions` on a 40-tooth ring takes seconds, and the
+ * paint is rebuilt on every trace tick, so the slow path would freeze the SVG
+ * pane the repeat is meant to speed up. Anything this cannot express (a
+ * non-solid cut, a boolean around the repeat) falls through to the compiler.
+ */
+function stampedPaint(op: CsgOperand): CsgPaint | undefined {
+  let node = unwrapUnary(op);
+  const holes: DrawOp[] = [];
+  if (node.kind === "csg2" && node.op === "diff") {
+    for (const cut of node.of.slice(1)) {
+      const c = unwrapUnary(cut);
+      if (c.kind === "region" || c.kind === "circle") holes.push(drawOp(c));
+      else if (c.kind === "pick" && isFinitePick(c))
+        holes.push({ kind: "path", d: islandsSvgPath(evaluateRegions(c)) });
+      else return undefined;
+    }
+    node = unwrapUnary(node.of[0]!);
+  }
+  // The stock is the repeat, allowed to be unioned with the hub discs that sit
+  // inside it — a hub adds nothing to the outline or the fill the copies do not
+  // already have, so it drops out of the paint (see the guard below).
+  const kids = node.kind === "csg2" && node.op === "union" ? node.of : [node];
+  let rep: PolarRepeat | undefined;
+  for (const kid of kids) {
+    const k = unwrapUnary(kid);
+    if (k.kind === "polarRepeat") {
+      if (rep) return undefined;
+      rep = k;
+    } else if (k.kind !== "circle") {
+      return undefined;
+    }
+  }
+  if (!rep) return undefined;
+  const merged = mergeRepeatOutline(rep);
+  // A hub is only droppable when it is *inside* what the copies already cover:
+  // on their axis, and no wider than their outline's inner reach (the root
+  // circle, for cells that run to the axis). Anything else is a real union and
+  // goes to the tree.
+  const inner = outlineInnerRadius(merged, rep.about);
+  for (const kid of kids) {
+    const k = unwrapUnary(kid);
+    if (k.kind !== "circle") continue;
+    const off = Math.hypot(k.center.x - rep.about.x, k.center.y - rep.about.y);
+    if (off > 1e-9 || abs(k.radius) > inner + 1e-9) return undefined;
+  }
+  const d = merged
+    .map((island) => regionSvgPath(island))
+    .filter((one) => one.length > 0)
+    .join(" ");
+  // The stock's own box: the cuts only take material away, so it still frames
+  // the paint (and it is the cheap one — no CSG compile).
+  const box = repeatAabb(rep);
+  if (!d || !box) return undefined;
+  const span = max(box.maxX - box.minX, box.maxY - box.minY, 1e-3);
+  // `mergePaintHoles`, not a separate `holes` list: the mask the SVG view builds
+  // paints the *stock path* and nothing else, so a hole is only a hole once it is
+  // a subpath of that one even-odd path. A separate list is for stroking holes,
+  // not for punching them.
+  return mergePaintHoles({
+    empty: false,
+    box: padAabb(box, span * 0.08),
+    stock: { kind: "path", d },
+    holes,
+  });
+}
+
+/** The copies' union outline as one path, and the copies' inner reach: the
+ * closest any of those edges comes to the repeat's axis. A hub disc within it is
+ * covered by the copies and can be left out of the paint. */
+function repeatOutlSvgPath(rep: PolarRepeat): string {
+  return mergeRepeatOutline(rep)
+    .map((island) => regionSvgPath(island))
+    .filter((d) => d.length > 0)
+    .join(" ");
+}
+
+function outlineInnerRadius(islands: readonly Region[], about: Vec2): number {
+  let inner = Infinity;
+  for (const island of islands) {
+    const loop = island.outer;
+    if (!Array.isArray(loop)) {
+      inner = NaN;
+      break;
+    }
+    for (const e of loop) {
+      inner = min(inner, hypot(e.a.x - about.x, e.a.y - about.y));
+      inner = min(inner, hypot(e.b.x - about.x, e.b.y - about.y));
+    }
+  }
+  // A loop that passes within a hair of the axis covers nothing useful: treat a
+  // degenerate inner reach as "no hub".
+  return Number.isFinite(inner) ? inner : -Infinity;
 }
 
 function paintBox(op: CsgOperand): Aabb | undefined {
@@ -288,6 +410,8 @@ function paintCompiledIslands(islands: readonly Region[]): CsgPaint {
  */
 export function csgPaint(op: CsgOperand): CsgPaint {
   if (!isFiniteOperand(op)) return emptyPaint();
+  const stamped = stampedPaint(op);
+  if (stamped) return stamped;
   const islands = evaluateRegions(op);
   if (islands.length > 0) return paintCompiledIslands(islands);
   const box = paintBox(op);
@@ -317,7 +441,7 @@ export function csgPaint(op: CsgOperand): CsgPaint {
   };
 }
 
-export function fillPaint(v: Region | Csg2 | Pick): CsgPaint {
+export function fillPaint(v: Region | Csg2 | Pick | PolarRepeat): CsgPaint {
   const hit = fillPaintCache.get(v);
   if (hit) return hit;
   const out = fillPaintFresh(v);
@@ -325,9 +449,9 @@ export function fillPaint(v: Region | Csg2 | Pick): CsgPaint {
   return out;
 }
 
-const fillPaintCache = new WeakMap<Region | Csg2 | Pick, CsgPaint>();
+const fillPaintCache = new WeakMap<Region | Csg2 | Pick | PolarRepeat, CsgPaint>();
 
-function fillPaintFresh(v: Region | Csg2 | Pick): CsgPaint {
+function fillPaintFresh(v: Region | Csg2 | Pick | PolarRepeat): CsgPaint {
   if (v.kind === "region") {
     const d = regionSvgPath(v);
     if (!d) return emptyPaint();
@@ -343,6 +467,10 @@ function fillPaintFresh(v: Region | Csg2 | Pick): CsgPaint {
   }
   if (v.kind === "pick") {
     if (!isFinitePick(v)) return emptyPaint();
+    return csgPaint(v);
+  }
+  if (v.kind === "polarRepeat") {
+    if (!isFinitePolarRepeat(v)) return emptyPaint();
     return csgPaint(v);
   }
   if (!isFiniteCsg2(v)) return emptyPaint();

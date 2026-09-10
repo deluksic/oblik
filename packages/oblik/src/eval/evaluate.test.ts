@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { isCsg2, offsetOfCsg } from "../geom/csg2";
+import { isCsg2, isFiniteOperand, offsetOfCsg, operandSdf } from "../geom/csg2";
 import { walkEdges } from "../geom/region";
 import { analyze } from "../source/analyze";
 import {
@@ -15,6 +15,7 @@ import {
   intersect,
   csg2,
   diff,
+  polarRepeat,
   region,
   roundOffset,
   segment,
@@ -507,5 +508,63 @@ describe("tryEvaluate", () => {
     const out = tryEvaluate(scene);
     expect(out.error).toBe("left is not defined");
     expect(out.trace).toEqual([]);
+  });
+});
+
+/** One cell of a ring, generated the way a scene's layout would. */
+function cell(): { x: number; y: number }[] {
+  return [
+    { x: 1.8, y: -0.3 },
+    { x: 2.2, y: -0.3 },
+    { x: 2.2, y: 0.3 },
+    { x: 1.8, y: 0.3 },
+  ];
+}
+
+describe("polarRepeat", () => {
+  test("a point chain becomes a region and folds into a repeat", () => {
+    const rep = polarRepeat(cell(), 12, { x: 0, y: 0 }, 0.4);
+    expect(rep.kind).toBe("polarRepeat");
+    expect(rep.count).toBe(12);
+    expect(rep.of.kind).toBe("region");
+    // Authored unrotated: the cell's own distance is the repeat's on its centre.
+    expect(operandSdf(rep, { x: 2, y: 0 })).toBeLessThan(0);
+    expect(operandSdf(rep, { x: -2, y: 0 })).toBeLessThan(0);
+  });
+
+  test("a walk with carriers passes straight through", () => {
+    const O = { x: 0, y: 0 };
+    const A = { x: 2, y: 0 };
+    const B = { x: 0, y: 2 };
+    const oa = segment(O, A);
+    const ab = segment(A, B);
+    const bo = segment(B, O);
+    const rep = polarRepeat([O, oa, A, ab, B, bo], 4, { x: 0, y: 0 }, 0);
+    expect(rep.of.kind).toBe("region");
+    expect(isFiniteOperand(rep)).toBe(true);
+  });
+
+  test("it is an operand, not a tape node: `csg2` is what draws it", () => {
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        const face = csg2(diff(polarRepeat(cell(), 12, { x: 0, y: 0 }, 0), []), "face");
+        return face;
+      },
+    });
+    const { trace } = evaluate(scene, {});
+    // One node: the `csg2`. The repeat inside it is a value, so it is neither
+    // drawn nor inspectable on its own — the operand-helper convention (`diff`,
+    // `leftOf`) the stamping and the panes both rely on.
+    expect(trace).toHaveLength(1);
+    expect(trace[0]!.kind).toBe("csg2");
+    expect(trace[0]!.id).toBe("face");
+  });
+
+  test("a repeat with a bad cell reads as empty, not as a broken ring", () => {
+    expect(isFiniteOperand(polarRepeat([], 12, { x: 0, y: 0 }, 0))).toBe(false);
+    expect(isFiniteOperand(polarRepeat(cell(), Number.NaN, { x: 0, y: 0 }, 0))).toBe(false);
+    expect(isFiniteOperand(polarRepeat(cell(), 12, { x: Number.NaN, y: 0 }, 0))).toBe(false);
   });
 });

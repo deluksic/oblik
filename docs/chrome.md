@@ -80,6 +80,16 @@ two views differ on purpose:
   record at all — where baking `px / scale` into the records made one zoom step rewrite
   226 of a 288-record scene. The quad's AA skirt went the same way: `QUAD_PAD_PX` grows
   the box in the vertex shader, so the stored AABB stays pure world geometry.
+- **A repeat's seams are not chrome, and both renderers have to be told so.** `polarRepeat`
+  folds the query point into one cell, so the field it evaluates is that _cell's_ distance:
+  where two copies tile (a gear tooth plus its wedge of root disc) the shared edge is
+  interior to the union yet still the cell's boundary, and a fill would draw it — the
+  outline band round each seam, the coverage ramping down and up: radial spokes. The fill
+  unions in the **hub** disc the cells stand on (`min(hub, fold(cell))`), which covers those
+  seams, and the hub itself is inside the copies so it contributes no outline of its own. The
+  paint side cannot lean on that: SVG strokes every subpath, so the copies' _shared_ edges
+  are dropped in the geometry (`mergeRepeatOutline`) and the surviving edges chain into the
+  ring's own loop — one outline, which is what a stroke has to follow.
 - **Chrome over a fill is one antialiased layer per pixel, never two blends.** Both the
   paint+outline pair and the band pair are areas of one pixel, so the output is the
   pixel's coverage times the _area-weighted_ mix of the layers: colors mix with the

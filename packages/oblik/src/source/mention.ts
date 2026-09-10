@@ -328,6 +328,7 @@ const GEOM_HELPERS = new Set([
   "union",
   "intersect",
   "pick",
+  "polarRepeat",
 ]);
 
 function callsInFn(

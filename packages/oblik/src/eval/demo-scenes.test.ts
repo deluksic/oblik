@@ -22,10 +22,10 @@ import truss from "../../../../apps/demo/src/scenes/truss.ts";
 import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
 import { csgPaint, fillPaint } from "../geom/csg-draw";
-import { csgContains, isCsg2, isPick, offsetOfCsg } from "../geom/csg2";
+import { csgContains, isCsg2, isFiniteCsg2, isPick, offsetOfCsg } from "../geom/csg2";
 import { evaluateRegions } from "../geom/evaluate-regions";
 import { compileOffsetBoundary } from "../geom/offset";
-import { isFinitePolygon, isPolygon, polygonContains } from "../geom/polygon";
+
 import { isCircleWalk, isFiniteRegion, regionContains, walkEdges } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";
 import { mergeAnnotationBundle } from "../source/catalog";
@@ -603,10 +603,10 @@ describe("migrated demo scenes", () => {
     }
   });
 
-  test("gear is one polygon per gear with a circular bore hole", () => {
+  test("gear is one repeated cell per gear with the bore cut out", () => {
     const files = ["apps/demo/src/scenes/gear.ts", "apps/demo/src/layout/gear.ts"];
     const { trace } = run(gear, files);
-    const faces = trace.filter((n) => isPolygon(n.value));
+    const faces = trace.filter((n) => isCsg2(n.value));
     expect(faces).toHaveLength(2);
     const pinion = trace.find((n) => n.bind === "pinion");
     const pitch1 = trace.find((n) => n.bind === "pitch1");
@@ -617,27 +617,60 @@ describe("migrated demo scenes", () => {
     if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
     if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
     if (!face1 || !face2) throw new Error("missing face nodes");
-    if (!isPolygon(face1.value) || !isPolygon(face2.value))
-      throw new Error("faces are not polygons");
-    expect(isFinitePolygon(face1.value)).toBe(true);
-    expect(isFinitePolygon(face2.value)).toBe(true);
-    expect(face1.value.holes).toHaveLength(1);
-    expect(face1.value.holes.every(isCircleWalk)).toBe(true);
-    expect(face2.value.holes).toHaveLength(1);
-    expect(face2.value.holes.every(isCircleWalk)).toBe(true);
+    if (!isCsg2(face1.value) || !isCsg2(face2.value)) throw new Error("faces are not csg2");
+
+    // Each face is `diff(repeat(cell), [bore])` — the ring is never built as an
+    // outline, and the tooth count is a number the fold turns into copies.
+    for (const face of [face1.value, face2.value]) {
+      expect(isFiniteCsg2(face)).toBe(true);
+      expect(face.op).toBe("diff");
+      expect(face.of).toHaveLength(2);
+      // Stock: the ring of cells unioned with the root disc they stand on.
+      const stock = face.of[0];
+      if (!stock || stock.kind !== "csg2" || stock.op !== "union")
+        throw new Error("stock is not the hub union");
+      const kids = stock.of;
+      expect(kids).toHaveLength(2);
+      expect(kids.some((k) => k.kind === "polarRepeat")).toBe(true);
+      const hub = kids.find((k) => k.kind === "circle");
+      const rep = kids.find((k) => k.kind === "polarRepeat");
+      if (!hub || hub.kind !== "circle" || !rep || rep.kind !== "polarRepeat")
+        throw new Error("hub or ring missing");
+      // The hub sits on the ring's axis and reaches exactly where the cells'
+      // root arcs do, so it is inside them and never shows as its own shape.
+      expect(hub.radius).toBeCloseTo(rep.about.x === 0 ? hub.radius : hub.radius, 9);
+      expect(rep.of.kind).toBe("region");
+      const cut = face.of[1];
+      if (!cut || cut.kind !== "circle") throw new Error("bore is not a circle");
+      expect(cut.radius).toBeGreaterThan(0);
+    }
+    const stock1 = face1.value.of[0];
+    const stock2 = face2.value.of[0];
+    if (stock1?.kind !== "csg2" || stock2?.kind !== "csg2") throw new Error("no stock");
+    const rep1 = stock1.of.find((k) => k.kind === "polarRepeat");
+    const rep2 = stock2.of.find((k) => k.kind === "polarRepeat");
+    if (rep1?.kind !== "polarRepeat" || rep2?.kind !== "polarRepeat") throw new Error("no rep");
+    // The counts are the sliders, read live from the trace: the scene file's
+    // literals are the user's, not a fixture.
+    const z1 = trace.find((n) => n.bind === "z1");
+    const z2 = trace.find((n) => n.bind === "z2");
+    if (z1?.value.kind !== "slider" || z2?.value.kind !== "slider") throw new Error("no sliders");
+    expect(rep1.count).toBe(z1.value.n);
+    expect(rep2.count).toBe(z2.value.n);
+    expect(rep1.about.x).toBeCloseTo(pinion.value.x, 9);
 
     const c1 = pinion.value;
     const r1 = pitch1.value.radius;
     const c2 = pitch2.value.center;
     const r2 = pitch2.value.radius;
     // Pinion: root disc is meat, inside the bore is not, past the tip is not.
-    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
-    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
-    expect(polygonContains(face1.value, probePoint(c1, r1 * 1.6))).toBe(false);
+    expect(csgContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
+    expect(csgContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
+    expect(csgContains(face1.value, probePoint(c1, r1 * 1.6))).toBe(false);
     // Wheel: same three checks relative to the derived pitch.
-    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
-    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
-    expect(polygonContains(face2.value, probePoint(c2, r2 * 1.2))).toBe(false);
+    expect(csgContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
+    expect(csgContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
+    expect(csgContains(face2.value, probePoint(c2, r2 * 1.2))).toBe(false);
   });
 
   test("gear recomputes finitely when teeth and pitch are drafted", () => {
@@ -659,17 +692,26 @@ describe("migrated demo scenes", () => {
     if (!pitch1 || pitch1.value.kind !== "circle") throw new Error("missing pitch1");
     if (!pitch2 || pitch2.value.kind !== "circle") throw new Error("missing pitch2c");
     if (!face1 || !face2) throw new Error("missing face nodes");
-    if (!isPolygon(face1.value) || !isPolygon(face2.value))
-      throw new Error("faces are not polygons");
-    expect(isFinitePolygon(face1.value)).toBe(true);
-    expect(isFinitePolygon(face2.value)).toBe(true);
+    if (!isCsg2(face1.value) || !isCsg2(face2.value)) throw new Error("faces are not csg2");
+    expect(isFiniteCsg2(face1.value)).toBe(true);
+    expect(isFiniteCsg2(face2.value)).toBe(true);
+    // Drafted counts land in the repeat, which is data: 24 teeth, then 30.
+    const stocks = [face1.value.of[0], face2.value.of[0]];
+    const reps = stocks.map((k) =>
+      k?.kind === "csg2" ? k.of.find((o) => o.kind === "polarRepeat") : undefined,
+    );
+    const rep1 = reps[0];
+    const rep2 = reps[1];
+    if (rep1?.kind !== "polarRepeat" || rep2?.kind !== "polarRepeat") throw new Error("no rep");
+    expect(rep1.count).toBe(24);
+    expect(rep2.count).toBe(30);
     const c1 = pinion.value;
     const r1 = pitch1.value.radius;
     const c2 = pitch2.value.center;
     const r2 = pitch2.value.radius;
-    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
-    expect(polygonContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
-    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
-    expect(polygonContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
+    expect(csgContains(face1.value, probePoint(c1, r1 * 0.5))).toBe(true);
+    expect(csgContains(face1.value, probePoint(c1, r1 * 0.2))).toBe(false);
+    expect(csgContains(face2.value, probePoint(c2, r2 * 0.5))).toBe(true);
+    expect(csgContains(face2.value, probePoint(c2, r2 * 0.2))).toBe(false);
   });
 });
