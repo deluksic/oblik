@@ -4,6 +4,7 @@ import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { builtin, f32, interpolate, vec2f, vec3f, vec4f } from "typegpu/data";
 import { max } from "typegpu/std";
 
+import { worldPerPx } from "../frame";
 import { diskLayout } from "../layout";
 
 /** World → clip, same mapping as pipelines/circles.ts toClip. */
@@ -17,7 +18,7 @@ const toClip = tgpu.fn(
   return vec4f(k * (p - f.cam), 0, 1);
 });
 
-const diskVertex = tgpu.vertexFn({
+export const diskVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
   out: {
     outPos: builtin.position,
@@ -27,12 +28,13 @@ const diskVertex = tgpu.vertexFn({
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const inst = diskLayout.$.points[diskLayout.$.pointOrder[instanceIndex]];
-  // Inactive disc layers are culled (radius <= 0); fully transparent paint is
+  // Inactive disc layers are culled (radiusPx <= 0); fully transparent paint is
   // pointless to rasterize (alpha <= 0).
-  if (inst.radius <= 0 || inst.alpha <= 0) {
+  if (inst.radiusPx <= 0 || inst.alpha <= 0) {
     return { outPos: vec4f(0, 0, -2, 1), color: vec3f(), alpha: 0 };
   }
-  const pos = inst.center + circle(vertexIndex) * inst.radius;
+  const radius = inst.radiusPx * worldPerPx(diskLayout.$.frame.scale);
+  const pos = inst.center + circle(vertexIndex) * radius;
   return { outPos: toClip(pos), color: inst.color, alpha: inst.alpha };
 });
 

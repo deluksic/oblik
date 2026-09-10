@@ -73,6 +73,13 @@ two views differ on purpose:
   the boundary pulls away from the ink — an offset's rounded corners, a hole — it shows
   on its own. Its alpha is 0 for a cold fill that should have no outline at all.
   The halo bands below are the opposite: measured **inside** from the edge.
+- **Every width in a fill record is CSS px, not world units.** Chrome is a
+  screen-space weight (SVG's non-scaling stroke), so the records carry px and the
+  shaders convert once, through `worldPerPx(frame.scale)`. Zooming then writes only the
+  frame uniform — it reprojects the world and the chrome with it and re-uploads no
+  record at all — where baking `px / scale` into the records made one zoom step rewrite
+  226 of a 288-record scene. The quad's AA skirt went the same way: `QUAD_PAD_PX` grows
+  the box in the vertex shader, so the stored AABB stays pure world geometry.
 - **Chrome over a fill is one antialiased layer per pixel, never two blends.** Both the
   paint+outline pair and the band pair are areas of one pixel, so the output is the
   pixel's coverage times the _area-weighted_ mix of the layers: colors mix with the
@@ -82,7 +89,8 @@ cov)`) cancels the ramp and steps hard at the seam between the knockout and the 
   exactly the bug `halo.test.ts`'s profile sweep exists to catch.
 - Contract: `gpu/pipelines/halo.ts` (the band and outline math), `halo.test.ts` (pixel
   semantics, including a dense profile sweep with no step over ~0.04 per 0.05px),
-  `pipelines/wgsl.test.ts` (shader structure).
+  `gpu/frame.ts` (`worldPerPx`, the one px→world conversion, and `QUAD_PAD_PX`),
+  `pipelines/wgsl.test.ts` (shader structure and the px unit).
 
 ## Other
 

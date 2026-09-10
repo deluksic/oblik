@@ -122,8 +122,11 @@ export function islandSpans(island: Region): SpanSet {
   return out;
 }
 
-/** Normalized spans (outer CCW, holes CW) + padded AABB per island. */
-export function islandGeomOf(value: Region | Polygon | CsgOperand, pad: number): IslandGeom {
+/** Normalized spans (outer CCW, holes CW) + tight AABB per island. The AA
+ * skirt is deliberately not baked in: it is a screen-space width, so the quad
+ * vertex shader grows the box instead (`QUAD_PAD_PX`), which keeps the bounds
+ * pure world geometry that no zoom can move. */
+export function islandGeomOf(value: Region | Polygon | CsgOperand): IslandGeom {
   const spans: SpanSet[] = [];
   const bounds: Box[] = [];
   for (const island of islandsOfValue(value)) {
@@ -133,10 +136,7 @@ export function islandGeomOf(value: Region | Polygon | CsgOperand, pad: number):
     growSpanBox(box, islandSet);
     if (!Number.isFinite(box.min.x)) continue;
     spans.push(islandSet);
-    bounds.push({
-      min: { x: box.min.x - pad, y: box.min.y - pad },
-      max: { x: box.max.x + pad, y: box.max.y + pad },
-    });
+    bounds.push(box);
   }
   return { spans, bounds };
 }

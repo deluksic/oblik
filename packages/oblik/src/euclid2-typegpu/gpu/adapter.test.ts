@@ -109,9 +109,11 @@ describe("adapter fill routing", () => {
     expect(quad.leafBase).toBe(0);
     expect(quad.alpha).toBeCloseTo(0.16);
     expect([quad.color.x, quad.color.y, quad.color.z]).toEqual([0, 0, 0]);
-    // The quad is the tree's AABB (the circle), padded and clipped to the pane.
-    expect(quad.aabbMin.x).toBeCloseTo(-2 - 2 / CAM.scale, 6);
-    expect(quad.aabbMax.x).toBeCloseTo(2 + 2 / CAM.scale, 6);
+    // The quad is the tree's AABB (the circle) in pure world units: the AA
+    // skirt is not baked in any more, the vertex shader grows it by
+    // `QUAD_PAD_PX` at draw time (see `pipelines/fills.ts`).
+    expect(quad.aabbMin.x).toBeCloseTo(-2, 9);
+    expect(quad.aabbMax.x).toBeCloseTo(2, 9);
 
     // The polygon still lands in the span buffers.
     expect(patch.fills.count).toBe(1);
@@ -251,8 +253,8 @@ describe("adapter fill routing", () => {
   });
 });
 
-/** CSS px → world units, the chrome convention (see `docs/chrome.md`). */
-const world = (px: number) => px / CAM.scale;
+/** The chrome widths the records carry are CSS px, so a hover ring of 7px is
+ * `halfPx = 3.5` — no zoom baked in (see `docs/chrome.md`). */
 
 describe("fill halo chrome", () => {
   test("a hot fill draws its halo under its own paint, cold ones do not", () => {
@@ -261,7 +263,7 @@ describe("fill halo chrome", () => {
     expect(cold.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
     const coldQuad = cold.fields.quads.writes[0]!.value;
     expect(coldQuad.haloRing.w).toBe(0);
-    expect(coldQuad.haloHalf.x).toBe(0);
+    expect(coldQuad.haloHalfPx.x).toBe(0);
 
     // Hover: the accent outline alone, 7px wide from the fill's edge inward
     // (half = 3.5px), at 50%, and no paper knockout — driven straight off the
@@ -280,8 +282,8 @@ describe("fill halo chrome", () => {
     ]);
     expect(hoverQuad.haloRing.w).toBeCloseTo(0.5, 6);
     expect(hoverQuad.haloKnock.w).toBe(0);
-    expect(hoverQuad.haloHalf.x).toBe(0);
-    expect(hoverQuad.haloHalf.y).toBeCloseTo(world(3.5), 6);
+    expect(hoverQuad.haloHalfPx.x).toBe(0);
+    expect(hoverQuad.haloHalfPx.y).toBeCloseTo(3.5, 6);
 
     // Selected: the same outline opaque, plus the 2px paper knockout band just
     // inside it.
@@ -293,8 +295,8 @@ describe("fill halo chrome", () => {
       ...COLORS.paper,
     ]);
     expect(liftedQuad.haloKnock.w).toBe(1);
-    expect(liftedQuad.haloHalf.x).toBeCloseTo(world(2), 6);
-    expect(liftedQuad.haloHalf.y).toBeCloseTo(world(3.5), 6);
+    expect(liftedQuad.haloHalfPx.x).toBeCloseTo(2, 6);
+    expect(liftedQuad.haloHalfPx.y).toBeCloseTo(3.5, 6);
   });
 
   test("the span path carries the same halo fields per island", () => {
@@ -304,7 +306,7 @@ describe("fill halo chrome", () => {
     expect(hovered.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
     const region = hovered.fills.writes[0]!.value;
     expect(region.haloRing.w).toBeCloseTo(0.5, 6);
-    expect(region.haloHalf.y).toBeCloseTo(world(3.5), 6);
+    expect(region.haloHalfPx.y).toBeCloseTo(3.5, 6);
   });
 
   test("dragging drops the halo and keeps the paint", () => {
@@ -317,16 +319,16 @@ describe("fill halo chrome", () => {
 });
 
 describe("fill outline (state colors)", () => {
-  /** The fill's own stroke: `inkClass` colors, construction stroke width, and
-   * unlike the halo bands all of it sits inside the silhouette. */
-  const strokeWidth = world(1.5);
+  /** The fill's own stroke: `inkClass` colors, the construction stroke width
+   * (1.5 CSS px, centred on the boundary). */
+  const strokeWidthPx = 1.5;
 
   test("every fill carries an outline: ink, accent when editable, cream when hot", () => {
     const plain = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate")]));
     const inkEdge = plain.fields.quads.writes[0]!.value;
     expect([inkEdge.edge.x, inkEdge.edge.y, inkEdge.edge.z]).toEqual([...COLORS.ink]);
     expect(inkEdge.edge.w).toBe(1);
-    expect(inkEdge.edgeWidth).toBeCloseTo(strokeWidth, 9);
+    expect(inkEdge.edgeWidthPx).toBeCloseTo(strokeWidthPx, 9);
 
     const editable = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate", true)]));
     const accentEdge = editable.fields.quads.writes[0]!.value;
@@ -345,7 +347,7 @@ describe("fill outline (state colors)", () => {
     const patch = createAdapter().tick(input([node("o_poly", polygonValue(), "shell", true)]));
     const region = patch.fills.writes[0]!.value;
     expect([region.edge.x, region.edge.y, region.edge.z]).toEqual([...COLORS.accent]);
-    expect(region.edgeWidth).toBeCloseTo(strokeWidth, 9);
+    expect(region.edgeWidthPx).toBeCloseTo(strokeWidthPx, 9);
   });
 
   test("flipping editability recolors the record without touching the spans", () => {
@@ -360,5 +362,103 @@ describe("fill outline (state colors)", () => {
     expect([quad.edge.x, quad.edge.y, quad.edge.z]).toEqual([...COLORS.accent]);
     expect(patch.fields.quads.writes).toHaveLength(1);
     expect(patch.fields.segs.writes).toHaveLength(0);
+  });
+});
+
+/** One node of every record kind — a stroke, a circle, a point, a compiled
+ * field and a span-path fill. Between them they carry every width a zoom used
+ * to rewrite: ctrl radii, annulus bands, disc radii, the fill outline and the
+ * halo bands. */
+function recordFixture(): TraceNode[] {
+  return [
+    node("o_seg", { kind: "segment", a: { x: -1, y: 0 }, b: { x: 1, y: 0 } }, "beam"),
+    node("o_circ", { kind: "circle", center: { x: 0, y: 3 }, radius: 1 }, "drill", true),
+    {
+      id: "o_pt",
+      occ: 0,
+      kind: "point",
+      value: { kind: "point", x: 2, y: -2 },
+      editable: true,
+      stack: [],
+    } as TraceNode,
+    csgNode("o_csg", 0, "pac"),
+    node("o_poly", polygonValue(), "shell"),
+  ];
+}
+
+/**
+ * The unit contract: every width in a record is CSS px, so the camera's zoom
+ * lives in the frame uniform alone. Nothing a zoom touches is a record, and a
+ * zoom therefore re-uploads nothing while still reprojecting the world — the
+ * whole point of storing px instead of world units (see `schemas.ts`).
+ */
+describe("zoom and pan write no records", () => {
+  test("the first tick uploads everything, the second nothing", () => {
+    const trace = recordFixture();
+    const adapter = createAdapter();
+    const first = adapter.tick(input(trace));
+    expect(first.stats.written).toBe(first.stats.total);
+    expect(first.stats.total).toBeGreaterThan(0);
+
+    const again = adapter.tick(input(trace));
+    expect(again.stats.written).toBe(0);
+    expect(again.stats.total).toBe(first.stats.total);
+  });
+
+  test("a zoom step rewrites no record but still draws the same runs", () => {
+    const trace = recordFixture();
+    const adapter = createAdapter();
+    const first = adapter.tick(input(trace));
+    const zoomed = adapter.tick(input(trace, { cam: { ...CAM, scale: CAM.scale * 1.05 } }));
+
+    expect(zoomed.stats.written).toBe(0);
+    expect(zoomed.stats.total).toBe(first.stats.total);
+    // Same runs, same slots: the reprojection is the frame uniform's job.
+    expect(zoomed.fillDraws).toEqual(first.fillDraws);
+    expect(zoomed.circles.bands).toEqual(first.circles.bands);
+    expect(zoomed.strokes.bands).toEqual(first.strokes.bands);
+  });
+
+  test("a pan rewrites no record, hover included", () => {
+    const trace = recordFixture();
+    const adapter = createAdapter();
+    const hovered = input(trace, { hoverId: "o_csg", selectedKey: "o_seg:0" });
+    adapter.tick(hovered);
+    const panned = adapter.tick({ ...hovered, cam: { ...CAM, x: CAM.x + 3, y: CAM.y - 2 } });
+    expect(panned.stats.written).toBe(0);
+  });
+
+  test("only an unbounded field box follows the camera", () => {
+    // A half-plane has no world extent of its own, so its quad has to be
+    // clamped to the pane — the one record a pan or zoom may legitimately move.
+    const half = node(
+      "o_half",
+      {
+        kind: "csg2",
+        op: "diff",
+        of: [
+          {
+            kind: "halfPlane",
+            line: { kind: "line", origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+            side: 1,
+          },
+          squareRegion(0.5),
+        ],
+      },
+      "shelf",
+    );
+    const nothingBounded = node("o_poly2", polygonValue(), "shell");
+    const adapter = createAdapter();
+    const first = adapter.tick(input([half, nothingBounded]));
+    expect(first.stats.written).toBe(first.stats.total);
+
+    const zoomed = adapter.tick(
+      input([half, nothingBounded], { cam: { ...CAM, scale: CAM.scale * 1.05 } }),
+    );
+    // Only the half-plane's quad: the span fill holds still, so this is the
+    // whole exception, not a rule.
+    expect(zoomed.fields.quads.writes).toHaveLength(1);
+    expect(zoomed.fills.writes).toHaveLength(0);
+    expect(zoomed.stats.written).toBe(1);
   });
 });

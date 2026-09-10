@@ -94,8 +94,8 @@ const px = (cssPx: number, scale: number) => cssPx / scale;
 const rgbv = (c: Rgb) => vec3f(c[0], c[1], c[2]);
 const centerOf = (p: Vec2) => vec2f(p.x, p.y);
 
-function twoPoint(a: Vec2, b: Vec2, color: Rgb, alpha: number, radius: number): StrokeDrawValue {
-  const ctrl = (p: Vec2) => StrokeCtrl({ position: centerOf(p), radius });
+function twoPoint(a: Vec2, b: Vec2, color: Rgb, alpha: number, radiusPx: number): StrokeDrawValue {
+  const ctrl = (p: Vec2) => StrokeCtrl({ position: centerOf(p), radiusPx });
   return StrokeDraw({
     a: ctrl(a),
     b: ctrl(a),
@@ -144,7 +144,7 @@ function dashSegment(
   b: Vec2,
   color: Rgb,
   alpha: number,
-  halfWidth: number,
+  halfWidthPx: number,
   scale: number,
 ): void {
   const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -158,7 +158,7 @@ function dashSegment(
         { x: a.x + ux * s1, y: a.y + uy * s1 },
         color,
         alpha,
-        halfWidth,
+        halfWidthPx,
       ),
     );
     return true;
@@ -177,20 +177,20 @@ function dashArc(
   sweep: number,
   color: Rgb,
   alpha: number,
-  halfWidth: number,
+  halfWidthPx: number,
   scale: number,
 ): void {
   if (radius <= 0 || Math.abs(sweep) < 1e-9) return;
   const dir = sweep > 0 ? 1 : -1;
   const arcLen = radius * Math.abs(sweep);
-  const piecesOf = (span: number) =>
-    Math.min(128, Math.max(4, Math.ceil(Math.max(1, Math.abs(span) * radius * scale) / 6)));
   const pointAt = (ang: number): Vec2 => ({
     x: center.x + Math.cos(ang) * radius,
     y: center.y + Math.sin(ang) * radius,
   });
   const cap = (p: Vec2) =>
-    disks.push(PointInst({ center: centerOf(p), radius: halfWidth, color: rgbv(color), alpha }));
+    disks.push(
+      PointInst({ center: centerOf(p), radiusPx: halfWidthPx, color: rgbv(color), alpha }),
+    );
   forEachDash(arcLen, DASH_ON / scale, DASH_GAP / scale, (s0, s1) => {
     if (s1 - s0 < 1e-6) return true;
     const ang0 = a0 + dir * (s0 / radius);
@@ -198,11 +198,10 @@ function dashArc(
     circles.push(
       CircleInst({
         center: centerOf(center),
-        r0: Math.max(0, radius - halfWidth),
-        r1: radius + halfWidth,
+        radius,
+        halfPx: halfWidthPx,
         a0: ang0,
         a1: ang1,
-        pieces: piecesOf(ang1 - ang0),
         color: rgbv(color),
         alpha,
         flags: 0,
@@ -214,26 +213,25 @@ function dashArc(
   });
 }
 
-/** Solid stroked ring (`rCenter ± halfWidth`), screen-space px already in
- * world units. */
+/** Solid stroked ring (`rCenter` world, `halfWidthPx` screen-space): the
+ * centre radius is node/world geometry, the band width is CSS px, exactly as
+ * `CircleInst` stores them. */
 function ring(
   out: CircleInstValue[],
   center: Vec2,
   rCenter: number,
-  halfWidth: number,
+  halfWidthPx: number,
   color: Rgb,
   alpha: number,
-  scale: number,
 ): void {
-  if (halfWidth <= 0 || rCenter < 0) return;
+  if (halfWidthPx <= 0 || rCenter < 0) return;
   out.push(
     CircleInst({
       center: centerOf(center),
-      r0: Math.max(0, rCenter - halfWidth),
-      r1: rCenter + halfWidth,
+      radius: rCenter,
+      halfPx: halfWidthPx,
       a0: 0,
       a1: TAU,
-      pieces: Math.min(128, Math.max(8, Math.ceil((TAU * Math.max(1, rCenter) * scale) / 6))),
       color: rgbv(color),
       alpha,
       flags: 0,
@@ -244,12 +242,12 @@ function ring(
 function disc(
   out: PointInstValue[],
   center: Vec2,
-  radius: number,
+  radiusPx: number,
   color: Rgb,
   alpha: number,
 ): void {
-  if (radius <= 0) return;
-  out.push(PointInst({ center: centerOf(center), radius, color: rgbv(color), alpha }));
+  if (radiusPx <= 0) return;
+  out.push(PointInst({ center: centerOf(center), radiusPx, color: rgbv(color), alpha }));
 }
 
 // -- fill islands ---------------------------------------------------------------
@@ -261,7 +259,6 @@ function pushFillIsland(
   chain: readonly LoopEdge[],
   color: Rgb,
   alpha: number,
-  scale: number,
 ): void {
   if (chain.length < 3) return;
   const reversed = chainArea(chain) < 0;
@@ -279,11 +276,10 @@ function pushFillIsland(
     spans.arcs.length = arcOffset;
     return;
   }
-  const pad = 2 / scale;
   fills.push(
     FillRegion({
-      aabbMin: vec2f(box.min.x - pad, box.min.y - pad),
-      aabbMax: vec2f(box.max.x + pad, box.max.y + pad),
+      aabbMin: vec2f(box.min.x, box.min.y),
+      aabbMax: vec2f(box.max.x, box.max.y),
       segOffset,
       segCount,
       arcOffset,
@@ -293,10 +289,10 @@ function pushFillIsland(
       flags: 0,
       // Ghost previews are never hot and carry no state colors.
       edge: vec4f(0, 0, 0, 0),
-      edgeWidth: 0,
+      edgeWidthPx: 0,
       haloRing: vec4f(0, 0, 0, 0),
       haloKnock: vec4f(0, 0, 0, 0),
-      haloHalf: vec2f(0, 0),
+      haloHalfPx: vec2f(0, 0),
     }),
   );
 }
@@ -320,7 +316,7 @@ function dashChain(
   edges: readonly LoopEdge[],
   color: Rgb,
   alpha: number,
-  halfWidth: number,
+  halfWidthPx: number,
   scale: number,
 ): void {
   for (const e of edges) {
@@ -335,11 +331,11 @@ function dashChain(
         circleDelta(carrier, e.a, e.b, e.k ?? 1),
         color,
         alpha,
-        halfWidth,
+        halfWidthPx,
         scale,
       );
     } else {
-      dashSegment(strokes, e.a, e.b, color, alpha, halfWidth, scale);
+      dashSegment(strokes, e.a, e.b, color, alpha, halfWidthPx, scale);
     }
   }
 }
@@ -351,7 +347,7 @@ function pushArrow(
   spans: SpanSet,
   arrow: { at: Vec2; tx: number; ty: number },
   ghost: Rgb,
-  halfArrowWidth: number,
+  halfArrowWidthPx: number,
   scale: number,
 ): void {
   const n = Math.hypot(arrow.tx, arrow.ty) || 1;
@@ -380,9 +376,8 @@ function pushArrow(
     ],
     ghost,
     1,
-    scale,
   );
-  strokes.push(twoPoint(tail, tip, ghost, 1, halfArrowWidth));
+  strokes.push(twoPoint(tail, tip, ghost, 1, halfArrowWidthPx));
 }
 
 // -- trace ghost -------------------------------------------------------------------
@@ -396,8 +391,7 @@ function pushTraceNode(
   cam: Camera2,
   size: PaneSize,
   colors: { ink: Rgb; accent: Rgb },
-  halfStroke: number,
-  scale: number,
+  halfStrokePx: number,
 ): void {
   const color = node.editable ? colors.accent : colors.ink;
   const alpha = MUTED_ALPHA * TRACE_BAND;
@@ -407,11 +401,10 @@ function pushTraceNode(
     circles.push(
       CircleInst({
         center: vec2f((v as Circle).center.x, (v as Circle).center.y),
-        r0: Math.max(0, r - halfStroke),
-        r1: r + halfStroke,
+        radius: r,
+        halfPx: halfStrokePx,
         a0: 0,
         a1: TAU,
-        pieces: Math.min(128, Math.max(8, Math.ceil((TAU * Math.max(1, r) * scale) / 6))),
         color: rgbv(color),
         alpha,
         flags: 0,
@@ -425,10 +418,10 @@ function pushTraceNode(
   const b = ends.b;
   strokes.push(
     StrokeDraw({
-      a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radius: halfStroke }),
-      b: StrokeCtrl({ position: vec2f(a.x, a.y), radius: halfStroke }),
-      c: StrokeCtrl({ position: vec2f(b.x, b.y), radius: halfStroke }),
-      d: StrokeCtrl({ position: vec2f(2 * b.x - a.x, 2 * b.y - a.y), radius: halfStroke }),
+      a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radiusPx: halfStrokePx }),
+      b: StrokeCtrl({ position: vec2f(a.x, a.y), radiusPx: halfStrokePx }),
+      c: StrokeCtrl({ position: vec2f(b.x, b.y), radiusPx: halfStrokePx }),
+      d: StrokeCtrl({ position: vec2f(2 * b.x - a.x, 2 * b.y - a.y), radiusPx: halfStrokePx }),
       run: StrokeRun({ color: rgbv(color), alpha, start: 0, count: 0, flags: 0 }),
     }),
   );
@@ -453,7 +446,11 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
     under: { fills: [], spans: emptySpans(), strokes: [], circles: [] },
     over: { fills: [], spans: emptySpans(), strokes: [], circles: [], disks: [], markers: [] },
   };
-  const halfStroke = px(strokePx / 2, scale);
+  // Every half width below is CSS px: the record stores px, the shaders scale
+  // it. `scale` stays only where a px length becomes world geometry (dash
+  // spacing, the arrow's shaft) — that geometry is a screen-space pattern, so it
+  // is meant to follow the zoom.
+  const halfStrokePx = strokePx / 2;
 
   // Trace ghosts (registered-tool drafts) render under the world, above the grid.
   if (ghost?.kind === "trace") {
@@ -463,16 +460,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
         // TraceGhost draw set for ink (segments/lines/parallels/circles).
         continue;
       }
-      pushTraceNode(
-        patch.under.strokes,
-        patch.under.circles,
-        n,
-        cam,
-        size,
-        colors,
-        halfStroke,
-        scale,
-      );
+      pushTraceNode(patch.under.strokes, patch.under.circles, n, cam, size, colors, halfStrokePx);
     }
   }
 
@@ -485,14 +473,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
       const closed = closeTo
         ? [...ghost.edges, straightEdge(chain[chain.length - 1]!.b, closeTo)]
         : ghost.edges;
-      pushFillIsland(
-        patch.over.fills,
-        patch.over.spans,
-        closed,
-        colors.ghost,
-        GHOST_FILL_ALPHA,
-        scale,
-      );
+      pushFillIsland(patch.over.fills, patch.over.spans, closed, colors.ghost, GHOST_FILL_ALPHA);
     }
     dashChain(
       patch.over.strokes,
@@ -501,7 +482,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
       chain,
       colors.ink,
       GHOST_STROKE_ALPHA,
-      halfStroke,
+      halfStrokePx,
       scale,
     );
     if (ghost.arrow) {
@@ -511,7 +492,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
         patch.over.spans,
         ghost.arrow,
         colors.ghost,
-        px(ARROW_STROKE_PX / 2, scale),
+        ARROW_STROKE_PX / 2,
         scale,
       );
     }
@@ -544,15 +525,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
         }),
       );
     } else {
-      ring(
-        patch.over.circles,
-        at,
-        px(SNAP_RING_R, scale),
-        px(SNAP_STROKE_PX / 2, scale),
-        colors.ghost,
-        1,
-        scale,
-      );
+      ring(patch.over.circles, at, px(SNAP_RING_R, scale), SNAP_STROKE_PX / 2, colors.ghost, 1);
     }
   }
 
@@ -565,7 +538,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
     switch (ghost.kind) {
       case "point":
         if (!hiddenByDiamond(ghost.at)) {
-          disc(patch.over.disks, ghost.at, px(GHOST_POINT_R, scale), colors.ghost, 1);
+          disc(patch.over.disks, ghost.at, GHOST_POINT_R, colors.ghost, 1);
         }
         break;
       case "corner":
@@ -573,25 +546,23 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
           patch.over.circles,
           ghost.at,
           px(CORNER_RING_R, scale),
-          px(PAPER_STROKE_PX / 2, scale),
+          PAPER_STROKE_PX / 2,
           colors.ghost,
           1,
-          scale,
         );
-        disc(patch.over.disks, ghost.at, px(CORNER_R, scale), colors.ghost, 1);
+        disc(patch.over.disks, ghost.at, CORNER_R, colors.ghost, 1);
         ring(
           patch.over.circles,
           ghost.at,
           px(CORNER_R, scale),
-          px(PAPER_STROKE_PX / 2, scale),
+          PAPER_STROKE_PX / 2,
           colors.paper,
           1,
-          scale,
         );
         break;
       case "circle": {
         if (!hiddenByDiamond(ghost.center)) {
-          disc(patch.over.disks, ghost.center, px(GHOST_POINT_R, scale), colors.ghost, 1);
+          disc(patch.over.disks, ghost.center, GHOST_POINT_R, colors.ghost, 1);
         }
         dashArc(
           patch.over.circles,
@@ -602,7 +573,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
           TAU,
           colors.ink,
           GHOST_STROKE_ALPHA,
-          halfStroke,
+          halfStrokePx,
           scale,
         );
         break;
@@ -614,7 +585,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
           ghost.b,
           colors.ink,
           GHOST_STROKE_ALPHA,
-          halfStroke,
+          halfStrokePx,
           scale,
         );
         break;
@@ -632,7 +603,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
             ends.b,
             colors.ink,
             GHOST_STROKE_ALPHA,
-            halfStroke,
+            halfStrokePx,
             scale,
           );
         break;
@@ -653,7 +624,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
             ends.b,
             colors.ink,
             GHOST_STROKE_ALPHA,
-            halfStroke,
+            halfStrokePx,
             scale,
           );
         break;
@@ -668,7 +639,7 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
             ends.b,
             colors.ink,
             i === ghost.chosen ? GHOST_STROKE_ALPHA : GHOST_STROKE_ALPHA * 0.3,
-            halfStroke,
+            halfStrokePx,
             scale,
           );
         });

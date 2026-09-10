@@ -1,8 +1,9 @@
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { builtin, f32, interpolate, vec2f, vec3f, vec4f } from "typegpu/data";
-import { cos, max, sin } from "typegpu/std";
+import { abs, ceil, clamp, cos, max, sin } from "typegpu/std";
 
+import { worldPerPx } from "../frame";
 import { circleLayout } from "../layout";
 import { MAX_CIRCLE_PIECES } from "../schemas";
 
@@ -17,7 +18,7 @@ const toClip = tgpu.fn(
   return vec4f(k * (p - f.cam), 0, 1);
 });
 
-const circleVertex = tgpu.vertexFn({
+export const circleVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
   out: {
     outPos: builtin.position,
@@ -31,12 +32,23 @@ const circleVertex = tgpu.vertexFn({
   // as float division and lands outer vertices at half-piece angles, which
   // tapers the band to zero at both sweep ends.
   const piece = Math.floor(vertexIndex / 2);
-  if (inst.r1 <= inst.r0 || inst.a1 === inst.a0 || piece > inst.pieces) {
+  // Band width (CSS px → world) and fan budget both follow from the record and
+  // the frame, so a zoom reprojects the annulus instead of rewriting it: one
+  // piece per ~6 px of arc, the range the CPU used to bake in. `max(radius, 1)`
+  // keeps a sub-unit circle smooth without pinning its piece count.
+  const sweep = abs(inst.a1 - inst.a0);
+  const pieces = clamp(
+    ceil((sweep * max(inst.radius, 1) * circleLayout.$.frame.scale) / 6),
+    32,
+    128,
+  );
+  if (inst.halfPx <= 0 || sweep === 0 || piece > pieces) {
     return { outPos: vec4f(0, 0, -2, 1), color: vec3f(), alpha: 0 };
   }
-  const t = piece / inst.pieces;
+  const half = inst.halfPx * worldPerPx(circleLayout.$.frame.scale);
+  const t = piece / pieces;
   const ang = inst.a0 + t * (inst.a1 - inst.a0);
-  const r = vertexIndex % 2 === 0 ? inst.r0 : inst.r1;
+  const r = vertexIndex % 2 === 0 ? max(0, inst.radius - half) : inst.radius + half;
   const pos = inst.center + vec2f(cos(ang), sin(ang)) * r;
   return { outPos: toClip(pos), color: inst.color, alpha: inst.alpha };
 });

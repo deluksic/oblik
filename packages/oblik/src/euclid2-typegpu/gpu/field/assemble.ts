@@ -4,6 +4,7 @@ import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data
 import type { v2f } from "typegpu/data";
 import { abs, atan2, clamp, dot, floor, length, max, min, sign, sqrt } from "typegpu/std";
 
+import { QUAD_PAD_PX, worldPerPx } from "../frame";
 import { fieldLayout } from "../layout";
 import { haloWithEdge, paintWithEdge } from "../pipelines/halo";
 import type { FieldNodePlan, FieldPlan } from "./plan";
@@ -211,7 +212,7 @@ const toClip = tgpu.fn(
 });
 
 /** The field quad: one AABB triangle-strip per compiled node. */
-const fieldVertex = tgpu.vertexFn({
+export const fieldVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
   out: {
     outPos: builtin.position,
@@ -222,8 +223,11 @@ const fieldVertex = tgpu.vertexFn({
   "use gpu";
   const slot = fieldLayout.$.fieldOrder[instanceIndex];
   const q = fieldLayout.$.fieldQuads[slot];
-  const x = vertexIndex === 1 || vertexIndex === 3 ? q.aabbMax.x : q.aabbMin.x;
-  const y = vertexIndex >= 2 ? q.aabbMax.y : q.aabbMin.y;
+  // Same split as the span pass: the AABB is world geometry, the AA skirt is a
+  // CSS-px width applied at draw time, so the record holds no camera.
+  const pad = QUAD_PAD_PX * worldPerPx(fieldLayout.$.frame.scale);
+  const x = vertexIndex === 1 || vertexIndex === 3 ? q.aabbMax.x + pad : q.aabbMin.x - pad;
+  const y = vertexIndex >= 2 ? q.aabbMax.y + pad : q.aabbMin.y - pad;
   return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), quad: slot };
 });
 
@@ -246,13 +250,14 @@ export function fieldFragment(plan: FieldPlan, layer: FieldLayer = "paint") {
     })(({ p, quad }) => {
       "use gpu";
       const q = fieldLayout.$.fieldQuads[quad];
+      const w = worldPerPx(fieldLayout.$.frame.scale);
       return haloWithEdge(
         evaluate(p, q.leafBase),
         q.haloRing,
         q.haloKnock,
-        q.haloHalf,
+        q.haloHalfPx * w,
         q.edge,
-        q.edgeWidth,
+        q.edgeWidthPx * w,
       );
     });
   }
@@ -262,7 +267,12 @@ export function fieldFragment(plan: FieldPlan, layer: FieldLayer = "paint") {
   })(({ p, quad }) => {
     "use gpu";
     const q = fieldLayout.$.fieldQuads[quad];
-    return paintWithEdge(evaluate(p, q.leafBase), vec4f(q.color, q.alpha), q.edge, q.edgeWidth);
+    return paintWithEdge(
+      evaluate(p, q.leafBase),
+      vec4f(q.color, q.alpha),
+      q.edge,
+      q.edgeWidthPx * worldPerPx(fieldLayout.$.frame.scale),
+    );
   });
 }
 

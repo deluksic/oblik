@@ -88,7 +88,7 @@ async function demoFills(): Promise<{
       let segs = 0;
       let arcs = 0;
       // The span path allocates exactly what `islandGeomOf` hands the adapter.
-      for (const block of islandGeomOf(n.value as Region, 0).spans) {
+      for (const block of islandGeomOf(n.value as Region).spans) {
         segs += block.segs.length;
         arcs += block.arcs.length;
       }

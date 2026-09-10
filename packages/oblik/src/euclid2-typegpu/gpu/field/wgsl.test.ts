@@ -136,7 +136,15 @@ describe("compiled field WGSL", () => {
         const haloReads = layer === "halo" ? 1 : 0;
         expect(occurrences(code, "(*q).haloRing")).toBe(haloReads);
         expect(occurrences(code, "(*q).haloKnock")).toBe(haloReads);
-        expect(occurrences(code, "(*q).haloHalf")).toBe(haloReads);
+        expect(occurrences(code, "(*q).haloHalfPx")).toBe(haloReads);
+        // Band and outline widths are px in the record and scaled here, like
+        // every other chrome width (see `pipelines/wgsl.test.ts`).
+        expect(occurrences(code, "worldPerPx(frame.scale)")).toBe(1);
+        const scaled =
+          layer === "halo"
+            ? [occurrences(code, "(*q).haloHalfPx * w"), occurrences(code, "(*q).edgeWidthPx * w")]
+            : [0, occurrences(code, "(*q).edgeWidthPx * worldPerPx(frame.scale)")];
+        expect(scaled).toEqual(layer === "halo" ? [1, 1] : [0, 1]);
       }
     }
     expect(seen.size).toBeGreaterThan(5);

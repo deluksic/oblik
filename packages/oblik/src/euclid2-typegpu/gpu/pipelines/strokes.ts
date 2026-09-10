@@ -12,6 +12,7 @@ import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { arrayOf, builtin, f32, interpolate, u16, u32, vec2f, vec3f, vec4f } from "typegpu/data";
 import { max } from "typegpu/std";
 
+import { worldPerPx } from "../frame";
 import { strokeLayout } from "../layout";
 import { MAX_JOIN_COUNT, RUN_GEOM_TWO_POINT } from "../schemas";
 
@@ -31,7 +32,7 @@ const toClip = tgpu.fn(
   return vec4f(ndc * w, 0, w);
 });
 
-const strokeVertex = tgpu.vertexFn({
+export const strokeVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
   out: {
     outPos: builtin.position,
@@ -41,27 +42,30 @@ const strokeVertex = tgpu.vertexFn({
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
   const draw = strokeLayout.$.strokes[strokeLayout.$.strokeOrder[instanceIndex]];
-  if (draw.a.radius < 0 || draw.b.radius < 0 || draw.c.radius < 0 || draw.d.radius < 0) {
+  if (draw.a.radiusPx < 0 || draw.b.radiusPx < 0 || draw.c.radiusPx < 0 || draw.d.radiusPx < 0) {
     return { outPos: vec4f(), color: vec3f(), alpha: 0 };
   }
+  // Half widths are CSS px in the record: the expander works in world units, so
+  // one zoom-independent conversion here covers all four ctrl points.
+  const w = worldPerPx(strokeLayout.$.frame.scale);
   // Two-point geometry (halo/knockout chrome of a straight stroke): a plain
   // round-capped segment between draw.b and draw.c, via lineVariableWidth.
   // Paint instances use the mirrored-neighbour polyline encoding (draw.a/d),
   // whose round joins produce the paint's round caps.
   if ((draw.run.flags & RUN_GEOM_TWO_POINT) !== u32(0)) {
     const r = lineVariableWidth(
-      LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
-      LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
+      LineControlPoint({ position: draw.b.position, radius: draw.b.radiusPx * w }),
+      LineControlPoint({ position: draw.c.position, radius: draw.c.radiusPx * w }),
       vertexIndex,
       MAX_JOIN_COUNT,
     );
     return { outPos: toClip(r.vertexPosition, r.w), color: draw.run.color, alpha: draw.run.alpha };
   }
   const result = polylineVariableWidth(
-    LineControlPoint({ position: draw.a.position, radius: draw.a.radius }),
-    LineControlPoint({ position: draw.b.position, radius: draw.b.radius }),
-    LineControlPoint({ position: draw.c.position, radius: draw.c.radius }),
-    LineControlPoint({ position: draw.d.position, radius: draw.d.radius }),
+    LineControlPoint({ position: draw.a.position, radius: draw.a.radiusPx * w }),
+    LineControlPoint({ position: draw.b.position, radius: draw.b.radiusPx * w }),
+    LineControlPoint({ position: draw.c.position, radius: draw.c.radiusPx * w }),
+    LineControlPoint({ position: draw.d.position, radius: draw.d.radiusPx * w }),
     vertexIndex,
     MAX_JOIN_COUNT,
   );

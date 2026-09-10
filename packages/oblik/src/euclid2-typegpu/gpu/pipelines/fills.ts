@@ -3,6 +3,7 @@ import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
 import { abs, atan2, clamp, dot, floor, length, max, min, sign, sqrt } from "typegpu/std";
 
+import { QUAD_PAD_PX, worldPerPx } from "../frame";
 import { fillLayout } from "../layout";
 import { haloWithEdge, paintWithEdge } from "./halo";
 
@@ -44,8 +45,13 @@ const fillVertex = tgpu.vertexFn({
   "use gpu";
   const slot = fillLayout.$.fillOrder[instanceIndex];
   const region = fillLayout.$.fills[slot];
-  const x = vertexIndex === 1 || vertexIndex === 3 ? region.aabbMax.x : region.aabbMin.x;
-  const y = vertexIndex >= 2 ? region.aabbMax.y : region.aabbMin.y;
+  // The stored AABB is pure world geometry (no camera in it); the AA skirt is a
+  // screen-space width, so it is applied here — outward from the box, which is
+  // what the CPU's `growBox(box, 2 / scale)` used to do before the draw.
+  const pad = QUAD_PAD_PX * worldPerPx(fillLayout.$.frame.scale);
+  const x =
+    vertexIndex === 1 || vertexIndex === 3 ? region.aabbMax.x + pad : region.aabbMin.x - pad;
+  const y = vertexIndex >= 2 ? region.aabbMax.y + pad : region.aabbMin.y - pad;
   return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), regionIndex: slot };
 });
 
@@ -117,7 +123,7 @@ export const fillFragment = tgpu.fragmentFn({
     spanDistance(regionIndex, p),
     vec4f(region.color, region.alpha),
     region.edge,
-    region.edgeWidth,
+    region.edgeWidthPx * worldPerPx(fillLayout.$.frame.scale),
   );
 });
 
@@ -129,13 +135,14 @@ export const haloFragment = tgpu.fragmentFn({
 })(({ p, regionIndex }) => {
   "use gpu";
   const region = fillLayout.$.fills[regionIndex];
+  const w = worldPerPx(fillLayout.$.frame.scale);
   return haloWithEdge(
     spanDistance(regionIndex, p),
     region.haloRing,
     region.haloKnock,
-    region.haloHalf,
+    region.haloHalfPx * w,
     region.edge,
-    region.edgeWidth,
+    region.edgeWidthPx * w,
   );
 });
 

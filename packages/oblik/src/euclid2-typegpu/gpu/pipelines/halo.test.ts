@@ -15,7 +15,9 @@ import { DEFAULT_CHROME_METRICS, overlayBands } from "../../../euclid2/view/chro
  *    real hole in the fill.
  *
  * Distances are CSS px inside the shape and `w = 1` (one pixel), like the
- * shader's `fwidth`.
+ * shader's `fwidth`. The widths are the records' own values — the shader scales
+ * them into world units with `worldPerPx`, which cancels against the world-space
+ * `fwidth`, so the twin stays in px and needs no zoom.
  */
 
 type Rgb = readonly [number, number, number];

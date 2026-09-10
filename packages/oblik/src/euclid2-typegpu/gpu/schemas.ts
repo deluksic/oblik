@@ -68,8 +68,8 @@ export const RUN_GEOM_TWO_POINT = 1 << 2;
 
 export const StrokeCtrl = struct({
   position: vec2f,
-  /** Half width in world units; negative disconnects the run. */
-  radius: f32,
+  /** Half width in CSS px (see `MarkerInst`); negative disconnects the run. */
+  radiusPx: f32,
 });
 export type StrokeCtrlValue = Infer<typeof StrokeCtrl>;
 
@@ -95,10 +95,11 @@ export type StrokeDrawValue = Infer<typeof StrokeDraw>;
 
 /** One layered disc of a point/glider mark: paint, paper outline, knockout,
  * or hover/select halo. Instances draw in `pointOrder` so discs stack
- * back-to-front like the SVG PointMark; radius <= 0 culls the disc. */
+ * back-to-front like the SVG PointMark; radiusPx <= 0 culls the disc. */
 export const PointInst = struct({
   center: vec2f,
-  radius: f32,
+  /** Disc radius in CSS px. */
+  radiusPx: f32,
   color: vec3f,
   alpha: f32,
 });
@@ -119,15 +120,17 @@ export const MarkerInst = struct({
 });
 export type MarkerInstValue = Infer<typeof MarkerInst>;
 
-/** Analytic stroked circle/arc: annulus band r0→r1 swept a0→a1 (a1 < a0 = CW). */
+/** Analytic stroked circle/arc: the annulus `radius ± halfPx` swept a0→a1
+ * (a1 < a0 = CW). `radius` is world — the node's own geometry, which no zoom
+ * touches — while the *band* width is CSS px. The fan's piece count follows from
+ * both plus the zoom, so the vertex shader derives it; nothing in the record
+ * depends on the camera. `halfPx <= 0` culls the instance. */
 export const CircleInst = struct({
   center: vec2f,
-  r0: f32,
-  r1: f32,
+  radius: f32,
+  halfPx: f32,
   a0: f32,
   a1: f32,
-  /** Active fan pieces (≤ MAX_CIRCLE_PIECES); vertex shader clamps beyond. */
-  pieces: f32,
   color: vec3f,
   alpha: f32,
   flags: u32,
@@ -170,20 +173,20 @@ export const FillRegion = struct({
   flags: u32,
   /** The fill's own outline: rgb = state color (ink → accent when editable →
    * `selectedPaint` when hot, the SVG `inkClass` mapping), a = opacity (0 = no
-   * outline). Drawn as a band inside the silhouette, like the halo. */
+   * outline). Centred on the boundary, like the SVG stroke. */
   edge: vec4f,
-  /** Outline width in world units, all of it inside the silhouette
-   * (`--oblik-stroke` / scale). */
-  edgeWidth: f32,
+  /** Outline width in CSS px (`--oblik-stroke`), half of it inside the
+   * silhouette. */
+  edgeWidthPx: f32,
   /** rgb = ring color (`--oblik-ring`), a = ring opacity (0 = no halo). */
   haloRing: vec4f,
   /** rgb = knockout color (`--oblik-knockout`, the paper), a = opacity of the
    * paper band inside the ring (0 = none). The ring band itself is always
    * paper-backed: that is what knocks the fill's own paint out. */
   haloKnock: vec4f,
-  /** (knockout width, ring width) in world units, both measured inward from the
+  /** (knockout width, ring width) in CSS px, both measured inward from the
    * fill's edge: the ring covers the first `y`, the paper the next `x`. */
-  haloHalf: vec2f,
+  haloHalfPx: vec2f,
 });
 export type FillRegionValue = Infer<typeof FillRegion>;
 
@@ -214,9 +217,9 @@ export const FieldQuad = struct({
   color: vec3f,
   alpha: f32,
   edge: vec4f,
-  edgeWidth: f32,
+  edgeWidthPx: f32,
   haloRing: vec4f,
   haloKnock: vec4f,
-  haloHalf: vec2f,
+  haloHalfPx: vec2f,
 });
 export type FieldQuadValue = Infer<typeof FieldQuad>;

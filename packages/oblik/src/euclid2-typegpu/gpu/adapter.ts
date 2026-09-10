@@ -62,7 +62,7 @@ const TAU = Math.PI * 2;
 const MUTED_ALPHA = 0.32;
 
 /** Layered disc slots of one point/glider node, back-to-front: halo ring,
- * selected knockout, paper outline, paint. Culled layers carry radius <= 0. */
+ * selected knockout, paper outline, paint. Culled layers carry radiusPx <= 0. */
 const POINT_DISC_COUNT = 4;
 const RING = 0;
 const KNOCKOUT = 1;
@@ -70,7 +70,7 @@ const OUTLINE = 2;
 const PAINT = 3;
 
 /** Layered draw slots of one ink (stroke/circle) node, back-to-front: halo
- * ring, selected knockout, paint. Culled layers carry radius <= 0. */
+ * ring, selected knockout, paint. Culled layers carry radiusPx <= 0. */
 const INK_DISC_COUNT = 3;
 const INK_HALO = 0;
 const INK_KNOCKOUT = 1;
@@ -212,9 +212,10 @@ export function createAdapter(): Adapter {
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
-    const scale = cam.scale;
-    const halfStroke = strokePx / 2 / scale;
-
+    // No record below takes the camera's scale: every width is CSS px (see the
+    // band widths under the ink section). The one consumer left is the overlay,
+    // whose px patterns — dash spacing, snap ring radii, the arrow shaft — are
+    // world geometry on purpose, because they must not scale with the zoom.
     const overlay = buildOverlay({
       ghost: input.ghost,
       snap:
@@ -223,7 +224,7 @@ export function createAdapter(): Adapter {
           : undefined,
       cam,
       size,
-      scale,
+      scale: cam.scale,
       strokePx,
       colors: {
         ink: colors.ink,
@@ -273,13 +274,17 @@ export function createAdapter(): Adapter {
     const circleLiftedPaint: number[] = [];
 
     const inkBand = splitChrome(ink, (n) => isSelected(n, input.selectedKey), white);
+    // Every width below is CSS px, not world units: the shaders scale them by
+    // the frame's zoom (`worldPerPx`), so the records hold nothing the camera
+    // can change and zooming reprojects the world instead of rewriting it.
+    const halfStrokePx = strokePx / 2;
     // Chrome bands sit at the same CSS px widths regardless of state (the
     // selected overlayBands pass is what points/ink chrome share upstream).
-    const outlineHalf = overlayBands(strokePx, { selected: true }).outline / 2 / scale;
-    const knockoutHalf = overlayBands(strokePx, { selected: true }).knockout / 2 / scale;
+    const outlineHalfPx = overlayBands(strokePx, { selected: true }).outline / 2;
+    const knockoutHalfPx = overlayBands(strokePx, { selected: true }).knockout / 2;
     // A fill's own outline is the construction stroke width, like every edge —
-    // and unlike the halo bands it sits *entirely* inside the silhouette.
-    const edgeWidth = strokePx / scale;
+    // and it straddles the boundary, so half of it sits outside the silhouette.
+    const edgeWidthPx = strokePx;
 
     const emitStrokeLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
       const start = strokePool.alloc(n, INK_DISC_COUNT);
@@ -289,9 +294,9 @@ export function createAdapter(): Adapter {
       const discs = strokeInkDiscs(
         n,
         colors,
-        halfStroke,
-        outlineHalf,
-        knockoutHalf,
+        halfStrokePx,
+        outlineHalfPx,
+        knockoutHalfPx,
         cam,
         size,
         hot,
@@ -305,7 +310,7 @@ export function createAdapter(): Adapter {
         }
       }
       for (const layer of layers) {
-        if (discs[layer]!.a.radius > 0) into.push(start + layer);
+        if (discs[layer]!.a.radiusPx > 0) into.push(start + layer);
       }
     };
     const emitCircleLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
@@ -316,10 +321,9 @@ export function createAdapter(): Adapter {
       const discs = circleInkDiscs(
         n,
         colors,
-        halfStroke,
-        outlineHalf,
-        knockoutHalf,
-        scale,
+        halfStrokePx,
+        outlineHalfPx,
+        knockoutHalfPx,
         hot,
         selected,
         input.muted(n) && !hot,
@@ -330,7 +334,7 @@ export function createAdapter(): Adapter {
         }
       }
       for (const layer of layers) {
-        if (discs[layer]!.r1 > discs[layer]!.r0) into.push(start + layer);
+        if (discs[layer]!.halfPx > 0) into.push(start + layer);
       }
     };
     const emitInk = (n: TraceNode, layers: readonly number[], sInto: number[], cInto: number[]) =>
@@ -411,13 +415,13 @@ export function createAdapter(): Adapter {
         const alpha = hot ? 0.28 : 0.16;
         const halo =
           input.showHalos && hot
-            ? haloWrites(selected, colors.ring, colors.paper, outlineHalf, knockoutHalf)
+            ? haloWrites(selected, colors.ring, colors.paper, outlineHalfPx, knockoutHalfPx)
             : NO_HALO;
         // The fill's own outline carries the same state colors as every other
         // ink node (`inkClass`): accent while editable, cream while hot.
         const edge = edgeWrites(
           hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink,
-          edgeWidth,
+          edgeWidthPx,
         );
         const plan = fieldPlan(n.value as CsgOperand);
         if (plan) {
@@ -429,7 +433,6 @@ export function createAdapter(): Adapter {
             edge,
             halo,
             visible,
-            2 / scale,
             fieldQuadWrites,
             fieldLeafWrites,
             fieldSegWrites,
@@ -445,7 +448,9 @@ export function createAdapter(): Adapter {
           }
           continue;
         }
-        const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
+        // Islands are finite: their AABB (and the quad's AA skirt, applied by
+        // the shader) is world geometry the camera cannot move.
+        const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand);
         if (geom.spans.length === 0) {
           fillPool.alloc(n, 0);
           fillSegPool.alloc(n, 0);
@@ -489,10 +494,10 @@ export function createAdapter(): Adapter {
                 alpha,
                 flags: 0,
                 edge: edge.color,
-                edgeWidth: edge.half,
+                edgeWidthPx: edge.halfPx,
                 haloRing: halo.ring,
                 haloKnock: halo.knock,
-                haloHalf: halo.half,
+                haloHalfPx: halo.halfPx,
               }),
             });
           });
@@ -526,7 +531,6 @@ export function createAdapter(): Adapter {
       const discs = pointDiscsOf(
         n,
         input.colors,
-        scale,
         isHot(n, input.hoverId, input.selectedKey),
         isSelected(n, input.selectedKey),
         input.muted(n) && !isHot(n, input.hoverId, input.selectedKey),
@@ -537,7 +541,7 @@ export function createAdapter(): Adapter {
         }
       }
       for (const layer of layers) {
-        if (discs[layer]!.radius > 0) pointOrder.push(start + layer);
+        if (discs[layer]!.radiusPx > 0) pointOrder.push(start + layer);
       }
     };
     // Back-to-front per SVG PointMark passes: a node's halo/knockout discs are
@@ -647,17 +651,21 @@ export function createAdapter(): Adapter {
     edge: EdgeFields,
     halo: HaloFields,
     visible: Box,
-    pad: number,
     quadWrites: { idx: number; value: FieldQuadValue }[],
     leafWrites: { idx: number; value: FieldLeafValue }[],
     segWrites: SpanWrite<FillSegValue>[],
     arcWrites: SpanWrite<FillArcValue>[],
   ): { slot: number } | undefined {
     const instance = buildFieldInstance(plan);
-    // The superset box (a half-plane makes it unbounded) clipped to the pane and
-    // padded by 2 CSS px, so the analytic AA ramp is never cut off at the edge.
-    const box = clipBox(growBox(fieldBox(plan, instance), pad), visible);
-    if (!box) {
+    // The superset box is the field's own world extent, so it holds still under
+    // a pan or a zoom; only a half-plane makes it unbounded, and that case is
+    // clamped to the pane because a quad has to be finite. The AA skirt is a
+    // screen-space width, so the vertex shader grows the quad instead (see
+    // `QUAD_PAD_PX`). Culling is separate from the record — it only drops the
+    // draw from the order.
+    const raw = fieldBox(plan, instance);
+    const box = Number.isFinite(raw.min.x) ? raw : clipBox(raw, visible);
+    if (!box || !overlaps(box, visible)) {
       fieldQuadPool.alloc(n, 0);
       fieldLeafPool.alloc(n, 0);
       fieldSegPool.alloc(n, 0);
@@ -706,10 +714,10 @@ export function createAdapter(): Adapter {
       color: vec3f(color[0], color[1], color[2]),
       alpha,
       edge: edge.color,
-      edgeWidth: edge.half,
+      edgeWidthPx: edge.halfPx,
       haloRing: halo.ring,
       haloKnock: halo.knock,
-      haloHalf: halo.half,
+      haloHalfPx: halo.halfPx,
     });
     if (diff(lastFieldQuad, n, encodeFieldQuad(quad))) quadWrites.push({ idx: slot, value: quad });
     return { slot };
@@ -761,14 +769,15 @@ function strokeEndpoints(
 }
 
 /** Round-capped two-point instance (lineVariableWidth geometry): endpoints at
- * draw.b → draw.c, radius = half width. `radius <= 0` culls the draw. */
+ * draw.b → draw.c, radiusPx = half width in CSS px. `radiusPx <= 0` culls the
+ * draw. */
 function twoPointStroke(
   ends: { a: Vec2; b: Vec2 },
   color: Rgb,
   alpha: number,
-  radius: number,
+  radiusPx: number,
 ): StrokeDrawValue {
-  const ctrl = (p: Vec2) => StrokeCtrl({ position: vec2f(p.x, p.y), radius });
+  const ctrl = (p: Vec2) => StrokeCtrl({ position: vec2f(p.x, p.y), radiusPx });
   return StrokeDraw({
     a: ctrl(ends.a),
     b: ctrl(ends.a),
@@ -793,16 +802,16 @@ function strokeValue(
   flags: number,
   cam: Camera2,
   size: PaneSize,
-  radius: number,
+  radiusPx: number,
 ): StrokeDrawValue | undefined {
   const ends = strokeEndpoints(n, cam, size);
   if (!ends) return undefined;
   const { a, b } = ends;
   return StrokeDraw({
-    a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radius }),
-    b: StrokeCtrl({ position: vec2f(a.x, a.y), radius }),
-    c: StrokeCtrl({ position: vec2f(b.x, b.y), radius }),
-    d: StrokeCtrl({ position: vec2f(2 * b.x - a.x, 2 * b.y - a.y), radius }),
+    a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radiusPx }),
+    b: StrokeCtrl({ position: vec2f(a.x, a.y), radiusPx }),
+    c: StrokeCtrl({ position: vec2f(b.x, b.y), radiusPx }),
+    d: StrokeCtrl({ position: vec2f(2 * b.x - a.x, 2 * b.y - a.y), radiusPx }),
     run: StrokeRun({
       color: vec3f(color[0], color[1], color[2]),
       alpha,
@@ -814,14 +823,14 @@ function strokeValue(
 }
 
 /** The three layered draws of one stroke node: halo ring (hot), knockout
- * (selected), paint. Inactive layers carry radius -1 and never reach the
+ * (selected), paint. Inactive layers carry radiusPx -1 and never reach the
  * draw order. Undefined when the node has no drawable run. */
 function strokeInkDiscs(
   n: TraceNode,
   colors: AdapterInput["colors"],
-  halfStroke: number,
-  outlineHalf: number,
-  knockoutHalf: number,
+  halfStrokePx: number,
+  outlineHalfPx: number,
+  knockoutHalfPx: number,
   cam: Camera2,
   size: PaneSize,
   hot: boolean,
@@ -837,28 +846,30 @@ function strokeInkDiscs(
     muted ? RUN_MUTED : 0,
     cam,
     size,
-    halfStroke,
+    halfStrokePx,
   );
   if (!paint) return undefined;
   const haloAlpha = selected
     ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
     : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
   return [
-    twoPointStroke(ends, colors.ring, haloAlpha, hot ? outlineHalf : -1),
-    twoPointStroke(ends, colors.paper, 1, selected ? knockoutHalf : -1),
+    twoPointStroke(ends, colors.ring, haloAlpha, hot ? outlineHalfPx : -1),
+    twoPointStroke(ends, colors.paper, 1, selected ? knockoutHalfPx : -1),
     paint,
   ];
 }
 
-/** The three layered annuli of one circle node (halo ring, knockout, paint);
- * inactive layers carry r1 <= r0 so the vertex shader culls them. */
+/** The three layered annuli of one circle node (halo ring, knockout, paint),
+ * all symmetric about the node's own world radius; inactive layers carry
+ * `halfPx = -1` so the vertex shader culls them. The band width is CSS px and
+ * the fan's piece count is derived from it and the zoom in the shader, so the
+ * record holds no scale. */
 function circleInkDiscs(
   n: TraceNode,
   colors: AdapterInput["colors"],
-  halfStroke: number,
-  outlineHalf: number,
-  knockoutHalf: number,
-  scale: number,
+  halfPx: number,
+  outlineHalfPx: number,
+  knockoutHalfPx: number,
   hot: boolean,
   selected: boolean,
   muted: boolean,
@@ -867,15 +878,13 @@ function circleInkDiscs(
   const r = Math.abs(v.radius);
   const cx = v.center.x;
   const cy = v.center.y;
-  const pieces = Math.max(32, Math.min(128, Math.ceil((TAU * r * scale) / 6)));
-  const disc = (r0: number, r1: number, color: Rgb, alpha: number, flags = 0): CircleInstValue =>
+  const disc = (band: number, color: Rgb, alpha: number, flags = 0): CircleInstValue =>
     CircleInst({
       center: vec2f(cx, cy),
-      r0,
-      r1,
+      radius: r,
+      halfPx: band,
       a0: 0,
       a1: TAU,
-      pieces,
       color: vec3f(color[0], color[1], color[2]),
       alpha,
       flags,
@@ -885,20 +894,9 @@ function circleInkDiscs(
     : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
   const paintColor = hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink;
   return [
-    disc(hot ? Math.max(0, r - outlineHalf) : 0, hot ? r + outlineHalf : 0, colors.ring, haloAlpha),
-    disc(
-      selected ? Math.max(0, r - knockoutHalf) : 0,
-      selected ? r + knockoutHalf : 0,
-      colors.paper,
-      1,
-    ),
-    disc(
-      r - halfStroke,
-      r + halfStroke,
-      paintColor,
-      muted ? MUTED_ALPHA : 1,
-      muted ? RUN_MUTED : 0,
-    ),
+    disc(hot ? outlineHalfPx : -1, colors.ring, haloAlpha),
+    disc(selected ? knockoutHalfPx : -1, colors.paper, 1),
+    disc(halfPx, paintColor, muted ? MUTED_ALPHA : 1, muted ? RUN_MUTED : 0),
   ];
 }
 
@@ -914,27 +912,24 @@ const POINT_RADIUS_TRIM_PX = 1;
 const POINT_RIM_EXTRA_PX = 0.5;
 
 /** The four concentric discs that compose one point mark, back-to-front
- * (halo ring / knockout first — drawn under the mark). Radii are CSS px
- * converted to world units (1 CSS px = 1 / scale world units, matching
- * euclid2/camera.ts worldToScreen). Inactive layers carry radius -1 so the
- * vertex shader culls them; muted fades the mark (paint + paper outline)
- * like the SVG `.muted` element opacity. */
+ * (halo ring / knockout first — drawn under the mark). Radii are CSS px; the
+ * vertex shader converts them with the frame's zoom. Inactive layers carry
+ * radius -1 so the vertex shader culls them; muted fades the mark (paint +
+ * paper outline) like the SVG `.muted` element opacity. */
 function pointDiscsOf(
   n: TraceNode,
   colors: AdapterInput["colors"],
-  scale: number,
   hot: boolean,
   selected: boolean,
   muted: boolean,
 ): PointInstValue[] {
   const v = n.value;
   const at: Vec2 = v.kind === "point" ? { x: v.x, y: v.y } : gliderAt(v as Glider);
-  const markR = (pointMarkRadius(n.editable) - POINT_RADIUS_TRIM_PX) / scale;
-  const px = (half: number) => half / scale;
-  const disc = (radius: number, color: Rgb, alpha: number): PointInstValue =>
+  const markR = pointMarkRadius(n.editable) - POINT_RADIUS_TRIM_PX;
+  const disc = (radiusPx: number, color: Rgb, alpha: number): PointInstValue =>
     PointInst({
       center: vec2f(at.x, at.y),
-      radius,
+      radiusPx,
       color: vec3f(color[0], color[1], color[2]),
       alpha,
     });
@@ -943,17 +938,17 @@ function pointDiscsOf(
   return [
     // Halo ring: hover at 0.5, selected at 1.0 (chrome pointOutlinePx).
     disc(
-      hot ? markR + px(DEFAULT_CHROME_METRICS.pointOutlinePx / 2) : -1,
+      hot ? markR + DEFAULT_CHROME_METRICS.pointOutlinePx / 2 : -1,
       colors.ring,
       selected
         ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
         : DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
     ),
     // Selected knockout gap in paper (chrome pointKnockoutPx).
-    disc(selected ? markR + px(DEFAULT_CHROME_METRICS.pointKnockoutPx / 2) : -1, colors.paper, 1),
+    disc(selected ? markR + DEFAULT_CHROME_METRICS.pointKnockoutPx / 2 : -1, colors.paper, 1),
     // Normal knockout: paper rim beneath the paint disc (SVG paint stroke,
     // POINT_STROKE_PX + 0.5).
-    disc(markR + px(POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX), colors.paper, markAlpha),
+    disc(markR + POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX, colors.paper, markAlpha),
     // The paint disc itself.
     disc(markR, paintColor, markAlpha),
   ];
@@ -967,7 +962,7 @@ function encodeStroke(v: StrokeDrawValue): Float64Array {
   for (const c of [v.a, v.b, v.c, v.d]) {
     f[i++] = c.position.x;
     f[i++] = c.position.y;
-    f[i++] = c.radius;
+    f[i++] = c.radiusPx;
   }
   f[i++] = v.run.color.r;
   f[i++] = v.run.color.g;
@@ -980,19 +975,18 @@ function encodeStroke(v: StrokeDrawValue): Float64Array {
 }
 
 function encodeCircle(v: CircleInstValue): Float64Array {
-  const f = new Float64Array(13);
+  const f = new Float64Array(12);
   f[0] = v.center.x;
   f[1] = v.center.y;
-  f[2] = v.r0;
-  f[3] = v.r1;
+  f[2] = v.radius;
+  f[3] = v.halfPx;
   f[4] = v.a0;
   f[5] = v.a1;
-  f[6] = v.pieces;
-  f[7] = v.color.r;
-  f[8] = v.color.g;
-  f[9] = v.color.b;
-  f[10] = v.alpha;
-  f[11] = v.flags;
+  f[6] = v.color.r;
+  f[7] = v.color.g;
+  f[8] = v.color.b;
+  f[9] = v.alpha;
+  f[10] = v.flags;
   return f;
 }
 
@@ -1009,11 +1003,11 @@ function encodeStrokes(draws: readonly StrokeDrawValue[]): Float64Array {
 
 /** Whole-node payload: the three layered annuli of a circle node. */
 function encodeCircles(discs: readonly CircleInstValue[]): Float64Array {
-  const out = new Float64Array(discs.length * 13);
+  const out = new Float64Array(discs.length * 12);
   let at = 0;
   for (const d of discs) {
     out.set(encodeCircle(d), at);
-    at += 13;
+    at += 12;
   }
   return out;
 }
@@ -1028,11 +1022,10 @@ function visibleWorldBox(cam: Camera2, size: PaneSize): Box {
   };
 }
 
-function growBox(box: Box, pad: number): Box {
-  return {
-    min: { x: box.min.x - pad, y: box.min.y - pad },
-    max: { x: box.max.x + pad, y: box.max.y + pad },
-  };
+/** Do two boxes overlap? (The pane test that culls off-screen fields without
+ * touching their records.) */
+function overlaps(a: Box, b: Box): boolean {
+  return a.min.x < b.max.x && a.max.x > b.min.x && a.min.y < b.max.y && a.max.y > b.min.y;
 }
 
 function clipBox(box: Box, clip: Box): Box | undefined {
@@ -1059,7 +1052,7 @@ function encodeFieldQuad(q: FieldQuadValue): Float64Array {
     q.edge.y,
     q.edge.z,
     q.edge.w,
-    q.edgeWidth,
+    q.edgeWidthPx,
     q.haloRing.x,
     q.haloRing.y,
     q.haloRing.z,
@@ -1068,8 +1061,8 @@ function encodeFieldQuad(q: FieldQuadValue): Float64Array {
     q.haloKnock.y,
     q.haloKnock.z,
     q.haloKnock.w,
-    q.haloHalf.x,
-    q.haloHalf.y,
+    q.haloHalfPx.x,
+    q.haloHalfPx.y,
   );
 }
 
@@ -1167,7 +1160,7 @@ function encodePoints(discs: readonly PointInstValue[]): Float64Array {
     let j = i * 7;
     f[j++] = v.center.x;
     f[j++] = v.center.y;
-    f[j++] = v.radius;
+    f[j++] = v.radiusPx;
     f[j++] = v.color.r;
     f[j++] = v.color.g;
     f[j++] = v.color.b;
@@ -1178,13 +1171,14 @@ function encodePoints(discs: readonly PointInstValue[]): Float64Array {
 
 // -- edge + halo chrome ------------------------------------------------------
 
-/** The fill's own outline: its state color and half-width (world units). */
-type EdgeFields = { color: v4f; half: number };
+/** The fill's own outline: its state color and total width in CSS px, centred
+ * on the boundary. */
+type EdgeFields = { color: v4f; halfPx: number };
 
 /** SVG's `inkClass` for a fill's stroke: `stroke-width: var(--oblik-stroke)`,
- * screen-space, drawn inside the silhouette here. */
-function edgeWrites(color: Rgb, half: number): EdgeFields {
-  return { color: vec4f(color[0], color[1], color[2], 1), half };
+ * screen-space, straddling the boundary here. */
+function edgeWrites(color: Rgb, halfPx: number): EdgeFields {
+  return { color: vec4f(color[0], color[1], color[2], 1), halfPx };
 }
 
 /** Append an outline's floats to a change-check buffer. */
@@ -1193,26 +1187,27 @@ function encodeEdge(f: Float64Array, at: number, edge: EdgeFields): number {
   f[at + 1] = edge.color.y;
   f[at + 2] = edge.color.z;
   f[at + 3] = edge.color.w;
-  f[at + 4] = edge.half;
+  f[at + 4] = edge.halfPx;
   return at + 5;
 }
 
 /** The halo fields of one fill node, exactly as the records store them. */
-type HaloFields = { ring: v4f; knock: v4f; half: v2f };
+type HaloFields = { ring: v4f; knock: v4f; halfPx: v2f };
 
 /** Cold nodes carry no halo: the bands' alphas are 0, so a stray halo run would
  * still draw nothing — this is only about not emitting the run at all. */
 const NO_HALO: HaloFields = {
   ring: vec4f(0, 0, 0, 0),
   knock: vec4f(0, 0, 0, 0),
-  half: vec2f(0, 0),
+  halfPx: vec2f(0, 0),
 };
 
 /**
  * Halo chrome of one hot fill node, mirroring `chromeLayers()`: hover is the
  * accent outline alone at 50%, selection is the same outline opaque plus the
- * paper knockout band just inside it. Widths are the ink chrome's — `outlinePx`
- * from the fill's edge inward, then `knockoutPx` — so a hot fill carries the
+ * paper knockout band just inside it. Widths are the ink chrome's, in CSS px —
+ * `outlinePx` from the fill's edge inward, then `knockoutPx` — so a hot fill
+ * carries the
  * same weight as a hot edge, and the halo layer itself is opaque (it knocks the
  * fill's paint out from under the ring instead of being tinted by it).
  */
@@ -1220,8 +1215,8 @@ function haloWrites(
   selected: boolean,
   ring: Rgb,
   paper: Rgb,
-  outlineHalf: number,
-  knockoutHalf: number,
+  outlineHalfPx: number,
+  knockoutHalfPx: number,
 ): HaloFields {
   const alpha = selected
     ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
@@ -1231,7 +1226,7 @@ function haloWrites(
     // The paper color is always carried: the outline band is paper-backed (that
     // is the knockout), and only the band *inside* the ring is conditional.
     knock: vec4f(paper[0], paper[1], paper[2], selected ? 1 : 0),
-    half: vec2f(selected ? knockoutHalf : 0, outlineHalf),
+    halfPx: vec2f(selected ? knockoutHalfPx : 0, outlineHalfPx),
   };
 }
 
@@ -1246,7 +1241,7 @@ function encodeHalo(f: Float64Array, at: number, halo: HaloFields): number {
   f[j++] = halo.knock.y;
   f[j++] = halo.knock.z;
   f[j++] = halo.knock.w;
-  f[j++] = halo.half.x;
-  f[j] = halo.half.y;
+  f[j++] = halo.halfPx.x;
+  f[j] = halo.halfPx.y;
   return j + 1;
 }

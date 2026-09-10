@@ -1,7 +1,10 @@
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
+import { circleVertex } from "./circles";
+import { diskVertex } from "./disks";
 import { fillFragment, haloFragment } from "./fills";
+import { strokeVertex } from "./strokes";
 
 /**
  * The span-pass fragments, resolved device-free. The interesting property is
@@ -58,7 +61,56 @@ describe("span fill WGSL", () => {
     // occurrence of those names is the record declaration itself.
     expect(occurrences(bothLayers, "(*region).haloRing")).toBe(1);
     expect(occurrences(bothLayers, "(*region).haloKnock")).toBe(1);
-    expect(occurrences(bothLayers, "(*region).haloHalf")).toBe(1);
+    expect(occurrences(bothLayers, "(*region).haloHalfPx")).toBe(1);
     expect(bothLayers).toContain("fwidth");
+  });
+});
+
+/**
+ * Widths are CSS px in the records and become world units in the shader, once,
+ * through `worldPerPx`. That is what makes a zoom a frame-uniform write instead
+ * of a record rewrite (see `adapter.test.ts`), so it is worth pinning: the WGSL
+ * has to declare px fields and divide by the frame's scale at every use.
+ */
+describe("record widths are CSS px", () => {
+  test("the span fill scales its outline and halo bands by the zoom", () => {
+    const wgsl = tgpu.resolve([haloFragment]);
+    expect(occurrences(wgsl, "edgeWidthPx: f32")).toBe(1);
+    expect(occurrences(wgsl, "haloHalfPx: vec2f")).toBe(1);
+    expect(occurrences(wgsl, "worldPerPx(frame.scale)")).toBe(1);
+    // Every width read goes through the conversion, never the raw px value.
+    expect(wgsl).toContain("((*region).haloHalfPx * w)");
+    expect(wgsl).toContain("((*region).edgeWidthPx * w)");
+  });
+
+  test("the stroke vertex shader converts all four ctrl radii", () => {
+    const wgsl = tgpu.resolve([strokeVertex]);
+    expect(occurrences(wgsl, "radiusPx: f32")).toBe(1);
+    // Four cull reads by name, then every radius that reaches the expander goes
+    // through the px→world conversion: two for the two-point pair, four for the
+    // mirrored-neighbour quad. One shared conversion for all six.
+    expect(occurrences(wgsl, "radiusPx * w")).toBe(6);
+    expect(occurrences(wgsl, "radiusPx < 0f")).toBe(4);
+    expect(occurrences(wgsl, "worldPerPx(frame.scale)")).toBe(1);
+  });
+
+  test("the disk vertex shader converts its px radius", () => {
+    const wgsl = tgpu.resolve([diskVertex]);
+    expect(occurrences(wgsl, "radiusPx: f32")).toBe(1);
+    expect(wgsl).toContain("worldPerPx(frame.scale)");
+  });
+
+  test("the circle vertex shader derives the band and the fan budget", () => {
+    const wgsl = tgpu.resolve([circleVertex]);
+    // The record carries the node's world radius and a px band; the piece count
+    // that used to be baked per zoom is now derived from both, at draw time.
+    expect(occurrences(wgsl, "halfPx: f32")).toBe(1);
+    expect(wgsl).toContain("ceil");
+    expect(wgsl).toContain("clamp");
+    expect(wgsl).not.toMatch(/\bpieces: f32/);
+    expect(wgsl).toMatch(/let pieces = clamp\(ceil\(/);
+    // The band is px→world, the outline cull keys off the px band.
+    expect(wgsl).toContain("((*inst).halfPx * worldPerPx(frame.scale))");
+    expect(wgsl).toContain("((*inst).halfPx <= 0f)");
   });
 });
