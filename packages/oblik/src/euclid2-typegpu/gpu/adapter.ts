@@ -1,12 +1,10 @@
 import { vec2f, vec3f } from "typegpu/data";
 
 import type { TraceNode } from "#eval/context";
-import type { Circle, CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
+import type { Circle, CsgOperand, Polygon, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
-import { evaluateRegions } from "#geom/evaluate-regions";
 import { gliderAt, isGlider, type Glider } from "#geom/gliders";
 import { infiniteLineAxis } from "#geom/ops";
-import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/region";
 
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
@@ -14,6 +12,7 @@ import type { Ghost, PlaceHit } from "../../euclid2/tool";
 import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
+import { blockOffset, islandGeomOf, type IslandGeom, type SpanEdge } from "./fillSpans";
 import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
 import type {
@@ -125,7 +124,6 @@ export type Adapter = {
 
 /** Fill geometry for one node: edge blocks (one per island) plus the island
  * AABB quad each block is drawn in. */
-type IslandGeom = { edges: FillEdgeValue[][]; bounds: { min: Vec2; max: Vec2 }[] };
 
 /** Track the last uploaded payload per key; true when the bytes changed. */
 function diff(map: Map<object, Float64Array>, key: object, next: Float64Array): boolean {
@@ -332,7 +330,7 @@ export function createAdapter(): Adapter {
       const lifted = white(n);
       const color = lifted ? colors.selectedPaint : colors.ink;
       const alpha = lifted ? 0.28 : 0.16;
-      const geom = islandGeom(n, scale);
+      const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
       if (geom.edges.length === 0) {
         fillPool.alloc(n, 0);
         edgePool.alloc(n, 0);
@@ -346,7 +344,7 @@ export function createAdapter(): Adapter {
         let at = edgeStart;
         for (const block of geom.edges) {
           for (const e of block) {
-            fillEdgeWrites.push({ idx: at, value: e });
+            fillEdgeWrites.push({ idx: at, value: toEdgeValue(e) });
             at++;
           }
         }
@@ -470,31 +468,6 @@ export function createAdapter(): Adapter {
     };
   }
 
-  function encodeFillRegions(
-    geom: IslandGeom,
-    color: Rgb,
-    alpha: number,
-    edgeStart: number,
-  ): Float64Array {
-    const f = new Float64Array(geom.edges.length * 11);
-    for (let i = 0; i < geom.edges.length; i++) {
-      const b = geom.bounds[i]!;
-      let j = i * 11;
-      f[j++] = b.min.x;
-      f[j++] = b.min.y;
-      f[j++] = b.max.x;
-      f[j++] = b.max.y;
-      f[j++] = edgeStart + blockOffset(geom.edges, i);
-      f[j++] = geom.edges[i]!.length;
-      f[j++] = color[0];
-      f[j++] = color[1];
-      f[j++] = color[2];
-      f[j++] = alpha;
-      f[j] = 0;
-    }
-    return f;
-  }
-
   function destroy() {
     lastStroke.clear();
     lastCircle.clear();
@@ -509,12 +482,6 @@ export function createAdapter(): Adapter {
   }
 
   return { tick, destroy };
-}
-
-function blockOffset(blocks: FillEdgeValue[][], i: number): number {
-  let at = 0;
-  for (let k = 0; k < i; k++) at += blocks[k]!.length;
-  return at;
 }
 
 // -- geometry ---------------------------------------------------------------
@@ -678,133 +645,6 @@ function circleInkDiscs(
   ];
 }
 
-/** Fill islands for a node: polygon nodes build their own region; everything
- * else compiles through evaluateRegions (WeakMap-cached). */
-function islandsOf(n: TraceNode): Region[] {
-  const v = n.value;
-  if (v.kind === "polygon") {
-    const p = v as Polygon;
-    const outer: LoopEdge[] = chainEdges(p.boundary);
-    if (outer.length === 0) return [];
-    return [{ kind: "region", outer, holes: p.holes as Loop[] }];
-  }
-  return evaluateRegions(v as CsgOperand);
-}
-
-function chainEdges(points: readonly Vec2[]): LoopEdge[] {
-  if (points.length < 2) return [];
-  const edges: LoopEdge[] = [];
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i]!;
-    const b = points[(i + 1) % points.length]!;
-    edges.push({ a, b, carrier: { kind: "segment", a, b } });
-  }
-  return edges;
-}
-
-/** Normalized edges (outer CCW, holes CW) + padded AABB per island. */
-function islandGeom(n: TraceNode, scale: number): IslandGeom {
-  const pad = 2 / scale;
-  const edges: FillEdgeValue[][] = [];
-  const bounds: { min: Vec2; max: Vec2 }[] = [];
-  for (const island of islandsOf(n)) {
-    const loops = [island.outer, ...island.holes];
-    const block: FillEdgeValue[] = [];
-    const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    for (let i = 0; i < loops.length; i++) {
-      const loop = loops[i]!;
-      const wantCw = i > 0;
-      for (const edge of normalizedLoop(loop, wantCw)) {
-        block.push(edge);
-        grow(box, edge.a);
-        grow(box, edge.b);
-        if (edge.radius > 0) {
-          grow(box, { x: edge.center.x - edge.radius, y: edge.center.y - edge.radius });
-          grow(box, { x: edge.center.x + edge.radius, y: edge.center.y + edge.radius });
-        }
-      }
-    }
-    if (block.length === 0 || !Number.isFinite(box.minX)) continue;
-    edges.push(block);
-    bounds.push({
-      min: { x: box.minX - pad, y: box.minY - pad },
-      max: { x: box.maxX + pad, y: box.maxY + pad },
-    });
-  }
-  return { edges, bounds };
-}
-
-function grow(box: { minX: number; minY: number; maxX: number; maxY: number }, p: Vec2) {
-  box.minX = Math.min(box.minX, p.x);
-  box.minY = Math.min(box.minY, p.y);
-  box.maxX = Math.max(box.maxX, p.x);
-  box.maxY = Math.max(box.maxY, p.y);
-}
-
-/** One island loop → fill edges, normalized: outer CCW, holes CW. */
-function normalizedLoop(loop: Loop, wantCw: boolean): FillEdgeValue[] {
-  if (isCircleWalk(loop)) {
-    const r = Math.abs(loop.radius);
-    const anchor = { x: loop.center.x + r, y: loop.center.y };
-    // Full circle: positive sweep = CCW outer, negative = CW hole.
-    return [
-      FillEdge({
-        a: vec2f(anchor.x, anchor.y),
-        b: vec2f(anchor.x, anchor.y),
-        center: vec2f(loop.center.x, loop.center.y),
-        radius: r,
-        span: wantCw ? -TAU : TAU,
-      }),
-    ];
-  }
-  const edges = walkEdges(loop);
-  if (edges.length === 0) return [];
-  const area = shoelace(tessellateWalk(loop));
-  const reversed = area < 0 !== wantCw;
-  const ordered = reversed ? reverseLoop(edges) : edges;
-  return ordered.map((e) => fillEdge(e));
-}
-
-/** CCW-positive polygon area of a closed walk. */
-function shoelace(points: readonly Vec2[]): number {
-  let sum = 0;
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i]!;
-    const b = points[(i + 1) % points.length]!;
-    sum += a.x * b.y - a.y * b.x;
-  }
-  return sum / 2;
-}
-
-function reverseLoop(edges: readonly LoopEdge[]): LoopEdge[] {
-  return edges.toReversed().map((e) => ({
-    a: e.b,
-    b: e.a,
-    carrier: e.carrier,
-    k: e.k === undefined ? undefined : e.k === 1 ? -1 : 1,
-  }));
-}
-
-function fillEdge(e: LoopEdge): FillEdgeValue {
-  if (e.carrier.kind === "circle") {
-    const carrier = e.carrier as Circle;
-    return FillEdge({
-      a: vec2f(e.a.x, e.a.y),
-      b: vec2f(e.b.x, e.b.y),
-      center: vec2f(carrier.center.x, carrier.center.y),
-      radius: Math.abs(carrier.radius),
-      span: circleDelta(carrier, e.a, e.b, e.k ?? 1),
-    });
-  }
-  return FillEdge({
-    a: vec2f(e.a.x, e.a.y),
-    b: vec2f(e.b.x, e.b.y),
-    center: vec2f(0, 0),
-    radius: -1,
-    span: 0,
-  });
-}
-
 // -- point/glider marks (layered discs, mirrors euclid2 PointMark) ------------
 
 /** GPU-only visual tuning over the shared SVG point metrics: paint dots read
@@ -921,7 +761,44 @@ function encodeCircles(discs: readonly CircleInstValue[]): Float64Array {
   return out;
 }
 
-function encodeFillEdges(edges: readonly FillEdgeValue[]): Float64Array {
+/** Byte-encoded fill regions for the change check: AABB, edge window, color. */
+function encodeFillRegions(
+  geom: IslandGeom,
+  color: Rgb,
+  alpha: number,
+  edgeStart: number,
+): Float64Array {
+  const f = new Float64Array(geom.edges.length * 11);
+  for (let i = 0; i < geom.edges.length; i++) {
+    const b = geom.bounds[i]!;
+    let j = i * 11;
+    f[j++] = b.min.x;
+    f[j++] = b.min.y;
+    f[j++] = b.max.x;
+    f[j++] = b.max.y;
+    f[j++] = edgeStart + blockOffset(geom.edges, i);
+    f[j++] = geom.edges[i]!.length;
+    f[j++] = color[0];
+    f[j++] = color[1];
+    f[j++] = color[2];
+    f[j++] = alpha;
+    f[j] = 0;
+  }
+  return f;
+}
+
+/** Plain span → GPU struct (the shared span builder works in `#geom` types). */
+function toEdgeValue(e: SpanEdge): FillEdgeValue {
+  return FillEdge({
+    a: vec2f(e.a.x, e.a.y),
+    b: vec2f(e.b.x, e.b.y),
+    center: vec2f(e.center.x, e.center.y),
+    radius: e.radius,
+    span: e.span,
+  });
+}
+
+function encodeFillEdges(edges: readonly SpanEdge[]): Float64Array {
   const f = new Float64Array(edges.length * 8);
   for (let i = 0; i < edges.length; i++) {
     const e = edges[i]!;
