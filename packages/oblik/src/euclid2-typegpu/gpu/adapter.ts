@@ -6,17 +6,20 @@ import { isFillGeom } from "#geom/csg2";
 import { gliderAt, isGlider, type Glider } from "#geom/gliders";
 import { infiniteLineAxis } from "#geom/ops";
 
-import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
+import { infiniteClip, screenToWorld, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
 import type { Ghost, PlaceHit } from "../../euclid2/tool";
 import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
-import { blockOffset, islandGeomOf, type IslandGeom, type SpanEdge } from "./fillSpans";
+import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
+import { blockOffset, islandGeomOf, type Box, type IslandGeom, type SpanEdge } from "./fillSpans";
 import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
 import type {
   CircleInstValue,
+  FieldLeafValue,
+  FieldQuadValue,
   FillEdgeValue,
   FillRegionValue,
   PointInstValue,
@@ -24,8 +27,13 @@ import type {
 } from "./schemas";
 import {
   CircleInst,
+  FieldLeaf,
+  FieldQuad,
   FillEdge,
   FillRegion,
+  MAX_FIELD_EDGES,
+  MAX_FIELD_LEAVES,
+  MAX_FIELD_QUADS,
   MAX_POINTS,
   PointInst,
   RUN_GEOM_TWO_POINT,
@@ -105,12 +113,28 @@ export type InkBands = {
   liftedPaint: Uint32Array;
 };
 
+/** One world fill draw. Fills are translucent, so paint order is the SVG's
+ * band order; a compiled field and a span fill are different pipelines, so the
+ * adapter emits a run per node and the painter plays them in that order. */
+export type FillDraw =
+  | { path: "spans"; first: number; count: number }
+  | { path: "field"; first: number; count: number; plan: FieldPlan };
+
 export type TickPatch = {
   strokes: { writes: { idx: number; value: StrokeDrawValue }[]; bands: InkBands };
   circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
   fills: SlotPatch<FillRegionValue>;
   /** Edge blocks back the fill regions; no draw list of their own. */
   fillEdges: { writes: { idx: number; value: FillEdgeValue }[] };
+  /** CSG fills compiled to GPU fields: an AABB quad per node, the leaf records
+   * it reads, and the boundary spans of its region leaves. */
+  fields: {
+    quads: SlotPatch<FieldQuadValue>;
+    leaves: { writes: { idx: number; value: FieldLeafValue }[] };
+    edges: { writes: { idx: number; value: FillEdgeValue }[] };
+  };
+  /** World fill draws, in band order (span fills and compiled fields mixed). */
+  fillDraws: FillDraw[];
   points: SlotPatch<PointInstValue>;
   /** Tool overlay (ghost previews + snap markers), rebuilt every tick. */
   overlay: OverlayPatch;
@@ -148,6 +172,9 @@ export function createAdapter(): Adapter {
   const fillPool = createSlotPool(256);
   const edgePool = createSlotPool(4096);
   const pointPool = createSlotPool(MAX_POINTS);
+  const fieldQuadPool = createSlotPool(MAX_FIELD_QUADS);
+  const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES);
+  const fieldEdgePool = createSlotPool(MAX_FIELD_EDGES);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
   const lastStroke = new Map<object, Float64Array>();
@@ -155,6 +182,9 @@ export function createAdapter(): Adapter {
   const lastFillRegion = new Map<object, Float64Array>();
   const lastFillEdges = new Map<object, Float64Array>();
   const lastPoint = new Map<object, Float64Array>();
+  const lastFieldQuad = new Map<object, Float64Array>();
+  const lastFieldLeaf = new Map<object, Float64Array>();
+  const lastFieldEdge = new Map<object, Float64Array>();
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
@@ -192,6 +222,9 @@ export function createAdapter(): Adapter {
     fillPool.sync(present);
     edgePool.sync(present);
     pointPool.sync(present);
+    fieldQuadPool.sync(present);
+    fieldLeafPool.sync(present);
+    fieldEdgePool.sync(present);
 
     const white = (n: TraceNode) => isHot(n, input.hoverId, input.selectedKey);
 
@@ -320,16 +353,45 @@ export function createAdapter(): Adapter {
       for (const n of pass.nodes) emitInk(n, pass.layers, pass.s, pass.c);
     }
 
-    // --- fills (rest → hover → lifted) ---
+    // --- fills (rest → hover → lifted). A `csg2` tree whose operands are all
+    // --- single scalar fields is drawn by the compiled-field pass (no island
+    // --- resolution, exact arcs, data-only uploads); everything else — regions,
+    // --- polygons, picks — keeps the span pass. Fills are translucent, so the
+    // --- two passes are drawn per node in band order (see `fillDraws`).
     const fillWrites: { idx: number; value: FillRegionValue }[] = [];
     const fillOrder: number[] = [];
     const fillEdgeWrites: { idx: number; value: FillEdgeValue }[] = [];
+    const fieldQuadWrites: { idx: number; value: FieldQuadValue }[] = [];
+    const fieldOrder: number[] = [];
+    const fieldLeafWrites: { idx: number; value: FieldLeafValue }[] = [];
+    const fieldEdgeWrites: { idx: number; value: FillEdgeValue }[] = [];
+    const fillDraws: FillDraw[] = [];
+    const visible = visibleWorldBox(cam, size);
 
     const fillBand = splitChrome(fills, (n) => isSelected(n, input.selectedKey), white);
     for (const n of [...fillBand.rest, ...fillBand.hover, ...fillBand.lifted]) {
       const lifted = white(n);
       const color = lifted ? colors.selectedPaint : colors.ink;
       const alpha = lifted ? 0.28 : 0.16;
+      const plan = fieldPlan(n.value as CsgOperand);
+      if (plan) {
+        const draw = emitField(
+          n,
+          plan,
+          color,
+          alpha,
+          visible,
+          2 / scale,
+          fieldQuadWrites,
+          fieldLeafWrites,
+          fieldEdgeWrites,
+        );
+        if (draw) {
+          fieldOrder.push(draw.slot);
+          fillDraws.push({ path: "field", first: fieldOrder.length - 1, count: 1, plan });
+        }
+        continue;
+      }
       const geom = islandGeomOf(n.value as Region | Polygon | CsgOperand, 2 / scale);
       if (geom.edges.length === 0) {
         fillPool.alloc(n, 0);
@@ -365,7 +427,9 @@ export function createAdapter(): Adapter {
           }),
         );
       }
+      const first = fillOrder.length;
       for (let i = 0; i < geom.edges.length; i++) fillOrder.push(regionStart + i);
+      fillDraws.push({ path: "spans", first, count: geom.edges.length });
     }
 
     // --- points (SVG PointMark passes: rest dots, hover halo, hover dot,
@@ -442,6 +506,16 @@ export function createAdapter(): Adapter {
         count: fillOrder.length,
       },
       fillEdges: { writes: fillEdgeWrites },
+      fields: {
+        quads: {
+          writes: fieldQuadWrites,
+          order: Uint32Array.from(fieldOrder),
+          count: fieldOrder.length,
+        },
+        leaves: { writes: fieldLeafWrites },
+        edges: { writes: fieldEdgeWrites },
+      },
+      fillDraws,
       points: {
         writes: pointWrites,
         order: Uint32Array.from(pointOrder),
@@ -454,6 +528,9 @@ export function createAdapter(): Adapter {
           circleWrites.length +
           fillWrites.length +
           fillEdgeWrites.length +
+          fieldQuadWrites.length +
+          fieldLeafWrites.length +
+          fieldEdgeWrites.length +
           pointWrites.length +
           overlay.under.strokes.length +
           overlay.under.circles.length +
@@ -463,9 +540,75 @@ export function createAdapter(): Adapter {
           overlay.over.disks.length +
           overlay.over.markers.length +
           overlay.over.fills.length,
-        total: strokePool.used + circlePool.used + fillPool.used + edgePool.used + pointPool.used,
+        total:
+          strokePool.used +
+          circlePool.used +
+          fillPool.used +
+          edgePool.used +
+          pointPool.used +
+          fieldQuadPool.used +
+          fieldLeafPool.used +
+          fieldEdgePool.used,
       },
     };
+  }
+
+  /** One fill node on the compiled-field path: leaves + boundary spans into the
+   * shared pools, one AABB quad, all byte-diffed so a drag rewrites only what
+   * moved and never re-encodes the shader's inputs. */
+  function emitField(
+    n: TraceNode,
+    plan: FieldPlan,
+    color: Rgb,
+    alpha: number,
+    visible: Box,
+    pad: number,
+    quadWrites: { idx: number; value: FieldQuadValue }[],
+    leafWrites: { idx: number; value: FieldLeafValue }[],
+    edgeWrites: { idx: number; value: FillEdgeValue }[],
+  ): { slot: number } | undefined {
+    const instance = buildFieldInstance(plan);
+    // The superset box (a half-plane makes it unbounded) clipped to the pane and
+    // padded by 2 CSS px, so the analytic AA ramp is never cut off at the edge.
+    const box = clipBox(growBox(fieldBox(plan, instance), pad), visible);
+    if (!box) {
+      fieldQuadPool.alloc(n, 0);
+      fieldLeafPool.alloc(n, 0);
+      fieldEdgePool.alloc(n, 0);
+      return undefined;
+    }
+    const leafStart = fieldLeafPool.alloc(n, instance.leaves.length);
+    const edgeStart = fieldEdgePool.alloc(n, instance.spans.length);
+    const slot = fieldQuadPool.alloc(n, 1);
+    if (leafStart === undefined || edgeStart === undefined || slot === undefined) return undefined;
+    const leaves = instance.leaves.map((leaf) =>
+      FieldLeaf({
+        a: vec2f(leaf.a.x, leaf.a.y),
+        b: vec2f(leaf.b.x, leaf.b.y),
+        r: leaf.r,
+        // Span windows are rebased onto the shared edge array; the diff below
+        // rewrites them when the pool moves the run.
+        spanOffset: edgeStart + leaf.spanOffset,
+        spanCount: leaf.spanCount,
+      }),
+    );
+    if (diff(lastFieldLeaf, n, encodeFieldLeaves(leaves))) {
+      leaves.forEach((value, i) => leafWrites.push({ idx: leafStart + i, value }));
+    }
+    if (instance.spans.length > 0 && diff(lastFieldEdge, n, encodeFillEdges(instance.spans))) {
+      instance.spans.forEach((e, i) =>
+        edgeWrites.push({ idx: edgeStart + i, value: toEdgeValue(e) }),
+      );
+    }
+    const quad = FieldQuad({
+      aabbMin: vec2f(box.min.x, box.min.y),
+      aabbMax: vec2f(box.max.x, box.max.y),
+      leafBase: leafStart,
+      color: vec3f(color[0], color[1], color[2]),
+      alpha,
+    });
+    if (diff(lastFieldQuad, n, encodeFieldQuad(quad))) quadWrites.push({ idx: slot, value: quad });
+    return { slot };
   }
 
   function destroy() {
@@ -474,11 +617,17 @@ export function createAdapter(): Adapter {
     lastFillRegion.clear();
     lastFillEdges.clear();
     lastPoint.clear();
+    lastFieldQuad.clear();
+    lastFieldLeaf.clear();
+    lastFieldEdge.clear();
     strokePool.reset();
     circlePool.reset();
     fillPool.reset();
     edgePool.reset();
     pointPool.reset();
+    fieldQuadPool.reset();
+    fieldLeafPool.reset();
+    fieldEdgePool.reset();
   }
 
   return { tick, destroy };
@@ -759,6 +908,63 @@ function encodeCircles(discs: readonly CircleInstValue[]): Float64Array {
     at += 13;
   }
   return out;
+}
+
+/** Visible pane rectangle in world units — the clamp for unbounded fields. */
+function visibleWorldBox(cam: Camera2, size: PaneSize): Box {
+  const a = screenToWorld({ x: 0, y: 0 }, cam, size);
+  const b = screenToWorld({ x: size.w, y: size.h }, cam, size);
+  return {
+    min: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) },
+    max: { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) },
+  };
+}
+
+function growBox(box: Box, pad: number): Box {
+  return {
+    min: { x: box.min.x - pad, y: box.min.y - pad },
+    max: { x: box.max.x + pad, y: box.max.y + pad },
+  };
+}
+
+function clipBox(box: Box, clip: Box): Box | undefined {
+  const out: Box = {
+    min: { x: Math.max(box.min.x, clip.min.x), y: Math.max(box.min.y, clip.min.y) },
+    max: { x: Math.min(box.max.x, clip.max.x), y: Math.min(box.max.y, clip.max.y) },
+  };
+  return out.min.x >= out.max.x || out.min.y >= out.max.y ? undefined : out;
+}
+
+/** Byte-encoded field quad for the change check: AABB, leaf window, color. */
+function encodeFieldQuad(q: FieldQuadValue): Float64Array {
+  return Float64Array.of(
+    q.aabbMin.x,
+    q.aabbMin.y,
+    q.aabbMax.x,
+    q.aabbMax.y,
+    q.leafBase,
+    q.color[0],
+    q.color[1],
+    q.color[2],
+    q.alpha,
+  );
+}
+
+/** Byte-encoded leaf records for the change check (a, b, r, span window). */
+function encodeFieldLeaves(leaves: readonly FieldLeafValue[]): Float64Array {
+  const f = new Float64Array(leaves.length * 7);
+  for (let i = 0; i < leaves.length; i++) {
+    const leaf = leaves[i]!;
+    let j = i * 7;
+    f[j++] = leaf.a.x;
+    f[j++] = leaf.a.y;
+    f[j++] = leaf.b.x;
+    f[j++] = leaf.b.y;
+    f[j++] = leaf.r;
+    f[j++] = leaf.spanOffset;
+    f[j] = leaf.spanCount;
+  }
+  return f;
 }
 
 /** Byte-encoded fill regions for the change check: AABB, edge window, color. */

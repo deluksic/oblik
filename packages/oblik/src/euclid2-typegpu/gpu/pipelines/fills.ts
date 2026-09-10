@@ -111,7 +111,14 @@ export const FILL_QUAD_VERTICES = 4;
 
 export type FillPipelines = {
   fills: (pass: GPURenderPassEncoder) => {
-    draw(vertexCount: number, instanceCount: number): void;
+    /** `firstInstance` picks a run's start in the shared order array, which is
+     * how the painter interleaves span fills with compiled fields. */
+    draw(
+      vertexCount: number,
+      instanceCount: number,
+      firstVertex?: number,
+      firstInstance?: number,
+    ): void;
   };
   destroy(): void;
 };

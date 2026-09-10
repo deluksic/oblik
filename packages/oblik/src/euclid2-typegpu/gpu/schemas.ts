@@ -19,9 +19,10 @@ export const MAX_MARKERS = 256;
 /** One draw per GPU-compiled CSG field (a `csg2` fill node). */
 export const MAX_FIELD_QUADS = 512;
 /** Leaf parameters across all compiled fields (≤ ~8 leaves per node). */
-export const MAX_FIELD_LEAVES = 2048;
-/** Boundary spans of the `region` leaves inside compiled fields. */
-export const MAX_FIELD_EDGES = 4096;
+export const MAX_FIELD_LEAVES = 4096;
+/** Boundary spans inside compiled fields. Region fills compile to a single
+ * `spans` leaf, so this pool carries the region load the span pass used to. */
+export const MAX_FIELD_EDGES = 8192;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({

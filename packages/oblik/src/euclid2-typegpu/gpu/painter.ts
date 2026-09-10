@@ -2,11 +2,13 @@ import type { TgpuRoot } from "typegpu";
 import { arrayOf, u32, vec2f, vec2u } from "typegpu/data";
 
 import type { Camera2, PaneSize } from "../../euclid2/camera";
-import type { TickPatch } from "./adapter";
+import type { FillDraw, TickPatch } from "./adapter";
+import { FIELD_QUAD_VERTICES, fieldPipeline } from "./field/assemble";
 import { makeFrameValue } from "./frame";
 import {
   circleLayout,
   diskLayout,
+  fieldLayout,
   fillLayout,
   gridLayout,
   markerLayout,
@@ -32,14 +34,22 @@ import {
 } from "./pipelines/markers";
 import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
 import type { Rgba } from "./renderer";
+/** Sample count every pipeline in this painter is built for (renderer target). */
+const MSAA_SAMPLES = 4;
+
 import {
   CircleInst,
+  FieldLeaf,
+  FieldQuad,
   FillEdge,
   FillRegion,
   Frame,
   GridSpan,
   MarkerInst,
   MAX_CIRCLES,
+  MAX_FIELD_EDGES,
+  MAX_FIELD_LEAVES,
+  MAX_FIELD_QUADS,
   MAX_FILL_EDGES,
   MAX_FILL_REGIONS,
   MAX_MARKERS,
@@ -127,6 +137,11 @@ export function createPainter(opts: {
   const fillBuffer = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const fillOrderBuffer = root.createBuffer(arrayOf(u32, MAX_FILL_REGIONS)).$usage("storage");
   const fillEdgeBuffer = root.createBuffer(arrayOf(FillEdge, MAX_FILL_EDGES)).$usage("storage");
+  /** Compiled CSG fields: one AABB quad per fill node plus its leaf/edge windows. */
+  const fieldQuadBuffer = root.createBuffer(arrayOf(FieldQuad, MAX_FIELD_QUADS)).$usage("storage");
+  const fieldOrderBuffer = root.createBuffer(arrayOf(u32, MAX_FIELD_QUADS)).$usage("storage");
+  const fieldLeafBuffer = root.createBuffer(arrayOf(FieldLeaf, MAX_FIELD_LEAVES)).$usage("storage");
+  const fieldEdgeBuffer = root.createBuffer(arrayOf(FillEdge, MAX_FIELD_EDGES)).$usage("storage");
 
   // Tool overlay (ghost previews + snap markers). Rebuilt and rewritten every
   // tick, so each phase owns a full data buffer and an identity order list
@@ -236,6 +251,13 @@ export function createPainter(opts: {
     fills: fillBuffer,
     fillOrder: fillOrderBuffer,
     fillEdges: fillEdgeBuffer,
+  });
+  const fieldGroup = root.createBindGroup(fieldLayout, {
+    frame: frameBuffer,
+    fieldQuads: fieldQuadBuffer,
+    fieldOrder: fieldOrderBuffer,
+    fieldLeaves: fieldLeafBuffer,
+    fieldEdges: fieldEdgeBuffer,
   });
   const diskGroup = root.createBindGroup(diskLayout, {
     frame: frameBuffer,
@@ -354,7 +376,8 @@ export function createPainter(opts: {
   let gridLines = 0;
   let axesVisible = false;
   let pointCount = 0;
-  let fillCount = 0;
+  /** World fill draws in band order (span fills and compiled fields mixed). */
+  let fillDraws: readonly FillDraw[] = [];
   let underStrokeCount = 0;
   let underCircleCount = 0;
   let underFillCount = 0;
@@ -418,8 +441,12 @@ export function createPainter(opts: {
       pointCount = patch.points.count;
       fillBuffer.writePartial(patch.fills.writes);
       fillOrderBuffer.write(patch.fills.order);
-      fillCount = patch.fills.count;
       fillEdgeBuffer.writePartial(patch.fillEdges.writes);
+      fieldQuadBuffer.writePartial(patch.fields.quads.writes);
+      fieldOrderBuffer.write(patch.fields.quads.order);
+      fieldLeafBuffer.writePartial(patch.fields.leaves.writes);
+      fieldEdgeBuffer.writePartial(patch.fields.edges.writes);
+      fillDraws = patch.fillDraws;
       // Tool overlay: phase buffers are rewritten wholesale each tick (small
       // counts; the static identity order arrays need no writes). Sliced to
       // the fixed capacities so a runaway ghost can never overflow.
@@ -468,7 +495,19 @@ export function createPainter(opts: {
       if (underCircleCount > 0) {
         underCircles.circles(pass).draw(CIRCLE_VERTEX_COUNT, underCircleCount);
       }
-      if (fillCount > 0) fills.fills(pass).draw(FILL_QUAD_VERTICES, fillCount);
+      // World fills, in the band order the adapter emitted: each node is one
+      // draw (a compiled field and a span fill are different pipelines), which
+      // keeps translucent overlap compositing in SVG order.
+      for (const draw of fillDraws) {
+        if (draw.count === 0) continue;
+        if (draw.path === "spans") {
+          fills.fills(pass).draw(FILL_QUAD_VERTICES, draw.count, 0, draw.first);
+        } else {
+          fieldPipeline(root, fieldGroup, draw.plan, opts.format, MSAA_SAMPLES)
+            .with(pass)
+            .draw(FIELD_QUAD_VERTICES, draw.count, 0, draw.first);
+        }
+      }
       // Ink chrome bands, back-to-front per SVG pass order: every edge's paint
       // (rest), hover halos, hover paints, lifted halos, lifted paints —
       // strokes before circles within each band — so a selected edge's chrome
@@ -552,6 +591,10 @@ export function createPainter(opts: {
       fillBuffer.destroy();
       fillOrderBuffer.destroy();
       fillEdgeBuffer.destroy();
+      fieldQuadBuffer.destroy();
+      fieldOrderBuffer.destroy();
+      fieldLeafBuffer.destroy();
+      fieldEdgeBuffer.destroy();
       strokeOrderId.destroy();
       circleOrderId.destroy();
       pointOrderId.destroy();
