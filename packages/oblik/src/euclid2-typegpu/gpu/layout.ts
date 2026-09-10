@@ -3,12 +3,17 @@ import { arrayOf, u32 } from "typegpu/data";
 
 import {
   CircleInst,
+  FieldLeaf,
+  FieldQuad,
   FillEdge,
   FillRegion,
   Frame,
   GridSpan,
   MarkerInst,
   MAX_CIRCLES,
+  MAX_FIELD_EDGES,
+  MAX_FIELD_LEAVES,
+  MAX_FIELD_QUADS,
   MAX_FILL_EDGES,
   MAX_FILL_REGIONS,
   MAX_MARKERS,
@@ -45,6 +50,16 @@ export const fillLayout = tgpu.bindGroupLayout({
   fills: { storage: arrayOf(FillRegion, MAX_FILL_REGIONS) },
   fillOrder: { storage: arrayOf(u32, MAX_FILL_REGIONS) },
   fillEdges: { storage: arrayOf(FillEdge, MAX_FILL_EDGES) },
+});
+
+/** GPU-compiled CSG fields: one AABB quad per fill node, its leaf parameters,
+ * and the boundary spans of its region leaves. */
+export const fieldLayout = tgpu.bindGroupLayout({
+  frame: { uniform: Frame },
+  fieldQuads: { storage: arrayOf(FieldQuad, MAX_FIELD_QUADS) },
+  fieldOrder: { storage: arrayOf(u32, MAX_FIELD_QUADS) },
+  fieldLeaves: { storage: arrayOf(FieldLeaf, MAX_FIELD_LEAVES) },
+  fieldEdges: { storage: arrayOf(FillEdge, MAX_FIELD_EDGES) },
 });
 
 export const diskLayout = tgpu.bindGroupLayout({

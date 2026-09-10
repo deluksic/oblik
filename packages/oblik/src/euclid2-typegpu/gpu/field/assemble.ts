@@ -1,0 +1,293 @@
+import { tgpu } from "typegpu";
+import type { TgpuBindGroup, TgpuRenderPipeline, TgpuRoot } from "typegpu";
+import { bool, builtin, f32, interpolate, u32, vec2f, vec4f } from "typegpu/data";
+import type { v2f } from "typegpu/data";
+import { abs, atan2, clamp, dot, floor, fwidth, length, max, min, sign, sqrt } from "typegpu/std";
+
+import { fieldLayout } from "../layout";
+import type { FieldNodePlan, FieldPlan } from "./plan";
+
+const TAU = 6.283185307179586;
+const FAR = 1e30;
+
+/** (world position, leaf window base) → signed distance, negative inside. */
+type FieldFn = (p: v2f, base: number) => number;
+
+/**
+ * Compiles a `FieldPlan` into TGSL. The tree becomes control flow at **codegen
+ * time** — one emitted expression per node, ops folded into `min`/`max` calls —
+ * so the only thing left at draw time is data: `base` (the node's leaf window)
+ * and the leaf records themselves. Two nodes with the same shape share the
+ * emitted WGSL byte for byte (`field/wgsl.test.ts` asserts that), which is why
+ * the pipeline cache can key on the shape string alone.
+ *
+ * This is a direct transcription of `eval.ts`, which is itself checked against
+ * the CPU reference (`operandSdf`/`csgSdf`) in `plan.test.ts`.
+ */
+export function assembleField(plan: FieldPlan): FieldFn {
+  return assembleNode(plan, plan.root);
+}
+
+function assembleNode(plan: FieldPlan, node: FieldNodePlan): FieldFn {
+  if (node.kind === "leaf") return assembleLeaf(plan, node.leaf);
+  if (node.kind === "offset") {
+    const inner = assembleNode(plan, node.of);
+    const index = node.leaf;
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      // Round joins fall out of the SDF shift, exactly like `roundOffsetValue`.
+      return inner(p, base) - fieldLayout.$.fieldLeaves[base + u32(index)].r;
+    });
+  }
+  const kids = node.of.map((child) => assembleNode(plan, child));
+  const first = kids[0];
+  if (!first) {
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )(() => {
+      "use gpu";
+      return f32(FAR);
+    });
+  }
+  // Fold on the CPU: each combine step is its own TGSL closure, so the emitted
+  // body is straight-line calls — no runtime loop, no indexed array.
+  let acc = first;
+  for (const child of kids.slice(1)) acc = combine(node.kind, acc, child);
+  return acc;
+}
+
+/** One boolean step of a fold. `diff` subtracts the right operand. */
+function combine(op: "union" | "intersect" | "diff", a: FieldFn, b: FieldFn): FieldFn {
+  if (op === "union") {
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      return min(a(p, base), b(p, base));
+    });
+  }
+  if (op === "intersect") {
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      return max(a(p, base), b(p, base));
+    });
+  }
+  return tgpu.fn(
+    [vec2f, u32],
+    f32,
+  )((p, base) => {
+    "use gpu";
+    return max(a(p, base), -b(p, base));
+  });
+}
+
+function assembleLeaf(plan: FieldPlan, index: number): FieldFn {
+  const kind = plan.leaves[index]!.kind;
+  if (kind === "circle") {
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      const leaf = fieldLayout.$.fieldLeaves[base + u32(index)];
+      return length(p - leaf.a) - leaf.r;
+    });
+  }
+  if (kind === "halfPlane") {
+    // `b` is the pre-rotated inside normal, so this is `−side · signedDist`.
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )((p, base) => {
+      "use gpu";
+      const leaf = fieldLayout.$.fieldLeaves[base + u32(index)];
+      return dot(p - leaf.a, leaf.b);
+    });
+  }
+  if (kind === "offset") {
+    return tgpu.fn(
+      [vec2f, u32],
+      f32,
+    )(() => {
+      "use gpu";
+      return f32(0);
+    });
+  }
+  return tgpu.fn(
+    [vec2f, u32],
+    f32,
+  )((p, base) => {
+    "use gpu";
+    const leaf = fieldLayout.$.fieldLeaves[base + u32(index)];
+    return spanWalk(leaf.spanOffset, leaf.spanCount, p);
+  });
+}
+
+/** Winding + nearest-boundary walk over a span window — the same loop the span
+ * fill pass runs in `pipelines/fills.ts` (segments and arcs, non-zero rule). */
+const spanWalk = tgpu.fn(
+  [u32, u32, vec2f],
+  f32,
+)((start, count, p) => {
+  "use gpu";
+  let winding = 0;
+  let dmin = f32(FAR);
+  for (let i = u32(0); i < count; i += 1) {
+    const e = fieldLayout.$.fieldEdges[start + i];
+    if (e.radius <= 0) {
+      const ab = e.b - e.a;
+      const ap = p - e.a;
+      const denom = dot(ab, ab);
+      const t = clamp(denom > 0 ? dot(ap, ab) / denom : 0, 0, 1);
+      dmin = min(dmin, length(ap - ab * t));
+      if (e.a.y > p.y !== e.b.y > p.y) {
+        const xint = e.a.x + ((p.y - e.a.y) * (e.b.x - e.a.x)) / (e.b.y - e.a.y);
+        if (xint > p.x) winding += e.b.y > e.a.y ? 1 : -1;
+      }
+    } else {
+      const k = sign(e.span);
+      const absSpan = abs(e.span);
+      const full = absSpan >= TAU;
+      const a0 = atan2(e.a.y - e.center.y, e.a.x - e.center.x);
+      const v = p - e.center;
+      const dist = length(v);
+      if (withinArc(atan2(v.y, v.x), k, a0, absSpan, full)) {
+        dmin = min(dmin, abs(dist - e.radius));
+      } else {
+        dmin = min(dmin, min(length(p - e.a), length(p - e.b)));
+      }
+      if (abs(v.y) < e.radius) {
+        const dx = sqrt(e.radius * e.radius - v.y * v.y);
+        let s = f32(-1);
+        while (true) {
+          const cx = e.center.x + s * dx;
+          if (cx > p.x && withinArc(atan2(v.y, s * dx), k, a0, absSpan, full)) {
+            winding += (e.span > 0 ? 1 : -1) * (s > 0 ? 1 : -1);
+          }
+          if (s === f32(1)) break;
+          s = f32(1);
+        }
+      }
+    }
+  }
+  return winding === 0 ? dmin : -dmin;
+});
+
+/** Angular inside-test for an arc span; TGSL has no closures, so this is a
+ * module-level fn rather than an inline arrow. */
+const withinArc = tgpu.fn(
+  [f32, f32, f32, f32, bool],
+  bool,
+)((q, k, a0, absSpan, full) => {
+  "use gpu";
+  if (full) return true;
+  let t = k > 0 ? q - a0 : a0 - q;
+  t = t - floor(t / TAU) * TAU;
+  return t <= absSpan;
+});
+
+/** World → clip, same mapping as the other pipelines. */
+const toClip = tgpu.fn(
+  [vec2f],
+  vec4f,
+)((p) => {
+  "use gpu";
+  const f = fieldLayout.$.frame;
+  const k = vec2f((f.scale * 2) / max(1, f.pane.x), (f.scale * 2) / max(1, f.pane.y));
+  return vec4f(k * (p - f.cam), 0, 1);
+});
+
+/** The field quad: one AABB triangle-strip per compiled node. */
+const fieldVertex = tgpu.vertexFn({
+  in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
+  out: {
+    outPos: builtin.position,
+    p: interpolate("linear", vec2f),
+    quad: interpolate("flat", u32),
+  },
+})(({ instanceIndex, vertexIndex }) => {
+  "use gpu";
+  const slot = fieldLayout.$.fieldOrder[instanceIndex];
+  const q = fieldLayout.$.fieldQuads[slot];
+  const x = vertexIndex === 1 || vertexIndex === 3 ? q.aabbMax.x : q.aabbMin.x;
+  const y = vertexIndex >= 2 ? q.aabbMax.y : q.aabbMin.y;
+  return { outPos: toClip(vec2f(x, y)), p: vec2f(x, y), quad: slot };
+});
+
+/** Corner vertices per field quad instance. */
+export const FIELD_QUAD_VERTICES = 4;
+
+/** Fragment entry for a plan — builds (does not cache) the compiled artifact. */
+export function fieldFragment(plan: FieldPlan) {
+  const evaluate = assembleField(plan);
+  return tgpu.fragmentFn({
+    in: { p: interpolate("linear", vec2f), quad: interpolate("flat", u32) },
+    out: vec4f,
+  })(({ p, quad }) => {
+    "use gpu";
+    const q = fieldLayout.$.fieldQuads[quad];
+    const d = evaluate(p, q.leafBase);
+    const cov = clamp(0.5 - d / max(fwidth(d), 1e-6), 0, 1);
+    return vec4f(q.color, q.alpha * cov);
+  });
+}
+
+// -- compiled artifacts ------------------------------------------------------
+
+/** The compiled fragment's type, inferred from the entry point itself. */
+export type FieldFragment = ReturnType<typeof fieldFragment>;
+
+/** Fragment entry per shape: the TGSL assembly and its WGSL, built once. */
+const fragments = new Map<string, FieldFragment>();
+
+export function fieldFragmentFor(plan: FieldPlan): FieldFragment {
+  const hit = fragments.get(plan.shape);
+  if (hit) return hit;
+  const built = fieldFragment(plan);
+  fragments.set(plan.shape, built);
+  return built;
+}
+
+/** Pipelines per (bind group, shape, target): the shape picks the fragment, the
+ * bind group picks the buffers, so a band and a shape each pay once. */
+const pipelines = new WeakMap<TgpuBindGroup, Map<string, TgpuRenderPipeline>>();
+
+export function fieldPipeline(
+  root: TgpuRoot,
+  bindGroup: TgpuBindGroup,
+  plan: FieldPlan,
+  format: GPUTextureFormat,
+  samples: number,
+): TgpuRenderPipeline {
+  const key = `${plan.shape}|${format}|${samples}`;
+  let perGroup = pipelines.get(bindGroup);
+  if (!perGroup) {
+    perGroup = new Map();
+    pipelines.set(bindGroup, perGroup);
+  }
+  const hit = perGroup.get(key);
+  if (hit) return hit;
+  const blend: GPUBlendState = {
+    color: { operation: "add", srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+    alpha: { operation: "add", srcFactor: "one", dstFactor: "one" },
+  };
+  const pipeline = root
+    .createRenderPipeline({
+      vertex: fieldVertex,
+      fragment: fieldFragmentFor(plan),
+      targets: { format, blend },
+      primitive: { topology: "triangle-strip" },
+      multisample: { count: samples },
+    })
+    .with(bindGroup);
+  perGroup.set(key, pipeline);
+  return pipeline;
+}

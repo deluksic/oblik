@@ -16,6 +16,12 @@ export const MAX_FILL_EDGES = 4096;
 export const MAX_POINTS = 4096;
 /** Screen-space square markers (snap diamonds and friends). */
 export const MAX_MARKERS = 256;
+/** One draw per GPU-compiled CSG field (a `csg2` fill node). */
+export const MAX_FIELD_QUADS = 512;
+/** Leaf parameters across all compiled fields (≤ ~8 leaves per node). */
+export const MAX_FIELD_LEAVES = 2048;
+/** Boundary spans of the `region` leaves inside compiled fields. */
+export const MAX_FIELD_EDGES = 4096;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -143,3 +149,28 @@ export const FillRegion = struct({
   flags: u32,
 });
 export type FillRegionValue = Infer<typeof FillRegion>;
+
+/** One leaf of a GPU-compiled CSG field, addressed by a comptime index: a
+ * circle (centre + radius), a half-plane (origin + pre-rotated inside normal),
+ * an offset distance (`r`), or a window into `fieldEdges` (a region boundary
+ * walk). Which fields are live is decided by the field's compiled shape. */
+export const FieldLeaf = struct({
+  a: vec2f,
+  b: vec2f,
+  r: f32,
+  spanOffset: u32,
+  spanCount: u32,
+});
+export type FieldLeafValue = Infer<typeof FieldLeaf>;
+
+/** One compiled-field draw: the tree's AABB quad, the leaf window it reads
+ * (`leafBase + comptime index`), and the flat fill color/alpha. Everything a
+ * drag changes lives here or in the leaves — never in the shader. */
+export const FieldQuad = struct({
+  aabbMin: vec2f,
+  aabbMax: vec2f,
+  leafBase: u32,
+  color: vec3f,
+  alpha: f32,
+});
+export type FieldQuadValue = Infer<typeof FieldQuad>;
