@@ -1,0 +1,58 @@
+/*
+ * Euclid2 pane chrome. The pane owns the SVG-vs-WebGPU renderer switch; the
+ * chosen view (Euclid2View or TypegpuView) mounts inside .paperWrap.
+ */
+.paperWrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Segmented SVG | GPU chip floating over the paper's top-right corner. The
+ * paper below is a flex child, so an absolute sibling overlays it without
+ * disturbing layout or wheel/pointer routing outside the chip's own box. */
+.renderSwitch {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  align-items: center;
+  padding: 1px;
+  border: 1px solid var(--oblik-line);
+  border-radius: 999px;
+  background: var(--oblik-paper);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.opt {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--oblik-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.opt:hover {
+  color: var(--oblik-text);
+  background: var(--oblik-raised);
+}
+
+.active,
+.active:hover {
+  color: var(--oblik-paper);
+  background: var(--oblik-accent);
+}
+
+.opt:focus-visible {
+  outline: 1px solid var(--oblik-ring);
+  outline-offset: 1px;
+}

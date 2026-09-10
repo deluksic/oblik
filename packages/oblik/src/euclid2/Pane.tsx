@@ -1,5 +1,7 @@
-import { createEffect, createMemo, createSignal, Loading } from "solid-js";
+import { Dynamic } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, Loading, untrack } from "solid-js";
 
+import { TypegpuView } from "../euclid2-typegpu/TypegpuView";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
@@ -7,9 +9,9 @@ import { newEvalMemo, type EvalMemo } from "../eval/memo";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
-import { ResizableSidebar } from "../host/ResizableSidebar";
 import { openInEditor } from "../host/editor";
 import { createEvalstatsSetting } from "../host/evalstats";
+import { ResizableSidebar } from "../host/ResizableSidebar";
 import {
   emptyScopeDetail,
   selectionDetailForScope,
@@ -17,6 +19,7 @@ import {
   type SelectionDetail,
 } from "../host/selection-detail";
 import { SelectionSidebar } from "../host/SelectionSidebar";
+import { createStoredSignal } from "../host/StoredSignalsContext";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
 import { Palette } from "./Palette";
@@ -40,6 +43,7 @@ import {
 import { Euclid2View } from "./view/View";
 
 import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
+import styles from "./Pane.module.css";
 
 export type Euclid2PaneProps = {
   scene: Euclid2Scene;
@@ -132,6 +136,23 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const [writeError, setWriteError] = createSignal<string | undefined>(undefined);
   const [liveEdit, setLiveEdit] = createSignal(() => (props.scene, false));
   const evalstats = createEvalstatsSetting();
+
+  // Renderer choice (WebGPU vs SVG) for this scene file, persisted per scene so
+  // the same world stays on its chosen implementation across reloads. No
+  // WebGPU capability detection here: an unsupported browser falls out of the
+  // GPU view's own init and shows its "WebGPU unavailable" notice.
+  const gpu = createStoredSignal<boolean>(`oblik.euclid2.gpu.${untrack(() => props.file)}`, {
+    defaultValue: true,
+  });
+
+  function setRenderer(useGpu: boolean) {
+    if (useGpu === gpu.value()) return;
+    gpu.set(useGpu);
+    // The swapped-in view starts with its own camera and no hover; drop the
+    // stale hover id so the first frame is clean. Selection/draft/tool state
+    // lives here in the pane and survives the swap.
+    setHoverId(undefined);
+  }
 
   const mentions = createMemo(() => props.mentions ?? []);
   const world = createMemo((prev: WorldEval | undefined) => {
@@ -369,29 +390,50 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     <div class={workspace}>
       <div class={wrap}>
         <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
-        <Euclid2View
-          trace={world().trace}
-          initialCamera={props.scene.camera}
-          placing={tool() !== undefined}
-          ghost={ghost()}
-          place={place()}
-          toolSession={tool()}
-          hoverId={hoverId()}
-          selectedKey={selectedKey()}
-          scope={scope()}
-          onHoverId={setHoverId}
-          onPick={onPick}
-          onDraft={mergeDraft}
-          onCommit={(id, values) => void commit(id, values)}
-          onLiveEdit={setLiveEdit}
-          onPlace={onPlace}
-          onCursor={setPlace}
-          evalStats={
-            evalstats.value()
-              ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
-              : undefined
-          }
-        />
+        <div class={styles.paperWrap}>
+          <Dynamic
+            component={gpu.value() ? TypegpuView : Euclid2View}
+            trace={world().trace}
+            initialCamera={props.scene.camera}
+            placing={tool() !== undefined}
+            ghost={ghost()}
+            place={place()}
+            toolSession={tool()}
+            hoverId={hoverId()}
+            selectedKey={selectedKey()}
+            scope={scope()}
+            onHoverId={setHoverId}
+            onPick={onPick}
+            onDraft={mergeDraft}
+            onCommit={(id, values) => void commit(id, values)}
+            onLiveEdit={setLiveEdit}
+            onPlace={onPlace}
+            onCursor={setPlace}
+            evalStats={
+              evalstats.value()
+                ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
+                : undefined
+            }
+          />
+          <div class={styles.renderSwitch} role="group" aria-label="Renderer">
+            <button
+              type="button"
+              class={[styles.opt, { [styles.active]: !gpu.value() }]}
+              aria-pressed={!gpu.value() ? "true" : "false"}
+              onClick={() => setRenderer(false)}
+            >
+              SVG
+            </button>
+            <button
+              type="button"
+              class={[styles.opt, { [styles.active]: gpu.value() }]}
+              aria-pressed={gpu.value() ? "true" : "false"}
+              onClick={() => setRenderer(true)}
+            >
+              GPU
+            </button>
+          </div>
+        </div>
         <Palette
           picker={picker()}
           prompt={prompt()}

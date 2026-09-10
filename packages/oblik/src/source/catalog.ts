@@ -14,7 +14,7 @@ export type OblikSceneEntry = {
   path: string;
   /** Authored `defineScene` title; undefined when the scene doesn't declare one. */
   title?: string;
-  kind: "euclid2" | "euclid2-typegpu" | "figure";
+  kind: "euclid2" | "figure";
   error?: string;
 };
 
@@ -67,7 +67,7 @@ export function parseOblikSceneSource(
     };
   }
 
-  if (kind && kind !== "euclid2" && kind !== "euclid2-typegpu" && kind !== "figure") {
+  if (kind && kind !== "euclid2" && kind !== "figure") {
     return {
       id,
       file,
@@ -83,7 +83,7 @@ export function parseOblikSceneSource(
     file,
     path: relPath.replace(/\\/g, "/"),
     title,
-    kind: kind === "figure" ? "figure" : kind === "euclid2-typegpu" ? "euclid2-typegpu" : "euclid2",
+    kind: kind === "figure" ? "figure" : "euclid2",
   };
 }
 

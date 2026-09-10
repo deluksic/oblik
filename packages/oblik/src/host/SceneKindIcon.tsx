@@ -1,6 +1,5 @@
 import { Show } from "solid-js";
 import IconDraftingCompass from "~icons/lucide/drafting-compass";
-import IconGpu from "~icons/lucide/gpu";
 import IconPaintbrush from "~icons/lucide/paintbrush";
 
 import type { OblikSceneEntry } from "../source/catalog";
@@ -15,8 +14,9 @@ export type SceneKindIconProps = {
 
 /**
  * Scene-kind glyph for scene lists: a drafting compass for `euclid2`
- * (constructive geometry), a GPU chip for `euclid2-typegpu`, and a
- * paintbrush for `figure` (ink scenes).
+ * (constructive geometry) and a paintbrush for `figure` (ink scenes). The
+ * euclid2 renderer (SVG vs WebGPU) is a per-scene switch inside the pane, so
+ * it is not part of the scene kind.
  */
 export function SceneKindIcon(props: SceneKindIconProps) {
   // Branch inside the template (Show), not by picking a component into a local
@@ -25,14 +25,7 @@ export function SceneKindIcon(props: SceneKindIconProps) {
   return (
     <Show
       when={props.kind === "figure"}
-      fallback={
-        <Show
-          when={props.kind === "euclid2-typegpu"}
-          fallback={<IconDraftingCompass class={props.class} aria-hidden="true" />}
-        >
-          <IconGpu class={props.class} aria-hidden="true" />
-        </Show>
-      }
+      fallback={<IconDraftingCompass class={props.class} aria-hidden="true" />}
     >
       <IconPaintbrush class={props.class} aria-hidden="true" />
     </Show>

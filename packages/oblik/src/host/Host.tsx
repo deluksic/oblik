@@ -1,22 +1,8 @@
 import { render } from "@solidjs/web";
-import {
-  createEffect,
-  Errored,
-  For,
-  Loading,
-  createMemo,
-  createSignal,
-  Show,
-} from "solid-js";
+import { createEffect, Errored, For, Loading, createMemo, createSignal, Show } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import { Euclid2TypegpuPane } from "../euclid2-typegpu/Pane";
-import type {
-  Euclid2Scene,
-  Euclid2TypegpuScene,
-  FigureScene,
-  Scene,
-} from "../eval/scene";
+import type { Euclid2Scene, FigureScene, Scene } from "../eval/scene";
 import { FigurePane } from "../figure/Pane";
 import { Modal } from "../modal/Modal";
 import type { Annotation } from "../source/analyze";
@@ -228,16 +214,6 @@ function Host(props: {
       return (
         <Euclid2Pane
           scene={scene() as Euclid2Scene}
-          file={sceneFile() ?? ""}
-          annotations={annotations()}
-          mentions={mentionsList()}
-        />
-      );
-    }
-    if (kind === "euclid2-typegpu") {
-      return (
-        <Euclid2TypegpuPane
-          scene={scene() as Euclid2TypegpuScene}
           file={sceneFile() ?? ""}
           annotations={annotations()}
           mentions={mentionsList()}

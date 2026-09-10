@@ -1,10 +1,4 @@
-export {
-  defineScene,
-  type Euclid2Scene,
-  type Euclid2TypegpuScene,
-  type FigureScene,
-  type Scene,
-} from "./eval/scene";
+export { defineScene, type Euclid2Scene, type FigureScene, type Scene } from "./eval/scene";
 export {
   evaluate,
   tryEvaluate,

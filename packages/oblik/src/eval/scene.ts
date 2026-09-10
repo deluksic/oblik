@@ -6,14 +6,6 @@ export type Euclid2Scene = {
   build: () => unknown;
 };
 
-export type Euclid2TypegpuScene = {
-  kind: "euclid2-typegpu";
-  title: string;
-  hint?: string;
-  camera?: { x: number; y: number; scale: number };
-  build: () => unknown;
-};
-
 export type FigureScene = {
   kind: "figure";
   title: string;
@@ -30,7 +22,7 @@ export type FigureScene = {
 };
 
 /** Discriminated union. Add a member when a scene kind ships — not a host registry. */
-export type Scene = Euclid2Scene | Euclid2TypegpuScene | FigureScene;
+export type Scene = Euclid2Scene | FigureScene;
 
 export function defineScene<T extends Scene>(scene: T): T {
   return scene;
