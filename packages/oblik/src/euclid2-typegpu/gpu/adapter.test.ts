@@ -75,6 +75,24 @@ function polygonValue() {
 }
 
 /** `kind` is derived from `value`, so the pair cannot disagree. */
+/** Slot indices a patch wrote, in ascending order. */
+function slotsOf(writes: readonly { idx: number }[]): number[] {
+  return writes.map((w) => w.idx).toSorted((p, q) => p - q);
+}
+
+/** Triangle polygon shifted along x: a second scene with the same shape. */
+function triangleAt(dx: number) {
+  return {
+    kind: "polygon" as const,
+    boundary: [
+      { x: -1 + dx, y: -1 },
+      { x: 1 + dx, y: -1 },
+      { x: dx, y: 1 },
+    ],
+    holes: [],
+  };
+}
+
 function node<V extends TraceValue>(
   id: string,
   value: V,
@@ -183,6 +201,115 @@ describe("adapter fill routing", () => {
     expect(patch.fields.segs.writes).toHaveLength(0);
     expect(patch.fields.arcs.writes).toHaveLength(0);
     expect(patch.fillDraws).toHaveLength(1);
+  });
+
+  /**
+   * Switching scenes drops one scene's keys and allocates the next scene's into
+   * the ranges they freed. A key that comes back — the demo's scenes share
+   * authored ids, and going back and forth is the normal way to compare them —
+   * finds its slot at the same index, but the *bytes* there are now the other
+   * key's. The byte diff must not read that as "unchanged".
+   */
+  test("a node that returns to a slot another key used is re-uploaded", () => {
+    const adapter = createAdapter();
+    const a = node("o_a", { kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } }, "a");
+    const b = node("o_b", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "b");
+
+    // The GPU buffer is exactly what the writes put there, so shadow it.
+    const buffer = new Map<number, unknown>();
+    const upload = (patch: ReturnType<typeof adapter.tick>) => {
+      for (const w of patch.strokes.writes) buffer.set(w.idx, w.value);
+      return patch;
+    };
+
+    // Scene A on its own: `o_a` takes slot range 0 and every disc is new.
+    const first = upload(adapter.tick(input([a])));
+    const aSlots = [...first.strokes.bands.rest];
+    expect(aSlots.length).toBeGreaterThan(0);
+    const aInk = new Map(aSlots.map((i) => [i, buffer.get(i)]));
+
+    // Scene B, which has none of A's keys: `o_b` reuses the range `o_a` freed.
+    upload(adapter.tick(input([b])));
+
+    // Back to A, with identical geometry. Its slot index is the same, so only
+    // the diff decides whether the buffer gets A's discs back.
+    const back = adapter.tick(input([a]));
+    expect(back.strokes.writes.filter((w) => aSlots.includes(w.idx))).not.toHaveLength(0);
+    upload(back);
+    for (const i of aSlots) expect(buffer.get(i)).toEqual(aInk.get(i));
+  });
+
+  /**
+   * The reported bug, without any navigation at all: one node leaves the trace
+   * (an erase, an undo, a node that went non-finite for a tick) while another
+   * takes the range it freed, then it comes back. The adapter cannot tell this
+   * from a scene swap, so dropping caches on navigation alone would not cover
+   * it — the per-tick records do.
+   */
+  test("a node that leaves and returns within one scene re-uploads", () => {
+    const adapter = createAdapter();
+    const x = node("o_x", { kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } }, "x");
+    const y = node("o_y", { kind: "segment", a: { x: 0, y: 2 }, b: { x: 1, y: 2 } }, "y");
+    const z = node("o_z", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "z");
+
+    const buffer = new Map<number, unknown>();
+    const upload = (patch: ReturnType<typeof adapter.tick>) => {
+      for (const w of patch.strokes.writes) buffer.set(w.idx, w.value);
+      return patch;
+    };
+
+    const first = upload(adapter.tick(input([x, z])));
+    const xSlots = [...first.strokes.bands.rest].filter((i) => buffer.has(i));
+    const xInk = new Map(xSlots.map((i) => [i, buffer.get(i)]));
+
+    upload(adapter.tick(input([z, y]))); // x leaves; y takes its range
+    const back = adapter.tick(input([x, z])); // x returns
+    expect(back.strokes.writes.filter((w) => xSlots.includes(w.idx))).not.toHaveLength(0);
+    upload(back);
+    for (const i of xSlots) expect(buffer.get(i)).toEqual(xInk.get(i));
+  });
+
+  /**
+   * The same hazard on the compiled-field path, where one node owns records in
+   * five pools at once. Each site must diff against *its own* slot, so a fill
+   * that comes back rewrites its quad, leaves, spans and region window rather
+   * than leaving the other scene's geometry in place.
+   */
+  test("a field fill that returns to a reused range rewrites every record", () => {
+    const adapter = createAdapter();
+    const a = csgNode("o_a", 0, "pac");
+    const b = csgNode("o_b", 1.5, "pac"); // same shape, different geometry
+    const first = adapter.tick(input([a]));
+    const firstIdx = {
+      quads: slotsOf(first.fields.quads.writes),
+      leaves: slotsOf(first.fields.leaves.writes),
+      segs: slotsOf(first.fields.segs.writes),
+    };
+    for (const slots of Object.values(firstIdx)) expect(slots.length).toBeGreaterThan(0);
+
+    adapter.tick(input([b])); // takes over every range A freed
+    const back = adapter.tick(input([a]));
+    expect(slotsOf(back.fields.quads.writes)).toEqual(firstIdx.quads);
+    expect(slotsOf(back.fields.leaves.writes)).toEqual(firstIdx.leaves);
+    expect(slotsOf(back.fields.segs.writes)).toEqual(firstIdx.segs);
+  });
+
+  /** And on the span path, whose record is the region slab plus its spans. */
+  test("a span fill that returns to a reused range rewrites its regions and spans", () => {
+    const adapter = createAdapter();
+    const a = node("o_a", triangleAt(0), "shell");
+    const b = node("o_b", triangleAt(2), "shell"); // same shape, moved
+
+    const first = adapter.tick(input([a]));
+    const firstRegions = slotsOf(first.fills.writes);
+    const firstSegs = slotsOf(first.fillSegs.writes);
+    expect(firstRegions.length).toBeGreaterThan(0);
+    expect(firstSegs.length).toBeGreaterThan(0);
+
+    adapter.tick(input([b]));
+    const back = adapter.tick(input([a]));
+    expect(slotsOf(back.fills.writes)).toEqual(firstRegions);
+    expect(slotsOf(back.fillSegs.writes)).toEqual(firstSegs);
   });
 
   test("dragging a leaf rewrites data; hover only recolors", () => {

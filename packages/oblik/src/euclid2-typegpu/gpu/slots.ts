@@ -112,7 +112,11 @@ export function createSlotPool(capacity: number): SlotPool {
     capacity,
     reset() {
       runs.clear();
+      // Back to the documented initial state: one run covering the capacity.
+      // (Emptying `free` instead left `findRun` with nothing to hand out, so
+      // every `alloc` after a reset returned undefined.)
       free.length = 0;
+      free.push({ start: 0, count: capacity });
       freeSlots = capacity;
     },
   };

@@ -164,6 +164,8 @@ export type TickPatch = {
 
 export type Adapter = {
   tick(input: AdapterInput): TickPatch;
+  /** Drop the slot runs and byte records. The view calls this on unmount; a
+   * navigation remounts the view, so there is nothing to reset in place. */
   destroy(): void;
 };
 
@@ -181,20 +183,37 @@ function nodeKey(n: TraceNode): string {
   return `${n.id}:${n.occ}`;
 }
 
-/** Track the last uploaded payload per key; true when the bytes changed. */
-function diff(map: Map<string, Float64Array>, key: string, next: Float64Array): boolean {
-  const prev = map.get(key);
-  if (prev && prev.length === next.length) {
-    let same = true;
-    for (let i = 0; i < next.length; i++) {
-      if (prev[i] !== next[i]) {
-        same = false;
-        break;
-      }
-    }
-    if (same) return false;
+/**
+ * Where a key's payload was last written and what those bytes were.
+ *
+ * The slot belongs in the record: a pool hands a freed range to whichever key
+ * needs it next, so bytes uploaded for a key are only still *its* bytes while it
+ * holds that same run. Scene switches are the common way to lose it — the next
+ * scene allocates its nodes into the ranges the previous one freed, and a node
+ * that comes back (the demo's scenes share authored ids) finds its old digits at
+ * the same index with another node's geometry in them. Comparing bytes alone
+ * skipped the rewrite and drew the previous scene's shapes.
+ */
+type Upload = { start: number; bytes: Float64Array };
+
+function sameBytes(a: Float64Array, b: Float64Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < b.length; i++) {
+    if (a[i] !== b[i]) return false;
   }
-  map.set(key, next);
+  return true;
+}
+
+/** True when the slot must be rewritten: the payload changed, or it moved. */
+function diff(
+  map: Map<string, Upload>,
+  key: string,
+  start: number,
+  next: Float64Array,
+): boolean {
+  const prev = map.get(key);
+  if (prev && prev.start === start && sameBytes(prev.bytes, next)) return false;
+  map.set(key, { start, bytes: next });
   return true;
 }
 
@@ -211,16 +230,30 @@ export function createAdapter(): Adapter {
   const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
-  const lastStroke = new Map<string, Float64Array>();
-  const lastCircle = new Map<string, Float64Array>();
-  const lastFillRegion = new Map<string, Float64Array>();
-  const lastFillSegs = new Map<string, Float64Array>();
-  const lastFillArcs = new Map<string, Float64Array>();
-  const lastPoint = new Map<string, Float64Array>();
-  const lastFieldQuad = new Map<string, Float64Array>();
-  const lastFieldLeaf = new Map<string, Float64Array>();
-  const lastFieldSegs = new Map<string, Float64Array>();
-  const lastFieldArcs = new Map<string, Float64Array>();
+  const lastStroke = new Map<string, Upload>();
+  const lastCircle = new Map<string, Upload>();
+  const lastFillRegion = new Map<string, Upload>();
+  const lastFillSegs = new Map<string, Upload>();
+  const lastFillArcs = new Map<string, Upload>();
+  const lastPoint = new Map<string, Upload>();
+  const lastFieldQuad = new Map<string, Upload>();
+  const lastFieldLeaf = new Map<string, Upload>();
+  const lastFieldSegs = new Map<string, Upload>();
+  const lastFieldArcs = new Map<string, Upload>();
+
+  /** Every record above, for the per-tick prune below. */
+  const uploads = [
+    lastStroke,
+    lastCircle,
+    lastFillRegion,
+    lastFillSegs,
+    lastFillArcs,
+    lastPoint,
+    lastFieldQuad,
+    lastFieldLeaf,
+    lastFieldSegs,
+    lastFieldArcs,
+  ];
 
   function tick(input: AdapterInput): TickPatch {
     const { cam, size, colors, strokePx } = input;
@@ -264,6 +297,14 @@ export function createAdapter(): Adapter {
     fieldLeafPool.sync(present);
     fieldSegPool.sync(present);
     fieldArcPool.sync(present);
+    // A key that left the scene released its runs, so whatever is in those
+    // ranges is no longer its payload — forget the record and write afresh when
+    // it returns.
+    for (const last of uploads) {
+      for (const key of last.keys()) {
+        if (!present.has(key)) last.delete(key);
+      }
+    }
 
     const white = (n: TraceNode) => isHot(n, input.hoverKey, input.selectedKey);
 
@@ -316,7 +357,7 @@ export function createAdapter(): Adapter {
         input.muted(n) && !hot,
       );
       if (!discs) return;
-      if (diff(lastStroke, nodeKey(n), encodeStrokes(discs))) {
+      if (diff(lastStroke, nodeKey(n), start, encodeStrokes(discs))) {
         for (let i = 0; i < INK_DISC_COUNT; i++) {
           strokeWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -340,7 +381,7 @@ export function createAdapter(): Adapter {
         selected,
         input.muted(n) && !hot,
       );
-      if (diff(lastCircle, nodeKey(n), encodeCircles(discs))) {
+      if (diff(lastCircle, nodeKey(n), start, encodeCircles(discs))) {
         for (let i = 0; i < INK_DISC_COUNT; i++) {
           circleWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -478,16 +519,17 @@ export function createAdapter(): Adapter {
         const arcStart = fillArcPool.alloc(nodeKey(n), arcs.length);
         const regionStart = fillPool.alloc(nodeKey(n), geom.spans.length);
         if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
-        if (diff(lastFillSegs, nodeKey(n), encodeSpanSegs(segs))) {
+        if (diff(lastFillSegs, nodeKey(n), segStart, encodeSpanSegs(segs))) {
           pushSegWrites(fillSegWrites, segStart, segs);
         }
-        if (diff(lastFillArcs, nodeKey(n), encodeSpanArcs(arcs))) {
+        if (diff(lastFillArcs, nodeKey(n), arcStart, encodeSpanArcs(arcs))) {
           pushArcWrites(fillArcWrites, arcStart, arcs);
         }
         if (
           diff(
             lastFillRegion,
             nodeKey(n),
+            regionStart,
             encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, edge, halo),
           )
         ) {
@@ -547,7 +589,7 @@ export function createAdapter(): Adapter {
         isSelected(n, input.selectedKey),
         input.muted(n) && !isHot(n, input.hoverKey, input.selectedKey),
       );
-      if (diff(lastPoint, nodeKey(n), encodePoints(discs))) {
+      if (diff(lastPoint, nodeKey(n), start, encodePoints(discs))) {
         for (let i = 0; i < POINT_DISC_COUNT; i++) {
           pointWrites.push({ idx: start + i, value: discs[i]! });
         }
@@ -709,14 +751,14 @@ export function createAdapter(): Adapter {
         arcCount: leaf.arcCount,
       }),
     );
-    if (diff(lastFieldLeaf, nodeKey(n), encodeFieldLeaves(leaves))) {
+    if (diff(lastFieldLeaf, nodeKey(n), leafStart, encodeFieldLeaves(leaves))) {
       leaves.forEach((value, i) => leafWrites.push({ idx: leafStart + i, value }));
     }
     const { segs, arcs } = instance.spans;
-    if (segs.length > 0 && diff(lastFieldSegs, nodeKey(n), encodeSpanSegs(segs))) {
+    if (segs.length > 0 && diff(lastFieldSegs, nodeKey(n), segStart, encodeSpanSegs(segs))) {
       pushSegWrites(segWrites, segStart, segs);
     }
-    if (arcs.length > 0 && diff(lastFieldArcs, nodeKey(n), encodeSpanArcs(arcs))) {
+    if (arcs.length > 0 && diff(lastFieldArcs, nodeKey(n), arcStart, encodeSpanArcs(arcs))) {
       pushArcWrites(arcWrites, arcStart, arcs);
     }
     const quad = FieldQuad({
@@ -731,7 +773,7 @@ export function createAdapter(): Adapter {
       haloKnock: halo.knock,
       haloHalfPx: halo.halfPx,
     });
-    if (diff(lastFieldQuad, nodeKey(n), encodeFieldQuad(quad)))
+    if (diff(lastFieldQuad, nodeKey(n), slot, encodeFieldQuad(quad)))
       quadWrites.push({ idx: slot, value: quad });
     return { slot };
   }
