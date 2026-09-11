@@ -25,6 +25,17 @@
   gap: var(--space-1);
 }
 
+/* The Origin heading and the traces it titles, as one flex child of the sidebar:
+   4px inside, the sidebar's own 8px around. `flex: 1` keeps the list scrolling
+   in whatever height is left over, exactly as it did unwrapped. */
+.originGroup {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .sidebar :is(p, h2) {
   margin: 0;
 }

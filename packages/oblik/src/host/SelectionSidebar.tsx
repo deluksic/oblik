@@ -65,15 +65,20 @@ export function SelectionInspector(
     <>
       <SidebarIdentity crumb={detail().crumb} meta={detail().meta} />
       {props.children}
-      <p class={[kicker, styles.kicker]}>Origin</p>
-      <Origin
-        origin={detail().origin}
-        onPickScope={props.onPickScope}
-        onOpenFile={props.onOpenFile}
-      />
-      <Show when={detail().expose}>
-        {(note) => <SidebarExpose note={note()} onExpose={props.onExpose} />}
-      </Show>
+      {/* One block, so the kicker sits with the traces it titles rather than
+          floating between this and whatever section is above it. The group
+          keeps the list's own `flex: 1` contract. */}
+      <div class={styles.originGroup}>
+        <p class={[kicker, styles.kicker]}>Origin</p>
+        <Origin
+          origin={detail().origin}
+          onPickScope={props.onPickScope}
+          onOpenFile={props.onOpenFile}
+        />
+        <Show when={detail().expose}>
+          {(note) => <SidebarExpose note={note()} onExpose={props.onExpose} />}
+        </Show>
+      </div>
     </>
   );
 }
