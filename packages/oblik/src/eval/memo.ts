@@ -15,10 +15,18 @@ import {
  */
 export type EvalMemo = {
   entries: Map<string, MemoEntry>;
+  /**
+   * User `memo(fn)` results, keyed by function object and call occurrence. They
+   * live here — one store per visit, not one per module — so the cached
+   * computation is shared by the views showing the scene and dies with the
+   * visit (see `eval/scene-cache.ts`). An eval with no memo (ghost and tool
+   * drafts) neither reads nor writes it, so it cannot poison the live store.
+   */
+  userMemos: WeakMap<object, Map<number, UserMemoEntry>>;
 };
 
 export function newEvalMemo(): EvalMemo {
-  return { entries: new Map() };
+  return { entries: new Map(), userMemos: new WeakMap() };
 }
 
 export type MemoEntry = {
@@ -164,29 +172,30 @@ export function scheduleSweep(m: EvalMemo, counts: Map<string, number>): void {
 
 type UserMemoEntry = { args: SceneValue[]; result: SceneValue };
 
-const userMemos = new WeakMap<object, Map<number, UserMemoEntry>>();
-
 /**
  * Cache a user computation inside scene evaluation, keyed by call occurrence.
  * Deterministic call order is required (same limitation as constructor ids in
  * loops). On a hit the previous result object is returned so identity
- * propagates into downstream constructors. The store is keyed on the function
- * object, so an HMR re-import of the defining module invalidates for free.
+ * propagates into downstream constructors. Entries hang off the visit's memo, so
+ * an HMR re-import of the defining module (a fresh function object, and a fresh
+ * visit) invalidates for free.
  */
 export function memo<A extends SceneValue[], R extends SceneValue>(
   fn: (...args: A) => R,
 ): (...args: A) => R {
   const wrapped = (...args: A): R => {
     const ctx: EvalCtx | undefined = currentEval();
-    if (!ctx) return fn(...args);
+    // No memo means a throwaway eval (ghost / tool draft): compute, never cache.
+    const store = ctx?.memo?.userMemos;
+    if (!ctx || !store) return fn(...args);
     const occMap = ctx.userMemoOcc ?? new Map<object, number>();
     ctx.userMemoOcc = occMap;
     const occ = occMap.get(fn) ?? 0;
     occMap.set(fn, occ + 1);
-    let entries = userMemos.get(fn);
+    let entries = store.get(fn);
     if (!entries) {
       entries = new Map();
-      userMemos.set(fn, entries);
+      store.set(fn, entries);
     }
     const entry = entries.get(occ);
     if (entry && sameFingerprint(entry.args, args)) {

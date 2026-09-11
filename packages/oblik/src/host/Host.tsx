@@ -2,7 +2,8 @@ import { render } from "@solidjs/web";
 import { createEffect, Errored, For, Loading, createMemo, createSignal, Show } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import type { Euclid2Scene, FigureScene, Scene } from "../eval/scene";
+import { createVisitCaches } from "../eval/scene-cache";
+import type { Scene } from "../eval/scene";
 import { FigurePane } from "../figure/Pane";
 import { Modal } from "../modal/Modal";
 import type { Annotation } from "../source/analyze";
@@ -140,9 +141,20 @@ function Host(props: {
   });
 
   // NOTE (Solid 2): `pane`/`sceneKind` are only ever evaluated when a scene is
-  // open (the welcome `<Show>` short-circuits them). Branch identity on the
-  // stable `sceneKind` memo so a scene is not remounted when only props change.
+  // open (the welcome `<Show>` short-circuits them). `sceneKind` picks the pane,
+  // and neither the pane nor the view is remounted when the scene module is
+  // replaced — see `visitCaches` below.
   const sceneKind = createMemo(() => scene()?.kind);
+
+  /**
+   * One set of caches per visit. Navigation changes `sceneId`, so this memo hands
+   * out a fresh store and the previous visit's computation is dropped — without
+   * touching the mounted view, and without a reset call anywhere.
+   */
+  const visitCaches = createMemo(() => {
+    sceneId();
+    return createVisitCaches();
+  });
 
   const annotations = createMemo(() => mergeAnnotationBundle(props.annotations));
 
@@ -195,6 +207,25 @@ function Host(props: {
   const sceneError = createMemo(() => entry()?.error);
   const sceneFile = createMemo(() => entry()?.path);
 
+  /**
+   * The scene *module* once its import has landed, and nothing while it is still
+   * pending. An HMR re-import replaces this object; `visitCaches` keys the
+   * visit's entries on it, so the memo is replaced while the view — and its
+   * camera — stays mounted.
+   */
+  const sceneModule = createMemo(() => {
+    const loaded = scene();
+    return loaded instanceof Promise ? undefined : loaded;
+  });
+  const figureScene = createMemo(() => {
+    const loaded = sceneModule();
+    return loaded?.kind === "figure" ? loaded : undefined;
+  });
+  const euclid2Scene = createMemo(() => {
+    const loaded = sceneModule();
+    return loaded?.kind === "euclid2" ? loaded : undefined;
+  });
+
   const pane = createMemo(() => {
     if (sceneDeleted()) return <p class={styles.err}>Scene deleted</p>;
     const err = sceneError();
@@ -202,22 +233,32 @@ function Host(props: {
     const kind = sceneKind();
     if (kind === "figure") {
       return (
-        <FigurePane
-          scene={scene() as FigureScene}
-          file={sceneFile() ?? ""}
-          annotations={annotations()}
-          mentions={mentionsList()}
-        />
+        <Show when={figureScene()}>
+          {(loaded) => (
+            <FigurePane
+              scene={loaded()}
+              file={sceneFile() ?? ""}
+              annotations={annotations()}
+              mentions={mentionsList()}
+              caches={visitCaches()}
+            />
+          )}
+        </Show>
       );
     }
     if (kind === "euclid2") {
       return (
-        <Euclid2Pane
-          scene={scene() as Euclid2Scene}
-          file={sceneFile() ?? ""}
-          annotations={annotations()}
-          mentions={mentionsList()}
-        />
+        <Show when={euclid2Scene()}>
+          {(loaded) => (
+            <Euclid2Pane
+              scene={loaded()}
+              file={sceneFile() ?? ""}
+              annotations={annotations()}
+              mentions={mentionsList()}
+              caches={visitCaches()}
+            />
+          )}
+        </Show>
       );
     }
     return <p class={styles.err}>Unknown scene kind</p>;

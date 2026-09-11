@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
 import { isGlider } from "#geom/gliders";
@@ -189,9 +189,18 @@ export function TypegpuView(props: TypegpuViewProps) {
   const [paperEl, setPaperEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const [canvasEl, setCanvasEl] = createSignal<HTMLCanvasElement | undefined>(undefined);
   const [gpu, setGpu] = createSignal<GpuState>("init");
-  const [camera, setCamera] = createSignal<Camera2>(
-    untrack(() => props.initialCamera) ?? DEFAULT_CAMERA,
-  );
+  /**
+   * The scene's declared camera is where the scene opens: switching scenes (a
+   * different declaration) reframes the view, while an edit that leaves the
+   * declaration alone — the HMR re-import that every committed edit triggers —
+   * must not move it. Comparing the *value* is what separates the two, so this
+   * matches `figure/View.tsx`; a pan or zoom is a local override that survives
+   * until the declaration changes.
+   */
+  const initialCamera = createMemo(() => props.initialCamera, {
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+  const [camera, setCamera] = createSignal<Camera2>(() => initialCamera() ?? DEFAULT_CAMERA);
   const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
   // Bumped once the renderer+painter exist so reactive effects re-run.
   const [ready, setReady] = createSignal(0);

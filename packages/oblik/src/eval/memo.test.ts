@@ -217,11 +217,12 @@ describe("memo(fn)", () => {
         grid(1, 2);
       },
     });
-    const r1 = evaluate(scene);
+    const store = newEvalMemo();
+    const r1 = evaluate(scene, { memo: store });
     // occ-keyed: the third call is its own slot, so all three build.
     expect(calls).toBe(3);
     expect(r1.stats).toEqual({ built: 3, hits: 0 });
-    const r2 = evaluate(scene);
+    const r2 = evaluate(scene, { memo: store });
     expect(calls).toBe(3);
     expect(r2.stats).toEqual({ built: 0, hits: 3 });
   });
@@ -260,10 +261,56 @@ describe("memo(fn)", () => {
         grid(1);
       },
     });
-    evaluate(scene);
+    const store = newEvalMemo();
+    evaluate(scene, { memo: store });
     expect(calls).toBe(1);
+    evaluate(scene, { memo: store });
+    expect(calls).toBe(1); // same fn: replayed
     grid = makeGrid(); // fresh fn object, same source
+    evaluate(scene, { memo: store });
+    expect(calls).toBe(2);
+  });
+
+  test("an eval with no memo neither reads nor writes the store", () => {
+    let calls = 0;
+    const grid = memo((i: number) => {
+      calls++;
+      return { i };
+    });
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        grid(1);
+      },
+    });
+    // Ghost and tool drafts evaluate with a throwaway ctx: no memo, no cache.
     evaluate(scene);
+    evaluate(scene);
+    expect(calls).toBe(2);
+    // …and they left nothing behind for the live visit.
+    const store = newEvalMemo();
+    evaluate(scene, { memo: store });
+    expect(calls).toBe(3);
+    evaluate(scene, { memo: store });
+    expect(calls).toBe(3);
+  });
+
+  test("two visits do not share user memos", () => {
+    let calls = 0;
+    const grid = memo((i: number) => {
+      calls++;
+      return { i };
+    });
+    const scene = defineScene({
+      kind: "euclid2",
+      title: "t",
+      build() {
+        grid(1);
+      },
+    });
+    evaluate(scene, { memo: newEvalMemo() });
+    evaluate(scene, { memo: newEvalMemo() });
     expect(calls).toBe(2);
   });
 });

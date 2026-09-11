@@ -4,7 +4,7 @@ import { TypegpuView } from "../euclid2-typegpu/TypegpuView";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import { newEvalMemo, type EvalMemo } from "../eval/memo";
+import type { VisitCaches } from "../eval/scene-cache";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
 import { sourceFileKey } from "../eval/stack";
@@ -48,13 +48,11 @@ export type Euclid2PaneProps = {
   file: string;
   annotations: Record<string, Annotation>;
   mentions?: readonly MentionFile[];
+  /** This visit's caches: the pane asks them for its own scene's entry. */
+  caches: VisitCaches;
 };
 
 type WorldEval = ReturnType<typeof tryEvaluate> & { ms: number };
-
-// Keyed on the scene module object: identical across draft ticks, replaced by
-// HMR on every source edit — invalidation for free.
-const evalMemos = new WeakMap<object, EvalMemo>();
 
 function entryFocus(file: string): ScopeFocus {
   return { file, name: "build", serial: 0 };
@@ -139,17 +137,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   const world = createMemo((prev: WorldEval | undefined) => {
     console.log("Running world");
     const t0 = performance.now();
-    let m = evalMemos.get(props.scene);
-    if (!m) {
-      m = newEvalMemo();
-      evalMemos.set(props.scene, m);
-    }
     const w = tryEvaluate(props.scene, {
       draft: draft(),
       annotations: props.annotations,
       module: props.file,
       captureStack: !liveEdit(),
-      memo: m,
+      memo: props.caches(props.scene).memo,
     });
     const ms = performance.now() - t0;
     w.trace = reuseUnchangedTrace(prev?.trace, w.trace);
