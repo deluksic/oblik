@@ -1,5 +1,11 @@
+/*
+ * Spacing belongs to `SidebarSection`: it is a flex column with its own
+ * `gap`, and the sidebar zeroes every `p` margin inside it. So nothing here
+ * sets a margin — an earlier version did, which double-spaced the section and
+ * fought the gap. Only the internal layout of each row is this module's
+ * business.
+ */
 .meta {
-  margin: 0 0 var(--space-2);
   font-size: 0.72rem;
   color: var(--oblik-muted);
 }
@@ -7,7 +13,6 @@
 .row {
   display: flex;
   gap: var(--space-1);
-  margin-bottom: var(--space-2);
 }
 
 /* Square icon buttons in the sidebar's own idiom (see BrushDock), not the
@@ -37,7 +42,6 @@
   grid-template-columns: max-content max-content;
   gap: var(--space-1) var(--space-3);
   width: fit-content;
-  margin-bottom: var(--space-2);
 }
 
 .dial {
@@ -45,7 +49,6 @@
   grid-template-columns: max-content 1fr max-content;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
   font-size: 0.72rem;
 }
 
