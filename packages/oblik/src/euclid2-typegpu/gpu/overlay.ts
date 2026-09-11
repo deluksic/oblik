@@ -293,12 +293,13 @@ function pushGhostLoop(
 }
 
 /** Close an open ghost chain into one loop, as `region(...)` closes a committed
- * cycle: a straight span from the last edge's end back to the first's start. */
-function closeChain(chain: readonly LoopEdge[]): Loop[] {
+ * cycle: a straight span from the last edge's end back to the first's start.
+ * `undefined` for a chain too short to enclose anything. */
+function closeChain(chain: readonly LoopEdge[]): LoopEdge[] | undefined {
   const first = chain[0];
   const last = chain[chain.length - 1];
-  if (!first || !last || chain.length < 2) return [];
-  return [[...chain, straightEdge(last.b, first.a)]];
+  if (!first || !last || chain.length < 2) return undefined;
+  return [...chain, straightEdge(last.b, first.a)];
 }
 
 // -- region ghost ----------------------------------------------------------------
@@ -333,6 +334,45 @@ function dashChain(
       dashSegment(strokes, e.a, e.b, color, alpha, halfWidthPx, scale);
     }
   }
+}
+
+/** Dashed outline of one closed ghost loop: a carrier walk closed back to its
+ * start, or a full circle. */
+function dashLoop(
+  strokes: StrokeDrawValue[],
+  circles: CircleInstValue[],
+  disks: PointInstValue[],
+  loop: Loop,
+  color: Rgb,
+  alpha: number,
+  halfWidthPx: number,
+  scale: number,
+): void {
+  if (Array.isArray(loop)) {
+    dashChain(
+      strokes,
+      circles,
+      disks,
+      closeChain(loop) ?? loop,
+      color,
+      alpha,
+      halfWidthPx,
+      scale,
+    );
+    return;
+  }
+  dashArc(
+    circles,
+    disks,
+    loop.center,
+    Math.abs(loop.radius),
+    0,
+    TAU,
+    color,
+    alpha,
+    halfWidthPx,
+    scale,
+  );
 }
 
 /** Solid shaft + filled arrowhead (SVG ghostArrow + ghostArrowHead). */
@@ -461,23 +501,39 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
 
   // Region ghost: translucent fill of the region as it would commit — the chain
   // closed back to its start, or the tool's already-closed loops (roundOffset) —
-  // dashed chain including the hover edge, optional offset arrow.
+  // with the same closed outline dashed over it, plus the optional offset arrow.
   if (ghost?.kind === "region") {
-    const chain = ghost.hover ? [...ghost.edges, ghost.hover] : ghost.edges;
-    const loops: Loop[] = ghost.loops ?? closeChain(chain);
-    for (const loop of loops) {
-      pushGhostLoop(patch.over.fills, patch.over.spans, loop, colors.ghost, GHOST_FILL_ALPHA);
+    if (ghost.loops) {
+      for (const loop of ghost.loops) {
+        pushGhostLoop(patch.over.fills, patch.over.spans, loop, colors.ghost, GHOST_FILL_ALPHA);
+        dashLoop(
+          patch.over.strokes,
+          patch.over.circles,
+          patch.over.disks,
+          loop,
+          colors.ink,
+          GHOST_STROKE_ALPHA,
+          halfStrokePx,
+          scale,
+        );
+      }
+    } else {
+      const chain = ghost.hover ? [...ghost.edges, ghost.hover] : ghost.edges;
+      const closed = closeChain(chain);
+      if (closed) {
+        pushGhostLoop(patch.over.fills, patch.over.spans, closed, colors.ghost, GHOST_FILL_ALPHA);
+      }
+      dashChain(
+        patch.over.strokes,
+        patch.over.circles,
+        patch.over.disks,
+        closed ?? chain,
+        colors.ink,
+        GHOST_STROKE_ALPHA,
+        halfStrokePx,
+        scale,
+      );
     }
-    dashChain(
-      patch.over.strokes,
-      patch.over.circles,
-      patch.over.disks,
-      chain,
-      colors.ink,
-      GHOST_STROKE_ALPHA,
-      halfStrokePx,
-      scale,
-    );
     if (ghost.arrow) {
       pushArrow(
         patch.over.strokes,

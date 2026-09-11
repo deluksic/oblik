@@ -1,5 +1,5 @@
 import type { TraceNode } from "#eval/context";
-import type { Branch, Circle, LineLike, LoopEdge } from "#geom";
+import type { Branch, Circle, LineLike, LoopEdge, Vec2 } from "#geom";
 import { alongK, lineBasis, projectOnCircle, projectOnLine } from "#geom";
 import { printExpr, parsePath, type Expr } from "#source/expr";
 
@@ -12,7 +12,7 @@ import {
   traceKey,
   type SnapFilter,
 } from "../pick";
-import { isCrossing, type PlacePoint } from "../place";
+import { isCrossing, isPinnedPoint, type PlacePoint } from "../place";
 import { dist, exprOfPlace, exprOfPrint, hoverPlace, previewCall, snapKey } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
 import type { Field, Ghost, PlaceHit, Placed, Preview, Scope, Tool, ToolSession } from "./types";
@@ -21,8 +21,10 @@ const { max, sqrt } = Math;
 type RegionSession = Extract<ToolSession, { verb: "region" }>;
 type CycleCarrier = RegionSession["carriers"][number];
 
-/** Fat snap so closing the cycle is easy even over other points. */
-export const REGION_CLOSE_PX = 80;
+/** Closing snap, a little fatter than the normal point snap (`PLACE_SNAP_PX`)
+ * so the start point wins over anything else in its vicinity without grabbing
+ * the cursor from far away. */
+export const REGION_CLOSE_PX = 24;
 
 const fields: Field<RegionSession>[] = [nameField((s) => s.focus === "name")];
 
@@ -169,6 +171,12 @@ function arrowAt(
   return { at, tx: dir.x * sign, ty: dir.y * sign };
 }
 
+/** Where the ghost's moving end sits: named points and crossings snap it, a
+ * free pointer keeps it under the cursor (carriers snap by projection). */
+function snapAt(place: PlaceHit): Vec2 {
+  return isPinnedPoint(place.point) ? place.point.at : place.world;
+}
+
 /** Named strokes through the current vertex, or `undefined` when not picking a carrier. */
 export function regionEligibleCarriers(
   session: ToolSession | undefined,
@@ -268,25 +276,23 @@ export const region: Tool<RegionSession> = {
       const a = session.vertices[i];
       const b = session.vertices[i + 1];
       const c = session.carriers[i]!;
-      if (!a) continue;
-      const to = b?.at ?? place?.world;
-      if (!to) continue;
-      edges.push(edgeOn(c.geom, a.at, to, c.k));
+      if (!a || !b) continue;
+      edges.push(edgeOn(c.geom, a.at, b.at, c.k));
     }
     const from = session.vertices[session.vertices.length - 1];
     let hover: LoopEdge | undefined;
     let arrow: { at: { x: number; y: number }; tx: number; ty: number } | undefined;
     if (needCarrier(session) && from && place?.carrier) {
+      const to = snapAt(place);
       const k =
-        place.carrier.geom.kind === "circle"
-          ? hoverK(place.carrier.geom, from.at, place.world)
-          : undefined;
-      hover = edgeOn(place.carrier.geom, from.at, place.world, k);
-      arrow = arrowAt(place.carrier.geom, from.at, place.world, k);
+        place.carrier.geom.kind === "circle" ? hoverK(place.carrier.geom, from.at, to) : undefined;
+      hover = edgeOn(place.carrier.geom, from.at, to, k);
+      arrow = arrowAt(place.carrier.geom, from.at, to, k);
     } else if (needPoint(session) && from && session.carriers.length > 0 && place) {
+      const to = snapAt(place);
       const c = session.carriers[session.carriers.length - 1]!;
-      hover = edgeOn(c.geom, from.at, place.world, c.k);
-      arrow = arrowAt(c.geom, from.at, place.world, c.k);
+      hover = edgeOn(c.geom, from.at, to, c.k);
+      arrow = arrowAt(c.geom, from.at, to, c.k);
     }
     if (edges.length === 0 && !hover && session.vertices[0]) {
       return { kind: "point", at: session.vertices[0].at };
