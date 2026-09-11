@@ -1,6 +1,8 @@
 # Plan: GPU point/glider discs via `@typegpu/geometry` disk primitive
 
-Prototype 12 — the WebGPU 2D canvas implementation (`packages/oblik/src/euclid2-typegpu/`). **Status: shipped.** This run planned the next smallest functional cut after hover/click-pick emission; it landed with the "Working euclid2, except tools and region outlines" commit. Since then the `euclid2-typegpu` scene kind and its `typegpu-*` twin scenes were deleted — the WebGPU view now mounts through the euclid2 pane's per-scene SVG | GPU switch (GPU default; see `12.md`), so verification steps naming `Nested circles (typegpu)` refer to that deleted twin.
+> **Status: historical (superseded).** This plan shipped, and the points it describes are in the renderer today — but the document is a snapshot of one cut inside P12, not a description of the current code. Two things it says are no longer true: the `euclid2-typegpu` scene kind and the `typegpu-*` twin scenes it refers to were deleted, and the per-scene `SVG | GPU` switch it mentions was deleted in `dfc1b86` — `TypegpuView` is now the only euclid2 renderer. Read [12.md](./12.md) for the current record; read this for how the disk primitive got in. Verification steps below that name a `(typegpu)` scene refer to a deleted twin.
+
+Prototype 12 — the WebGPU 2D canvas implementation (`packages/oblik/src/euclid2-typegpu/`). **Status: shipped.** This run planned the next smallest functional cut after hover/click-pick emission; it landed with the "Working euclid2, except tools and region outlines" commit.
 
 ## Current state (verified)
 

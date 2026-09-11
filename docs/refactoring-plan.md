@@ -189,9 +189,11 @@ Single pass/submit; the dirty-flag rAF loop; bind groups built once; the MSAA te
 
 ---
 
-## 4. The euclid2 SVG strip (current work item)
+## 4. The euclid2 SVG strip (shipped — `dfc1b86`)
 
-Make the WebGPU view the only renderer for `euclid2` scenes: no `SVG | GPU` chip, no per-scene stored choice, no `<Dynamic>` swap. The SVG view stays for `figure` scenes and SVG export — this is a strip of the _euclid2_ SVG renderer, not of SVG.
+> **Status: done.** This section is the plan for the strip, kept as the record of what was deleted and why; the code it produced is described in [`prototypes/12.md`](./prototypes/12.md) §"One renderer". §4.2 is a completed checklist, not pending work.
+
+Make the WebGPU view the only renderer for `euclid2` scenes: no `SVG | GPU` chip, no per-scene stored choice, no `<Dynamic>` swap. The SVG renderer survived for `figure` scenes and SVG export — this was a strip of the _euclid2_ SVG renderer, not of SVG.
 
 ### 4.1 Inventory
 
@@ -241,7 +243,7 @@ Consequences worth recording:
 
 | #   | step                                                         | depends on | risk                               |
 | --- | ------------------------------------------------------------ | ---------- | ---------------------------------- |
-| 0   | SVG strip (§4)                                               | —          | low; compiler-verified             |
+| 0   | SVG strip (§4) — **done, `dfc1b86`**                         | —          | low; compiler-verified             |
 | 1   | `RENDER_SAMPLES` + shared `clipFrom` (§3.1)                  | —          | low, mechanical                    |
 | 2   | `geom/kinds/` + derived union (§2.8 steps 1–3)               | —          | low, mechanical; byte-pinned tests |
 | 3   | `gpu/field/kinds/` (§2.8 step 2)                             | 2          | low, mechanical                    |
@@ -255,10 +257,12 @@ Steps 0–2 are independent and can land in any order; everything else is happie
 
 ## 6. Doc drift to fix in the same passes
 
-- `prototypes/12.md:81` lists the field's leaf kinds as `region | circle | halfPlane | offset` — `repeat` is missing since `c32ec1d`.
-- `12.md` has no model paragraph for `polarRepeat`; the only architecture prose lives in `prototypes/7.md:85-96` and one bullet in `chrome.md:83`. The P12 checklist has no row for repeated cells.
-- `prototypes/12-gpu-points-plan.md` is a shipped, historical plan whose filename invites being read as _the_ P12 doc; mark it as history.
-- `docs/README.md` indexes prototypes 1–9 and omits 10–12.
+The four items this section carried are fixed in the P12 close-out, and the record is accurate about them now: the field's leaf kinds read `spans | circle | halfPlane | offset | repeat` (a `region` operand contributes its `spans`, and the list had also never matched the `spans` tag); `12.md` has a `polarRepeat` model paragraph plus rows in its checklist and pass/fail table; `12-gpu-points-plan.md` is marked historical in the file itself; and `README.md` indexes prototypes 1–13 with a status marker on every one.
+
+Open, to fix in the pass that touches it:
+
+- `intent.md`'s "Shape" block lists `packages/geom`, `euclid2`, `euclid3`, `sdf`, `apps/paper` and `packages/shell`. The shipped layout is `packages/oblik` (+ `create-oblik`) and `apps/demo`. The block reads as aspiration, but nothing marks it as such.
+- `prototypes/13.md` must gain its postmortem at close — the charter was written from P12's, per `intent.md`.
 
 ## 7. Not in this plan
 

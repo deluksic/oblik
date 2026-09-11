@@ -57,9 +57,9 @@ GPU (TypeGPU), WASM kernels, and npm converters attach when a scene type needs t
 
 ## How we work
 
-Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current runtime: [Prototype 6](./prototypes/6.md) (P5 paper app still runs). Current view experiment: [Prototype 9](./prototypes/9.md) (figure). Next charter: [Prototype 11](./prototypes/11.md) (incremental evaluation: site memoization, user `memo()`, pick prefilter). P10 composite tools are in; P8 mention is shipped; P7 Loop / Region / Csg2 are on the tape.
+Each prototype is an experiment: a short charter, a build, a postmortem. The next charter is written from the postmortem. Intent lives here. Current: [Prototype 12](./prototypes/12.md) — the euclid2 WebGPU renderer, shipped and closed, and the only renderer since the SVG view was deleted (`dfc1b86`). Open charter: [Prototype 13](./prototypes/13.md) — tracing a raster reference. Shipped or building: P11 incremental evaluation, P10 composite tools, P9 figure, P8 mention, P7 Loop / Region / Csg2; P6 stays the greenfield runtime.
 
-Packages and rules: [layout.md](./layout.md). Catalog and palette: [scenes.md](./scenes.md).
+Packages and rules: [`AGENTS.md`](../AGENTS.md) and the package READMEs. Renderer contract: [chrome.md](./chrome.md), [refactoring-plan.md](./refactoring-plan.md).
 
 ## Horizon
 
