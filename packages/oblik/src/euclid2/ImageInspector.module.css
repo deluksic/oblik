@@ -39,8 +39,3 @@
   width: 100%;
   accent-color: var(--oblik-accent);
 }
-
-/* The picker is a button: the input is only there to be clicked. */
-.file {
-  display: none;
-}

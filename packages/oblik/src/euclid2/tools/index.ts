@@ -172,10 +172,7 @@ export function previewOf(
 ) {
   const tool = of(session);
   const sc = scopeOf(scope);
-  return withSlot(
-    tool.preview(session, place, sc),
-    focusedDraft(tool, session, sc),
-  );
+  return withSlot(tool.preview(session, place, sc), focusedDraft(tool, session, sc));
 }
 
 export function tabTool(session: ToolSession, dir: 1 | -1 = 1): ToolSession {

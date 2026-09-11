@@ -193,10 +193,7 @@ function resolveSlotValue(
  * state, focus cycling, click fill order, hover, hit snapping, and the
  * commit focus jump; the tool declares only its geometry hooks.
  */
-export function defineSlotTool<
-  S extends ToolSession & SlotFields,
-  Vals extends SlotFields,
->(
+export function defineSlotTool<S extends ToolSession & SlotFields, Vals extends SlotFields>(
   spec: ToolSpec,
   def: SlotToolDef<S, Vals>,
 ): Tool<S> {
@@ -278,10 +275,7 @@ export function defineSlotTool<
         if (custom) return { session: custom };
       }
       const next = slots[slots.indexOf(slot) + 1]?.id;
-      const focus =
-        session.focus === "name"
-          ? "name"
-          : (next ?? slot.focusAfter ?? session.focus);
+      const focus = session.focus === "name" ? "name" : (next ?? slot.focusAfter ?? session.focus);
       return {
         session: {
           ...session,

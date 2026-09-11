@@ -148,13 +148,13 @@ function put(
     scope.points[key] = { expr, at: gliderAt(n.value) };
   }
   if (n.value.kind === "line" || n.value.kind === "segment" || n.value.kind === "parallelLine") {
-    scope.carriers[key] = { expr, geom: n.value  };
+    scope.carriers[key] = { expr, geom: n.value };
   }
   if (n.value.kind === "circle") {
-    scope.circles[key] = { expr, geom: n.value  };
+    scope.circles[key] = { expr, geom: n.value };
   }
   if (n.value.kind === "region") {
-    scope.regions[key] = { expr, geom: n.value  };
+    scope.regions[key] = { expr, geom: n.value };
   }
   if (n.value.kind === "slider") {
     if (expr.kind === "ref") scope.lengths[expr.name] = n.value.n;

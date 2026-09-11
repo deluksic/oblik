@@ -5,13 +5,7 @@ import { circleUnitAt, clamp01, gliderAt, isGlider, lineSAt, segmentTAt } from "
 import { lineBasis, signedDist } from "#geom/ops";
 import { mul, perp, sub } from "#geom/vec";
 
-import {
-  clientToNdc,
-  ndcToWorld,
-  type Camera2,
-  type PaneRect,
-  type PaneSize,
-} from "../camera";
+import { clientToNdc, ndcToWorld, type Camera2, type PaneRect, type PaneSize } from "../camera";
 import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
 import {
   gliderOnTraceNode,

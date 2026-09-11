@@ -57,7 +57,7 @@ export function SliderDock(props: SliderDockProps) {
       // panels room for their box-shadows inside the scrollable container so
       // outlines are never clipped. Width = panel + both paddings.
       style={{ width: `${SLIDER_PANEL_W + SLIDER_MARGIN * 2}px` }}
-      onScroll={(e) => setSliderDockScrollTop((e.currentTarget).scrollTop)}
+      onScroll={(e) => setSliderDockScrollTop(e.currentTarget.scrollTop)}
       onWheel={(e) => {
         const el = e.currentTarget;
         // Let a scrollable list take the wheel; otherwise it falls through to

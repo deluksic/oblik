@@ -10,3 +10,22 @@
   min-width: 0;
   min-height: 0;
 }
+
+/* The pane's own chrome: the hint line, and the actions that act on the paper
+   rather than on the selection. */
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The hint can be long and the button must not be pushed off the pane. */
+.statusRow > p {
+  flex: 1;
+  min-width: 0;
+}
+
+.hiddenFile {
+  display: none;
+}

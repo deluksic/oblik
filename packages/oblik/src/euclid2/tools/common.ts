@@ -95,10 +95,7 @@ export function constructedInsert(p: PlacePoint): InsertJob | undefined {
   return { from: p.kind, args: e.args };
 }
 
-export function hoverPlace(
-  p: PlacePoint,
-  trace: readonly SnapNode[],
-): string | undefined {
+export function hoverPlace(p: PlacePoint, trace: readonly SnapNode[]): string | undefined {
   if (p.kind === "ref") return p.key ?? keyByPrint(trace, p.bind);
   if (isGliderPlace(p)) return p.key ?? keyByPrint(trace, p.bind);
   if (p.kind === "lineIntersection") return p.key ?? keyByPrint(trace, p.a);

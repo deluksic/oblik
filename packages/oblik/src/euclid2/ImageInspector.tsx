@@ -1,5 +1,3 @@
-import { createSignal } from "solid-js";
-
 import type { ImageRot, ImageValue } from "../eval/image";
 import { NumberField } from "../figure/NumberField";
 import { SidebarSection } from "../host/SelectionSidebar";
@@ -18,8 +16,6 @@ export type ImageInspectorProps = {
   onPreview: (props: ImageProps) => void;
   /** Write leaves to the source: once per gesture, on release or blur. */
   onCommit: (props: ImageProps) => void;
-  /** Hand a picked file to the same import the paste and drop paths use. */
-  onImport: (file: File) => void;
 };
 
 const TURNS: ImageRot[] = [0, 90, 180, 270];
@@ -36,7 +32,6 @@ const TURNS: ImageRot[] = [0, 90, 180, 270];
  * the one on offer.
  */
 export function ImageInspector(props: ImageInspectorProps) {
-  const [fileEl, setFileEl] = createSignal<HTMLInputElement | undefined>(undefined);
   /** A button has no "drag": show it at once and write it once. */
   const act = (leaves: ImageProps) => {
     props.onPreview(leaves);
@@ -130,27 +125,6 @@ export function ImageInspector(props: ImageInspectorProps) {
         value={props.value.style.contrast}
         onPreview={(contrast) => props.onPreview({ "style.contrast": contrast })}
         onCommit={() => props.onCommit({ "style.contrast": props.value.style.contrast })}
-      />
-      <div class={styles.row}>
-        <button
-          type="button"
-          class={[btn, secondary]}
-          title="Import a reference"
-          onClick={() => fileEl()?.click()}
-        >
-          Import image…
-        </button>
-      </div>
-      <input
-        ref={setFileEl}
-        class={styles.file}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.currentTarget.files?.[0];
-          e.currentTarget.value = "";
-          if (file !== undefined) props.onImport(file);
-        }}
       />
     </SidebarSection>
   );

@@ -5,7 +5,6 @@ import { offsetValue, wrapCsg } from "../geom/csg2";
 import type { LoopEdge, ParallelLine } from "../geom/types";
 import type { SnapNode } from "./pick";
 import type { PlacePoint } from "./place";
-import type { PlaceCtx, Scope } from "./tools/types";
 import {
   clickTool,
   commitTool,
@@ -21,6 +20,7 @@ import {
   typeTool,
 } from "./tool";
 import { regionEligibleCarriers } from "./tools/region";
+import type { PlaceCtx, Scope } from "./tools/types";
 
 const { sqrt } = Math;
 const free = (x: number, y: number): PlacePoint => ({ kind: "free", at: { x, y } });

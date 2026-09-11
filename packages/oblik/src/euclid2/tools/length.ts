@@ -53,7 +53,7 @@ export function fieldValue(scope: Scope, object: string, field: string): number 
   }
   const carrier = scope.carriers[object];
   if (field === "distance" && carrier?.geom.kind === "parallelLine") {
-    return (carrier.geom).distance;
+    return carrier.geom.distance;
   }
   return undefined;
 }

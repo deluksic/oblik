@@ -47,6 +47,7 @@ import {
 } from "./tool";
 import type { InsertJob } from "./tools/types";
 
+import { btn, secondary } from "../ui/button.module.css";
 import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 import styles from "./Pane.module.css";
 
@@ -332,8 +333,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     { equals: false },
   );
 
-  /** A picked file: the same import the paste and drop paths use, at the middle
-   * of what the user is looking at. */
+  /** The picker's file input. Import is a pane action — it is about the paper,
+   * not about the selected node — so it lives in the pane's chrome beside the
+   * status line, and a picked file takes the same path as a paste, placed at the
+   * middle of what the user is looking at. */
+  const [importEl, setImportEl] = createSignal<HTMLInputElement | undefined>(undefined);
+
   function importPicked(file: File) {
     void importAt(file, { world: { x: view().x, y: view().y }, view: view() });
   }
@@ -468,7 +473,30 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   return (
     <div class={workspace}>
       <div class={wrap}>
-        <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
+        <div class={styles.statusRow}>
+          <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>
+            {status()}
+          </p>
+          <button
+            type="button"
+            class={[btn, secondary]}
+            title="Import a raster reference — or paste one, or drop a file on the canvas"
+            onClick={() => importEl()?.click()}
+          >
+            Import image…
+          </button>
+          <input
+            ref={setImportEl}
+            class={styles.hiddenFile}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0];
+              e.currentTarget.value = "";
+              if (file !== undefined) importPicked(file);
+            }}
+          />
+        </div>
         <div class={styles.paperWrap}>
           <TypegpuView
             trace={tape()}
@@ -524,24 +552,22 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       </div>
       <ResizableSidebar>
         <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-          <SelectionSidebar>
-            <SelectionInspector
-              detail={selectionDetail()}
-              onPickScope={pickScope}
-              onExpose={(bind) => void expose(bind)}
-              onOpenFile={(file, line) => void openAt(file, line)}
-            />
+          <SelectionInspector
+            detail={selectionDetail()}
+            onPickScope={pickScope}
+            onExpose={(bind) => void expose(bind)}
+            onOpenFile={(file, line) => void openAt(file, line)}
+          >
             <Show when={imageNode()}>
               {(node) => (
                 <ImageInspector
                   value={node().value as ImageValue}
                   onPreview={previewImage}
                   onCommit={(leaves) => void patchImage(leaves)}
-                  onImport={importPicked}
                 />
               )}
             </Show>
-          </SelectionSidebar>
+          </SelectionInspector>
         </Loading>
       </ResizableSidebar>
     </div>

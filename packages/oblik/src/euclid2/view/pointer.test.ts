@@ -68,13 +68,7 @@ describe("applyDrag", () => {
     const e0 = { clientX: 100, clientY: 100 };
     const drag = panDrag(e0, camera);
     drag.moved = true;
-    const next = applyDrag(
-      drag,
-      { clientX: 148, clientY: 100 },
-      undefined,
-      camera,
-      size,
-    );
+    const next = applyDrag(drag, { clientX: 148, clientY: 100 }, undefined, camera, size);
     expect(next.camera?.x).toBe(-1);
     expect(next.camera?.y).toBe(0);
   });
@@ -99,21 +93,19 @@ describe("applyDrag", () => {
     drag.moved = true;
     const same = applyDrag(drag, down, el, camera, size);
     expect(same.draft?.values[0]).toBeCloseTo(1.76);
-    const pulled = applyDrag(
-      drag,
-      { clientX: 400, clientY: 300 - 2.5 * 48 },
-      el,
-      camera,
-      size,
-    );
+    const pulled = applyDrag(drag, { clientX: 400, clientY: 300 - 2.5 * 48 }, el, camera, size);
     expect(pulled.draft?.values[0]).toBeCloseTo(2.5);
   });
 
   test("records the grab sdf of the un-offset operand", () => {
-    const drag = offsetDrag(OFFSET_REGION, { x: 0.5, y: 0.2 }, {
-      clientX: 0,
-      clientY: 0,
-    });
+    const drag = offsetDrag(
+      OFFSET_REGION,
+      { x: 0.5, y: 0.2 },
+      {
+        clientX: 0,
+        clientY: 0,
+      },
+    );
     expect(drag?.kind).toBe("offset");
     if (drag?.kind !== "offset") return;
     expect(drag.grabSdf).toBeCloseTo(-0.2);

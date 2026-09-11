@@ -44,17 +44,27 @@ export function SelectionSidebar(props: ParentProps<SelectionSidebarProps>) {
   );
 }
 
-/** The default node/scope inspection: identity + origin source + optional expose. */
-export function SelectionInspector(props: {
-  detail?: SelectionDetail;
-  onPickScope?: (pick: ScopePick) => void;
-  onExpose?: (bind: string) => void;
-  onOpenFile?: (file: string, line: number) => void;
-}) {
+/**
+ * The default node/scope inspection: identity, whatever the pane has to say
+ * about the selected node, then its origin source and an optional expose.
+ *
+ * Children land between the identity block and Origin on purpose: a pane's own
+ * section is about the node the user has selected *now*, while Origin is where
+ * it came from — which is what you read second.
+ */
+export function SelectionInspector(
+  props: ParentProps<{
+    detail?: SelectionDetail;
+    onPickScope?: (pick: ScopePick) => void;
+    onExpose?: (bind: string) => void;
+    onOpenFile?: (file: string, line: number) => void;
+  }>,
+) {
   const detail = () => props.detail ?? EMPTY_SELECTION_DETAIL;
   return (
     <>
       <SidebarIdentity crumb={detail().crumb} meta={detail().meta} />
+      {props.children}
       <p class={[kicker, styles.kicker]}>Origin</p>
       <Origin
         origin={detail().origin}
