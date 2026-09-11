@@ -10,6 +10,7 @@ import {
   type Camera2,
   type PaneSize,
 } from "../euclid2/camera";
+import { pastedImage, droppedImage } from "../euclid2/importImage";
 import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { hoverTool, mutedForScope, snapFilterOf, toolChrome } from "../euclid2/tool";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
@@ -53,6 +54,12 @@ export type TypegpuViewProps = {
   onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | undefined) => void;
+  /** A pasted or dropped bitmap, with where it landed: the world point, and the
+   * view it landed in (the pane turns that into a node). */
+  onImportImage?: (
+    file: File,
+    at: { world: { x: number; y: number }; view: { w: number; h: number; scale: number } },
+  ) => void;
   scope?: Scope;
   evalStats?: { ms: number; built: number; hits: number } | undefined;
 };
@@ -374,6 +381,48 @@ export function TypegpuView(props: TypegpuViewProps) {
 
   /** CPU pick at the pointer (shared `pick.ts`, no DOM), restricted to nodes the
    * pane actually draws — see `isDrawnNode`. */
+  /** Hand a bitmap up with the place it belongs: the world point, and the view
+   * it landed in so the pane can size it to what is on screen. */
+  function importAt(file: File, worldPoint: { x: number; y: number }): void {
+    const pane = size();
+    props.onImportImage?.(file, {
+      world: worldPoint,
+      view: { w: pane.w, h: pane.h, scale: camera().scale },
+    });
+  }
+
+  function onDrop(e: DragEvent): void {
+    // Always preventDefault: without it on `dragover` the browser navigates to
+    // the file and the scene is gone, image or no image.
+    e.preventDefault();
+    const file = droppedImage(e.dataTransfer ?? undefined);
+    if (!file) return;
+    const el = paperEl();
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const at = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    importAt(file, screenToWorld(at, camera(), size()));
+  }
+
+  createEffect(
+    () => 1,
+    () => {
+      const onPaste = (e: ClipboardEvent) => {
+        // A paste into a field belongs to the field: the inspector's numbers
+        // take a pasted value like any other input.
+        const target = e.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+        const file = pastedImage(e.clipboardData ?? undefined);
+        if (!file) return;
+        e.preventDefault();
+        // A paste carries no location, so it lands in the middle of the view.
+        importAt(file, { x: camera().x, y: camera().y });
+      };
+      window.addEventListener("paste", onPaste);
+      return () => window.removeEventListener("paste", onPaste);
+    },
+  );
+
   function hitsAt(e: PointerEvent, el: HTMLDivElement): TraceNode[] {
     const cam = camera();
     const rect = el.getBoundingClientRect();
@@ -563,6 +612,8 @@ export function TypegpuView(props: TypegpuViewProps) {
           [styles.grab]: grabbingHover() && drag.phase() !== "dragging" && !props.placing,
         },
       ]}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={onDrop}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => {

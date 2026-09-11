@@ -329,7 +329,8 @@ export type InsertJob = {
     | "circleCircleIntersection"
     | "pointOnSegment"
     | "pointOnLine"
-    | "pointOnCircle";
+    | "pointOnCircle"
+    | "image";
   args: Expr[];
   bind?: string;
   patchVertex?: { id: string; index: number };

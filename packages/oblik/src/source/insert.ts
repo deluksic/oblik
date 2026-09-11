@@ -430,7 +430,12 @@ export function insertCall(
     return next.slice(0, lineStart) + chunk + next.slice(lineStart);
   }
   const close = body.getEnd() - 1;
-  const before = next.slice(0, close);
+  // Insert *before* the closing brace's own indentation, not after it: leaving
+  // that whitespace in front of the brace puts the new statement after it and
+  // drops the brace to column zero.
+  let at = close;
+  while (at > 0 && (next[at - 1] === " " || next[at - 1] === "\t")) at--;
+  const before = next.slice(0, at);
   const prefix = before.endsWith("\n") ? "" : "\n";
-  return before + prefix + chunk + next.slice(close);
+  return before + prefix + chunk + next.slice(at);
 }

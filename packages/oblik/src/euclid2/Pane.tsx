@@ -4,10 +4,11 @@ import { TypegpuView } from "../euclid2-typegpu/TypegpuView";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import type { VisitCaches } from "../eval/scene-cache";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
+import type { VisitCaches } from "../eval/scene-cache";
 import { sourceFileKey } from "../eval/stack";
+import type { Vec2 } from "../geom";
 import { openInEditor } from "../host/editor";
 import { createEvalstatsSetting } from "../host/evalstats";
 import { ResizableSidebar } from "../host/ResizableSidebar";
@@ -19,8 +20,8 @@ import {
 } from "../host/selection-detail";
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import type { Annotation } from "../source/analyze";
-import type { InsertJob } from "./tools/types";
 import type { MentionFile } from "../source/mention";
+import { imageArgs, importImage } from "./importImage";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
 import {
@@ -39,6 +40,7 @@ import {
   type ToolSession,
   type ToolStep,
 } from "./tool";
+import type { InsertJob } from "./tools/types";
 
 import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 import styles from "./Pane.module.css";
@@ -111,6 +113,16 @@ function sameDraft(a: Draft, b: Draft): boolean {
     if (!bv || bv.length !== av.length || bv.some((v, i) => v !== av[i])) return false;
   }
   return true;
+}
+
+/** Decode a blob to its pixel size. `createImageBitmap` is the only
+ * format-specific code in the app — the browser is the only oracle for "can this
+ * be drawn", so the import asks it before uploading anything. */
+async function decodeImage(blob: Blob): Promise<{ width: number; height: number }> {
+  const bitmap = await createImageBitmap(blob);
+  const size = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return size;
 }
 
 export function Euclid2Pane(props: Euclid2PaneProps) {
@@ -272,6 +284,27 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(undefined);
   }
 
+  /**
+   * A pasted or dropped bitmap: upload the bytes, then insert the node that
+   * draws them. Two requests, so a failed insert leaves the asset on disk —
+   * which the status line says, because a silent orphan is worse than a loud one.
+   */
+  async function importAt(
+    file: File,
+    at: { world: Vec2; view: { w: number; h: number; scale: number } },
+  ) {
+    const result = await importImage(file, at, {
+      decode: decodeImage,
+      fetch: (input, init) => fetch(input, init),
+    });
+    if (typeof result === "string") {
+      setWriteError(result);
+      return;
+    }
+    setWriteError(undefined);
+    await insert({ from: "image", args: imageArgs(result.url, result.opts) });
+  }
+
   async function insert(job: InsertJob) {
     const dest = focus();
     const res = await fetch("/__oblik-insert", {
@@ -376,6 +409,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             onLiveEdit={setLiveEdit}
             onPlace={onPlace}
             onCursor={setPlace}
+            onImportImage={(file, at) => void importAt(file, at)}
             evalStats={
               evalstats.value()
                 ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }

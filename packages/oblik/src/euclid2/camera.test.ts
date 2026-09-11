@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   clientToNdc,
+  fitWorldWidth,
   ndcToWorld,
   screenToWorld,
   wheelZoomFactor,
@@ -82,5 +83,43 @@ describe("camera", () => {
   test("a huge delta is clamped to a few notches", () => {
     expect(wheelZoomFactor(10_000, 0)).toBeCloseTo(ZOOM_NOTCH ** -4, 10);
     expect(wheelZoomFactor(-1, 2)).toBeCloseTo(ZOOM_NOTCH ** 4, 10);
+  });
+});
+
+describe("fitWorldWidth", () => {
+  const view = { w: 800, h: 600, scale: 60 };
+  const image = { width: 404, height: 500 };
+
+  test("the result fits inside the view, margin included", () => {
+    const width = fitWorldWidth(view, image);
+    const worldW = view.w / view.scale;
+    const worldH = view.h / view.scale;
+    expect(width).toBeLessThan(worldW);
+    expect((width * image.height) / image.width).toBeLessThan(worldH);
+    // The margin is the pad on each side of the limiting axis.
+    expect((width * image.height) / image.width / worldH).toBeCloseTo(0.9, 9);
+  });
+
+  test("the limiting axis decides, either way round", () => {
+    const wide = { width: 4000, height: 100 };
+    expect((fitWorldWidth(view, wide) * wide.height) / wide.width).toBeLessThan(
+      view.h / view.scale,
+    );
+    const tall = { width: 100, height: 4000 };
+    expect((fitWorldWidth(view, tall) * tall.height) / tall.width).toBeCloseTo(
+      (view.h / view.scale) * 0.9,
+      9,
+    );
+  });
+
+  test("a bigger zoom fits more image, not the same", () => {
+    const near = fitWorldWidth({ ...view, scale: 120 }, image);
+    const far = fitWorldWidth({ ...view, scale: 60 }, image);
+    expect(near).toBeCloseTo(far / 2, 9);
+  });
+
+  test("a zero-sized image or a zero zoom does not produce infinity", () => {
+    expect(Number.isFinite(fitWorldWidth(view, { width: 0, height: 0 }))).toBe(true);
+    expect(Number.isFinite(fitWorldWidth({ ...view, scale: 0 }, image))).toBe(true);
   });
 });

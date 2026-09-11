@@ -6,8 +6,10 @@ import { Readable } from "node:stream";
 import type { HotUpdateOptions, Plugin } from "vite";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 
+import { imageArgs, importImageOpts } from "../euclid2/importImage";
 import { IMAGE_MAX_BYTES } from "./import-image";
 import { contentHash } from "./import-image.server";
+import { formatNum } from "./patch";
 import { oblikPlugin } from "./vite-plugin";
 
 const SCENE_SRC = `import { point, defineScene } from "oblik";
@@ -374,5 +376,59 @@ export default defineScene({
     const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
     const res = await callEndpoint(plugin, "POST", "/__oblik-nope", Buffer.from("{}"));
     expect(res.nextCalled).toBe(true);
+  });
+});
+
+describe("the insert an import writes", () => {
+  test("produces the call and the import line the user then edits", async () => {
+    const scene = path.join(sceneDir, "ref.ts");
+    fs.writeFileSync(
+      scene,
+      `import { point, defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "Ref",
+  build() {
+    const A = point(0, 0, "o_a");
+  },
+});
+`,
+    );
+    const opts = importImageOpts(
+      { x: 1.5, y: 2 },
+      { width: 40, height: 20 },
+      {
+        w: 800,
+        h: 600,
+        scale: 60,
+      },
+    );
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-insert",
+      Buffer.from(
+        JSON.stringify({
+          file: path.relative(tmp, scene),
+          dest: undefined,
+          from: "image",
+          args: imageArgs("/assets/gear-9f3a2c11.png", opts),
+        }),
+      ),
+    );
+    expect(res.status).toBe(200);
+    const written = fs.readFileSync(scene, "utf8");
+    // The constructor joins the existing import rather than a second line...
+    expect(written).toContain('import { point, defineScene, image } from "oblik";');
+    // ...and the options object prints as the nested literal the API documents,
+    // with the width the view could show (the visible world is 13x10 units, so a
+    // 40x20 bitmap is fitted to 12 of them) and an id for the node.
+    // The printer rounds to the two decimals the rest of the source uses.
+    const width = formatNum(opts.targetSize.width ?? 0);
+    expect(written).toContain(
+      `image("/assets/gear-9f3a2c11.png", { world: { x: 1.5, y: 2 }, imageSize: { width: 40, height: 20 }, targetSize: { width: ${width} }, anchor: { x: 20, y: 10 }, style: { saturation: 0.15 } }, "o_`,
+    );
   });
 });

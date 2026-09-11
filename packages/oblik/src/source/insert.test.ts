@@ -21,6 +21,41 @@ function withBinds(...names: string[]): string {
   return src.replace("    return { A };", `${extras}    return { A };`);
 }
 
+describe("insertCall", () => {
+  const call = () =>
+    insertCall(src.replace("    return { A };\n", ""), {
+      from: "circle",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "num", value: 2 },
+      ],
+      id: "o_new",
+    });
+
+  /**
+   * The closing brace keeps the indentation it had. Inserting at the brace
+   * character itself puts the new statement *after* the brace's leading
+   * whitespace, which strands that whitespace on its own line and drops the
+   * brace to column zero — the shape every tool insert used to leave behind.
+   */
+  test("keeps the closing brace where it was", () => {
+    expect(call()).toContain('    const c = circle(A, 2, "o_new");\n  },\n});\n');
+    expect(call()).not.toContain("\n  \n");
+  });
+
+  test("inserts before a return statement, indented like its neighbours", () => {
+    const out = insertCall(src, {
+      from: "circle",
+      args: [
+        { kind: "ref", name: "A" },
+        { kind: "num", value: 2 },
+      ],
+      id: "o_new",
+    });
+    expect(out).toContain('    const c = circle(A, 2, "o_new");\n    return { A };');
+  });
+});
+
 describe("printExpr", () => {
   test("prints nums, refs, and nested calls", () => {
     const e: Expr = {
