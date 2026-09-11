@@ -327,7 +327,11 @@ export default defineScene({
   kind: "euclid2",
   title: "Ref",
   build() {
-    image("/assets/gear-9f3a2c11.png", { x: 0, y: 0, w: 40, h: 20 }, "o_img");
+    image(
+      "/assets/gear-9f3a2c11.png",
+      { world: { x: 0, y: 0 }, imageSize: { width: 40, height: 20 }, targetSize: { width: 40 } },
+      "o_img",
+    );
   },
 });
 `;
@@ -341,15 +345,18 @@ export default defineScene({
         JSON.stringify({
           file: path.relative(tmp, scene),
           id: "o_img",
-          props: { x: 5, rot: 90, fade: 1 },
+          // A drag sends both coordinates of the placement; the other two
+          // leaves are single props.
+          props: { "world.x": 5, "world.y": 0, rot: 90, fade: 1 },
         }),
       ),
     );
     expect(res.status).toBe(200);
-    // x and rot existed; fade was inserted, in the props' canonical order.
-    expect(fs.readFileSync(scene, "utf8")).toContain(
-      'image("/assets/gear-9f3a2c11.png", { x: 5, y: 0, w: 40, h: 20, rot: 90, fade: 1 }, "o_img")',
-    );
+    // The leaves existed; the call keeps its shape and only those numbers move.
+    const patched = fs.readFileSync(scene, "utf8");
+    expect(patched).toContain("world: { x: 5, y: 0 }");
+    expect(patched).toContain("rot: 90");
+    expect(patched).toContain("fade: 1");
   });
 
   test("rejects an empty patch and an id that is not in the file", async () => {
@@ -358,7 +365,7 @@ export default defineScene({
       callEndpoint(plugin, "POST", "/__oblik-image", Buffer.from(JSON.stringify(body)));
     const file = path.relative(tmp, path.join(sceneDir, "alpha.ts"));
     expect((await post({ file, id: "o_a", props: {} })).status).toBe(400);
-    expect((await post({ file, id: "o_missing", props: { x: 1 } })).status).toBe(500);
+    expect((await post({ file, id: "o_missing", props: { fade: 1 } })).status).toBe(500);
     expect((await post({ file, id: "o_a", props: { fade: 2 } })).status).toBe(400);
   });
 

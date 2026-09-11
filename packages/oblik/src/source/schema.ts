@@ -90,34 +90,57 @@ export function parsePaintPatch(raw: SceneValue): PaintPatchBody | string {
 }
 
 /**
- * The image node's patch: any subset of the props the inspector and the
- * transform gestures write. `rot`/`flip` are the two discrete props, so they are
- * literals rather than numbers; `w`/`h` cannot be negative and `fade` is the
- * charter's `[0, 1]`, enforced here because this endpoint is the only writer.
- * `src` is optional and unused by P13's gestures — it is here so re-pointing a
- * node is a patch rather than a source edit if a later prototype wants it.
+ * The image node's patch: plain values at dotted leaves of the options object,
+ * flat so the editor has one code path for every prop (see
+ * `source/image-edit.ts` and its `IMAGE_LEAVES`).
+ *
+ * The pairing checks are the guard that a *created* branch is drawable. A patch
+ * that states `origin.world.x` on a call that has no `origin` makes the editor
+ * write `origin: { world: { x: … } }`; without a `y` that rect is NaN and the
+ * node quietly stops drawing, so the wire refuses the half-stated pair instead.
+ * `targetSize` is deliberately exempt — one side is a complete instruction, and
+ * inferring the other is the point.
  */
 export const imagePatchSchema = v.object({
   file: v.string(),
   id: v.pipe(v.string(), v.minLength(1)),
-  props: v.object({
-    src: v.optional(v.pipe(v.string(), v.minLength(1))),
-    x: v.optional(v.number()),
-    y: v.optional(v.number()),
-    w: v.optional(v.pipe(v.number(), v.minValue(0))),
-    h: v.optional(v.pipe(v.number(), v.minValue(0))),
-    rot: v.optional(v.union([v.literal(0), v.literal(90), v.literal(180), v.literal(270)])),
-    flip: v.optional(v.union([v.literal(0), v.literal(1)])),
-    fade: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
-  }),
+  props: v.pipe(
+    v.object({
+      src: v.optional(v.pipe(v.string(), v.minLength(1))),
+      "world.x": v.optional(v.number()),
+      "world.y": v.optional(v.number()),
+      "anchor.x": v.optional(v.number()),
+      "anchor.y": v.optional(v.number()),
+      "imageSize.width": v.optional(v.number()),
+      "imageSize.height": v.optional(v.number()),
+      "targetSize.width": v.optional(v.pipe(v.number(), v.minValue(0))),
+      "targetSize.height": v.optional(v.pipe(v.number(), v.minValue(0))),
+      rot: v.optional(v.union([v.literal(0), v.literal(90), v.literal(180), v.literal(270)])),
+      flip: v.optional(v.union([v.literal(0), v.literal(1)])),
+      fade: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
+    }),
+    v.check(
+      (p) => both(p["world.x"], p["world.y"]) && both(p["anchor.x"], p["anchor.y"]),
+      "world and anchor each need both coordinates",
+    ),
+    v.check((p) => both(p["imageSize.width"], p["imageSize.height"]), "imageSize needs both sides"),
+  ),
 });
+
+/** Both absent, or both present — never one of a pair. */
+function both(a: unknown, b: unknown): boolean {
+  return (a === undefined) === (b === undefined);
+}
 
 export type ImagePatchBody = v.InferOutput<typeof imagePatchSchema>;
 
 export function parseImagePatch(raw: SceneValue): ImagePatchBody | string {
   const r = v.safeParse(imagePatchSchema, raw);
   if (!r.success) return r.issues.map((i) => i.message).join("; ");
-  if (Object.keys(r.output.props).length === 0) return "props is empty";
+  const { src, ...leaves } = r.output.props;
+  if (src === undefined && Object.values(leaves).every((value) => value === undefined)) {
+    return "props is empty";
+  }
   return r.output;
 }
 

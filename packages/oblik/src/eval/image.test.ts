@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { Vec2 } from "../geom";
 import {
   distToImage,
+  imageRect,
   flipImage,
   IMAGE_QUAD_UVS,
   imageAabb,
@@ -12,6 +13,7 @@ import {
   rotateImage,
   scaleImage,
   snapImageRot,
+  type ImageOpts,
   type ImageRot,
   type ImageValue,
 } from "./image";
@@ -35,6 +37,16 @@ function img(props: Partial<ImageValue> = {}): ImageValue {
 
 function byXThenY(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return a.x - b.x || a.y - b.y;
+}
+
+/** An options object that describes a plain 40x20 rect at world (10, 20). */
+function rectOpts(over: Record<string, unknown> = {}): ImageOpts {
+  return {
+    world: { x: 10, y: 20 },
+    imageSize: { width: 40, height: 20 },
+    targetSize: { width: 40, height: 20 },
+    ...over,
+  } as ImageOpts;
 }
 
 function span(a: Vec2, b: Vec2): number {
@@ -68,6 +80,63 @@ describe("isFiniteImage", () => {
     // The constructor snaps `rot` to a quarter turn, so only a hand-built value
     // can carry a NaN here — which is exactly what the guard is for.
     expect(isFiniteImage(img({ rot: Number.NaN as ImageRot }))).toBe(false);
+  });
+});
+
+describe("imageRect", () => {
+  test("the default anchor hangs the bitmap down and right of world", () => {
+    // Image y runs down, world y runs up: the bitmap's top-left is at world
+    // (10, 20) and the rect reaches *down* to y = 0.
+    expect(imageRect(rectOpts())).toEqual({ x: 10, y: 0, w: 40, h: 20 });
+  });
+
+  test("the anchor pixel lands exactly on world", () => {
+    // The bitmap's centre, at twice its pixel size, centred on the world origin.
+    const rect = imageRect(
+      rectOpts({
+        world: { x: 0, y: 0 },
+        anchor: { x: 50, y: 25 },
+        imageSize: { width: 100, height: 50 },
+        targetSize: { width: 200 },
+      }),
+    );
+    expect(rect).toEqual({ x: -100, y: -50, w: 200, h: 100 });
+  });
+
+  test("one target side infers the other from the bitmap's aspect", () => {
+    const rect = imageRect(
+      rectOpts({ imageSize: { width: 404, height: 500 }, targetSize: { width: 20 } }),
+    );
+    expect(rect.w).toBe(20);
+    expect(rect.h).toBeCloseTo((20 * 500) / 404, 9);
+    const tall = imageRect(
+      rectOpts({ imageSize: { width: 404, height: 500 }, targetSize: { height: 200 } }),
+    );
+    expect(tall.h).toBe(200);
+    expect(tall.w).toBeCloseTo((200 * 404) / 500, 9);
+  });
+
+  test("both target sides distort deliberately", () => {
+    expect(imageRect(rectOpts({ targetSize: { width: 40, height: 10 } }))).toMatchObject({
+      w: 40,
+      h: 10,
+    });
+  });
+
+  test("a call that describes no rect is an all-NaN rect, not a throw", () => {
+    const nan = { x: Number.NaN, y: Number.NaN, w: Number.NaN, h: Number.NaN };
+    expect(imageRect(undefined)).toEqual(nan);
+    expect(imageRect(rectOpts({ targetSize: {} }))).toEqual(nan);
+    expect(imageRect(rectOpts({ targetSize: { width: 0 } }))).toEqual(nan);
+    expect(imageRect(rectOpts({ targetSize: { width: -4 } }))).toEqual(nan);
+    expect(imageRect(rectOpts({ imageSize: { width: 0, height: 0 } }))).toEqual(nan);
+    expect(imageRect(rectOpts({ world: { x: Number.NaN, y: 0 } }))).toEqual(nan);
+    expect(imageRect(rectOpts({ world: undefined }))).toEqual(nan);
+  });
+
+  test("a traced point reads as a plain Vec2", () => {
+    const P = { x: 3, y: 4, kind: "point" as const };
+    expect(imageRect(rectOpts({ world: P }))).toMatchObject({ x: 3, y: 4 - 20 });
   });
 });
 

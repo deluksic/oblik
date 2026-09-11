@@ -7,14 +7,19 @@ import type { Aabb, Vec2 } from "../geom";
  * pixel dimensions — the world rect is explicit, and the import flow is what
  * preserves the file's aspect ratio.
  *
- * `x`/`y` is the **pre-rotation** corner the rect grows `+w` and `+h` from: the
- * rect is `[x, x+w] × [y, y+h]` in world units, and `rot` turns it about its own
- * centre. World y runs up, so that corner is the rect's *screen* bottom-left and
- * the picture's top-left sits at `(x, y+h)`; a positive `rot` reads as a
- * clockwise turn on screen. `flip` mirrors the sampled image about the vertical
- * centre axis — it changes which way the picture faces, never the rect's
- * geometry. `fade ∈ [0, 1]` mixes the image toward the paper colour, which is
- * what lets sketch lines read on top of a photograph.
+ * This is the *resolved* form: a concrete world rect, which is what pick and the
+ * GPU need and all they see. The authoring form — an anchor, the bitmap's pixel
+ * size and a target size — is `ImageOpts`, and `imageRect` is the conversion;
+ * nothing downstream of here knows about pixels.
+ *
+ * `x`/`y` is the **pre-rotation** minimum corner, the one the rect grows `+w`
+ * and `+h` from, and `rot` turns the rect about its own centre. World y runs up
+ * while image y runs down, so the bitmap's top-left is the rect's `(x, y+h)`
+ * corner; a positive `rot` reads as a clockwise turn on screen. `flip` mirrors
+ * the sampled image about the vertical centre axis — it changes which way the
+ * picture faces, never the rect's geometry. `fade ∈ [0, 1]` mixes the image
+ * toward the paper colour, which is what lets sketch lines read on top of a
+ * photograph.
  *
  * Loading and decoding stay outside this module: an `ImageValue` is a rect and a
  * URL, which is what keeps eval, pick and the GPU pure and device-free.
@@ -35,20 +40,99 @@ export type ImageValue = {
 export type ImageRot = 0 | 90 | 180 | 270;
 
 /**
- * Everything about a reference but its source. The rect is required — it is the
- * node's geometry and eval never learns the bitmap's pixel size — while the
- * three look props default to their no-op values, so the common call is
- * `image(src, { x, y, w, h })`.
+ * Everything about a reference but its source: where it is pinned, how big the
+ * bitmap is, how big to draw it, and the three look props.
+ *
+ * `world` is where it goes and `anchor` is the pixel of the bitmap that goes
+ * there — the **anchor point**, as After Effects and Figma call it (Flash's
+ * *registration point*, Illustrator's *reference point*, a game engine's
+ * *pivot*; paired with a world coordinate it is a *control point*). It defaults
+ * to the bitmap's top-left, so the picture hangs down and to the right of
+ * `world` — the reading every other rect in this system has (SVG, canvas, CSS).
+ * Anchor the centre to place a reference by its middle, or a hole to pin the
+ * reference to the feature being traced.
+ *
+ * A **traced point drops straight into `world`**: a `point()` is a `Vec2`, so
+ * `image(src, { world: P, … })` pins the reference to it and eval reads its
+ * coordinates — move the point and the picture moves with it, the same way
+ * `circle(P, r)` does.
+ *
+ * `imageSize` — the bitmap's own pixel size — is what the aspect comes from, and
+ * it is stated here rather than read from the file so that **nothing about
+ * evaluation is asynchronous and nothing has to decode**: eval does arithmetic
+ * on numbers the script gave it. `targetSize` states the world size; one side
+ * infers the other from that aspect, both sides allow deliberate distortion.
+ *
+ * Image space is **pixels, y running down** from the top-left, the way the
+ * bitmap and the uv table are numbered; world y runs up. `imageRect` is the one
+ * place that conversion happens.
  */
 export type ImageOpts = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  world: Vec2;
+  anchor?: Vec2;
+  imageSize: { width: number; height: number };
+  targetSize: { width?: number; height?: number };
   rot?: ImageRot;
   flip?: 0 | 1;
   fade?: number;
 };
+
+/** The world rect a reference occupies: its minimum corner, growing `+w`/`+h`. */
+export type ImageRect = { x: number; y: number; w: number; h: number };
+
+function num(value: unknown): number {
+  return typeof value === "number" ? value : Number.NaN;
+}
+
+/** A rect that nothing can draw, pick or bound — the shape every bad call takes. */
+function nanRect(): ImageRect {
+  return { x: Number.NaN, y: Number.NaN, w: Number.NaN, h: Number.NaN };
+}
+
+/**
+ * The world rect a call describes, or an all-NaN rect when the call cannot
+ * describe one — no target size at all, a non-positive side, a pixel size that
+ * is missing or degenerate, or a `world` that names no point. A NaN rect
+ * is not a throw: `isFiniteImage` keeps the node off the tape, which is how
+ * every other malformed value in this system behaves.
+ *
+ * Inference is per-axis scale: `targetSize.width / imageSize.width` is the scale
+ * when a width is stated, and the other axis takes the same scale. When both
+ * sides are stated the scales are independent, which is the deliberate
+ * distortion the rect allows. The rect is then shifted so that the pixel
+ * `anchor` lands exactly on `world` — with the default, the bitmap's own (0, 0)
+ * sits at the rect's world *maximum* y, because image y runs down and world y
+ * runs up.
+ */
+export function imageRect(opts: Partial<ImageOpts> | undefined): ImageRect {
+  const o = opts && typeof opts === "object" ? opts : {};
+  const iw = num(o.imageSize?.width);
+  const ih = num(o.imageSize?.height);
+  if (!(iw > 0) || !(ih > 0)) return nanRect();
+  // A `point()` is a Vec2, so this reads whatever the script pinned to.
+  const wx = num(o.world?.x);
+  const wy = num(o.world?.y);
+  if (!Number.isFinite(wx) || !Number.isFinite(wy)) return nanRect();
+
+  const hasW = Number.isFinite(num(o.targetSize?.width));
+  const hasH = Number.isFinite(num(o.targetSize?.height));
+  if (!hasW && !hasH) return nanRect();
+  const w = hasW ? num(o.targetSize?.width) : (num(o.targetSize?.height) / ih) * iw;
+  const h = hasH ? num(o.targetSize?.height) : (num(o.targetSize?.width) / iw) * ih;
+  if (!(w > 0) || !(h > 0)) return nanRect();
+
+  const ax = Number.isFinite(num(o.anchor?.x)) ? num(o.anchor?.x) : 0;
+  const ay = Number.isFinite(num(o.anchor?.y)) ? num(o.anchor?.y) : 0;
+  // world = world0 + ((px - ax) · w/iw, -(py - ay) · h/ih); take the rect's corners.
+  const kx = w / iw;
+  const ky = h / ih;
+  return {
+    x: wx - ax * kx,
+    y: wy - (ih - ay) * ky,
+    w,
+    h,
+  };
+}
 
 export function isImage(value: unknown): value is ImageValue {
   return !!value && typeof value === "object" && (value as ImageValue).kind === "image";

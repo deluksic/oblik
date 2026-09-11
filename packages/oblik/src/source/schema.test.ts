@@ -109,28 +109,82 @@ describe("parseOpen", () => {
 describe("parseImagePatch", () => {
   const file = "apps/demo/src/scenes/gear.ts";
 
-  test("accepts a partial patch and keeps only what was sent", () => {
-    const job = parseImagePatch({ file, id: "o_img", props: { x: 1.5, rot: 90 } });
+  test("accepts dotted leaves and keeps only what was sent", () => {
+    const job = parseImagePatch({
+      file,
+      id: "o_img",
+      props: { "world.x": 1.5, "world.y": 2.5, "targetSize.width": 20, rot: 90 },
+    });
     expect(typeof job).not.toBe("string");
     if (typeof job === "string") throw new Error(job);
-    expect(job).toEqual({ file, id: "o_img", props: { x: 1.5, rot: 90 } });
+    expect(job.props).toEqual({
+      "world.x": 1.5,
+      "world.y": 2.5,
+      "targetSize.width": 20,
+      rot: 90,
+    });
+  });
+
+  test("handles keys with dots in them, rather than nesting them again", () => {
+    const job = parseImagePatch({ file, id: "o_img", props: { fade: 0.5 } });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job.props).toHaveProperty("fade", 0.5);
+  });
+
+  test("accepts a target size on one side only — the other is inferred", () => {
+    expect(
+      typeof parseImagePatch({ file, id: "o_img", props: { "targetSize.width": 20 } }),
+    ).not.toBe("string");
+    expect(
+      typeof parseImagePatch({ file, id: "o_img", props: { "targetSize.height": 20 } }),
+    ).not.toBe("string");
   });
 
   test("rejects an empty id and an empty patch", () => {
-    expect(typeof parseImagePatch({ file, id: "", props: { x: 1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "", props: { fade: 1 } })).toBe("string");
     expect(typeof parseImagePatch({ file, id: "o_img", props: {} })).toBe("string");
   });
 
-  test("rejects a turn that is not a quarter", () => {
+  /**
+   * A half-stated pair is the one patch that would make a *created* branch
+   * undrawable: the editor would write `world: { x: … }` and the
+   * rect would be NaN. The wire refuses it rather than letting the node vanish.
+   */
+  test("rejects half a pair, for the branches that need both", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "world.x": 1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "imageSize.width": 4 } })).toBe(
+      "string",
+    );
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "anchor.y": 2 } })).toBe("string");
+  });
+
+  test("accepts both of a pair", () => {
+    expect(
+      typeof parseImagePatch({
+        file,
+        id: "o_img",
+        props: { "world.x": 1, "world.y": 2, "imageSize.width": 4, "imageSize.height": 8 },
+      }),
+    ).not.toBe("string");
+  });
+
+  test("rejects a turn that is not a quarter, and a flip that is not 0 or 1", () => {
     expect(typeof parseImagePatch({ file, id: "o_img", props: { rot: 45 } })).toBe("string");
     expect(typeof parseImagePatch({ file, id: "o_img", props: { rot: "90" } })).toBe("string");
     expect(typeof parseImagePatch({ file, id: "o_img", props: { flip: 2 } })).toBe("string");
   });
 
-  test("rejects a negative side and a fade outside [0, 1]", () => {
-    expect(typeof parseImagePatch({ file, id: "o_img", props: { w: -1 } })).toBe("string");
+  test("rejects a negative target size and a fade outside [0, 1]", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "targetSize.width": -1 } })).toBe(
+      "string",
+    );
     expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: 1.2 } })).toBe("string");
     expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: -0.1 } })).toBe("string");
+  });
+
+  test("rejects a leaf it does not know", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { x: 1 } })).toBe("string");
   });
 
   test("rejects a src that is not a non-empty string", () => {

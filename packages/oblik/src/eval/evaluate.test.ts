@@ -605,15 +605,28 @@ function imageScene(body: () => void) {
   });
 }
 
+/** An options object that describes a plain 40x20 rect at world (10, 20). */
+function sizedImage(over: Record<string, unknown> = {}): ImageOpts {
+  return {
+    world: { x: 10, y: 20 },
+    imageSize: { width: 40, height: 20 },
+    targetSize: { width: 40, height: 20 },
+    ...over,
+  } as ImageOpts;
+}
+
 describe("image nodes", () => {
-  test("records one node with the rect it was authored with", () => {
+  /**
+   * The bitmap's top-left is the anchor by default and image y runs *down* while
+   * world y runs up, so a 20-tall bitmap pinned at world y = 20 reaches down to
+   * y = 0. That is the whole reason this model replaced a bare `x`/`y` rect: the
+   * picture hangs the way a reader expects, and "upright" is not a separate fact
+   * that a uv table has to get right.
+   */
+  test("records one node with the rect the anchor and sizes describe", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        image(
-          "/assets/gear-9f3a2c11.png",
-          { x: 10, y: 20, w: 40, h: 20, rot: 90, flip: 1, fade: 0.25 },
-          "o_img",
-        );
+        image("/assets/gear-9f3a2c11.png", sizedImage({ rot: 90, flip: 1, fade: 0.25 }), "o_img");
       }),
     );
     expect(trace.map((n) => n.kind)).toEqual(["image"]);
@@ -624,7 +637,7 @@ describe("image nodes", () => {
       kind: "image",
       src: "/assets/gear-9f3a2c11.png",
       x: 10,
-      y: 20,
+      y: 0,
       w: 40,
       h: 20,
       rot: 90,
@@ -633,19 +646,102 @@ describe("image nodes", () => {
     });
   });
 
+  test("one target side infers the other from the bitmap's aspect", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image(
+          "/assets/scan.png",
+          {
+            world: { x: 0, y: 0 },
+            imageSize: { width: 404, height: 500 },
+            targetSize: { width: 20 },
+          },
+          "o_img",
+        );
+      }),
+    );
+    expect(trace[0]?.value.kind === "image" ? trace[0].value.w : 0).toBe(20);
+    expect(trace[0]?.value.kind === "image" ? trace[0].value.h : 0).toBeCloseTo(
+      (20 * 500) / 404,
+      9,
+    );
+  });
+
+  test("both target sides distort deliberately", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image(
+          "/a.png",
+          {
+            world: { x: 0, y: 0 },
+            imageSize: { width: 40, height: 20 },
+            targetSize: { width: 40, height: 10 },
+          },
+          "o_img",
+        );
+      }),
+    );
+    expect(trace[0]?.value).toMatchObject({ w: 40, h: 10 });
+  });
+
+  test("an interior anchor pixel lands on its world point", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image(
+          "/a.png",
+          {
+            // The bitmap's own centre, drawn at twice its pixel size, centred on
+            // world origin: the rect straddles it.
+            world: { x: 0, y: 0 },
+            anchor: { x: 50, y: 25 },
+            imageSize: { width: 100, height: 50 },
+            targetSize: { width: 200 },
+          },
+          "o_img",
+        );
+      }),
+    );
+    expect(trace[0]?.value).toMatchObject({ x: -100, y: -50, w: 200, h: 100 });
+  });
+
   test("the look props default to their no-op values", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        image("/a.png", { x: 1, y: 2, w: 3, h: 4 }, "o_img");
+        image("/a.png", sizedImage(), "o_img");
       }),
     );
     expect(trace[0]?.value).toMatchObject({ rot: 0, flip: 0, fade: 0 });
   });
 
+  /**
+   * The reference is pinned to traced geometry by handing `world` a point. Eval
+   * reads its coordinates, so the picture follows wherever the point goes — the
+   * same dependency `circle(P, r)` has.
+   */
+  test("a reference pinned to a point follows it", () => {
+    const pinned = (px: number) =>
+      evaluate(
+        imageScene(() => {
+          const P = point(px, 0, "o_p");
+          image(
+            "/a.png",
+            { world: P, imageSize: { width: 10, height: 10 }, targetSize: { width: 10 } },
+            "o_img",
+          );
+        }),
+      );
+    const xOf = (px: number) => {
+      const node = pinned(px).trace.find((n) => n.kind === "image");
+      return node?.value.kind === "image" ? node.value.x : undefined;
+    };
+    expect(xOf(0)).toBe(0);
+    expect(xOf(4)).toBe(4);
+  });
+
   test("an occurrence counts like any other node", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        for (let i = 0; i < 2; i++) image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_img");
+        for (let i = 0; i < 2; i++) image("/a.png", sizedImage(), "o_img");
       }),
     );
     expect(trace.map((n) => n.occ)).toEqual([0, 1]);
@@ -661,20 +757,53 @@ describe("image nodes", () => {
     const draft = new Map([["o_img", [1, 2, 3, 4, 270, 1, 0.9]]]);
     const { trace } = evaluate(
       imageScene(() => {
-        image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_img");
+        image("/a.png", sizedImage(), "o_img");
       }),
       { draft },
     );
-    expect(trace[0]?.value).toMatchObject({ x: 0, y: 0, w: 10, h: 10, rot: 0, fade: 0 });
+    expect(trace[0]?.value).toMatchObject({ x: 10, y: 0, w: 40, h: 20, rot: 0, fade: 0 });
   });
 
-  test("a missing side or an empty source is evaluated but never recorded", () => {
+  test("a call that describes no rect is evaluated but never recorded", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        // JavaScript callers are not typechecked: the guard is what stops it.
-        image("/a.png", { x: 0, y: 0, w: 10 } as ImageOpts, "o_missing");
-        image("", { x: 0, y: 0, w: 10, h: 10 }, "o_sourceless");
-        image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_good");
+        // No target size at all, a degenerate bitmap, no world point, no source.
+        image(
+          "/a.png",
+          { world: { x: 0, y: 0 }, imageSize: { width: 4, height: 4 }, targetSize: {} },
+          "o_sizeless",
+        );
+        image(
+          "/a.png",
+          {
+            world: { x: 0, y: 0 },
+            imageSize: { width: 0, height: 0 },
+            targetSize: { width: 1 },
+          },
+          "o_tiny",
+        );
+        image(
+          "/a.png",
+          {
+            world: { x: 0, y: 0 },
+            anchor: { x: 2, y: 2 },
+            imageSize: { width: 4, height: 4 },
+            targetSize: { width: 0 },
+          },
+          "o_zerowidth",
+        );
+        image("", sizedImage(), "o_sourceless");
+        image("/a.png", sizedImage(), "o_good");
+      }),
+    );
+    expect(trace.map((n) => n.id)).toEqual(["o_good"]);
+  });
+
+  test("a JavaScript caller with no options at all does not throw", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/a.png", undefined as unknown as ImageOpts, "o_bad");
+        image("/a.png", sizedImage(), "o_good");
       }),
     );
     expect(trace.map((n) => n.id)).toEqual(["o_good"]);

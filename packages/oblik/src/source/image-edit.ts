@@ -1,18 +1,39 @@
 import MagicString from "magic-string";
 import * as ts from "typescript";
 
-import type { ImageOpts } from "../eval/image";
 import { trailingId } from "./analyze";
 import { formatNum } from "./patch";
 
-/** Any subset of a reference's fields; an absent key is left alone. The source
- * is a separate argument in the call, so it patches separately too. */
-export type ImageProps = Partial<ImageOpts> & { src?: string };
+/**
+ * Every leaf an image patch may set, as a dotted path into the options object.
+ *
+ * Flat on the wire so that one code path writes a prop at any depth —
+ * `world.x` is no different from `fade` — and so that a later prop adds a
+ * name here rather than another case to the editor. Order matters: it is the
+ * order missing leaves are created in.
+ */
+export const IMAGE_LEAVES = [
+  "world.x",
+  "world.y",
+  "anchor.x",
+  "anchor.y",
+  "imageSize.width",
+  "imageSize.height",
+  "targetSize.width",
+  "targetSize.height",
+  "rot",
+  "flip",
+  "fade",
+] as const;
 
-/** The props object's field order, used when a property has to be inserted. */
-const PROP_ORDER = ["x", "y", "w", "h", "rot", "flip", "fade"] as const;
+export type ImageLeaf = (typeof IMAGE_LEAVES)[number];
 
-type PropKey = (typeof PROP_ORDER)[number];
+/** A patch as it arrives on the wire: plain values at dotted leaves. `src` is
+ * the call's first argument rather than a prop, so it travels beside them. */
+export type ImageProps = Partial<Record<ImageLeaf, number>> & { src?: string };
+
+/** A subtree being assembled for a missing branch: printed values at the leaves. */
+type Tree = string | { [key: string]: Tree };
 
 function parse(source: string): ts.SourceFile {
   return ts.createSourceFile("scene.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -37,13 +58,9 @@ function imageCallWithId(sf: ts.SourceFile, id: string): ts.CallExpression | und
   return found;
 }
 
-function printValue(value: string | number): string {
-  return typeof value === "string" ? JSON.stringify(value) : formatNum(value);
-}
-
-/** Every named property of the options object, so a patch can find the ones to
- * overwrite. Shorthand counts: `{ x, y, w, h }` patches `x` by replacing the
- * whole property, since there is no initializer to write. */
+/** Named properties of an options object, so a patch can tell what it overwrites
+ * and what it has to create. Shorthand counts: `{ x, y }` has both, and a patch
+ * replaces the whole property because there is no initializer to write. */
 function propsOf(obj: ts.ObjectLiteralExpression): Map<string, ts.ObjectLiteralElementLike> {
   const out = new Map<string, ts.ObjectLiteralElementLike>();
   for (const p of obj.properties) {
@@ -53,12 +70,18 @@ function propsOf(obj: ts.ObjectLiteralExpression): Map<string, ts.ObjectLiteralE
   return out;
 }
 
+function printTree(tree: Tree): string {
+  if (typeof tree === "string") return tree;
+  const parts = Object.entries(tree).map(([key, value]) => `${key}: ${printTree(value)}`);
+  return `{ ${parts.join(", ")} }`;
+}
+
 /**
- * Add `entries` (`["fade: 0.4"]`) to the options object, in the style the object
- * is already written in: a multiline object gets one property per line, indented
- * like its last property, and a single-line one is extended in place. Trailing
- * commas are respected rather than doubled — the same care `stamp.ts` takes when
- * it appends an id.
+ * Add `entries` (`["fade: 0.4"]`) to an object literal, in the style it is
+ * already written in: a multiline object gets one property per line, indented
+ * like its last property, and a single-line one is extended in place with one
+ * normalised separator. Trailing commas are respected rather than doubled — the
+ * same care `stamp.ts` takes when it appends an id.
  */
 function insertProps(
   ms: MagicString,
@@ -78,8 +101,6 @@ function insertProps(
   const gapStart = last.getEnd();
   const gap = source.slice(gapStart, closeBrace);
   if (!gap.includes("\n")) {
-    // Whatever sat between the last property and the brace — a trailing comma,
-    // a space, neither — is replaced by one normalised separator.
     ms.remove(gapStart, closeBrace);
     ms.appendLeft(closeBrace, `, ${entries.join(", ")} `);
     return;
@@ -95,15 +116,75 @@ function insertProps(
   ms.appendLeft(closeWs, `,\n${indent}${entries.join(`,\n${indent}`)}${trailing}\n`);
 }
 
+/** Record `path: value` under the object it is missing from, so that every
+ * creation inside one object becomes a single inserted property tree rather than
+ * one insert per leaf — which would emit the same parent twice. */
+function addPending(
+  pending: Map<ts.ObjectLiteralExpression, Tree>,
+  obj: ts.ObjectLiteralExpression,
+  path: readonly string[],
+  value: string,
+): void {
+  const existing = pending.get(obj);
+  const tree: { [key: string]: Tree } = existing && typeof existing !== "string" ? existing : {};
+  pending.set(obj, tree);
+  let node = tree;
+  for (const key of path.slice(0, -1)) {
+    const next = node[key];
+    if (typeof next !== "object") node[key] = {};
+    node = node[key] as { [key: string]: Tree };
+  }
+  node[path[path.length - 1]!] = value;
+}
+
+/** Write one leaf, descending through the objects on the way and recording the
+ * branch it has to create. Returns nothing: every leaf it is given is a write. */
+function setLeaf(
+  ms: MagicString,
+  sf: ts.SourceFile,
+  obj: ts.ObjectLiteralExpression,
+  path: readonly string[],
+  value: string,
+  pending: Map<ts.ObjectLiteralExpression, Tree>,
+): void {
+  const head = path[0]!;
+  const rest = path.slice(1);
+  const prop = propsOf(obj).get(head);
+  if (rest.length === 0) {
+    if (!prop) {
+      addPending(pending, obj, [head], value);
+      return;
+    }
+    // A shorthand property (`{ x, y }`) has no initializer to write, so the whole
+    // property becomes a named one — never a bare value in its place.
+    const shorthand = !ts.isPropertyAssignment(prop);
+    const target = shorthand ? prop : prop.initializer;
+    ms.overwrite(target.getStart(sf), target.getEnd(), shorthand ? `${head}: ${value}` : value);
+    return;
+  }
+  if (!prop) {
+    addPending(pending, obj, path, value);
+    return;
+  }
+  const init = ts.isPropertyAssignment(prop) ? prop.initializer : undefined;
+  if (!init || !ts.isObjectLiteralExpression(init)) {
+    throw new Error(`image(..., { ${head}: … }) is not an object literal to patch`);
+  }
+  setLeaf(ms, sf, init, rest, value, pending);
+}
+
 /**
- * Patch a reference's props in place. Properties that are already in the call
- * are overwritten; ones it does not carry yet are inserted, so an inspector can
- * fade a node the author wrote as `image(src, { x, y, w, h })` without touching
- * the source by hand. `src` is rewritten as the call's first argument.
+ * Patch a reference's props in place. Leaves the call already carries are
+ * overwritten; missing ones are created, so an inspector can move or resize a
+ * node the author wrote short without anyone editing the file by hand. `src` is
+ * rewritten as the call's first argument.
  *
- * Throws when there is no such call, when the props argument is not an object
- * literal (a ref cannot be patched field by field), or when the patch is empty —
- * the caller turns that into an error response rather than writing half a file.
+ * A created branch is written whole from the leaves in the patch, so a caller
+ * that creates `world` must state both coordinates — which the
+ * patch schema enforces, because a half-stated rect is a node that silently
+ * stops drawing. Throws when there is no such call, when a branch to descend
+ * through is not an object literal (a ref cannot be patched field by field), or
+ * when the patch is empty.
  */
 export function patchImageProps(source: string, id: string, props: ImageProps): string {
   const sf = parse(source);
@@ -116,41 +197,24 @@ export function patchImageProps(source: string, id: string, props: ImageProps): 
   if (props.src !== undefined) {
     const arg = args[0];
     if (!arg) throw new Error(`image("${id}") has no src argument`);
-    ms.overwrite(arg.getStart(sf), arg.getEnd(), printValue(props.src));
+    ms.overwrite(arg.getStart(sf), arg.getEnd(), JSON.stringify(props.src));
     wrote++;
   }
 
-  const fields = PROP_ORDER.filter((key) => props[key] !== undefined);
-  if (fields.length > 0) {
+  const leaves = IMAGE_LEAVES.filter((leaf) => props[leaf] !== undefined);
+  if (leaves.length > 0) {
     const optsArg = args[1];
     if (!optsArg || !ts.isObjectLiteralExpression(optsArg)) {
       throw new Error(`image("${id}") has no options object to patch`);
     }
-    const existing = propsOf(optsArg);
-    const missing: PropKey[] = [];
-    for (const key of fields) {
-      const text = printValue(props[key] as string | number);
-      const prop = existing.get(key);
-      if (!prop) {
-        missing.push(key);
-        continue;
-      }
-      // A shorthand property (`{ x, y }`) has no initializer to write, so the
-      // whole property becomes a named one — never a bare `7` in its place.
-      const shorthand = !ts.isPropertyAssignment(prop);
-      const target = shorthand ? prop : prop.initializer;
-      ms.overwrite(target.getStart(sf), target.getEnd(), shorthand ? `${key}: ${text}` : text);
+    const pending = new Map<ts.ObjectLiteralExpression, Tree>();
+    for (const leaf of leaves) {
+      setLeaf(ms, sf, optsArg, leaf.split("."), formatNum(props[leaf]!), pending);
       wrote++;
     }
-    if (missing.length > 0) {
-      insertProps(
-        ms,
-        source,
-        sf,
-        optsArg,
-        missing.map((key) => `${key}: ${printValue(props[key] as string | number)}`),
-      );
-      wrote += missing.length;
+    for (const [obj, tree] of pending) {
+      const entries = Object.entries(tree).map(([key, value]) => `${key}: ${printTree(value)}`);
+      insertProps(ms, source, sf, obj, entries);
     }
   }
 
