@@ -66,9 +66,10 @@ import {
   type TraceValue,
 } from "./context";
 import {
-  imageRect,
   imageStyle,
   isFiniteImage,
+  num,
+  numOr,
   snapImageRot,
   type ImageOpts,
   type ImageValue,
@@ -494,7 +495,15 @@ export const image = mark(
     const value: ImageValue = {
       kind: "image",
       src: typeof src === "string" ? src : "",
-      ...imageRect(o),
+      world: { x: num(o.world?.x), y: num(o.world?.y) },
+      anchor: { x: numOr(o.anchor?.x, 0), y: numOr(o.anchor?.y, 0) },
+      imageSize: { width: num(o.imageSize?.width), height: num(o.imageSize?.height) },
+      // Only the sides the call stated: the value mirrors the source, so a
+      // one-sided target keeps inferring its other side on every read.
+      targetSize: {
+        ...(o.targetSize?.width !== undefined ? { width: o.targetSize.width } : {}),
+        ...(o.targetSize?.height !== undefined ? { height: o.targetSize.height } : {}),
+      },
       rot: snapImageRot(o.rot ?? 0),
       flip: o.flip ? 1 : 0,
       style: imageStyle(o),

@@ -13,7 +13,7 @@ import type { Ghost, PlaceHit } from "../../euclid2/tool";
 import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
-import { imageQuad, isImage, type ImageValue } from "../../eval/image";
+import { imageQuad, imageRect, isImage, type ImageValue } from "../../eval/image";
 import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
 import {
   blockWindows,
@@ -336,7 +336,15 @@ export function createAdapter(): Adapter {
       const key = nodeKey(n);
       const slot = imagePool.alloc(key, 1);
       if (slot === undefined) continue;
-      const inst = imageInstance(n.value);
+      const inst = imageInstance(
+        n.value,
+        colors,
+        isHot(n, input.hoverKey, input.selectedKey),
+        isSelected(n, input.selectedKey),
+        strokePx,
+        // The same weight a selected stroke's outline gets.
+        overlayBands(strokePx, { selected: true }).outline,
+      );
       if (diff(lastImage, key, slot, encodeImage(inst)))
         imageWrites.push({ idx: slot, value: inst });
       imageDraws.push({ slot, src: n.value.src });
@@ -1249,18 +1257,34 @@ function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
   return f;
 }
 
+const NO_EDGE = vec4f(0, 0, 0, 0);
+
 /** One reference quad: the four corners in strip order (`rot`/`flip` already
- * folded in by `eval/image.ts`) plus the three style dials. */
-function imageInstance(value: ImageValue): ImageInstValue {
+ * folded in by `eval/image.ts`), the three style dials, and — only while the
+ * node is hot — its selection outline, in the same state colours every other
+ * node's chrome uses. */
+function imageInstance(
+  value: ImageValue,
+  colors: AdapterInput["colors"],
+  hot: boolean,
+  selected: boolean,
+  strokePx: number,
+  selectedOutlinePx: number,
+): ImageInstValue {
   const [a, b, c, d] = imageQuad(value);
+  const rect = imageRect(value);
+  const edge = hot ? edgeWrites(selected ? colors.selectedPaint : colors.ring, 0).color : NO_EDGE;
   return ImageInst({
     a: vec2f(a.x, a.y),
     b: vec2f(b.x, b.y),
     c: vec2f(c.x, c.y),
     d: vec2f(d.x, d.y),
+    size: vec2f(rect.w, rect.h),
     opacity: value.style.opacity,
     saturation: value.style.saturation,
     contrast: value.style.contrast,
+    edge: vec4f(edge.x, edge.y, edge.z, hot ? 1 : 0),
+    edgePx: hot ? (selected ? selectedOutlinePx : strokePx) : 0,
   });
 }
 
@@ -1274,9 +1298,16 @@ function encodeImage(inst: ImageInstValue): Float64Array {
     inst.c.y,
     inst.d.x,
     inst.d.y,
+    inst.size.x,
+    inst.size.y,
     inst.opacity,
     inst.saturation,
     inst.contrast,
+    inst.edge.x,
+    inst.edge.y,
+    inst.edge.z,
+    inst.edge.w,
+    inst.edgePx,
   );
 }
 

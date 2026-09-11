@@ -26,8 +26,9 @@ import {
   style,
   union,
 } from "./constructors";
+import type { TraceNode } from "./context";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
-import type { ImageOpts } from "./image";
+import { imageRect, type ImageOpts, type ImageRect } from "./image";
 import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
 import { defineScene } from "./scene";
 import { siteOf } from "./site";
@@ -605,7 +606,13 @@ function imageScene(body: () => void) {
   });
 }
 
-/** An options object that describes a plain 40x20 rect at world (10, 20). */
+/** The rect a trace node's reference resolves to, asserting the arm. */
+function rectOfTrace(node: TraceNode): ImageRect {
+  if (node.value.kind !== "image") throw new Error(`not a reference: ${node.kind}`);
+  return imageRect(node.value);
+}
+
+/** A reference 40x20 bitmap units big, pinned at world (10, 20). */
 function sizedImage(over: Record<string, unknown> = {}): ImageOpts {
   return {
     world: { x: 10, y: 20 },
@@ -637,17 +644,20 @@ describe("image nodes", () => {
     const node = trace[0]!;
     expect(node.id).toBe("o_img");
     expect(node.occ).toBe(0);
+    // The value is the authored props: what the source states is what the
+    // inspector edits, and `imageRect` is the one place a rect comes out.
     expect(node.value).toEqual({
       kind: "image",
       src: "/assets/gear-9f3a2c11.png",
-      x: 10,
-      y: 0,
-      w: 40,
-      h: 20,
+      world: { x: 10, y: 20 },
+      anchor: { x: 0, y: 0 },
+      imageSize: { width: 40, height: 20 },
+      targetSize: { width: 40, height: 20 },
       rot: 90,
       flip: 1,
       style: { opacity: 0.25, saturation: 1, contrast: 1 },
     });
+    expect(rectOfTrace(node)).toEqual({ x: 10, y: 0, w: 40, h: 20 });
   });
 
   test("one target side infers the other from the bitmap's aspect", () => {
@@ -664,11 +674,12 @@ describe("image nodes", () => {
         );
       }),
     );
-    expect(trace[0]?.value.kind === "image" ? trace[0].value.w : 0).toBe(20);
-    expect(trace[0]?.value.kind === "image" ? trace[0].value.h : 0).toBeCloseTo(
-      (20 * 500) / 404,
-      9,
-    );
+    const value = trace[0]!.value;
+    expect(value.kind === "image" ? value.targetSize : undefined).toEqual({ width: 20 });
+    // One side stated, the rect derived on every read.
+    const rect = rectOfTrace(trace[0]!);
+    expect(rect.w).toBe(20);
+    expect(rect.h).toBeCloseTo((20 * 500) / 404, 9);
   });
 
   test("both target sides distort deliberately", () => {
@@ -685,7 +696,7 @@ describe("image nodes", () => {
         );
       }),
     );
-    expect(trace[0]?.value).toMatchObject({ w: 40, h: 10 });
+    expect(rectOfTrace(trace[0]!)).toMatchObject({ w: 40, h: 10 });
   });
 
   test("an interior anchor pixel lands on its world point", () => {
@@ -705,7 +716,7 @@ describe("image nodes", () => {
         );
       }),
     );
-    expect(trace[0]?.value).toMatchObject({ x: -100, y: -50, w: 200, h: 100 });
+    expect(rectOfTrace(trace[0]!)).toMatchObject({ x: -100, y: -50, w: 200, h: 100 });
   });
 
   test("the look dials default to the bitmap as it is", () => {
@@ -751,7 +762,7 @@ describe("image nodes", () => {
       );
     const xOf = (px: number) => {
       const node = pinned(px).trace.find((n) => n.kind === "image");
-      return node?.value.kind === "image" ? node.value.x : undefined;
+      return node === undefined ? undefined : rectOfTrace(node).x;
     };
     expect(xOf(0)).toBe(0);
     expect(xOf(4)).toBe(4);
@@ -780,14 +791,7 @@ describe("image nodes", () => {
       }),
       { draft },
     );
-    expect(trace[0]?.value).toMatchObject({
-      x: 10,
-      y: 0,
-      w: 40,
-      h: 20,
-      rot: 0,
-      style: { opacity: 1, saturation: 1, contrast: 1 },
-    });
+    expect(rectOfTrace(trace[0]!)).toMatchObject({ x: 10, y: 0, w: 40, h: 20 });
   });
 
   test("a call that describes no rect is evaluated but never recorded", () => {

@@ -1,8 +1,9 @@
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { builtin, f32, interpolate, u32, vec2f, vec3f, vec4f } from "typegpu/data";
-import { dot, max, mix, saturate, select, textureSample } from "typegpu/std";
+import { clamp, dot, max, min, mix, saturate, select, textureSample } from "typegpu/std";
 
+import { worldPerPx } from "../frame";
 import { imageLayout } from "../layout";
 
 /** Quad corners per reference (triangle-strip). */
@@ -25,6 +26,26 @@ const toClip = tgpu.fn(
 });
 
 /**
+ * The selection outline's coverage: a band `edgePx` CSS px wide measured inward
+ * from the quad's border, antialiased at its inner edge.
+ *
+ * `size` is the pre-rotation rect's world size, which is what turns the uv
+ * distance to a border into a world distance — so the band follows a rotated
+ * quad and stays `edgePx` wide on screen at any zoom, because the px→world
+ * conversion reads the frame rather than the record.
+ */
+const edgeCoverage = tgpu.fn(
+  [vec2f, vec2f, f32, f32],
+  f32,
+)((uv, size, edgePx, scale) => {
+  "use gpu";
+  const band = edgePx * worldPerPx(scale);
+  // Distance to the nearest border measured in bands: <= 1 is inside it.
+  const t = min(min(uv.x, 1 - uv.x) * (size.x / band), min(uv.y, 1 - uv.y) * (size.y / band));
+  return clamp((1 - t) * edgePx + 0.5, 0, 1);
+});
+
+/**
  * One reference quad. The record already holds the four world corners in strip
  * order — `rot` and `flip` were folded in on the CPU (`eval/image.ts`) — so the
  * vertex shader picks a corner and hands the fragment its texture coordinate.
@@ -37,6 +58,9 @@ export const imageVertex = tgpu.vertexFn({
     outPos: builtin.position,
     uv: interpolate("linear", vec2f),
     style: interpolate("flat", vec3f),
+    edge: interpolate("flat", vec4f),
+    edgePx: interpolate("flat", f32),
+    size: interpolate("flat", vec2f),
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
@@ -59,6 +83,9 @@ export const imageVertex = tgpu.vertexFn({
     outPos: toClip(p),
     uv: vec2f(x, y),
     style: vec3f(inst.opacity, inst.saturation, inst.contrast),
+    edge: inst.edge,
+    edgePx: inst.edgePx,
+    size: inst.size,
   };
 });
 
@@ -73,13 +100,26 @@ export const imageVertex = tgpu.vertexFn({
  * over.
  */
 export const imageFragment = tgpu.fragmentFn({
-  in: { uv: interpolate("linear", vec2f), style: interpolate("flat", vec3f) },
+  in: {
+    uv: interpolate("linear", vec2f),
+    style: interpolate("flat", vec3f),
+    edge: interpolate("flat", vec4f),
+    edgePx: interpolate("flat", f32),
+    size: interpolate("flat", vec2f),
+  },
   out: vec4f,
-})(({ uv, style }) => {
+})(({ uv, style, edge, edgePx, size }) => {
   "use gpu";
   const sampled = textureSample(imageLayout.$.tex, imageLayout.$.samp, uv);
   const grey = mix(vec3f(dot(sampled.rgb, LUMA)), sampled.rgb, style.y);
-  return vec4f(saturate((grey - MID) * style.z + MID), sampled.a * style.x);
+  const base = saturate((grey - MID) * style.z + MID);
+  const fa = sampled.a * style.x;
+  // The outline goes *over* the bitmap with straight alpha — the same
+  // formulation the fill's own outline uses — and a zero edge alpha (a cold
+  // reference) leaves the fragment exactly as it was.
+  const ea = edgeCoverage(uv, size, edgePx, imageLayout.$.frame.scale) * edge.w;
+  const alpha = ea + fa * (1 - ea);
+  return vec4f((edge.xyz * ea + base * (fa * (1 - ea))) / max(alpha, 1e-6), alpha);
 });
 
 const alphaBlend: GPUBlendState = {

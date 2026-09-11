@@ -18,16 +18,26 @@ import {
   type ImageValue,
 } from "./image";
 
+/**
+ * A reference whose rect is `(10, 20)` to `(50, 40)`: the bitmap's top-left is
+ * anchored at world `(10, 40)`, and image y running down puts the rect below it.
+ * The geometry tests read the rect, so the numbers below are the rect's.
+ */
 const base: ImageValue = {
   kind: "image",
   src: "/assets/gear-9f3a2c11.png",
-  x: 10,
-  y: 20,
-  w: 40,
-  h: 20,
+  world: { x: 10, y: 40 },
+  anchor: { x: 0, y: 0 },
+  imageSize: { width: 40, height: 20 },
+  targetSize: { width: 40, height: 20 },
   rot: 0,
   flip: 0,
   style: { opacity: 0.5, saturation: 0.2, contrast: 1.2 },
+};
+
+const rectOf = (value: ImageValue) => {
+  const r = imageRect(value);
+  return { x: r.x, y: r.y, w: r.w, h: r.h };
 };
 
 /** A copy of the fixture: keeps inline props checked against the union fields. */
@@ -71,12 +81,12 @@ describe("isFiniteImage", () => {
 
   test("an empty source or a non-positive side is not", () => {
     expect(isFiniteImage(img({ src: "" }))).toBe(false);
-    expect(isFiniteImage(img({ w: 0 }))).toBe(false);
-    expect(isFiniteImage(img({ h: -3 }))).toBe(false);
+    expect(isFiniteImage(img({ targetSize: { width: 0, height: 20 } }))).toBe(false);
+    expect(isFiniteImage(img({ targetSize: { width: 40, height: -3 } }))).toBe(false);
   });
 
   test("NaN anywhere is not", () => {
-    expect(isFiniteImage(img({ x: Number.NaN }))).toBe(false);
+    expect(isFiniteImage(img({ world: { x: Number.NaN, y: 40 } }))).toBe(false);
     // The constructor snaps `rot` to a quarter turn, so only a hand-built value
     // can carry a NaN here — which is exactly what the guard is for.
     expect(isFiniteImage(img({ rot: Number.NaN as ImageRot }))).toBe(false);
@@ -217,11 +227,12 @@ describe("imageQuad", () => {
       for (const flip of [0, 1] as const) {
         const value = img({ rot, flip });
         const quad = imageQuad(value);
+        const rect = imageRect(value);
         // The shared edge is the diagonal...
-        expect(span(quad[1]!, quad[2]!)).toBeCloseTo(Math.hypot(value.w, value.h), 9);
+        expect(span(quad[1]!, quad[2]!)).toBeCloseTo(Math.hypot(rect.w, rect.h), 9);
         // ...and the strip's outer edges are the rect's sides.
         for (const d of [span(quad[0]!, quad[1]!), span(quad[2]!, quad[3]!)]) {
-          expect([value.w, value.h]).toContainEqual(Math.round(d * 1e9) / 1e9);
+          expect([rect.w, rect.h]).toContainEqual(Math.round(d * 1e9) / 1e9);
         }
       }
     }
@@ -246,12 +257,13 @@ describe("imageQuad", () => {
       for (const flip of [0, 1] as const) {
         const value = img({ rot, flip });
         const quad = imageQuad(value);
+        const rect = imageRect(value);
         const triangleArea = (p: Vec2, q: Vec2, r: Vec2) => Math.abs(area2(p, q, r)) / 2;
         // No overlap: two triangles that tile the rect have exactly its area
         // between them, so anything more means they cover the same ground twice.
         expect(
           triangleArea(quad[0]!, quad[1]!, quad[2]!) + triangleArea(quad[1]!, quad[2]!, quad[3]!),
-        ).toBeCloseTo(value.w * value.h, 9);
+        ).toBeCloseTo(rect.w * rect.h, 9);
         // Interior samples of the rect, built from its own two sides so the
         // rotation and mirror are the model's business, not the test's.
         const [a, b, , d] = imageCorners(value);
@@ -290,13 +302,14 @@ describe("imageQuad", () => {
       [1, 0],
     ]);
     const quad = imageQuad(base);
+    const rect = imageRect(base);
     const uvOf = (u: number, v: number) =>
       quad[IMAGE_QUAD_UVS.findIndex(([cu, cv]) => cu === u && cv === v)];
     // World y runs up, so the picture's top-left is the rect's (x, y+h) corner,
     // and the texture's (0, 0) is what has to land there.
-    expect(uvOf(0, 0)).toEqual({ x: base.x, y: base.y + base.h });
-    expect(uvOf(0, 1)).toEqual({ x: base.x, y: base.y });
-    expect(uvOf(1, 0)).toEqual({ x: base.x + base.w, y: base.y + base.h });
+    expect(uvOf(0, 0)).toEqual({ x: rect.x, y: rect.y + rect.h });
+    expect(uvOf(0, 1)).toEqual({ x: rect.x, y: rect.y });
+    expect(uvOf(1, 0)).toEqual({ x: rect.x + rect.w, y: rect.y + rect.h });
   });
 });
 
@@ -310,7 +323,7 @@ describe("imageAabb", () => {
   });
 
   test("a non-finite rect has no box", () => {
-    expect(imageAabb(img({ x: Number.NaN }))).toBeUndefined();
+    expect(imageAabb(img({ world: { x: Number.NaN, y: 40 } }))).toBeUndefined();
   });
 });
 
@@ -368,16 +381,32 @@ describe("rotateImage / flipImage", () => {
 });
 
 describe("scaleImage", () => {
-  test("scales the rect about the anchor", () => {
+  test("scales the bitmap's size about a world point", () => {
     const scaled = scaleImage(base, { x: 50, y: 40 }, 2);
-    expect(scaled).toMatchObject({ x: -30, y: 0, w: 80, h: 40 });
+    expect(scaled.targetSize).toEqual({ width: 80, height: 40 });
+    // The anchor pixel moves with the picture: it is a point *of* the picture.
+    expect(scaled.world).toEqual({ x: 50 + (10 - 50) * 2, y: 40 + (40 - 40) * 2 });
   });
 
-  test("the anchor corner does not move", () => {
-    const anchor = { x: 50, y: 40 };
-    const scaled = scaleImage(base, anchor, 2.5);
-    // Corner 2 is the (x+w, y+h) corner, which is where the anchor sits.
-    expect(imageCorners(scaled)[2]).toEqual(anchor);
+  test("a one-sided target stays one-sided, so the aspect keeps inferring", () => {
+    const one = img({ targetSize: { width: 40 } });
+    expect(scaleImage(one, { x: 0, y: 0 }, 0.5).targetSize).toEqual({ width: 20 });
+  });
+
+  test("the anchor's own world point does not move", () => {
+    const about = { x: 0, y: 0 };
+    const anchored = img({ world: about });
+    expect(scaleImage(anchored, about, 2.5).world).toEqual(about);
+  });
+
+  test("the scaled rect is the rect scaled about the point", () => {
+    const about = { x: 50, y: 40 };
+    const before = rectOf(base);
+    const after = rectOf(scaleImage(base, about, 2));
+    expect(after.x).toBeCloseTo(about.x + (before.x - about.x) * 2, 9);
+    expect(after.y).toBeCloseTo(about.y + (before.y - about.y) * 2, 9);
+    expect(after.w).toBeCloseTo(before.w * 2, 9);
+    expect(after.h).toBeCloseTo(before.h * 2, 9);
   });
 
   test("a quarter turn in either order is the same picture", () => {

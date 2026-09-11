@@ -420,10 +420,11 @@ describe("image pick", () => {
     value: {
       kind: "image",
       src: "/assets/gear-9f3a2c11.png",
-      x: 0,
-      y: 0,
-      w: 4,
-      h: 2,
+      // The rect is (0, 0) to (4, 2): the bitmap's top-left anchored at (0, 2).
+      world: { x: 0, y: 2 },
+      anchor: { x: 0, y: 0 },
+      imageSize: { width: 4, height: 2 },
+      targetSize: { width: 4, height: 2 },
       rot: 0,
       flip: 0,
       style: { opacity: 0.4, saturation: 1, contrast: 1 },
@@ -492,7 +493,10 @@ describe("image pick", () => {
   });
 
   test("a collapsed or sourceless image never picks", () => {
-    const collapsed: TraceNode = { ...IMG, value: { ...IMG.value, w: 0 } };
+    const collapsed: TraceNode = {
+      ...IMG,
+      value: { ...IMG.value, targetSize: { width: 0, height: 2 } },
+    };
     const sourceless: TraceNode = { ...IMG, value: { ...IMG.value, src: "" } };
     expect(isFiniteTrace(collapsed)).toBe(false);
     expect(isFiniteTrace(sourceless)).toBe(false);

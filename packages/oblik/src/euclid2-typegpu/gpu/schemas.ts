@@ -237,8 +237,18 @@ export const ImageInst = struct({
   b: vec2f,
   c: vec2f,
   d: vec2f,
+  /** The pre-rotation rect's world size — what turns the uv border into a world
+   * distance for the selection outline. */
+  size: vec2f,
   opacity: f32,
   saturation: f32,
   contrast: f32,
+  /** The node's own outline: rgb, and an alpha of 0 for "no outline". A
+   * reference has no ink of its own, so unlike a fill it carries none until it
+   * is hovered or selected — that band *is* its selection chrome. */
+  edge: vec4f,
+  /** Outline width in CSS px, measured inward from the quad's border. Converted
+   * in the shader through the frame, so a zoom writes no records. */
+  edgePx: f32,
 });
 export type ImageInstValue = Infer<typeof ImageInst>;

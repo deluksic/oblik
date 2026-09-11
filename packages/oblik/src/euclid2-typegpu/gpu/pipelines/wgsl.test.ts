@@ -169,4 +169,20 @@ describe("image WGSL", () => {
     // than being interpolated corner to corner.
     expect(occurrences(code, "@interpolate(flat) style")).toBe(2);
   });
+
+  /**
+   * The selection outline is a band inside the quad's border, and a *cold*
+   * reference carries none: `edge.w` is 0, so the band's coverage multiplies to
+   * nothing and the fragment is the two mixes it always was. The width is CSS px
+   * converted through the frame, so a zoom never rewrites a record.
+   */
+  test("the outline band is px-wide, inward, and off when cold", () => {
+    expect(code).toContain("edgePx * worldPerPx(scale)");
+    // Distance to the nearest border, in bands, from the rect's own size...
+    expect(code).toContain("min((min(uv.x, (1f - uv.x)) * (size.x / band))");
+    expect(code).toContain("min(uv.y, (1f - uv.y)) * (size.y / band)");
+    // ...and the edge's own alpha is what switches it off.
+    expect(occurrences(code, "* _arg_0.edge.w")).toBe(1);
+    expect(occurrences(code, "@interpolate(flat) edge")).toBe(4);
+  });
 });

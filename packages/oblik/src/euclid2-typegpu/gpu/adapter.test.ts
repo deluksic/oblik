@@ -107,10 +107,11 @@ function imageValue(over: Partial<ImageValue> = {}): ImageValue {
   return {
     kind: "image",
     src: "/assets/gear-9f3a2c11.png",
-    x: 0,
-    y: 0,
-    w: 4,
-    h: 2,
+    // The rect is (0, 0) to (4, 2): the bitmap's top-left anchored at (0, 2).
+    world: { x: 0, y: 2 },
+    anchor: { x: 0, y: 0 },
+    imageSize: { width: 4, height: 2 },
+    targetSize: { width: 4, height: 2 },
     rot: 0,
     flip: 0,
     style: { opacity: 0.4, saturation: 0.2, contrast: 1.1 },
@@ -755,7 +756,9 @@ describe("adapter image routing", () => {
   test("a moved reference rewrites its own record only", () => {
     const adapter = createAdapter();
     adapter.tick(input([imageNode("o_img"), imageNode("o_other")]));
-    const patch = adapter.tick(input([imageNode("o_img", { x: 3 }), imageNode("o_other")]));
+    const patch = adapter.tick(
+      input([imageNode("o_img", { world: { x: 3, y: 2 } }), imageNode("o_other")]),
+    );
 
     expect(patch.images.writes).toHaveLength(1);
     expect(patch.images.writes[0]!.idx).toBe(0);
@@ -772,8 +775,44 @@ describe("adapter image routing", () => {
     expect(patch.stats.total).toBe(1);
   });
 
+  /**
+   * A reference has no ink of its own, so its **selection chrome is its
+   * outline** — the band the image fragment draws inside the quad's border. It
+   * carries one only while hot, in the state colour every other node's chrome
+   * uses, and the selected weight is the one selected strokes get.
+   */
+  test("hovering or selecting adds the outline band, cold carries none", () => {
+    const adapter = createAdapter();
+    const trace = [imageNode("o_img")];
+    const cold = adapter.tick(input(trace)).images.writes[0]!.value;
+    expect(cold.edge.w).toBe(0);
+    expect(cold.edgePx).toBe(0);
+
+    const hovered = adapter.tick(input(trace, { hoverKey: "o_img:0" })).images.writes[0]!.value;
+    expect(hovered.edge.w).toBe(1);
+    expect(hovered.edgePx).toBeGreaterThan(0);
+
+    const selected = adapter.tick(input(trace, { selectedKey: "o_img:0" })).images.writes[0]!.value;
+    expect(selected.edge.w).toBe(1);
+    expect(selected.edgePx).toBeGreaterThan(hovered.edgePx);
+    // The state colour changes with it: the ring on hover, the selected paint
+    // once selected.
+    expect([selected.edge.x, selected.edge.y, selected.edge.z]).not.toEqual([
+      hovered.edge.x,
+      hovered.edge.y,
+      hovered.edge.z,
+    ]);
+  });
+
+  test("the outline band knows the rect it sits in", () => {
+    const inst = createAdapter().tick(input([imageNode("o_img")])).images.writes[0]!.value;
+    expect([inst.size.x, inst.size.y]).toEqual([4, 2]);
+  });
+
   test("a collapsed reference is never recorded", () => {
-    const patch = createAdapter().tick(input([imageNode("o_img", { w: 0 })]));
+    const patch = createAdapter().tick(
+      input([imageNode("o_img", { targetSize: { width: 0, height: 2 } })]),
+    );
     expect(patch.images.draws).toHaveLength(0);
     expect(patch.stats.total).toBe(0);
   });

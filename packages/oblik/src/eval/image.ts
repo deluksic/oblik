@@ -26,10 +26,17 @@ import type { Aabb, Vec2 } from "../geom";
 export type ImageValue = {
   kind: "image";
   src: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  /** Where the reference is pinned — `anchor` is the bitmap pixel that sits
+   * there, and the two place the **pre-rotation** rect (see the charter's open
+   * question about making the anchor the pivot too). */
+  world: Vec2;
+  anchor: Vec2;
+  imageSize: { width: number; height: number };
+  /** Exactly the sides the call stated: one of them is derived downstream from
+   * the other and the bitmap's aspect, which is why the value keeps the
+   * authored form rather than a resolved rect. `imageRect` is the conversion,
+   * and the inspector edits what the source says. */
+  targetSize: { width?: number; height?: number };
   rot: ImageRot;
   flip: 0 | 1;
   style: ImageStyle;
@@ -121,8 +128,13 @@ function dial(value: unknown, fallback: number): number {
 /** The world rect a reference occupies: its minimum corner, growing `+w`/`+h`. */
 export type ImageRect = { x: number; y: number; w: number; h: number };
 
-function num(value: unknown): number {
+export function num(value: unknown): number {
   return typeof value === "number" ? value : Number.NaN;
+}
+
+/** A number, or a default when the prop is not one. */
+export function numOr(value: unknown, fallback: number): number {
+  return typeof value === "number" ? value : fallback;
 }
 
 /** A rect that nothing can draw, pick or bound — the shape every bad call takes. */
@@ -186,15 +198,14 @@ export function isImage(value: unknown): value is ImageValue {
  * silently coerced — the same contract as a NaN circle.
  */
 export function isFiniteImage(value: ImageValue): boolean {
+  const rect = imageRect(value);
   return (
     typeof value.src === "string" &&
     value.src.length > 0 &&
-    Number.isFinite(value.x) &&
-    Number.isFinite(value.y) &&
-    Number.isFinite(value.w) &&
-    Number.isFinite(value.h) &&
-    value.w > 0 &&
-    value.h > 0 &&
+    Number.isFinite(rect.x) &&
+    Number.isFinite(rect.y) &&
+    rect.w > 0 &&
+    rect.h > 0 &&
     Number.isFinite(value.rot) &&
     Number.isFinite(value.flip) &&
     Number.isFinite(value.style.opacity) &&
@@ -234,13 +245,14 @@ function quarterTurns(rot: number): number {
  * the shader's uv table are both written against that order.
  */
 export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
-  const cx = value.x + value.w / 2;
-  const cy = value.y + value.h / 2;
+  const rect = imageRect(value);
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
   const k = quarterTurns(value.rot);
   const cos = ROT_COS[k]!;
   const sin = ROT_SIN[k]!;
-  const hw = value.w / 2;
-  const hh = value.h / 2;
+  const hw = rect.w / 2;
+  const hh = rect.h / 2;
   const at = (dx: number, dy: number): Vec2 => ({
     x: cx + dx * cos - dy * sin,
     y: cy + dx * sin + dy * cos,
@@ -307,8 +319,9 @@ export function imageAabb(value: ImageValue): Aabb | undefined {
  * `distToRegion`, so an image picks like the filled thing it is.
  */
 export function distToImage(value: ImageValue, world: Vec2): number {
-  const cx = value.x + value.w / 2;
-  const cy = value.y + value.h / 2;
+  const rect = imageRect(value);
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
   const k = quarterTurns(value.rot);
   const cos = ROT_COS[k]!;
   const sin = ROT_SIN[k]!;
@@ -317,8 +330,8 @@ export function distToImage(value: ImageValue, world: Vec2): number {
   // World → the rect's own frame: the inverse of the rotation `imageCorners` applies.
   const lx = dx * cos + dy * sin;
   const ly = -dx * sin + dy * cos;
-  const ox = Math.abs(lx) - value.w / 2;
-  const oy = Math.abs(ly) - value.h / 2;
+  const ox = Math.abs(lx) - rect.w / 2;
+  const oy = Math.abs(ly) - rect.h / 2;
   if (ox <= 0 && oy <= 0) return 0;
   const gx = ox > 0 ? ox : 0;
   const gy = oy > 0 ? oy : 0;
@@ -340,12 +353,20 @@ export function flipImage(value: ImageValue): ImageValue {
  * pre-rotation rect about `anchor` is the same picture as scaling the visible
  * quad about it. This is what measure mode commits.
  */
-export function scaleImage(value: ImageValue, anchor: Vec2, k: number): ImageValue {
+export function scaleImage(value: ImageValue, about: Vec2, k: number): ImageValue {
+  const { width, height } = value.targetSize;
   return {
     ...value,
-    x: anchor.x + (value.x - anchor.x) * k,
-    y: anchor.y + (value.y - anchor.y) * k,
-    w: value.w * k,
-    h: value.h * k,
+    // `world` is a point *of* the picture — the anchor pixel — so scaling the
+    // picture about `about` moves it exactly this far, and both stated sides
+    // scale, which is what keeps a one-sided target in proportion.
+    world: {
+      x: about.x + (value.world.x - about.x) * k,
+      y: about.y + (value.world.y - about.y) * k,
+    },
+    targetSize: {
+      ...(width !== undefined ? { width: width * k } : {}),
+      ...(height !== undefined ? { height: height * k } : {}),
+    },
   };
 }

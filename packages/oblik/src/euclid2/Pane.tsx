@@ -21,6 +21,7 @@ import {
 import { SelectionSidebar } from "../host/SelectionSidebar";
 import type { Annotation } from "../source/analyze";
 import type { MentionFile } from "../source/mention";
+import { freshSiteId } from "../source/stamp";
 import { imageArgs, importImage } from "./importImage";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
@@ -302,7 +303,12 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       return;
     }
     setWriteError(undefined);
-    await insert({ from: "image", args: imageArgs(result.url, result.opts) });
+    // The id is minted here rather than server-side so the node that was just
+    // written can be selected: a pasted reference arrives selected, which is
+    // what makes the inspector and its outline useful immediately.
+    const id = freshSiteId();
+    await insert({ from: "image", args: imageArgs(result.url, result.opts), id });
+    setSelectedKey(`${id}:0`);
   }
 
   async function insert(job: InsertJob) {

@@ -333,6 +333,9 @@ export type InsertJob = {
     | "image";
   args: Expr[];
   bind?: string;
+  /** The site id to write. Omitted, the server mints one — but a caller that
+   * wants to *select* what it just inserted has to know the id. */
+  id?: string;
   patchVertex?: { id: string; index: number };
   /**
    * Present on registered-tool inserts: `from` is the registered name (not a
