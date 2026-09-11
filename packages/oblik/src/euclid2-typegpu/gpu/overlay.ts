@@ -349,16 +349,7 @@ function dashLoop(
   scale: number,
 ): void {
   if (Array.isArray(loop)) {
-    dashChain(
-      strokes,
-      circles,
-      disks,
-      closeChain(loop) ?? loop,
-      color,
-      alpha,
-      halfWidthPx,
-      scale,
-    );
+    dashChain(strokes, circles, disks, closeChain(loop) ?? loop, color, alpha, halfWidthPx, scale);
     return;
   }
   dashArc(
@@ -432,10 +423,10 @@ function pushTraceNode(
   const alpha = MUTED_ALPHA * TRACE_BAND;
   const v = node.value;
   if (v.kind === "circle") {
-    const r = Math.abs((v).radius);
+    const r = Math.abs(v.radius);
     circles.push(
       CircleInst({
-        center: vec2f((v).center.x, (v).center.y),
+        center: vec2f(v.center.x, v.center.y),
         radius: r,
         halfPx: halfStrokePx,
         a0: 0,

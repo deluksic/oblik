@@ -5,6 +5,7 @@ import { clamp, dot, max, min, mix, saturate, select, textureSample } from "type
 
 import { worldPerPx } from "../frame";
 import { imageLayout } from "../layout";
+import { edgeCoverage, haloColor } from "./halo";
 
 /** Quad corners per reference (triangle-strip). */
 export const IMAGE_QUAD_VERTICES = 4;
@@ -26,23 +27,24 @@ const toClip = tgpu.fn(
 });
 
 /**
- * The selection outline's coverage: a band `edgePx` CSS px wide measured inward
- * from the quad's border, antialiased at its inner edge.
+ * The reference's selection chrome, in the same two bands a fill's boundary
+ * carries — *literally* the same functions (`halo.ts`), so a selected reference
+ * and a selected region read identically.
  *
- * `size` is the pre-rotation rect's world size, which is what turns the uv
- * distance to a border into a world distance — so the band follows a rotated
- * quad and stays `edgePx` wide on screen at any zoom, because the px→world
- * conversion reads the frame rather than the record.
+ * The only difference is where the distance comes from. A fill has a boundary
+ * walk and gets a signed distance to it; a reference has a quad, so its
+ * distance is the uv distance to the nearest border, scaled to CSS px by the
+ * rect's own world size and the frame's zoom. That conversion in the shader —
+ * not in the record — is what keeps a zoom from rewriting anything, and it is
+ * why the band follows a rotated quad for free.
  */
-const edgeCoverage = tgpu.fn(
-  [vec2f, vec2f, f32, f32],
+const borderPx = tgpu.fn(
+  [vec2f, vec2f, f32],
   f32,
-)((uv, size, edgePx, scale) => {
+)((uv, size, scale) => {
   "use gpu";
-  const band = edgePx * worldPerPx(scale);
-  // Distance to the nearest border measured in bands: <= 1 is inside it.
-  const t = min(min(uv.x, 1 - uv.x) * (size.x / band), min(uv.y, 1 - uv.y) * (size.y / band));
-  return clamp((1 - t) * edgePx + 0.5, 0, 1);
+  const inset = min(min(uv.x, 1 - uv.x) * size.x, min(uv.y, 1 - uv.y) * size.y);
+  return inset / worldPerPx(scale);
 });
 
 /**
@@ -59,8 +61,11 @@ export const imageVertex = tgpu.vertexFn({
     uv: interpolate("linear", vec2f),
     style: interpolate("flat", vec3f),
     edge: interpolate("flat", vec4f),
-    edgePx: interpolate("flat", f32),
+    edgeWidthPx: interpolate("flat", f32),
     size: interpolate("flat", vec2f),
+    haloRing: interpolate("flat", vec4f),
+    haloKnock: interpolate("flat", vec4f),
+    haloHalfPx: interpolate("flat", vec2f),
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
@@ -84,8 +89,11 @@ export const imageVertex = tgpu.vertexFn({
     uv: vec2f(x, y),
     style: vec3f(inst.opacity, inst.saturation, inst.contrast),
     edge: inst.edge,
-    edgePx: inst.edgePx,
+    edgeWidthPx: inst.edgeWidthPx,
     size: inst.size,
+    haloRing: inst.haloRing,
+    haloKnock: inst.haloKnock,
+    haloHalfPx: inst.haloHalfPx,
   };
 });
 
@@ -104,22 +112,35 @@ export const imageFragment = tgpu.fragmentFn({
     uv: interpolate("linear", vec2f),
     style: interpolate("flat", vec3f),
     edge: interpolate("flat", vec4f),
-    edgePx: interpolate("flat", f32),
+    edgeWidthPx: interpolate("flat", f32),
     size: interpolate("flat", vec2f),
+    haloRing: interpolate("flat", vec4f),
+    haloKnock: interpolate("flat", vec4f),
+    haloHalfPx: interpolate("flat", vec2f),
   },
   out: vec4f,
-})(({ uv, style, edge, edgePx, size }) => {
+})(({ uv, style, edge, edgeWidthPx, size, haloRing, haloKnock, haloHalfPx }) => {
   "use gpu";
   const sampled = textureSample(imageLayout.$.tex, imageLayout.$.samp, uv);
   const grey = mix(vec3f(dot(sampled.rgb, LUMA)), sampled.rgb, style.y);
   const base = saturate((grey - MID) * style.z + MID);
   const fa = sampled.a * style.x;
-  // The outline goes *over* the bitmap with straight alpha — the same
-  // formulation the fill's own outline uses — and a zero edge alpha (a cold
-  // reference) leaves the fragment exactly as it was.
-  const ea = edgeCoverage(uv, size, edgePx, imageLayout.$.frame.scale) * edge.w;
-  const alpha = ea + fa * (1 - ea);
-  return vec4f((edge.xyz * ea + base * (fa * (1 - ea))) / max(alpha, 1e-6), alpha);
+
+  // Same convention as a fill's boundary: the distance is signed, negative
+  // inside, here measured in CSS px from the quad's border inward.
+  const d = -borderPx(uv, size, imageLayout.$.frame.scale);
+  const band = haloColor(d, haloRing, haloKnock, haloHalfPx);
+  // The node's own outline sits above the halo, as it does on a fill. Only its
+  // inner half can land — the outer half is outside the quad — so the band runs
+  // `edgeWidthPx / 2` in from the border.
+  const t = clamp(edgeCoverage(d, edgeWidthPx) / max(band.w, 1e-6), 0, 1) * edge.w;
+  const chrome = vec4f(mix(band.xyz, edge.xyz, t), band.w);
+
+  // Both over the bitmap with straight alpha, the formulation `haloWithEdge`
+  // uses: a cold reference has a zero-coverage chrome and comes out exactly as
+  // the two mixes it always was.
+  const alpha = chrome.w + fa * (1 - chrome.w);
+  return vec4f((chrome.xyz * chrome.w + base * (fa * (1 - chrome.w))) / max(alpha, 1e-6), alpha);
 });
 
 const alphaBlend: GPUBlendState = {

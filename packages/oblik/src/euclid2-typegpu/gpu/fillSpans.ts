@@ -109,7 +109,7 @@ export function islandsOfValue(value: Region | Polygon | CsgOperand): Region[] {
     const p = value;
     const outer = chainEdges(p.boundary);
     if (outer.length === 0) return [];
-    return [{ kind: "region", outer, holes: p.holes  }];
+    return [{ kind: "region", outer, holes: p.holes }];
   }
   return evaluateRegions(value);
 }

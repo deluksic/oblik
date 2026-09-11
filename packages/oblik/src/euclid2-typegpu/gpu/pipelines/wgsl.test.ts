@@ -164,25 +164,37 @@ describe("image WGSL", () => {
     expect(code).toContain("- 0.5f) * ");
     expect(code).toContain("saturate(");
     expect(code).toContain("sampled.a * ");
-    expect(code).not.toContain("paper");
+    // Nothing reads a paper *colour* any more: the one that used to be mixed in
+    // for `fade` is gone, and fading is alpha against the cleared attachment.
+    // (The halo's knockout band carries the paper colour in its own field.)
+    expect(code).not.toContain("theme.paper");
+    expect(code).toContain("let alpha = (chrome.w + ");
     // The dials are per-instance constants, so they ride a flat varying rather
     // than being interpolated corner to corner.
     expect(occurrences(code, "@interpolate(flat) style")).toBe(2);
   });
 
   /**
-   * The selection outline is a band inside the quad's border, and a *cold*
-   * reference carries none: `edge.w` is 0, so the band's coverage multiplies to
-   * nothing and the fragment is the two mixes it always was. The width is CSS px
-   * converted through the frame, so a zoom never rewrites a record.
+   * The selection chrome is the *same* code a fill's boundary runs: the fragment
+   * calls `haloColor` and `edgeCoverage` from `halo.ts` on a distance measured
+   * from the quad's border. The only new thing is that distance — CSS px, from
+   * the rect's own size and the frame's zoom, so a zoom never rewrites a record.
+   * A cold reference has zero-coverage chrome and comes out as the two mixes.
    */
-  test("the outline band is px-wide, inward, and off when cold", () => {
-    expect(code).toContain("edgePx * worldPerPx(scale)");
-    // Distance to the nearest border, in bands, from the rect's own size...
-    expect(code).toContain("min((min(uv.x, (1f - uv.x)) * (size.x / band))");
-    expect(code).toContain("min(uv.y, (1f - uv.y)) * (size.y / band)");
-    // ...and the edge's own alpha is what switches it off.
-    expect(occurrences(code, "* _arg_0.edge.w")).toBe(1);
-    expect(occurrences(code, "@interpolate(flat) edge")).toBe(4);
+  test("the chrome is the fill's halo, driven by a border distance in px", () => {
+    expect(occurrences(code, "fn haloColor(")).toBe(1);
+    expect(occurrences(code, "fn edgeCoverage(")).toBe(1);
+    expect(occurrences(code, "haloColor(")).toBe(2);
+    expect(occurrences(code, "edgeCoverage(")).toBe(2);
+    // The distance: the uv inset scaled to px through the rect's world size.
+    expect(code).toContain(
+      "min((min(uv.x, (1f - uv.x)) * size.x), (min(uv.y, (1f - uv.y)) * size.y))",
+    );
+    expect(code).toContain("let inset =");
+    expect(code).toContain("(inset / worldPerPx(scale))");
+    // Negative inside, the convention both fill functions take.
+    expect(code).toContain("let d = -(borderPx(");
+    expect(code).toContain("edgeWidthPx");
+    expect(occurrences(code, "@interpolate(flat) haloRing")).toBe(2);
   });
 });

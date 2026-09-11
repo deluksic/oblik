@@ -781,30 +781,44 @@ describe("adapter image routing", () => {
    * carries one only while hot, in the state colour every other node's chrome
    * uses, and the selected weight is the one selected strokes get.
    */
-  test("hovering or selecting adds the outline band, cold carries none", () => {
+  test("hovering or selecting lights the same chrome a hot fill carries", () => {
     const adapter = createAdapter();
     const trace = [imageNode("o_img")];
     const cold = adapter.tick(input(trace)).images.writes[0]!.value;
     expect(cold.edge.w).toBe(0);
-    expect(cold.edgePx).toBe(0);
+    expect(cold.haloRing.w).toBe(0);
+    expect(cold.haloKnock.w).toBe(0);
 
     const hovered = adapter.tick(input(trace, { hoverKey: "o_img:0" })).images.writes[0]!.value;
+    // Hover: the ring alone, paper-backed at half opacity, no knockout gap yet.
+    expect(hovered.haloRing.w).toBeCloseTo(0.5, 6);
+    expect(hovered.haloKnock.w).toBe(0);
     expect(hovered.edge.w).toBe(1);
-    expect(hovered.edgePx).toBeGreaterThan(0);
+    expect(hovered.edgeWidthPx).toBeGreaterThan(0);
+    expect(hovered.haloHalfPx.y).toBeGreaterThan(0);
 
     const selected = adapter.tick(input(trace, { selectedKey: "o_img:0" })).images.writes[0]!.value;
+    // Selected: the same ring opaque, plus the paper knockout just inside it —
+    // and the node's own outline switches to the selected paint.
+    expect(selected.haloRing.w).toBe(1);
+    expect(selected.haloKnock.w).toBe(1);
+    expect(selected.haloHalfPx.x).toBeGreaterThan(0);
+    // The node's own outline is the state colour in both: it is the halo that
+    // says which state it is.
     expect(selected.edge.w).toBe(1);
-    expect(selected.edgePx).toBeGreaterThan(hovered.edgePx);
-    // The state colour changes with it: the ring on hover, the selected paint
-    // once selected.
-    expect([selected.edge.x, selected.edge.y, selected.edge.z]).not.toEqual([
-      hovered.edge.x,
-      hovered.edge.y,
-      hovered.edge.z,
-    ]);
   });
 
-  test("the outline band knows the rect it sits in", () => {
+  test("a drag suppresses the halo and keeps the outline, like every other node", () => {
+    const adapter = createAdapter();
+    const trace = [imageNode("o_img")];
+    const dragging = adapter.tick(input(trace, { hoverKey: "o_img:0", showHalos: false })).images
+      .writes[0]!.value;
+    expect(dragging.haloRing.w).toBe(0);
+    expect(dragging.haloKnock.w).toBe(0);
+    expect(dragging.edge.w).toBe(1);
+  });
+
+  test("the band knows the rect it sits in", () => {
     const inst = createAdapter().tick(input([imageNode("o_img")])).images.writes[0]!.value;
     expect([inst.size.x, inst.size.y]).toEqual([4, 2]);
   });

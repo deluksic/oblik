@@ -328,28 +328,6 @@ export function createAdapter(): Adapter {
       if (!imageKeys.has(key)) lastImage.delete(key);
     }
 
-    // --- references (the backdrop). One slot per node, in tape order; the
-    // --- draw list pairs each slot with the source whose texture paints it.
-    const imageWrites: { idx: number; value: ImageInstValue }[] = [];
-    const imageDraws: { slot: number; src: string }[] = [];
-    for (const n of images) {
-      const key = nodeKey(n);
-      const slot = imagePool.alloc(key, 1);
-      if (slot === undefined) continue;
-      const inst = imageInstance(
-        n.value,
-        colors,
-        isHot(n, input.hoverKey, input.selectedKey),
-        isSelected(n, input.selectedKey),
-        strokePx,
-        // The same weight a selected stroke's outline gets.
-        overlayBands(strokePx, { selected: true }).outline,
-      );
-      if (diff(lastImage, key, slot, encodeImage(inst)))
-        imageWrites.push({ idx: slot, value: inst });
-      imageDraws.push({ slot, src: n.value.src });
-    }
-
     const white = (n: TraceNode) => isHot(n, input.hoverKey, input.selectedKey);
 
     // --- strokes + circles (ink band). Five draw-order bands per kind mirror
@@ -379,6 +357,30 @@ export function createAdapter(): Adapter {
     // selected overlayBands pass is what points/ink chrome share upstream).
     const outlineHalfPx = overlayBands(strokePx, { selected: true }).outline / 2;
     const knockoutHalfPx = overlayBands(strokePx, { selected: true }).knockout / 2;
+
+    // --- references (the backdrop). One slot per node, in tape order; the
+    // --- draw list pairs each slot with the source whose texture paints it.
+    const imageWrites: { idx: number; value: ImageInstValue }[] = [];
+    const imageDraws: { slot: number; src: string }[] = [];
+    for (const n of images) {
+      const key = nodeKey(n);
+      const slot = imagePool.alloc(key, 1);
+      if (slot === undefined) continue;
+      const inst = imageInstance(
+        n.value,
+        colors,
+        isHot(n, input.hoverKey, input.selectedKey),
+        isSelected(n, input.selectedKey),
+        input.showHalos,
+        strokePx,
+        outlineHalfPx,
+        knockoutHalfPx,
+      );
+      if (diff(lastImage, key, slot, encodeImage(inst)))
+        imageWrites.push({ idx: slot, value: inst });
+      imageDraws.push({ slot, src: n.value.src });
+    }
+
     // A fill's own outline is the construction stroke width, like every edge —
     // and it straddles the boundary, so half of it sits outside the silhouette.
     const edgeWidthPx = strokePx;
@@ -1257,23 +1259,34 @@ function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
   return f;
 }
 
-const NO_EDGE = vec4f(0, 0, 0, 0);
-
-/** One reference quad: the four corners in strip order (`rot`/`flip` already
- * folded in by `eval/image.ts`), the three style dials, and — only while the
- * node is hot — its selection outline, in the same state colours every other
- * node's chrome uses. */
+/**
+ * One reference quad: the four corners in strip order (`rot`/`flip` already
+ * folded in by `eval/image.ts`), the three style dials, and — while the node is
+ * hot — the *same* chrome a hot fill carries: `haloWrites` for the paper-backed
+ * ring and its knockout gap, `edgeWrites` for the node's own outline in the
+ * state colour every other node's ink uses.
+ *
+ * A cold reference carries neither. A fill's own outline is always on — ink
+ * when cold — because it *is* the fill's ink; a reference has no ink, so a
+ * border around every one of them would be noise.
+ */
 function imageInstance(
   value: ImageValue,
   colors: AdapterInput["colors"],
   hot: boolean,
   selected: boolean,
+  showHalos: boolean,
   strokePx: number,
-  selectedOutlinePx: number,
+  outlineHalfPx: number,
+  knockoutHalfPx: number,
 ): ImageInstValue {
   const [a, b, c, d] = imageQuad(value);
   const rect = imageRect(value);
-  const edge = hot ? edgeWrites(selected ? colors.selectedPaint : colors.ring, 0).color : NO_EDGE;
+  const halo =
+    showHalos && hot
+      ? haloWrites(selected, colors.ring, colors.paper, outlineHalfPx, knockoutHalfPx)
+      : NO_HALO;
+  const edge = edgeWrites(hot ? colors.selectedPaint : colors.ink, strokePx);
   return ImageInst({
     a: vec2f(a.x, a.y),
     b: vec2f(b.x, b.y),
@@ -1283,32 +1296,33 @@ function imageInstance(
     opacity: value.style.opacity,
     saturation: value.style.saturation,
     contrast: value.style.contrast,
-    edge: vec4f(edge.x, edge.y, edge.z, hot ? 1 : 0),
-    edgePx: hot ? (selected ? selectedOutlinePx : strokePx) : 0,
+    edge: vec4f(edge.color.x, edge.color.y, edge.color.z, hot ? 1 : 0),
+    edgeWidthPx: edge.halfPx * 2,
+    haloRing: halo.ring,
+    haloKnock: halo.knock,
+    haloHalfPx: halo.halfPx,
   });
 }
 
 function encodeImage(inst: ImageInstValue): Float64Array {
-  return Float64Array.of(
-    inst.a.x,
-    inst.a.y,
-    inst.b.x,
-    inst.b.y,
-    inst.c.x,
-    inst.c.y,
-    inst.d.x,
-    inst.d.y,
-    inst.size.x,
-    inst.size.y,
-    inst.opacity,
-    inst.saturation,
-    inst.contrast,
-    inst.edge.x,
-    inst.edge.y,
-    inst.edge.z,
-    inst.edge.w,
-    inst.edgePx,
-  );
+  const f = new Float64Array(28);
+  let j = 0;
+  f[j++] = inst.a.x;
+  f[j++] = inst.a.y;
+  f[j++] = inst.b.x;
+  f[j++] = inst.b.y;
+  f[j++] = inst.c.x;
+  f[j++] = inst.c.y;
+  f[j++] = inst.d.x;
+  f[j++] = inst.d.y;
+  f[j++] = inst.size.x;
+  f[j++] = inst.size.y;
+  f[j++] = inst.opacity;
+  f[j++] = inst.saturation;
+  f[j++] = inst.contrast;
+  j = encodeEdge(f, j, { color: inst.edge, halfPx: inst.edgeWidthPx / 2 });
+  encodeHalo(f, j, { ring: inst.haloRing, knock: inst.haloKnock, halfPx: inst.haloHalfPx });
+  return f;
 }
 
 function encodePoints(discs: readonly PointInstValue[]): Float64Array {

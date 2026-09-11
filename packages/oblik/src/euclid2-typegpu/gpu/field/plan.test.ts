@@ -4,11 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
-import { walkEdges } from "#geom/region";
-
 import type { CsgOperand, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { operandAabb, operandSdf, polarRepeatValue } from "#geom/csg2";
+import { walkEdges } from "#geom/region";
 
 import { evaluate } from "../../../eval/evaluate";
 import type { Scene } from "../../../eval/scene";

@@ -5,10 +5,9 @@ import { fileURLToPath } from "node:url";
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
-import { walkEdges } from "#geom/region";
-
 import type { CsgOperand, Region, Vec2 } from "#geom";
 import { isFillGeom, polarRepeatValue } from "#geom/csg2";
+import { walkEdges } from "#geom/region";
 
 import { evaluate } from "../../../eval/evaluate";
 import type { Scene } from "../../../eval/scene";
@@ -54,8 +53,7 @@ async function csgCases(): Promise<Case[]> {
     for (const n of trace) {
       if (!isFillGeom(n.value) || n.value.kind !== "csg2") continue;
       const plan = fieldPlan(n.value);
-      if (plan)
-        cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
+      if (plan) cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
     }
   }
   return cases;

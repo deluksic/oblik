@@ -243,12 +243,19 @@ export const ImageInst = struct({
   opacity: f32,
   saturation: f32,
   contrast: f32,
-  /** The node's own outline: rgb, and an alpha of 0 for "no outline". A
+  /** The node's own outline: rgb = state colour, a = 0 for "no outline". A
    * reference has no ink of its own, so unlike a fill it carries none until it
-   * is hovered or selected — that band *is* its selection chrome. */
+   * is hovered or selected. */
   edge: vec4f,
-  /** Outline width in CSS px, measured inward from the quad's border. Converted
-   * in the shader through the frame, so a zoom writes no records. */
-  edgePx: f32,
+  /** Outline width in CSS px. */
+  edgeWidthPx: f32,
+  /** The selection chrome, in the very fields a fill's halo uses — the shader
+   * runs the same bands (`halo.ts`) over the quad's border instead of over a
+   * boundary walk: rgb = ring colour, a = opacity; then the paper knockout
+   * band; then (knockout width, ring width) in CSS px, both measured inward.
+   * A reference carries none until it is hot. */
+  haloRing: vec4f,
+  haloKnock: vec4f,
+  haloHalfPx: vec2f,
 });
 export type ImageInstValue = Infer<typeof ImageInst>;

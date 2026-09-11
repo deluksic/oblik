@@ -73,7 +73,7 @@ export const haloColor = tgpu.fn(
  * that defined the region (and under the ink drawn there) instead of doubling it
  * with a second line just inside; where the boundary pulls away from the ink —
  * an offset's rounded corners, a hole — it shows on its own. */
-const edgeCoverage = tgpu.fn(
+export const edgeCoverage = tgpu.fn(
   [f32, f32],
   f32,
 )((d, edgeWidth) => {
