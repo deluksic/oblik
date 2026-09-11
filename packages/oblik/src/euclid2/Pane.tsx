@@ -1,8 +1,9 @@
-import { createEffect, createMemo, createSignal, Loading } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 
 import { TypegpuView } from "../euclid2-typegpu/TypegpuView";
 import type { TraceNode } from "../eval/context";
 import { tryEvaluate, type Draft } from "../eval/evaluate";
+import type { ImageValue } from "../eval/image";
 import { assignInv, invMatches } from "../eval/inv";
 import { carryTraceInv, reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { Euclid2Scene } from "../eval/scene";
@@ -18,10 +19,12 @@ import {
   type ScopePick,
   type SelectionDetail,
 } from "../host/selection-detail";
-import { SelectionSidebar } from "../host/SelectionSidebar";
+import { SelectionInspector, SelectionSidebar } from "../host/SelectionSidebar";
 import type { Annotation } from "../source/analyze";
+import type { ImageProps } from "../source/image-edit";
 import type { MentionFile } from "../source/mention";
 import { freshSiteId } from "../source/stamp";
+import { ImageInspector } from "./ImageInspector";
 import { imageArgs, importImage } from "./importImage";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
@@ -311,6 +314,38 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setSelectedKey(`${id}:0`);
   }
 
+  /** Set by the view: where the camera is and how big the pane is, which is
+   * what an import from the picker places against. */
+  const [view, setView] = createSignal(
+    { w: 800, h: 600, scale: 48, x: 0, y: 0 },
+    { equals: false },
+  );
+
+  /** A picked file: the same import the paste and drop paths use, at the middle
+   * of what the user is looking at. */
+  function importPicked(file: File) {
+    void importAt(file, { world: { x: view().x, y: view().y }, view: view() });
+  }
+
+  /** Write reference leaves through the patch endpoint — the only writer a
+   * reference has, since its numbers live inside an options object. */
+  async function patchImage(leaves: ImageProps) {
+    const node = imageNode();
+    if (!node) return;
+    const file = node.module ?? focus().file;
+    const res = await fetch("/__oblik-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file, id: node.id, props: leaves }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
+      setWriteError(body?.error ?? `patch failed (${res.status})`);
+      return;
+    }
+    setWriteError(undefined);
+  }
+
   async function insert(job: InsertJob) {
     const dest = focus();
     const res = await fetch("/__oblik-insert", {
@@ -393,6 +428,13 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";
   });
 
+  /** The selected reference, when the selection is one: that is what the
+   * inspector edits. */
+  const imageNode = createMemo(() => {
+    const node = world().trace.find((n) => traceKey(n) === selectedKey());
+    return node?.value.kind === "image" ? node : undefined;
+  });
+
   return (
     <div class={workspace}>
       <div class={wrap}>
@@ -416,6 +458,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             onPlace={onPlace}
             onCursor={setPlace}
             onImportImage={(file, at) => void importAt(file, at)}
+            onView={setView}
             evalStats={
               evalstats.value()
                 ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
@@ -451,12 +494,23 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       </div>
       <ResizableSidebar>
         <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-          <SelectionSidebar
-            detail={selectionDetail()}
-            onPickScope={pickScope}
-            onExpose={(bind) => void expose(bind)}
-            onOpenFile={(file, line) => void openAt(file, line)}
-          />
+          <SelectionSidebar>
+            <SelectionInspector
+              detail={selectionDetail()}
+              onPickScope={pickScope}
+              onExpose={(bind) => void expose(bind)}
+              onOpenFile={(file, line) => void openAt(file, line)}
+            />
+            <Show when={imageNode()}>
+              {(node) => (
+                <ImageInspector
+                  value={node().value as ImageValue}
+                  onPatch={(leaves) => void patchImage(leaves)}
+                  onImport={importPicked}
+                />
+              )}
+            </Show>
+          </SelectionSidebar>
         </Loading>
       </ResizableSidebar>
     </div>

@@ -1,0 +1,46 @@
+.meta {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--oblik-muted);
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  margin-bottom: 8px;
+}
+
+.dial {
+  display: grid;
+  grid-template-columns: 64px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.dialLabel {
+  color: var(--oblik-muted);
+}
+
+.dialValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.range {
+  width: 100%;
+  accent-color: var(--oblik-accent);
+}
+
+/* The picker is a button: the input is only there to be clicked. */
+.file {
+  display: none;
+}

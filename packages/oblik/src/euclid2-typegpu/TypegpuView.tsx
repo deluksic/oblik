@@ -54,6 +54,9 @@ export type TypegpuViewProps = {
   onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | undefined) => void;
+  /** The live view state, on every change: what the pane needs to place an
+   * import at the middle of what the user is looking at. */
+  onView?: (view: { w: number; h: number; scale: number; x: number; y: number }) => void;
   /** A pasted or dropped bitmap, with where it landed: the world point, and the
    * view it landed in (the pane turns that into a node). */
   onImportImage?: (
@@ -403,6 +406,11 @@ export function TypegpuView(props: TypegpuViewProps) {
     const at = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     importAt(file, screenToWorld(at, camera(), size()));
   }
+
+  createEffect(
+    () => ({ w: size().w, h: size().h, scale: camera().scale, x: camera().x, y: camera().y }),
+    (view) => props.onView?.(view),
+  );
 
   createEffect(
     () => 1,
