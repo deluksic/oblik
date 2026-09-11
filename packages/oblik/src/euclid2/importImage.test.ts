@@ -4,10 +4,13 @@ import {
   checkImage,
   describeDrop,
   droppedImage,
+  droppedPath,
   imageArgs,
   importImage,
+  importImageByPath,
   importImageOpts,
   pastedImage,
+  type TransferLike,
 } from "./importImage";
 
 const PNG = { type: "image/png", name: "Some Gear (2).PNG", size: 4096 };
@@ -214,9 +217,8 @@ describe("importImage", () => {
   });
 
   /**
-   * The browser is the only format oracle, so the decode runs first: a file it
-   * cannot draw never reaches the server, which is what keeps a rejected drop
-   * from leaving an orphan in `public/assets`.
+   * Decode runs first because the browser is the only format oracle: a file it
+   * cannot draw never reaches the server, so a rejected drop leaves no orphan.
    */
   test("a file that does not decode is refused before the upload", async () => {
     const { impl, calls } = fakeFetch(() => ({ ok: true, json: { url: "/assets/x.png" } }));
@@ -300,5 +302,116 @@ describe("importImage", () => {
       ),
     ).toBe("that image has no pixels");
     expect(calls).toHaveLength(0);
+  });
+});
+
+/** A drop from an embedded browser: text payloads, no files. */
+function textDrop(payloads: Record<string, string>): TransferLike {
+  return { getData: (type: string) => payloads[type] ?? "" } as unknown as TransferLike;
+}
+
+describe("droppedPath", () => {
+  test("reads the URI list, comments and CRLF and all", () => {
+    const drop = textDrop({ "text/uri-list": "# 1 file\r\nfile:///work/ref.png\r\n" });
+    expect(droppedPath(drop)).toBe("file:///work/ref.png");
+  });
+
+  test("reads the JSON dialects", () => {
+    const urls = textDrop({ resourceurls: JSON.stringify(["file:///work/ref.png"]) });
+    expect(droppedPath(urls)).toBe("file:///work/ref.png");
+    const code = textDrop({
+      codefiles: JSON.stringify([{ resource: { fsPath: "/work/ref.png" } }]),
+    });
+    expect(droppedPath(code)).toBe("/work/ref.png");
+  });
+
+  test("skips what is not an image and keeps looking", () => {
+    const drop = textDrop({
+      "text/uri-list": "file:///work/notes.md",
+      "text/plain": "/work/ref.PNG",
+    });
+    expect(droppedPath(drop)).toBe("/work/ref.PNG");
+  });
+
+  test("nothing to take from links, words, or the browser's own page drag", () => {
+    expect(droppedPath(undefined)).toBeUndefined();
+    expect(
+      droppedPath(textDrop({ "text/uri-list": "https://example.com/ref.png" })),
+    ).toBeUndefined();
+    expect(droppedPath(textDrop({ "text/plain": "hello" }))).toBeUndefined();
+    expect(droppedPath(textDrop({ codefiles: "not json" }))).toBeUndefined();
+  });
+});
+
+describe("describeDrop", () => {
+  test("quotes the text payload back — that is what says which dialect to add next", () => {
+    const drop = textDrop({ "text/uri-list": "file:///work/notes.md" });
+    const message = describeDrop({ ...drop, files: [], items: [], types: ["text/uri-list"] });
+    expect(message).toContain("file:///work/notes.md");
+  });
+});
+
+function assetFetch(respond: (url: string) => { ok: boolean; status?: number; json?: unknown }) {
+  const calls: string[] = [];
+  const impl = (async (input: unknown) => {
+    calls.push(String(input));
+    const r = respond(String(input));
+    return {
+      ok: r.ok,
+      status: r.status ?? (r.ok ? 200 : 500),
+      json: async () => r.json ?? {},
+      blob: async () => new Blob([new Uint8Array([1, 2, 3])]),
+    } as unknown as Response;
+  }) as unknown as typeof fetch;
+  return { impl, calls };
+}
+
+const AT = { world: { x: 10, y: 20 }, view: VIEW };
+
+describe("importImageByPath", () => {
+  test("asks the dev server to read the path, then decodes the copy it serves", async () => {
+    const { impl, calls } = assetFetch((url) =>
+      url === "/__oblik-import-path"
+        ? { ok: true, json: { url: "/assets/ref-1a2b3c4d.png" } }
+        : { ok: true },
+    );
+    const result = await importImageByPath("file:///work/ref.png", AT, {
+      fetch: impl,
+      decode: async () => ({ width: 800, height: 600 }),
+    });
+    expect(calls).toEqual(["/__oblik-import-path", "/assets/ref-1a2b3c4d.png"]);
+    expect(typeof result).not.toBe("string");
+    if (typeof result === "string") return;
+    expect(result.url).toBe("/assets/ref-1a2b3c4d.png");
+    expect(result.size).toEqual({ width: 800, height: 600 });
+    expect(result.opts.world).toEqual({ x: 10, y: 20 });
+    expect(result.opts.anchor).toEqual({ x: 400, y: 300 });
+    expect(result.rect.w).toBeGreaterThan(0);
+  });
+
+  test("a refusal from the dev server is the message the pane shows", async () => {
+    const { impl } = assetFetch(() => ({
+      ok: false,
+      status: 400,
+      json: { error: "ref.png is outside the project root" },
+    }));
+    const result = await importImageByPath("/elsewhere/ref.png", AT, {
+      fetch: impl,
+      decode: async () => ({ width: 1, height: 1 }),
+    });
+    expect(result).toBe("ref.png is outside the project root");
+  });
+
+  test("a stored asset the browser cannot draw says so", async () => {
+    const { impl } = assetFetch((url) =>
+      url === "/__oblik-import-path" ? { ok: true, json: { url: "/assets/x.png" } } : { ok: true },
+    );
+    const result = await importImageByPath("/work/ref.png", AT, {
+      fetch: impl,
+      decode: async () => {
+        throw new Error("no");
+      },
+    });
+    expect(result).toBe("the browser could not draw that image");
   });
 });

@@ -177,7 +177,14 @@ describe("oblikPlugin hotUpdate", () => {
 
 type Middleware = (req: unknown, res: unknown, next: (err?: unknown) => void) => void;
 
-type EndpointResult = { status: number; body: string; nextCalled: boolean };
+type EndpointResult = {
+  status: number;
+  body: string;
+  /** The response bytes, before any utf8 interpretation. */
+  raw: Buffer;
+  headers: Record<string, string>;
+  nextCalled: boolean;
+};
 
 /** The `url` an upload answered with. */
 function storedUrl(res: EndpointResult): string {
@@ -186,15 +193,17 @@ function storedUrl(res: EndpointResult): string {
 
 /**
  * Drive the plugin's own middleware the way Vite does: call `configureServer`
- * with a server that records what gets registered, then hand the last
- * registration a fake request carrying real bytes.
+ * with a server that records what gets registered, then hand one of them a fake
+ * request carrying real bytes. `pick` chooses which — the last registration is
+ * where the endpoints are, and the asset middleware is first.
  */
-async function callEndpoint(
+async function callMiddleware(
   plugin: Plugin,
   method: string,
   url: string,
-  body: Buffer = Buffer.alloc(0),
+  opts: { body?: Buffer; pick?: (captured: Middleware[]) => Middleware | undefined } = {},
 ): Promise<EndpointResult> {
+  const body = opts.body ?? Buffer.alloc(0);
   const captured: Middleware[] = [];
   const hook = plugin.configureServer;
   if (typeof hook !== "function") {
@@ -208,7 +217,7 @@ async function callEndpoint(
       moduleGraph: fakeGraph([]),
     },
   ]);
-  const mw = captured[captured.length - 1];
+  const mw = (opts.pick ?? ((all: Middleware[]) => all[all.length - 1]))(captured);
   if (!mw) throw new Error("the plugin registered no middleware");
   const req = Readable.from(body.length > 0 ? [body] : []) as unknown as {
     method: string;
@@ -217,15 +226,20 @@ async function callEndpoint(
   req.method = method;
   req.url = url;
   let status = 0;
-  let text = "";
+  let raw: Buffer = Buffer.alloc(0);
   let nextCalled = false;
+  const headers: Record<string, string> = {};
   await new Promise<void>((resolve) => {
     const res = {
       statusCode: 200,
-      setHeader: () => {},
+      setHeader: (name: string, value: unknown) => {
+        headers[name.toLowerCase()] = String(value);
+      },
       end: (chunk?: unknown) => {
         status = res.statusCode;
-        text = chunk === undefined ? "" : String(chunk);
+        raw = Buffer.isBuffer(chunk)
+          ? chunk
+          : Buffer.from(chunk === undefined ? "" : String(chunk));
         resolve();
       },
     };
@@ -234,7 +248,17 @@ async function callEndpoint(
       resolve();
     });
   });
-  return { status, body: text, nextCalled };
+  return { status, body: raw.toString(), raw, headers, nextCalled };
+}
+
+/** The endpoint middleware: the last one the plugin registers. */
+function callEndpoint(
+  plugin: Plugin,
+  method: string,
+  url: string,
+  body: Buffer = Buffer.alloc(0),
+): Promise<EndpointResult> {
+  return callMiddleware(plugin, method, url, { body });
 }
 
 describe("the image endpoints", () => {
@@ -376,6 +400,104 @@ export default defineScene({
     const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
     const res = await callEndpoint(plugin, "POST", "/__oblik-nope", Buffer.from("{}"));
     expect(res.nextCalled).toBe(true);
+  });
+});
+
+function jsonBody(value: unknown): Buffer {
+  return Buffer.from(JSON.stringify(value));
+}
+
+describe("the dropped-path endpoint", () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+
+  test("reads a path inside the root and stores what it finds", async () => {
+    const ref = path.join(appRoot, "ref.png");
+    fs.writeFileSync(ref, PNG);
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-path",
+      jsonBody({ path: `file://${ref}` }),
+    );
+    expect(res.status).toBe(200);
+    const { url } = JSON.parse(res.body) as { url: string };
+    expect(url).toMatch(/^\/assets\/ref-[0-9a-f]{8}\.png$/);
+    expect(fs.readFileSync(path.join(appRoot, "public", url))).toEqual(PNG);
+  });
+
+  test("refuses a path outside the root", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const outside = path.join(tmp, "..", "outside.png");
+    const res = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-path",
+      jsonBody({ path: outside }),
+    );
+    expect(res.status).toBe(400);
+    expect((JSON.parse(res.body) as { error: string }).error).toContain("outside the project root");
+  });
+
+  test("refuses a link, a non-image and a missing body", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const link = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-path",
+      jsonBody({ path: "https://example.com/ref.png" }),
+    );
+    expect(link.status).toBe(400);
+    const notes = path.join(appRoot, "notes.md");
+    fs.writeFileSync(notes, "hi");
+    const other = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-path",
+      jsonBody({ path: notes }),
+    );
+    expect((JSON.parse(other.body) as { error: string }).error).toContain("not an image");
+    const empty = await callEndpoint(plugin, "POST", "/__oblik-import-path");
+    expect(empty.status).toBe(400);
+  });
+});
+
+describe("the asset middleware", () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+
+  test("serves an asset written after startup, which vite's listing cannot see", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const file = path.join(appRoot, "public", "assets", "late-9f3a2c11.png");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, PNG);
+    const res = await callMiddleware(plugin, "GET", "/assets/late-9f3a2c11.png", {
+      pick: (all) => all[0],
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toBe("image/png");
+    expect(res.raw).toEqual(PNG);
+  });
+
+  test("leaves every other request to vite", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callMiddleware(plugin, "GET", "/assets/gone.png", { pick: (all) => all[0] });
+    expect(res.nextCalled).toBe(true);
+    expect(res.status).toBe(0);
+  });
+});
+
+describe("a file already in publicDir", () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x02]);
+
+  test("is imported where it lies, with no second copy", async () => {
+    const ref = path.join(appRoot, "public", "assets", "ref.png");
+    fs.mkdirSync(path.dirname(ref), { recursive: true });
+    fs.writeFileSync(ref, PNG);
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(plugin, "POST", "/__oblik-import-path", jsonBody({ path: ref }));
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toMatchObject({ url: "/assets/ref.png", deduped: true });
+    expect(fs.readdirSync(path.join(appRoot, "public", "assets"))).toEqual(["ref.png"]);
   });
 });
 

@@ -15,8 +15,8 @@ import {
 } from "./catalog";
 import { patchFrame } from "./frame-edit";
 import { patchImageProps } from "./image-edit";
-import { IMAGE_MAX_BYTES } from "./import-image";
-import { writeImageAsset } from "./import-image.server";
+import { IMAGE_MAX_BYTES, mimeForExtension } from "./import-image";
+import { assetFileForUrl, importDroppedFile, writeImageAsset } from "./import-image.server";
 import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { EDITOR_OPEN_DEFAULT, editorArgv, spawnEditor } from "./open-editor.server";
@@ -235,6 +235,25 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
     name: "oblik",
     configureServer(server) {
       server.watcher.add(path.join(appRoot, "src"));
+      // Vite reads `publicDir` once at startup, so an asset an import writes
+      // afterwards never reaches the browser through its own middleware — while
+      // the pane and the renderer both fetch that URL immediately.
+      server.middlewares.use((req, res, next) => {
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          next();
+          return;
+        }
+        const publicDir = server.config.publicDir;
+        const abs = publicDir ? assetFileForUrl(publicDir, req.url) : undefined;
+        if (abs === undefined) {
+          next();
+          return;
+        }
+        const mime = mimeForExtension(path.extname(abs).slice(1));
+        res.setHeader("Content-Type", mime ?? "application/octet-stream");
+        res.setHeader("Content-Length", String(fs.statSync(abs).size));
+        res.end(req.method === "HEAD" ? undefined : fs.readFileSync(abs));
+      });
       if (!fs.existsSync(path.join(server.config.root, "index.html"))) {
         // Serve a shell for "/" so apps can mount with just a main.tsx.
         server.middlewares.use((req, res, next) => {
@@ -398,6 +417,32 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
               return;
             }
             const asset = writeImageAsset(publicDir, query.slug ?? "", query.ext, bytes);
+            json(res, 200, { ok: true, url: asset.url, name: asset.name, deduped: asset.deduped });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-import-path") {
+          let raw = "";
+          try {
+            const body = JSON.parse(await readBody(req)) as { path?: unknown };
+            raw = typeof body.path === "string" ? body.path : "";
+          } catch {
+            json(res, 400, { ok: false, error: "bad request body" });
+            return;
+          }
+          const publicDir = server.config.publicDir;
+          if (!publicDir) {
+            json(res, 500, { ok: false, error: "vite has no publicDir to store assets in" });
+            return;
+          }
+          try {
+            const asset = importDroppedFile(publicDir, workspaceRoot, raw);
+            if (typeof asset === "string") {
+              json(res, 400, { ok: false, error: asset });
+              return;
+            }
             json(res, 200, { ok: true, url: asset.url, name: asset.name, deduped: asset.deduped });
           } catch (err) {
             json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });

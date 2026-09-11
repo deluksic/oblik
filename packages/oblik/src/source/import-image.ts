@@ -1,14 +1,6 @@
 /**
  * The wire contract for importing a raster reference, shared by the browser
- * (paste / drop / picker) and the dev-server endpoint that stores it. Pure — no
- * node, no DOM — so both sides validate against one list and one cap, and a
- * change to either is a single edit.
- *
- * The browser's decode (`createImageBitmap`) is the real acceptance test for a
- * format; this list is the half the server can check without decoding anything.
- * It is deliberately raster-only: an SVG decodes to a bitmap inconsistently
- * (it needs intrinsic dimensions) and would be served from the app's own origin
- * with script intact, which is not a surface this prototype wants to open.
+ * (paste / drop / picker) and the dev-server endpoint that stores it.
  */
 export const IMAGE_EXTENSIONS = [
   "png",
@@ -25,6 +17,9 @@ export type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
 
 /** Both sides enforce it: the client before upload, the endpoint while reading. */
 export const IMAGE_MAX_BYTES = 32 * 1024 * 1024;
+
+/** The same cap, as the number the messages say. */
+export const IMAGE_MAX_MB = Math.floor(IMAGE_MAX_BYTES / (1024 * 1024));
 
 const MIME_EXTENSION: Record<string, ImageExtension> = {
   "image/png": "png",
@@ -46,6 +41,23 @@ export function isImageExtension(ext: string): ext is ImageExtension {
 /** The extension to store a decoded blob under. `undefined` → not a raster we take. */
 export function extensionForMime(type: string): ImageExtension | undefined {
   return MIME_EXTENSION[type.trim().toLowerCase()];
+}
+
+const EXTENSION_MIME: Record<ImageExtension, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+};
+
+/** What to serve an allowlisted extension as. */
+export function mimeForExtension(ext: string): string | undefined {
+  const lower = ext.toLowerCase();
+  return isImageExtension(lower) ? EXTENSION_MIME[lower] : undefined;
 }
 
 /** Fallback for a drop whose `file.type` is empty (common for `.webp`/`.bmp`). */
@@ -75,4 +87,30 @@ export function sanitizeSlug(raw: string): string {
 export function slugFromName(name: string): string {
   const dot = name.lastIndexOf(".");
   return sanitizeSlug(dot > 0 ? name.slice(0, dot) : name);
+}
+
+/**
+ * A drag that carried a *path* rather than bytes: an embedded browser hands a
+ * drop over as a `file://` URI, which the page itself cannot fetch. Returns the
+ * filesystem path for a `file:` URI or an absolute path, and nothing for a link
+ * the dev server must not read.
+ */
+export function dropPathToFile(raw: string): string | undefined {
+  const text = raw.trim().replace(/^["']|["']$/g, "");
+  if (text === "") return undefined;
+  if (/^file:\/\//i.test(text)) {
+    const rest = text.slice("file://".length).split(/[?#]/)[0] ?? "";
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(rest);
+    } catch {
+      return undefined;
+    }
+    // `file:///C:/x.png` keeps its drive letter, `file:///Users/x.png` the
+    // leading slash that makes it absolute; `file://host/share` is neither.
+    const abs = /^\/?[A-Za-z]:[\\/]/.test(decoded) ? decoded.replace(/^\//, "") : decoded;
+    return /^[A-Za-z]:[\\/]/.test(abs) || abs.startsWith("/") ? abs : undefined;
+  }
+  const absolute = /^[A-Za-z]:[\\/]/.test(text) || text.startsWith("\\\\") || text.startsWith("/");
+  return absolute ? text : undefined;
 }

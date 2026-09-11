@@ -2,26 +2,17 @@ import { imageRect, type ImageOpts, type ImageRect, type ImageStyle } from "../e
 import type { Vec2 } from "../geom";
 import type { Expr } from "../source/expr";
 import {
+  dropPathToFile,
   extensionForMime,
   extensionFromName,
   IMAGE_MAX_BYTES,
+  IMAGE_MAX_MB,
   slugFromName,
   type ImageExtension,
 } from "../source/import-image";
 import { fitWorldWidth } from "./camera";
 
-/**
- * Bringing a bitmap in: an `ImageFileLike` in, a scene node out.
- *
- * The halves are deliberately apart. Reading a paste or a drop is pure data
- * shuffling over the DOM's own structures, the gate is pure, and only the
- * upload and the decode are effects — which is why the decode and `fetch` are
- * injected here and the module imports nothing from the DOM.
- *
- * The order matters: **decode, then upload**. The browser is the only format
- * oracle there is, so a file it cannot draw is refused before a single byte
- * reaches the server — no orphan in `public/assets`, nothing to clean up.
- */
+/** Bringing a bitmap in: an `ImageFileLike` in, a scene node out. */
 
 /** Just enough of a `File` to gate one, so the gate is testable off-DOM. */
 export type ImageFileLike = { type: string; name?: string; size: number };
@@ -37,28 +28,26 @@ export type ClipboardItemLike<T extends ImageFileLike> = {
   getAsFile(): T | null | undefined;
 };
 
-/** The transfer shape both readers need: `DataTransfer` satisfies it, and a test
- * can hand over a literal. Generic in the file type, so passing a `DataTransfer`
- * gives back a `File` — no cast at the call site. */
+/** Just enough of a `DataTransfer` for both readers, generic in the file type so
+ * a `DataTransfer` gives back `File`s and a test can hand over a literal. */
 export type TransferLike<T extends ImageFileLike = ImageFileLike> = {
   files?: ArrayLike<T>;
   items?: ArrayLike<ClipboardItemLike<T>>;
+  getData?: (type: string) => string;
 };
 
 /** The look a freshly imported reference gets: the light-table look — the bitmap
  * as printed, desaturated so ink and the grid read over it. */
 export const IMPORT_STYLE: Partial<ImageStyle> = { saturation: 0.15 };
 
-const MAX_MB = Math.floor(IMAGE_MAX_BYTES / (1024 * 1024));
-
 /**
- * The client-side gate, which runs before anything is uploaded. It answers two
- * questions the server cannot: which extension the format is (only this side
- * decoded it) and whether it is worth sending at all.
+ * The client-side gate, which runs before anything is uploaded and answers what
+ * the server cannot: which extension the format is, and whether it is worth
+ * sending at all.
  */
 export function checkImage(file: ImageFileLike): { ext: ImageExtension; slug: string } | string {
   if (!(file.size > 0)) return "that file is empty";
-  if (file.size > IMAGE_MAX_BYTES) return `that image is larger than ${MAX_MB} MB`;
+  if (file.size > IMAGE_MAX_BYTES) return `that image is larger than ${IMAGE_MAX_MB} MB`;
   const ext = extensionForMime(file.type) ?? extensionFromName(file.name ?? "");
   if (!ext) {
     return `${file.name !== undefined && file.name !== "" ? file.name : "that file"} is not a format the browser can draw`;
@@ -69,14 +58,7 @@ export function checkImage(file: ImageFileLike): { ext: ImageExtension; slug: st
   };
 }
 
-/**
- * The image a paste carried, if it carried one.
- *
- * `clipboardData.files` is empty for a pasted bitmap in most browsers and fills
- * only when the clipboard holds a real file (a PNG copied in Finder), so both
- * are read. A paste with no image item is left alone — that is how a text paste
- * stays a text paste.
- */
+/** The image a paste carried, if it carried one. */
 export function pastedImage<T extends ImageFileLike>(
   data: TransferLike<T> | undefined,
 ): T | undefined {
@@ -89,11 +71,8 @@ export function pastedImage<T extends ImageFileLike>(
 }
 
 /**
- * The image a drop carried. Unlike a paste this is usually `files`, but not
- * always: an embedded browser (VS Code's, for one) can hand a drag over as an
- * item list, and a drag from outside the page may carry only a URI list. Both
- * are read — and `describeDrop` is what says so in the status line when neither
- * holds a file, because a drop that quietly does nothing is the worst version.
+ * The image a drop carried. Usually `files`, but not always: an embedded browser
+ * (VS Code's, for one) can hand a drag over as an item list instead.
  */
 export function droppedImage<T extends ImageFileLike>(
   data: TransferLike<T> | undefined,
@@ -106,7 +85,9 @@ export function droppedImage<T extends ImageFileLike>(
   return imageFromFiles(data);
 }
 
-/** What a drop offered, for a message the user can act on. */
+/** What a drop offered, for a message the user can act on. The payload itself is
+ * in there too: a drop from an embedded browser is all text, and what a text
+ * payload says is the only way to tell which link to add next. */
 export function describeDrop(
   data: (TransferLike & { types?: ArrayLike<string> }) | undefined,
 ): string {
@@ -117,10 +98,118 @@ export function describeDrop(
     files > 0 ? `${files} file${files === 1 ? "" : "s"}` : "",
     items > 0 ? `${items} item${items === 1 ? "" : "s"}` : "",
     types.length > 0 ? `types: ${types.join(", ")}` : "",
+    ...DROP_PATH_TYPES.map((type) => snippet(data?.getData?.(type)))
+      .filter((text) => text !== "")
+      .map((text) => `“${text}”`),
   ].filter((part) => part !== "");
   return carried.length === 0
     ? "that drop carried nothing the page could read — use Import image…, or paste the file"
     : `that drop carried no image (${carried.join("; ")}) — use Import image…, or paste the file`;
+}
+
+/** One payload, short enough for a status line. */
+function snippet(text: string | undefined): string {
+  const flat = (text ?? "").replace(/\s+/g, " ").trim();
+  return flat.length > 80 ? `${flat.slice(0, 77)}…` : flat;
+}
+
+/**
+ * A drop that carried a *path*: an embedded browser (VS Code's explorer, for
+ * one) hands the drag over as URIs in several dialects. The first one that names
+ * an image file wins; the server is what decides whether it may read it.
+ */
+export function droppedPath(data: TransferLike | undefined): string | undefined {
+  for (const type of DROP_PATH_TYPES) {
+    const raw = data?.getData?.(type) ?? "";
+    for (const candidate of stringsIn(raw)) {
+      if (dropPathToFile(candidate) !== undefined && extensionFromName(candidate) !== undefined) {
+        return candidate;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** VS Code sets the first two, `resourceurls`/`codefiles` are its own dialects,
+ * and a plain path lands in `text/plain`. */
+const DROP_PATH_TYPES = [
+  "text/uri-list",
+  "application/vnd.code.uri-list",
+  "resourceurls",
+  "codefiles",
+  "text/plain",
+];
+
+/** The strings a payload holds, whether it is JSON (`resourceurls`, `codefiles`)
+ * or one URI per line (`text/uri-list`, where `#` starts a comment). */
+function stringsIn(raw: string): string[] {
+  const text = raw.trim();
+  if (text === "") return [];
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      return flatStrings(JSON.parse(text));
+    } catch {
+      return [];
+    }
+  }
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+}
+
+function flatStrings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(flatStrings);
+  if (typeof value === "object" && value !== null) return Object.values(value).flatMap(flatStrings);
+  return [];
+}
+
+/** Fetch the stored asset and let the browser report its pixels — one decode
+ * path for bytes and for paths. */
+async function stored(
+  url: string,
+  at: { world: Vec2; view: { w: number; h: number; scale: number } },
+  deps: UploadDeps,
+): Promise<ImportedImage | string> {
+  let blob: Blob;
+  try {
+    const res = await deps.fetch(url);
+    if (!res.ok) return `the stored asset could not be read (${res.status})`;
+    blob = await res.blob();
+  } catch {
+    return "the stored asset could not be read";
+  }
+  const size = await deps.decode(blob).catch(() => undefined);
+  if (size === undefined) return "the browser could not draw that image";
+  if (!(size.width > 0) || !(size.height > 0)) return "that image has no pixels";
+  const opts = importImageOpts(at.world, size, at.view);
+  return { url, size, opts, rect: imageRect(opts) };
+}
+
+/** Import a bitmap the drop named by path: the dev server reads and stores it,
+ * then the browser decodes the copy it serves. */
+export async function importImageByPath(
+  path: string,
+  at: { world: Vec2; view: { w: number; h: number; scale: number } },
+  deps: UploadDeps,
+): Promise<ImportedImage | string> {
+  let res: Response;
+  try {
+    res = await deps.fetch("/__oblik-import-path", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+  } catch {
+    return "the dev server did not accept that path";
+  }
+  const body = (await res.json().catch(() => undefined)) as
+    | { url?: string; error?: string }
+    | undefined;
+  if (!res.ok) return body?.error ?? `import failed (${res.status})`;
+  if (body?.url === undefined) return "import failed";
+  return stored(body.url, at, deps);
 }
 
 function itemsOf<T extends ImageFileLike>(
@@ -141,15 +230,8 @@ function imageFromFiles<T extends ImageFileLike>(
   return undefined;
 }
 
-/**
- * Where a freshly imported reference goes: its centre on `world`, at a size that
- * shows the whole bitmap in the view it was dropped into (`fitWorldWidth`).
- *
- * The height is left to `imageSize` and the aspect, so the node keeps the file's
- * proportions on its own. The width is a *stated* world size rather than the
- * pixel count, which is what makes the reference visible the moment it lands;
- * giving it its true scale is measure's job.
- */
+/** The bitmap's centre on `world`, sized to fit the view it landed in — the
+ * height is left to the aspect. Its true scale is measure's job. */
 export function importImageOpts(
   world: Vec2,
   size: DecodedImage,
@@ -164,14 +246,14 @@ export function importImageOpts(
   };
 }
 
-/** The `/__oblik-insert` argument list for a reference: the URL, then the
- * options object — the same `Expr` tree every other insert is written from. */
 const num = (value: number): Expr => ({ kind: "num", value });
 const pointExpr = (point: Vec2): Expr => ({
   kind: "props",
   props: { x: num(point.x), y: num(point.y) },
 });
 
+/** The `/__oblik-insert` argument list for a reference: the URL, then the
+ * options object — the same `Expr` tree every other insert is written from. */
 export function imageArgs(url: string, opts: ImageOpts): Expr[] {
   const props: Record<string, Expr> = {
     world: pointExpr(opts.world),
@@ -221,8 +303,7 @@ export type ImportedImage = {
 
 /**
  * Decode, upload, and hand back what to insert. Every rejection is a string the
- * pane can show, and nothing is uploaded until the browser has drawn the bitmap
- * once.
+ * pane can show; the upload happens only once the browser has drawn the bitmap.
  */
 export async function importImage(
   file: Blob & { name?: string; size: number; type?: string },

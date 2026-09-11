@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  dropPathToFile,
   extensionForMime,
   extensionFromName,
   isImageExtension,
@@ -81,5 +82,32 @@ describe("the shared constants", () => {
 
   test("the cap is a sane size for a screenshot", () => {
     expect(IMAGE_MAX_BYTES).toBeGreaterThanOrEqual(8 * 1024 * 1024);
+  });
+});
+
+describe("dropPathToFile", () => {
+  test("reads a file: URI, decoded", () => {
+    expect(dropPathToFile("file:///Users/me/My%20Ref.png")).toBe("/Users/me/My Ref.png");
+    expect(dropPathToFile("  file:///work/ref.png  ")).toBe("/work/ref.png");
+  });
+
+  test("keeps a drive letter, drops the slash the URI form adds", () => {
+    expect(dropPathToFile("file:///C:/work/ref.png")).toBe("C:/work/ref.png");
+    expect(dropPathToFile("C:\\work\\ref.png")).toBe("C:\\work\\ref.png");
+    expect(dropPathToFile("\\\\server\\share\\ref.png")).toBe("\\\\server\\share\\ref.png");
+  });
+
+  test("a plain absolute path is one too — text/plain carries those", () => {
+    expect(dropPathToFile("/tmp/ref.png")).toBe("/tmp/ref.png");
+  });
+
+  test("nothing for a link, a relative name or nonsense", () => {
+    expect(dropPathToFile("https://example.com/ref.png")).toBeUndefined();
+    expect(dropPathToFile("ref.png")).toBeUndefined();
+    expect(dropPathToFile("file://host/share/ref.png")).toBeUndefined();
+    expect(dropPathToFile("file:///tmp/%E0%A4%A.png")).toBeUndefined();
+    expect(dropPathToFile("")).toBeUndefined();
+    // The root is a path; the extension check is what refuses it.
+    expect(dropPathToFile("file:///")).toBe("/");
   });
 });

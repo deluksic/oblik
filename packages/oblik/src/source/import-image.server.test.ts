@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { contentHash, writeImageAsset } from "./import-image.server";
+import { IMAGE_MAX_BYTES } from "./import-image";
+import {
+  assetFileForUrl,
+  contentHash,
+  importDroppedFile,
+  resolveDropFile,
+  writeImageAsset,
+} from "./import-image.server";
 
 let publicDir = "";
 
@@ -70,5 +77,93 @@ describe("writeImageAsset", () => {
 
   test("an empty slug still stores something nameable", () => {
     expect(writeImageAsset(publicDir, "", "png", PNG).name).toMatch(/^image-[0-9a-f]{8}\.png$/);
+  });
+});
+
+describe("resolveDropFile", () => {
+  test("resolves a drop inside the root, URI or plain path", () => {
+    const file = path.join(publicDir, "ref.png");
+    fs.writeFileSync(file, PNG);
+    expect(resolveDropFile(publicDir, `file://${file}`)).toEqual({ path: file, ext: "png" });
+    expect(resolveDropFile(publicDir, file)).toEqual({ path: file, ext: "png" });
+  });
+
+  test("a dropped string is not permission to read the machine", () => {
+    const outside = path.join(publicDir, "..", "outside.png");
+    expect(resolveDropFile(publicDir, outside)).toContain("outside the project root");
+    expect(resolveDropFile(publicDir, publicDir)).toContain("outside the project root");
+  });
+
+  test("refuses a link, a non-image, a missing file and an empty one", () => {
+    expect(resolveDropFile(publicDir, "https://example.com/ref.png")).toContain("link");
+    const notes = path.join(publicDir, "notes.md");
+    fs.writeFileSync(notes, "hi");
+    expect(resolveDropFile(publicDir, notes)).toContain("is not an image");
+    expect(resolveDropFile(publicDir, path.join(publicDir, "gone.png"))).toContain("cannot read");
+    const empty = path.join(publicDir, "empty.png");
+    fs.writeFileSync(empty, "");
+    expect(resolveDropFile(publicDir, empty)).toContain("empty");
+  });
+
+  test("refuses a file over the cap before reading it", () => {
+    const big = path.join(publicDir, "big.png");
+    fs.writeFileSync(big, Buffer.alloc(IMAGE_MAX_BYTES + 1));
+    expect(resolveDropFile(publicDir, big)).toContain("larger than");
+  });
+});
+
+describe("importDroppedFile", () => {
+  const pub = () => path.join(publicDir, "public");
+
+  test("uses a file already inside publicDir where it lies — no second copy", () => {
+    const file = path.join(pub(), "assets", "ref.png");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, PNG);
+    expect(importDroppedFile(pub(), publicDir, file)).toEqual({
+      url: "/assets/ref.png",
+      name: "ref.png",
+      path: file,
+      deduped: true,
+    });
+    expect(fs.readdirSync(path.join(pub(), "assets"))).toEqual(["ref.png"]);
+  });
+
+  test("copies a file from elsewhere in the root, content-addressed, once", () => {
+    const file = path.join(publicDir, "ref.png");
+    fs.writeFileSync(file, PNG);
+    const first = importDroppedFile(pub(), publicDir, file);
+    expect(typeof first).not.toBe("string");
+    if (typeof first === "string") return;
+    expect(first.url).toMatch(/^\/assets\/ref-[0-9a-f]{8}\.png$/);
+    expect(first.deduped).toBe(false);
+    expect(importDroppedFile(pub(), publicDir, file)).toMatchObject({
+      url: first.url,
+      deduped: true,
+    });
+  });
+
+  test("a refusal writes nothing at all", () => {
+    const notes = path.join(publicDir, "notes.md");
+    fs.writeFileSync(notes, "hi");
+    expect(importDroppedFile(pub(), publicDir, notes)).toContain("not an image");
+    expect(fs.existsSync(path.join(pub(), "assets"))).toBe(false);
+  });
+});
+
+describe("assetFileForUrl", () => {
+  test("finds an image already in the assets directory, query string or not", () => {
+    const file = path.join(publicDir, "assets", "ref-9f3a2c11.png");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, PNG);
+    expect(assetFileForUrl(publicDir, "/assets/ref-9f3a2c11.png")).toBe(file);
+    expect(assetFileForUrl(publicDir, "/assets/ref-9f3a2c11.png?v=2")).toBe(file);
+  });
+
+  test("nothing for another directory, extension, traversal or a missing file", () => {
+    expect(assetFileForUrl(publicDir, "/src/main.ts")).toBeUndefined();
+    expect(assetFileForUrl(publicDir, "/assets/notes.md")).toBeUndefined();
+    expect(assetFileForUrl(publicDir, "/assets/../outside.png")).toBeUndefined();
+    expect(assetFileForUrl(publicDir, "/assets/gone.png")).toBeUndefined();
+    expect(assetFileForUrl(publicDir, undefined)).toBeUndefined();
   });
 });
