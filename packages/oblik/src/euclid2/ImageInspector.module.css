@@ -1,10 +1,17 @@
 /*
- * Spacing belongs to `SidebarSection`: it is a flex column with its own
- * `gap`, and the sidebar zeroes every `p` margin inside it. So nothing here
- * sets a margin — an earlier version did, which double-spaced the section and
- * fought the gap. Only the internal layout of each row is this module's
- * business.
+ * The section is one flex child of the sidebar; this block is one flex child of
+ * the section. That is deliberate: spacing between these slots is this module's
+ * business (via `gap`, never `margin` — the sidebar zeroes `p` margins and a
+ * margin here would double-space against the section's own gap).
+ *
+ * Everything sizes with `minmax`/`1fr` rather than `max-content`, because the
+ * sidebar is `overflow: hidden`: a too-wide row is clipped, not scrolled.
  */
+.stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .meta {
   font-size: 0.72rem;
   color: var(--oblik-muted);
@@ -16,8 +23,8 @@
   gap: var(--space-1);
 }
 
-/* Square icon buttons in the sidebar's own idiom (see BrushDock), not the
-   title bar's text buttons: these carry glyphs, not labels. */
+/* Square icon buttons in the sidebar's idiom (see BrushDock), not the title
+   bar's text buttons: these carry glyphs, not labels. */
 .iconBtn {
   flex: none;
   display: flex;
@@ -38,37 +45,36 @@
   border-color: var(--oblik-hover);
 }
 
-/*
- * One field per row. `NumberField`'s input is a fixed 4.25rem, so a two-column
- * grid is ~192px — which fits the sidebar's 280px default and is silently
- * *clipped* below ~220px, because the sidebar is `overflow: hidden`. A single
- * column cannot overflow at any width the sidebar allows (180px minimum), which
- * is the same reason the sidebar's own grids use `minmax(0, …)` rather than
- * `max-content`.
- */
-.fields {
+/* Placement and size, as many per row as the sidebar can show: two at its
+   default width, one at the narrow end, never clipped. */
+.params {
   display: grid;
-  grid-template-columns: minmax(0, max-content);
+  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
   justify-content: start;
-  gap: var(--space-1);
+  gap: var(--space-1) var(--space-3);
 }
 
-.dial {
+/*
+ * The three dials are *one* grid, not three: sharing the columns is what makes
+ * every slider the same length and aligned, whatever its label says. The track
+ * column is capped (`11rem`) and shrinkable, so a wide sidebar does not stretch
+ * a slider across the panel.
+ */
+.dials {
   display: grid;
-  /* The slider takes the slack; the label and readout never push the row wider
-     than the sidebar can show. */
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content);
+  grid-template-columns: 4.5rem minmax(0, 11rem) 2.4rem;
+  justify-content: start;
   align-items: center;
-  gap: var(--space-2);
-  font-size: 0.72rem;
+  gap: var(--space-1) var(--space-2);
 }
 
 .dialLabel {
+  font-size: 0.72rem;
   color: var(--oblik-muted);
 }
 
 .dialValue {
-  min-width: 2.2rem;
+  font-size: 0.72rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
