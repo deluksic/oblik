@@ -8,6 +8,7 @@
 .meta {
   font-size: 0.72rem;
   color: var(--oblik-muted);
+  overflow-wrap: anywhere;
 }
 
 .row {
@@ -37,16 +38,26 @@
   border-color: var(--oblik-hover);
 }
 
+/*
+ * One field per row. `NumberField`'s input is a fixed 4.25rem, so a two-column
+ * grid is ~192px — which fits the sidebar's 280px default and is silently
+ * *clipped* below ~220px, because the sidebar is `overflow: hidden`. A single
+ * column cannot overflow at any width the sidebar allows (180px minimum), which
+ * is the same reason the sidebar's own grids use `minmax(0, …)` rather than
+ * `max-content`.
+ */
 .fields {
   display: grid;
-  grid-template-columns: max-content max-content;
-  gap: var(--space-1) var(--space-3);
-  width: fit-content;
+  grid-template-columns: minmax(0, max-content);
+  justify-content: start;
+  gap: var(--space-1);
 }
 
 .dial {
   display: grid;
-  grid-template-columns: max-content 1fr max-content;
+  /* The slider takes the slack; the label and readout never push the row wider
+     than the sidebar can show. */
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content);
   align-items: center;
   gap: var(--space-2);
   font-size: 0.72rem;

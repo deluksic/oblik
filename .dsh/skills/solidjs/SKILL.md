@@ -129,6 +129,7 @@ createEffect(
 - **CSS modules** per component: colocated `Component.module.css` imported as `styles`. Ambient typing: `packages/oblik/src/css-modules.d.ts` (`*.css` → `Record<string, string>`).
 - Design tokens: `packages/oblik/src/theme.css`, imported once from `host/Host.tsx` (`import "../theme.css"`). Use `--oblik-*` vars from `:root` (paper/knockout/cream, accent, ink, chrome halo widths, strokes). Halo metrics live in `docs/chrome.md` (repo root).
 - Flex/grid children that should fill height need `min-height: 0`. Panes and views are `display: flex; flex-direction: column` with the interactive surface as the `flex: 1` child.
+- **Spacing comes from the parent's flex/grid `gap`, never `margin`.** The sidebar zeroes `p` margins and every section is a flex column with its own gap, so a child that adds a margin double-spaces the block and fights the parent. For the same reason, columns must be able to shrink: prefer `minmax(0, …)`/`1fr` over bare `max-content`, because the sidebar is `overflow: hidden` and a too-wide row is clipped rather than scrolled.
 - Icons: `import IconX from "~icons/lucide/x";` (unplugin-icons, lucide set). Ambient typing: `packages/oblik/src/icons.d.ts`.
 
 ## Paths & imports
