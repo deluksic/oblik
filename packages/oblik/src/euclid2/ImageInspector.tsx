@@ -13,8 +13,11 @@ export type ImageInspectorProps = {
   /** The selected reference's authored props — the value *is* the source, so
    * every field here is what the scene file says. */
   value: ImageValue;
-  /** Write leaves through the patch endpoint. */
-  onPatch: (props: ImageProps) => void;
+  /** Show a leaf edit live, without touching the source — what a range drag and
+   * every keystroke in a field do. */
+  onPreview: (props: ImageProps) => void;
+  /** Write leaves to the source: once per gesture, on release or blur. */
+  onCommit: (props: ImageProps) => void;
   /** Hand a picked file to the same import the paste and drop paths use. */
   onImport: (file: File) => void;
 };
@@ -34,6 +37,11 @@ const TURNS: ImageRot[] = [0, 90, 180, 270];
  */
 export function ImageInspector(props: ImageInspectorProps) {
   const [fileEl, setFileEl] = createSignal<HTMLInputElement | undefined>(undefined);
+  /** A button has no "drag": show it at once and write it once. */
+  const act = (leaves: ImageProps) => {
+    props.onPreview(leaves);
+    props.onCommit(leaves);
+  };
   const width = () => props.value.targetSize.width;
   const height = () => props.value.targetSize.height;
 
@@ -50,7 +58,7 @@ export function ImageInspector(props: ImageInspectorProps) {
           type="button"
           class={[btn, secondary]}
           title="Rotate 90° anticlockwise"
-          onClick={() => props.onPatch({ rot: turn(props.value.rot, -1) })}
+          onClick={() => act({ rot: turn(props.value.rot, -1) })}
         >
           ⟲
         </button>
@@ -58,7 +66,7 @@ export function ImageInspector(props: ImageInspectorProps) {
           type="button"
           class={[btn, secondary]}
           title="Rotate 90° clockwise"
-          onClick={() => props.onPatch({ rot: turn(props.value.rot, 1) })}
+          onClick={() => act({ rot: turn(props.value.rot, 1) })}
         >
           ⟳
         </button>
@@ -66,7 +74,7 @@ export function ImageInspector(props: ImageInspectorProps) {
           type="button"
           class={[btn, secondary]}
           title="Mirror about the vertical centre axis"
-          onClick={() => props.onPatch({ flip: props.value.flip ? 0 : 1 })}
+          onClick={() => act({ flip: props.value.flip ? 0 : 1 })}
         >
           ⇄
         </button>
@@ -75,26 +83,30 @@ export function ImageInspector(props: ImageInspectorProps) {
         <NumberField
           label="x"
           value={props.value.world.x}
-          onChange={(x) => props.onPatch({ "world.x": x })}
+          onChange={(x) => props.onPreview({ "world.x": x })}
+          onCommit={() => props.onCommit({ "world.x": props.value.world.x })}
         />
         <NumberField
           label="y"
           value={props.value.world.y}
-          onChange={(y) => props.onPatch({ "world.y": y })}
+          onChange={(y) => props.onPreview({ "world.y": y })}
+          onCommit={() => props.onCommit({ "world.y": props.value.world.y })}
         />
         {width() !== undefined ? (
           <NumberField
             label="width"
             min={0}
             value={width()!}
-            onChange={(w) => props.onPatch({ "targetSize.width": w })}
+            onChange={(w) => props.onPreview({ "targetSize.width": w })}
+            onCommit={() => props.onCommit({ "targetSize.width": width() ?? 0 })}
           />
         ) : (
           <NumberField
             label="height"
             min={0}
             value={height() ?? 0}
-            onChange={(h) => props.onPatch({ "targetSize.height": h })}
+            onChange={(h) => props.onPreview({ "targetSize.height": h })}
+            onCommit={() => props.onCommit({ "targetSize.height": height() ?? 0 })}
           />
         )}
       </div>
@@ -102,19 +114,22 @@ export function ImageInspector(props: ImageInspectorProps) {
         label="opacity"
         max={1}
         value={props.value.style.opacity}
-        onChange={(opacity) => props.onPatch({ "style.opacity": opacity })}
+        onPreview={(opacity) => props.onPreview({ "style.opacity": opacity })}
+        onCommit={() => props.onCommit({ "style.opacity": props.value.style.opacity })}
       />
       <Dial
         label="saturation"
         max={4}
         value={props.value.style.saturation}
-        onChange={(saturation) => props.onPatch({ "style.saturation": saturation })}
+        onPreview={(saturation) => props.onPreview({ "style.saturation": saturation })}
+        onCommit={() => props.onCommit({ "style.saturation": props.value.style.saturation })}
       />
       <Dial
         label="contrast"
         max={4}
         value={props.value.style.contrast}
-        onChange={(contrast) => props.onPatch({ "style.contrast": contrast })}
+        onPreview={(contrast) => props.onPreview({ "style.contrast": contrast })}
+        onCommit={() => props.onCommit({ "style.contrast": props.value.style.contrast })}
       />
       <div class={styles.row}>
         <button
@@ -147,12 +162,20 @@ function turn(rot: ImageRot, steps: number): ImageRot {
   return TURNS[((((at < 0 ? 0 : at) + steps) % TURNS.length) + TURNS.length) % TURNS.length]!;
 }
 
-/** One style dial: a range for the gesture, the number for the record. */
+/**
+ * One style dial: a range for the gesture, the number for the record.
+ *
+ * `input` fires continuously and only *previews* — the canvas follows the
+ * thumb with no source write, because a write here would mean a file write and
+ * a full HMR round per pointer event. `change` fires once, when the gesture
+ * ends, and that is what commits.
+ */
 function Dial(props: {
   label: string;
   value: number;
   max: number;
-  onChange: (value: number) => void;
+  onPreview: (value: number) => void;
+  onCommit: () => void;
 }) {
   return (
     <label class={styles.dial}>
@@ -164,7 +187,8 @@ function Dial(props: {
         max={props.max}
         step={0.01}
         value={props.value}
-        onInput={(e) => props.onChange(Number(e.currentTarget.value))}
+        onInput={(e) => props.onPreview(Number(e.currentTarget.value))}
+        onChange={() => props.onCommit()}
       />
       <span class={styles.dialValue}>{formatNum(props.value)}</span>
     </label>

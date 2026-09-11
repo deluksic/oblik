@@ -10,7 +10,11 @@ export type NumberFieldProps = {
   label: string;
   value: number;
   min?: number;
+  /** Fires per keystroke: a caller that writes to disk wants `onCommit` too. */
   onChange: (next: number) => void;
+  /** The gesture's end — blur or Enter — for callers whose `onChange` is a
+   * preview rather than a write. */
+  onCommit?: () => void;
 };
 
 export function NumberField(props: NumberFieldProps) {
@@ -57,6 +61,7 @@ export function NumberField(props: NumberFieldProps) {
         }}
         onBlur={() => {
           setFocused(false);
+          props.onCommit?.();
           if (!invalid()) setText(formatNum(props.value));
         }}
       />

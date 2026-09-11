@@ -25,6 +25,7 @@ import type { ImageProps } from "../source/image-edit";
 import type { MentionFile } from "../source/mention";
 import { freshSiteId } from "../source/stamp";
 import { ImageInspector } from "./ImageInspector";
+import { applyImageLeaves, withImageOverride, type ImageOverride } from "./imageOverride";
 import { imageArgs, importImage } from "./importImage";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
@@ -314,6 +315,16 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setSelectedKey(`${id}:0`);
   }
 
+  /**
+   * A live edit that has not been written to the source yet. A patch costs a
+   * file write and a full HMR round, so a drag previews here and commits on
+   * release; the evaluated tape is what the view draws and the inspector reads,
+   * so the preview *is* the drag.
+   */
+  const [imageOverride, setImageOverride] = createSignal<ImageOverride | undefined>(undefined, {
+    equals: false,
+  });
+
   /** Set by the view: where the camera is and how big the pane is, which is
    * what an import from the picker places against. */
   const [view, setView] = createSignal(
@@ -329,9 +340,17 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   /** Write reference leaves through the patch endpoint — the only writer a
    * reference has, since its numbers live inside an options object. */
+  /** Show a live edit without writing it, keyed to the node it belongs to. */
+  function previewImage(leaves: ImageProps) {
+    const node = imageNode();
+    if (!node || node.value.kind !== "image") return;
+    setImageOverride({ id: node.id, occ: node.occ, value: applyImageLeaves(node.value, leaves) });
+  }
+
   async function patchImage(leaves: ImageProps) {
     const node = imageNode();
     if (!node) return;
+    previewImage(leaves);
     const file = node.module ?? focus().file;
     const res = await fetch("/__oblik-image", {
       method: "POST",
@@ -340,6 +359,9 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
+      // A failed write drops the preview: the canvas goes back to source truth
+      // rather than keeping a value the file does not have.
+      setImageOverride(undefined);
       setWriteError(body?.error ?? `patch failed (${res.status})`);
       return;
     }
@@ -431,9 +453,13 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   /** The selected reference, when the selection is one: that is what the
    * inspector edits. */
   const imageNode = createMemo(() => {
-    const node = world().trace.find((n) => traceKey(n) === selectedKey());
+    const node = tape().find((n) => traceKey(n) === selectedKey());
     return node?.value.kind === "image" ? node : undefined;
   });
+
+  /** The evaluated tape with the live edit applied — what the view draws and
+   * what the inspector shows, so a drag and its preview are one thing. */
+  const tape = createMemo(() => withImageOverride(world().trace, imageOverride()));
 
   return (
     <div class={workspace}>
@@ -441,7 +467,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
         <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
         <div class={styles.paperWrap}>
           <TypegpuView
-            trace={world().trace}
+            trace={tape()}
             initialCamera={props.scene.camera}
             placing={tool() !== undefined}
             ghost={ghost()}
@@ -505,7 +531,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
               {(node) => (
                 <ImageInspector
                   value={node().value as ImageValue}
-                  onPatch={(leaves) => void patchImage(leaves)}
+                  onPreview={previewImage}
+                  onCommit={(leaves) => void patchImage(leaves)}
                   onImport={importPicked}
                 />
               )}
