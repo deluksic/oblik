@@ -1,29 +1,52 @@
 .meta {
-  margin: 0 0 8px;
-  font-size: 11px;
+  margin: 0 0 var(--space-2);
+  font-size: 0.72rem;
   color: var(--oblik-muted);
 }
 
 .row {
   display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+/* Square icon buttons in the sidebar's own idiom (see BrushDock), not the
+   title bar's text buttons: these carry glyphs, not labels. */
+.iconBtn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  padding: var(--space-0) var(--space-1);
+  font-size: 0.9rem;
+  line-height: 1;
+  border: 1px solid var(--oblik-line);
+  border-radius: 6px;
+  background: var(--oblik-raised);
+  color: var(--oblik-text);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  border-color: var(--oblik-hover);
 }
 
 .fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 8px;
-  margin-bottom: 8px;
+  grid-template-columns: max-content max-content;
+  gap: var(--space-1) var(--space-3);
+  width: fit-content;
+  margin-bottom: var(--space-2);
 }
 
 .dial {
   display: grid;
-  grid-template-columns: 64px 1fr 34px;
+  grid-template-columns: max-content 1fr max-content;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  font-size: 11px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: 0.72rem;
 }
 
 .dialLabel {
@@ -31,6 +54,7 @@
 }
 
 .dialValue {
+  min-width: 2.2rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

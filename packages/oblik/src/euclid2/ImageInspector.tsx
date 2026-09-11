@@ -4,7 +4,6 @@ import { SidebarSection } from "../host/SelectionSidebar";
 import type { ImageProps } from "../source/image-edit";
 import { formatNum } from "../source/patch";
 
-import { btn, secondary } from "../ui/button.module.css";
 import styles from "./ImageInspector.module.css";
 
 export type ImageInspectorProps = {
@@ -51,7 +50,7 @@ export function ImageInspector(props: ImageInspectorProps) {
       <div class={styles.row}>
         <button
           type="button"
-          class={[btn, secondary]}
+          class={styles.iconBtn}
           title="Rotate 90° anticlockwise"
           onClick={() => act({ rot: turn(props.value.rot, -1) })}
         >
@@ -59,7 +58,7 @@ export function ImageInspector(props: ImageInspectorProps) {
         </button>
         <button
           type="button"
-          class={[btn, secondary]}
+          class={styles.iconBtn}
           title="Rotate 90° clockwise"
           onClick={() => act({ rot: turn(props.value.rot, 1) })}
         >
@@ -67,7 +66,7 @@ export function ImageInspector(props: ImageInspectorProps) {
         </button>
         <button
           type="button"
-          class={[btn, secondary]}
+          class={styles.iconBtn}
           title="Mirror about the vertical centre axis"
           onClick={() => act({ flip: props.value.flip ? 0 : 1 })}
         >
