@@ -7,10 +7,11 @@ import type { Aabb, Vec2 } from "../geom";
  * pixel dimensions — the world rect is explicit, and the import flow is what
  * preserves the file's aspect ratio.
  *
- * `x`/`y` is the **pre-rotation** corner: the rect is `[x, x+w] × [y, y+h]` in
- * world units, and `rot` turns that rect about its own centre. On screen (where
- * y runs down) `(x, y)` reads as the top-left corner, and a positive `rot` reads
- * as a clockwise turn. `flip` mirrors the sampled image about the vertical
+ * `x`/`y` is the **pre-rotation** corner the rect grows `+w` and `+h` from: the
+ * rect is `[x, x+w] × [y, y+h]` in world units, and `rot` turns it about its own
+ * centre. World y runs up, so that corner is the rect's *screen* bottom-left and
+ * the picture's top-left sits at `(x, y+h)`; a positive `rot` reads as a
+ * clockwise turn on screen. `flip` mirrors the sampled image about the vertical
  * centre axis — it changes which way the picture faces, never the rect's
  * geometry. `fade ∈ [0, 1]` mixes the image toward the paper colour, which is
  * what lets sketch lines read on top of a photograph.
@@ -32,6 +33,22 @@ export type ImageValue = {
 
 /** Quarter turns. Not a free angle: the steps keep the rect axis-aligned at 0/180. */
 export type ImageRot = 0 | 90 | 180 | 270;
+
+/**
+ * Everything about a reference but its source. The rect is required — it is the
+ * node's geometry and eval never learns the bitmap's pixel size — while the
+ * three look props default to their no-op values, so the common call is
+ * `image(src, { x, y, w, h })`.
+ */
+export type ImageOpts = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rot?: ImageRot;
+  flip?: 0 | 1;
+  fade?: number;
+};
 
 export function isImage(value: unknown): value is ImageValue {
   return !!value && typeof value === "object" && (value as ImageValue).kind === "image";
@@ -79,8 +96,12 @@ function quarterTurns(rot: number): number {
 /**
  * The rect's four corners in world space, starting at `(x, y)` and walking
  * `(x+w, y)`, `(x+w, y+h)`, `(x, y+h)` — the rect's own frame, rotated about the
- * centre by `rot`. On screen that order reads top-left, top-right, bottom-right,
- * bottom-left.
+ * centre by `rot`.
+ *
+ * On screen world y runs **up**, so that walk reads bottom-left, bottom-right,
+ * top-right, top-left: the `(x, y)` corner is the rect's *screen* bottom-left,
+ * and the picture's own top-left is the corner at `(x, y+h)`. `imageQuad` and
+ * the shader's uv table are both written against that order.
  */
 export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   const cx = value.x + value.w / 2;
@@ -98,18 +119,42 @@ export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
 }
 
 /**
- * The textured quad in **draw order**: vertex 0 samples `(u, v) = (0, 0)`, then
- * `(1, 0)`, `(1, 1)`, `(0, 1)` — a triangle strip.
+ * The textured quad in **strip order**.
  *
- * `flip` is folded in here, by swapping the two corner pairs rather than the
+ * Not the walk `imageCorners` returns: a four-vertex triangle strip advances two
+ * vertices at a time, so its two triangles are `{v0,v1,v2}` and `{v1,v2,v3}` and
+ * they share the edge `v1–v2`. For those two triangles to *tile* the rect, that
+ * shared edge has to be a **diagonal** — walking the perimeter instead puts the
+ * shared edge on a side, so the triangles overlap on one side and leave a wedge
+ * of the rect uncovered. Hence `a, b, d, c` (the zig-zag the fill and grid quads
+ * use too), not `a, b, c, d`. `image.test.ts` pins the diagonal.
+ *
+ * `flip` is folded in here, by swapping the left/right pairs rather than the
  * texture coordinates: the four positions are unchanged, the picture turns over,
  * and the shader has no flip flag to branch on. `rot` is already baked into the
  * corners by `imageCorners`, so the GPU layer receives a quad and samples it.
  */
 export function imageQuad(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   const [a, b, c, d] = imageCorners(value);
-  return value.flip ? [b, a, d, c] : [a, b, c, d];
+  return value.flip ? [b, a, c, d] : [a, b, d, c];
 }
+
+/**
+ * The texture coordinate each quad vertex samples, in `imageQuad`'s order.
+ *
+ * These are the corners' *screen* roles, and getting them wrong turns the
+ * picture upside down rather than failing loudly: vertex 0 is the rect's screen
+ * bottom-left, so it samples the texture's bottom-left `(0, 1)`, and the
+ * texture's `(0, 0)` — its top-left, the way WebGPU numbers them — belongs to
+ * vertex 2 (the rect's screen top-left, since the strip order puts the two top
+ * corners last). The shader derives the same table; `wgsl.test.ts` pins it.
+ */
+export const IMAGE_QUAD_UVS: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [1, 1],
+  [0, 0],
+  [1, 0],
+];
 
 /** World bounds of the rotated rect, or `undefined` when the rect is not finite. */
 export function imageAabb(value: ImageValue): Aabb | undefined {

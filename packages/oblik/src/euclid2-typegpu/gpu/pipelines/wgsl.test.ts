@@ -137,6 +137,22 @@ describe("image WGSL", () => {
     expect(code).not.toMatch(/\b(rot|flip)\b/);
   });
 
+  /**
+   * The uv table is where "upright" is decided, and getting it backwards draws
+   * the picture upside down without failing anything: vertex 0 is the rect's
+   * screen *bottom*-left (world y runs up), so it samples the texture's bottom
+   * row — `select(1f, 0f, ...)`, not the other way round. `IMAGE_QUAD_UVS` in
+   * `eval/image.ts` is the same table.
+   */
+  test("the uv table reads world y as screen up", () => {
+    // u: the right-hand pair of the strip order is vertices 1 and 3.
+    expect(code).toContain("select(0f, 1f, ((vertexIndex == 1u) || (vertexIndex == 3u)))");
+    expect(code).not.toContain("((vertexIndex == 1u) || (vertexIndex == 2u))");
+    // v: the bottom row of the texture is the rect's bottom edge, vertices 0-1.
+    expect(code).toContain("select(1f, 0f, (vertexIndex >= 2u))");
+    expect(code).not.toContain("select(0f, 1f, (vertexIndex >= 2u))");
+  });
+
   test("the fragment desaturates, then fades toward the paper", () => {
     expect(occurrences(code, "textureSample(")).toBe(1);
     expect(occurrences(code, "dot(")).toBe(1);

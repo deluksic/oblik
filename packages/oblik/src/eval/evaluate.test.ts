@@ -27,6 +27,7 @@ import {
   union,
 } from "./constructors";
 import { emit, evaluate, tryEvaluate } from "./evaluate";
+import type { ImageOpts } from "./image";
 import { paintsFromTrace, paintStrokesFromTrace } from "./paint";
 import { defineScene } from "./scene";
 import { siteOf } from "./site";
@@ -608,7 +609,11 @@ describe("image nodes", () => {
   test("records one node with the rect it was authored with", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        image("/assets/gear-9f3a2c11.png", 10, 20, 40, 20, 90, 1, 0.25, "o_img");
+        image(
+          "/assets/gear-9f3a2c11.png",
+          { x: 10, y: 20, w: 40, h: 20, rot: 90, flip: 1, fade: 0.25 },
+          "o_img",
+        );
       }),
     );
     expect(trace.map((n) => n.kind)).toEqual(["image"]);
@@ -628,39 +633,48 @@ describe("image nodes", () => {
     });
   });
 
+  test("the look props default to their no-op values", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/a.png", { x: 1, y: 2, w: 3, h: 4 }, "o_img");
+      }),
+    );
+    expect(trace[0]?.value).toMatchObject({ rot: 0, flip: 0, fade: 0 });
+  });
+
   test("an occurrence counts like any other node", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        for (let i = 0; i < 2; i++) image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_img");
+        for (let i = 0; i < 2; i++) image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_img");
       }),
     );
     expect(trace.map((n) => n.occ)).toEqual([0, 1]);
   });
 
-  test("a draft row overrides the props in argument order", () => {
+  /**
+   * The props live in an options object, where the positional literal patcher
+   * cannot reach them, so a reference has no draft path: a drag that writes a
+   * draft row for one changes nothing. The inspector's patch endpoint is the
+   * writer instead (`source/image-edit.ts`).
+   */
+  test("a draft row does not move a reference", () => {
     const draft = new Map([["o_img", [1, 2, 3, 4, 270, 1, 0.9]]]);
     const { trace } = evaluate(
       imageScene(() => {
-        image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_img");
+        image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_img");
       }),
       { draft },
     );
-    expect(trace[0]?.value).toMatchObject({
-      x: 1,
-      y: 2,
-      w: 3,
-      h: 4,
-      rot: 270,
-      flip: 1,
-      fade: 0.9,
-    });
+    expect(trace[0]?.value).toMatchObject({ x: 0, y: 0, w: 10, h: 10, rot: 0, fade: 0 });
   });
 
-  test("a non-positive rect is evaluated but never recorded", () => {
+  test("a missing side or an empty source is evaluated but never recorded", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        image("/a.png", Number.NaN, 0, 10, 10, 0, 0, 0, "o_bad");
-        image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_good");
+        // JavaScript callers are not typechecked: the guard is what stops it.
+        image("/a.png", { x: 0, y: 0, w: 10 } as ImageOpts, "o_missing");
+        image("", { x: 0, y: 0, w: 10, h: 10 }, "o_sourceless");
+        image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_good");
       }),
     );
     expect(trace.map((n) => n.id)).toEqual(["o_good"]);

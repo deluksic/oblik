@@ -51,6 +51,7 @@ export type { SliderOpts } from "./eval/constructors";
 export {
   distToImage,
   flipImage,
+  IMAGE_QUAD_UVS,
   imageAabb,
   imageCorners,
   imageQuad,
@@ -59,6 +60,7 @@ export {
   rotateImage,
   scaleImage,
   snapImageRot,
+  type ImageOpts,
   type ImageRot,
   type ImageValue,
 } from "./eval/image";

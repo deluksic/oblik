@@ -25,7 +25,7 @@ const toClip = tgpu.fn(
 });
 
 /**
- * One reference quad. The record already holds the four world corners in draw
+ * One reference quad. The record already holds the four world corners in strip
  * order — `rot` and `flip` were folded in on the CPU (`eval/image.ts`) — so the
  * vertex shader picks a corner and hands the fragment its texture coordinate.
  * Nothing here depends on the camera beyond the frame uniform, so a pan or zoom
@@ -48,9 +48,13 @@ export const imageVertex = tgpu.vertexFn({
     select(inst.c, inst.d, vertexIndex === u32(3)),
     vertexIndex >= u32(2),
   );
-  // Vertex order is uv order: (0,0), (1,0), (1,1), (0,1).
-  const x = vertexIndex === u32(1) || vertexIndex === u32(2) ? f32(1) : f32(0);
-  const y = vertexIndex >= u32(2) ? f32(1) : f32(0);
+  // Vertex order is strip order (see `imageQuad`), and the uv table is the
+  // corners' *screen* roles (`IMAGE_QUAD_UVS` in `eval/image.ts`): vertices 0
+  // and 1 are the rect's bottom edge, 2 and 3 its top, so the texture's bottom
+  // row is v = 1. Reading world y as if it ran down puts the picture upside
+  // down without failing anything, so `wgsl.test.ts` pins both selects.
+  const x = vertexIndex === u32(1) || vertexIndex === u32(3) ? f32(1) : f32(0);
+  const y = vertexIndex >= u32(2) ? f32(0) : f32(1);
   return { outPos: toClip(p), uv: vec2f(x, y), fade: inst.fade };
 });
 

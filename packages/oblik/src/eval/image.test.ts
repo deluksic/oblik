@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 
+import type { Vec2 } from "../geom";
 import {
   distToImage,
   flipImage,
+  IMAGE_QUAD_UVS,
   imageAabb,
   imageCorners,
   imageQuad,
@@ -33,6 +35,15 @@ function img(props: Partial<ImageValue> = {}): ImageValue {
 
 function byXThenY(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return a.x - b.x || a.y - b.y;
+}
+
+function span(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+/** Twice the signed area of a triangle — its sign is the winding. */
+function area2(a: Vec2, b: Vec2, c: Vec2): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 /** The visible centre is rotation-invariant. */
@@ -99,16 +110,124 @@ describe("imageCorners", () => {
 });
 
 describe("imageQuad", () => {
-  test("walks the corners in triangle-strip draw order", () => {
-    expect(imageQuad(base)).toEqual(imageCorners(base));
+  test("returns the rect's corners in strip order, not the perimeter walk", () => {
+    // The zig-zag is what puts the shared strip edge on the diagonal: the two
+    // top corners come last, so vertices 1 and 2 are opposite.
+    expect(imageQuad(base)).toEqual([
+      { x: 10, y: 20 },
+      { x: 50, y: 20 },
+      { x: 10, y: 40 },
+      { x: 50, y: 40 },
+    ]);
+    expect(imageCorners(base)).not.toEqual(imageQuad(base));
   });
 
   test("flip reorders the corners, never the rect", () => {
     const quad = imageQuad(img({ flip: 1 }));
-    // Vertex 0 now holds what vertex 1 held: the picture is mirrored in place.
+    // The left/right pairs swap: the picture is mirrored in place.
     expect(quad[0]).toEqual(imageCorners(base)[1]);
     expect(quad[1]).toEqual(imageCorners(base)[0]);
+    // The two top corners keep their places; only left and right swap.
+    expect(quad[2]).toEqual(imageCorners(base)[2]);
+    expect(quad[3]).toEqual(imageCorners(base)[3]);
     expect([...quad].toSorted(byXThenY)).toEqual([...imageCorners(base)].toSorted(byXThenY));
+  });
+
+  /**
+   * The invariant that actually makes a strip tile a rect: its two triangles are
+   * `{v0,v1,v2}` and `{v1,v2,v3}`, so they share the edge `v1–v2`, and that edge
+   * must be a **diagonal**. Walk the perimeter instead — which is what this code
+   * first did — and the shared edge is a side: the triangles then overlap on one
+   * side of it and leave a wedge of the rect uncovered, which shows up on screen
+   * as a picture stretched across a quadrilateral with a triangular bite taken
+   * out of it. Checking that consecutive vertices are *adjacent corners* is not
+   * enough: the perimeter walk satisfies that and is still wrong.
+   */
+  test("every rotation and flip puts the shared strip edge on a diagonal", () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      for (const flip of [0, 1] as const) {
+        const value = img({ rot, flip });
+        const quad = imageQuad(value);
+        // The shared edge is the diagonal...
+        expect(span(quad[1]!, quad[2]!)).toBeCloseTo(Math.hypot(value.w, value.h), 9);
+        // ...and the strip's outer edges are the rect's sides.
+        for (const d of [span(quad[0]!, quad[1]!), span(quad[2]!, quad[3]!)]) {
+          expect([value.w, value.h]).toContainEqual(Math.round(d * 1e9) / 1e9);
+        }
+      }
+    }
+  });
+
+  /**
+   * The invariant stated the way the rasterizer enforces it: the strip's two
+   * triangles must cover the rect **exactly once**. Sampling interior points and
+   * counting how many triangles contain each one catches both failure modes at
+   * once — a point in no triangle (the wedge a perimeter walk leaves) and a point
+   * in two (the overlap that causes it).
+   */
+  test("the two strip triangles tile the rect exactly once", () => {
+    const inTriangle = (a: Vec2, b: Vec2, c: Vec2, p: Vec2) => {
+      const d1 = area2(a, b, p);
+      const d2 = area2(b, c, p);
+      const d3 = area2(c, a, p);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) ? 1 : 0;
+    };
+    const n = 8;
+    for (const rot of [0, 90, 180, 270] as const) {
+      for (const flip of [0, 1] as const) {
+        const value = img({ rot, flip });
+        const quad = imageQuad(value);
+        const triangleArea = (p: Vec2, q: Vec2, r: Vec2) => Math.abs(area2(p, q, r)) / 2;
+        // No overlap: two triangles that tile the rect have exactly its area
+        // between them, so anything more means they cover the same ground twice.
+        expect(
+          triangleArea(quad[0]!, quad[1]!, quad[2]!) + triangleArea(quad[1]!, quad[2]!, quad[3]!),
+        ).toBeCloseTo(value.w * value.h, 9);
+        // Interior samples of the rect, built from its own two sides so the
+        // rotation and mirror are the model's business, not the test's.
+        const [a, b, , d] = imageCorners(value);
+        for (let i = 1; i < n; i++) {
+          for (let j = 1; j < n; j++) {
+            const s = i / n;
+            const t = j / n;
+            const p = {
+              x: a.x + s * (b.x - a.x) + t * (d.x - a.x),
+              y: a.y + s * (b.y - a.y) + t * (d.y - a.y),
+            };
+            const covered =
+              inTriangle(quad[0]!, quad[1]!, quad[2]!, p) +
+              inTriangle(quad[1]!, quad[2]!, quad[3]!, p);
+            // No gaps. (Points exactly on the shared edge count twice, which is
+            // why the overlap half of this is the area sum below, not a count.)
+            expect(covered).toBeGreaterThanOrEqual(1);
+          }
+        }
+      }
+    }
+  });
+
+  /**
+   * The uv table is the corners' *screen* roles, and getting it wrong turns the
+   * picture upside down without failing anything: vertex 0 is the rect's screen
+   * bottom-left (world `(x, y)`, since world y runs up), so it samples the
+   * texture's bottom-left, and the texture's own top-left `(0, 0)` — the way
+   * WebGPU numbers them — belongs to the corner at `(x, y+h)`.
+   */
+  test("the uv table puts the picture's top-left at the rect's screen top-left", () => {
+    expect(IMAGE_QUAD_UVS).toEqual([
+      [0, 1],
+      [1, 1],
+      [0, 0],
+      [1, 0],
+    ]);
+    const quad = imageQuad(base);
+    const uvOf = (u: number, v: number) =>
+      quad[IMAGE_QUAD_UVS.findIndex(([cu, cv]) => cu === u && cv === v)];
+    // World y runs up, so the picture's top-left is the rect's (x, y+h) corner,
+    // and the texture's (0, 0) is what has to land there.
+    expect(uvOf(0, 0)).toEqual({ x: base.x, y: base.y + base.h });
+    expect(uvOf(0, 1)).toEqual({ x: base.x, y: base.y });
+    expect(uvOf(1, 0)).toEqual({ x: base.x + base.w, y: base.y + base.h });
   });
 });
 

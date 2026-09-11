@@ -145,27 +145,28 @@ describe("patchLiterals", () => {
     expect(next).toContain('roundOffset(face, -0.3, "o_off")');
   });
 
-  test("image props are editable literals in argument order, and patch back", () => {
-    const raw = `image("/assets/a.png", 10, 20, 40, 20, 90, 1, 0.5, "o_img");\n`;
+  /**
+   * A reference's numbers live inside its options object, out of reach of the
+   * positional literal patcher — so `dof` is empty, the node is not
+   * literal-editable, and `patchLiterals` has nothing to write. The inspector's
+   * own patch endpoint is the writer (`source/image-edit.ts`).
+   */
+  test("image props are not literal-patchable, and do not pretend to be", () => {
+    const raw = `image("/assets/a.png", { x: 10, y: 20, w: 40, h: 20 }, "o_img");\n`;
     const anno = analyze(raw, "t.ts").get("o_img");
-    expect(anno?.editable).toBe(true);
-    // dof is [x, y, w, h, rot, flip, fade] — the patch row indexes the call's args.
-    expect(anno?.literals).toEqual([10, 20, 40, 20, 90, 1, 0.5]);
-    expect(patchLiterals(raw, "o_img", [1, 2, 3, 4, 0, 0, 0])).toBe(
-      `image("/assets/a.png", 1, 2, 3, 4, 0, 0, 0, "o_img");\n`,
-    );
-  });
-
-  test("an image whose rect is a ref is not literal-editable", () => {
-    const raw = `image("/a.png", x0, 0, 10, 10, 0, 0, 0, "o_img");\n`;
-    expect(analyze(raw, "t.ts").get("o_img")?.editable).toBe(false);
+    expect(anno?.editable).toBe(false);
+    expect(anno?.literals).toBeUndefined();
+    expect(patchLiterals(raw, "o_img", [1, 2, 3, 4, 0, 0, 0])).toBeUndefined();
   });
 });
 
 describe("stamp on an image call", () => {
   test("appends the id the constructor registry expects", () => {
-    const { source, added } = stamp(`image("/a.png", 0, 0, 10, 10, 0, 0, 0);\n`, () => "o_0");
+    const { source, added } = stamp(
+      `image("/a.png", { x: 0, y: 0, w: 10, h: 10 });\n`,
+      () => "o_0",
+    );
     expect(added).toEqual(["o_0"]);
-    expect(source).toBe(`image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_0");\n`);
+    expect(source).toBe(`image("/a.png", { x: 0, y: 0, w: 10, h: 10 }, "o_0");\n`);
   });
 });

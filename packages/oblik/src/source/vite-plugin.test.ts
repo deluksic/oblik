@@ -327,7 +327,7 @@ export default defineScene({
   kind: "euclid2",
   title: "Ref",
   build() {
-    image("/assets/gear-9f3a2c11.png", 0, 0, 40, 20, 0, 0, 0.5, "o_img");
+    image("/assets/gear-9f3a2c11.png", { x: 0, y: 0, w: 40, h: 20 }, "o_img");
   },
 });
 `;
@@ -346,8 +346,9 @@ export default defineScene({
       ),
     );
     expect(res.status).toBe(200);
+    // x and rot existed; fade was inserted, in the props' canonical order.
     expect(fs.readFileSync(scene, "utf8")).toContain(
-      'image("/assets/gear-9f3a2c11.png", 5, 0, 40, 20, 90, 0, 1, "o_img")',
+      'image("/assets/gear-9f3a2c11.png", { x: 5, y: 0, w: 40, h: 20, rot: 90, fade: 1 }, "o_img")',
     );
   });
 

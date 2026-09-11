@@ -65,7 +65,7 @@ import {
   type TraceNode,
   type TraceValue,
 } from "./context";
-import { isFiniteImage, snapImageRot, type ImageRot, type ImageValue } from "./image";
+import { isFiniteImage, snapImageRot, type ImageOpts, type ImageValue } from "./image";
 import { memoized } from "./memo";
 import {
   cloneStyle,
@@ -462,43 +462,45 @@ export const csg2 = mark(
  * A raster reference on the paper — a screenshot, a photo, a scanned drawing —
  * drawn under the grid, the fills, the strokes and the points.
  *
- * The rect is explicit and **`x`/`y` is the pre-rotation corner**: `rot` turns
- * the rect about its own centre in 90° steps and `flip` mirrors it about the
- * vertical centre axis, so the world rect a rotated image occupies is
- * `h`-wide and `w`-tall. `fade ∈ [0, 1]` mixes the bitmap toward the paper
- * colour, which is what lets sketch lines read on top of a photograph.
+ * `opts` carries the rect and the three look props, so a reference reads as a
+ * node with named fields rather than a row of eight numbers, and a later prop
+ * (a crop, an opacity mask) does not renumber every call site. The rect is
+ * explicit and `x`/`y` is the corner it grows `+w` and `+h` from — the rect's
+ * screen bottom-left, since world y runs up; `rot` turns the rect about its own
+ * centre in 90° steps and `flip` mirrors it about the vertical centre axis, so
+ * the world rect a rotated image occupies is `h`-wide and `w`-tall.
+ * `fade ∈ [0, 1]` mixes the bitmap toward the paper colour, which is what lets
+ * sketch lines read on top of a photograph.
  *
  * Not a `Geom` and not a CSG operand: nothing composes an image, so eval never
  * learns the bitmap's pixel dimensions. The import flow is what keeps the rect's
  * aspect ratio equal to the file's; uniform scale operations preserve it, and
  * independent `w`/`h` still allow deliberate distortion.
+ *
+ * `dof` is empty on purpose: the numeric props live *inside* the options object,
+ * where the positional literal patcher (`source/patch.ts`) cannot reach them.
+ * The inspector writes them through `source/image-edit.ts` instead, which is the
+ * only writer a reference needs — so there is no on-canvas draft path for one.
  */
 export const image = mark(
-  (
-    src: string,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    rot: ImageRot,
-    flip: 0 | 1,
-    fade: number,
-    id?: string,
-  ): ImageValue => {
+  (src: string, opts: ImageOpts, id?: string): ImageValue => {
+    const o: Partial<ImageOpts> = opts && typeof opts === "object" ? opts : {};
     const value: ImageValue = {
       kind: "image",
       src: typeof src === "string" ? src : "",
-      x: draftAt(id, 0, x),
-      y: draftAt(id, 1, y),
-      w: draftAt(id, 2, w),
-      h: draftAt(id, 3, h),
-      rot: snapImageRot(draftAt(id, 4, rot)),
-      flip: draftAt(id, 5, flip) ? 1 : 0,
-      fade: draftAt(id, 6, fade),
+      // A missing side is NaN, not a default: a rect the caller did not state is
+      // a broken node, and `isFiniteImage` keeps it off the tape like any other.
+      x: o.x ?? Number.NaN,
+      y: o.y ?? Number.NaN,
+      w: o.w ?? Number.NaN,
+      h: o.h ?? Number.NaN,
+      rot: snapImageRot(o.rot ?? 0),
+      flip: o.flip ? 1 : 0,
+      fade: o.fade ?? 0,
     };
     return traced(value, id);
   },
-  { dof: [1, 2, 3, 4, 5, 6, 7] },
+  { dof: [] },
 );
 
 export type SliderOpts = {
