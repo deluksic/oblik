@@ -549,22 +549,24 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
       </div>
       <ResizableSidebar>
         <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
-          <SelectionInspector
-            detail={selectionDetail()}
-            onPickScope={pickScope}
-            onExpose={(bind) => void expose(bind)}
-            onOpenFile={(file, line) => void openAt(file, line)}
-          >
-            <Show when={imageNode()}>
-              {(node) => (
-                <ImageInspector
-                  value={node().value as ImageValue}
-                  onPreview={previewImage}
-                  onCommit={(leaves) => void patchImage(leaves)}
-                />
-              )}
-            </Show>
-          </SelectionInspector>
+          <SelectionSidebar>
+            <SelectionInspector
+              detail={selectionDetail()}
+              onPickScope={pickScope}
+              onExpose={(bind) => void expose(bind)}
+              onOpenFile={(file, line) => void openAt(file, line)}
+            >
+              <Show when={imageNode()}>
+                {(node) => (
+                  <ImageInspector
+                    value={node().value as ImageValue}
+                    onPreview={previewImage}
+                    onCommit={(leaves) => void patchImage(leaves)}
+                  />
+                )}
+              </Show>
+            </SelectionInspector>
+          </SelectionSidebar>
         </Loading>
       </ResizableSidebar>
     </div>

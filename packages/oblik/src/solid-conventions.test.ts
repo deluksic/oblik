@@ -44,6 +44,28 @@ describe("solid conventions", () => {
     expect(offenders).toEqual([]);
   });
 
+  test("renders the sidebar inspector inside its sidebar", () => {
+    // Removing the `<SelectionSidebar>` wrapper costs the panel its `<aside>` —
+    // and with it the padding, the background, the border and the column gap —
+    // while every type still checks and no test can see the DOM. So: wherever a
+    // pane renders `<SelectionInspector`, it must be inside a
+    // `<SelectionSidebar>`.
+    const offenders: string[] = [];
+    for (const file of walk(root)) {
+      if (!file.endsWith(".tsx")) continue;
+      const src = fs.readFileSync(file, "utf8");
+      // The file that *defines* the sidebar renders its default inspector
+      // inside its own `<aside>` — it is the wrapper.
+      if (src.includes("export function SelectionSidebar")) continue;
+      const inspector = src.indexOf("<SelectionInspector");
+      if (inspector < 0) continue;
+      const open = src.lastIndexOf("<SelectionSidebar>", inspector);
+      const close = src.lastIndexOf("</SelectionSidebar>", inspector);
+      if (open < 0 || close > open) offenders.push(path.relative(root, file));
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("does not pass live nodes with non-undefined assertions", () => {
     const offenders: string[] = [];
     for (const file of walk(root)) {

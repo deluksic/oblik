@@ -5,10 +5,10 @@ import { mentionExpr, mentionPrint, scopeFromTrace, type ScopeFocus } from "../e
 import type { SceneValue, TraceNode } from "../eval/context";
 import { tryEvaluate } from "../eval/evaluate";
 import { assignInv, invMatches } from "../eval/inv";
-import type { VisitCaches } from "../eval/scene-cache";
 import { isPaint } from "../eval/paint";
 import { reuseUnchangedTrace } from "../eval/reuse-trace";
 import type { FigureScene } from "../eval/scene";
+import type { VisitCaches } from "../eval/scene-cache";
 import { sourceFileKey } from "../eval/stack";
 import { openInEditor } from "../host/editor";
 import { ResizableSidebar } from "../host/ResizableSidebar";
@@ -253,7 +253,7 @@ export function FigurePane(props: FigurePaneProps) {
 
   function geomForPaint(paint: TraceNode): TraceNode | undefined {
     if (!isPaint(paint.value)) return undefined;
-    const t = (paint.value).targets[0];
+    const t = paint.value.targets[0];
     if (!t) return undefined;
     return world().trace.find((n) => n.id === t.id && n.occ === t.occ);
   }
@@ -419,7 +419,7 @@ export function FigurePane(props: FigurePaneProps) {
           <Show
             when={frameSelected() ? frameXywh() : undefined}
             fallback={
-              <Loading fallback={<SelectionInspector detail={emptyScopeDetail(focus())} />}>
+              <Loading fallback={<SelectionSidebar detail={emptyScopeDetail(focus())} />}>
                 <SelectionInspector
                   detail={selectionDetail()}
                   onPickScope={pickScope}
