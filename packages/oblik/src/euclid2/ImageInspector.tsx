@@ -1,3 +1,7 @@
+import IconFlipHorizontal from "~icons/lucide/flip-horizontal-2";
+import IconRotateCcw from "~icons/lucide/rotate-ccw";
+import IconRotateCw from "~icons/lucide/rotate-cw";
+
 import type { ImageRot, ImageValue } from "../eval/image";
 import { NumberField } from "../figure/NumberField";
 import { SidebarSection } from "../host/SelectionSidebar";
@@ -55,7 +59,7 @@ export function ImageInspector(props: ImageInspectorProps) {
             title="Rotate 90° anticlockwise"
             onClick={() => act({ rot: turn(props.value.rot, -1) })}
           >
-            ⟲
+            <IconRotateCcw />
           </button>
           <button
             type="button"
@@ -63,7 +67,7 @@ export function ImageInspector(props: ImageInspectorProps) {
             title="Rotate 90° clockwise"
             onClick={() => act({ rot: turn(props.value.rot, 1) })}
           >
-            ⟳
+            <IconRotateCw />
           </button>
           <button
             type="button"
@@ -71,7 +75,7 @@ export function ImageInspector(props: ImageInspectorProps) {
             title="Mirror about the vertical centre axis"
             onClick={() => act({ flip: props.value.flip ? 0 : 1 })}
           >
-            ⇄
+            <IconFlipHorizontal />
           </button>
         </div>
         <div class={styles.params}>

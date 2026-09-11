@@ -34,15 +34,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.9rem;
-  padding: var(--space-0) var(--space-1);
-  font-size: 0.9rem;
-  line-height: 1;
+  min-width: 1.75rem;
+  padding: var(--space-1);
   border: 1px solid var(--oblik-line);
   border-radius: 6px;
   background: var(--oblik-raised);
   color: var(--oblik-text);
   cursor: pointer;
+}
+
+/* The glyph is an SVG, so its size is stated rather than inherited from a font
+   size — which is what made the first pass (text arrows like ⟲) look tiny. */
+.iconBtn svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
 }
 
 .iconBtn:hover {
