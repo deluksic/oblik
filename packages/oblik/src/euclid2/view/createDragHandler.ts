@@ -2,11 +2,30 @@ import { createSignal, onCleanup } from "solid-js";
 
 import type { SceneValue } from "#eval/context";
 
+import { DragTracker } from "./dragTracker";
 import type { PointerInput } from "./pointer";
 
 export type DragSession = {
   onPointerMove?: (event: PointerEvent) => void;
-  onDone?: (event?: PointerInput | undefined) => void;
+  /**
+   * End of the gesture. `dragged` is the handler's click-vs-drag verdict —
+   * see `DragEnd`.
+   */
+  onDone?: (end?: DragEnd) => void;
+};
+
+/**
+ * What a finished gesture was. `pointer` is the release event when there is
+ * one; `dragged` is false only when the pointer never left the press point by
+ * the click tolerance, which makes the gesture a click.
+ *
+ * Exists so callers never re-derive "was this a click?" from the release
+ * coordinates: a drag that returns to where it started has identical endpoints,
+ * so any before/after distance test calls it a click. Only the handler sees
+ * every move, so only the handler can answer this.
+ */
+export type DragEnd = PointerInput & {
+  dragged: boolean;
 };
 
 /** Pointer-session phase. Read `phase()` from JSX. */
@@ -18,8 +37,22 @@ export type CreateDragHandlers<T extends SceneValue[] = []> = (
 ) => DragSession | undefined;
 
 export type DragHandlerOptions = {
-  /** Euclidean distance in CSS pixels before `onPointerMove` runs. */
+  /**
+   * Euclidean distance in CSS pixels before `onPointerMove` runs — how far the
+   * gesture travels before it starts moving anything. This is the jitter
+   * guard, not the click test.
+   */
   deadZoneRadius?: number;
+  /**
+   * Euclidean distance in CSS pixels the pointer may ever travel before the
+   * gesture stops counting as a click (see `DragEnd.dragged`). Defaults to
+   * `deadZoneRadius`.
+   *
+   * Deliberately separate from the dead zone: a pan wants to start moving
+   * after ~1px, while a press that stays within ~4px should still select
+   * whatever it landed on.
+   */
+  clickTolerance?: number;
   preventDefault?: boolean;
 };
 
@@ -30,16 +63,6 @@ export type DragHandler = {
     options?: DragHandlerOptions,
   ) => (event: PointerEvent, ...args: T) => void;
 };
-
-function pastDeadZone(
-  from: { clientX: number; clientY: number },
-  to: { clientX: number; clientY: number },
-  radius: number,
-): boolean {
-  const dx = to.clientX - from.clientX;
-  const dy = to.clientY - from.clientY;
-  return dx * dx + dy * dy >= radius * radius;
-}
 
 function anyAbort(a: AbortSignal, b: AbortSignal): AbortSignal {
   if (typeof AbortSignal.any === "function") return AbortSignal.any([a, b]);
@@ -97,6 +120,8 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
     options?: DragHandlerOptions,
   ): (event: PointerEvent, ...args: T) => void {
     const deadZoneRadius = options?.deadZoneRadius ?? defaults.deadZoneRadius ?? 0;
+    const clickTolerance =
+      options?.clickTolerance ?? defaults.clickTolerance ?? deadZoneRadius;
     const preventDefault = options?.preventDefault ?? defaults.preventDefault ?? true;
 
     return (initEvent: PointerEvent, ...args: T) => {
@@ -117,7 +142,12 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
       captured?.setPointerCapture(initEvent.pointerId);
 
       const { onPointerMove, onDone } = handlers;
-      let moved = false;
+      // The tracker owns both latches: `dragged` answers the click-vs-drag
+      // question for `onDone`, `moved` gates whether moves are forwarded. The
+      // gate must latch — a per-event distance test would stop forwarding moves
+      // as soon as the pointer came back near the press point, freezing the
+      // thing being dragged at the dead-zone edge so it could never get home.
+      const tracker = new DragTracker(initEvent, clickTolerance);
 
       function finish(event?: Event) {
         if (cleanup.signal.aborted) return;
@@ -133,7 +163,19 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
         }
         const pointer = isPointerInput(event) ? event : undefined;
         setPhase("not-started");
-        onDone?.(pointer);
+        // Built property by property, never spread: `clientX`/`clientY` are
+        // accessors on MouseEvent's prototype, so a spread of a real
+        // PointerEvent copies nothing and yields `undefined` coordinates that
+        // only blow up later, as NaN in a value. Copying the two coordinates
+        // reads the getters, and the type stops being a promise the data
+        // cannot keep.
+        onDone?.(
+          pointer && {
+            clientX: pointer.clientX,
+            clientY: pointer.clientY,
+            dragged: tracker.dragged(),
+          },
+        );
       }
 
       function onPointerMove_(event: PointerEvent) {
@@ -141,15 +183,15 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
           event.preventDefault();
           event.stopImmediatePropagation();
         }
-        if (moved || pastDeadZone(initEvent, event, deadZoneRadius)) {
-          if (!moved) setPhase("dragging");
-          moved = true;
+        tracker.update(event);
+        if (tracker.moved(event, deadZoneRadius)) {
+          if (phase() !== "dragging") setPhase("dragging");
           onPointerMove?.(event);
         }
       }
 
       function preventClickIfMoved(event: Event) {
-        if (moved && preventDefault) {
+        if (tracker.dragged() && preventDefault) {
           event.preventDefault();
           event.stopImmediatePropagation();
         }

@@ -1,11 +1,6 @@
-/*
- * The section is one flex child of the sidebar; this block is one flex child of
- * the section. That is deliberate: spacing between these slots is this module's
- * business (via `gap`, never `margin` — the sidebar zeroes `p` margins and a
- * margin here would double-space against the section's own gap).
- *
- * Everything sizes with `minmax`/`1fr` rather than `max-content`, because the
- * sidebar is `overflow: hidden`: a too-wide row is clipped, not scrolled.
+/**
+ * One flex child of the sidebar's section, so the spacing between these slots is
+ * this module's `gap`. Nothing here sets a margin.
  */
 /* The slots inside the reference block. One step tighter than the sidebar's
    own 16px between blocks, and one step wider than the 4px inside a group
@@ -43,8 +38,8 @@
   cursor: pointer;
 }
 
-/* The glyph is an SVG, so its size is stated rather than inherited from a font
-   size — which is what made the first pass (text arrows like ⟲) look tiny. */
+/* Square icon buttons in the sidebar's idiom (see BrushDock), not the title
+   bar's text buttons: these carry glyphs, not labels. */
 .iconBtn svg {
   display: block;
   width: 1rem;
@@ -64,11 +59,10 @@
   gap: var(--space-1) var(--space-3);
 }
 
-/*
- * The three dials are *one* grid, not three: sharing the columns is what makes
- * every slider the same length and aligned, whatever its label says. The track
- * column is capped (`11rem`) and shrinkable, so a wide sidebar does not stretch
- * a slider across the panel.
+/**
+ * The three dials are *one* grid, so the sliders share columns and line up
+ * whatever their labels say. `minmax`/`1fr` because the sidebar is
+ * `overflow: hidden` and clips anything wider.
  */
 .dials {
   display: grid;

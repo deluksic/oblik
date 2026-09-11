@@ -4,14 +4,7 @@ import * as ts from "typescript";
 import { trailingId } from "./analyze";
 import { formatNum } from "./patch";
 
-/**
- * Every leaf an image patch may set, as a dotted path into the options object.
- *
- * Flat on the wire so that one code path writes a prop at any depth —
- * `world.x` is no different from `style.opacity` — and so that a later prop adds a
- * name here rather than another case to the editor. Order matters: it is the
- * order missing leaves are created in.
- */
+/** Every leaf a patch may set, as a dotted path into the options object. */
 export const IMAGE_LEAVES = [
   "world.x",
   "world.y",
@@ -79,11 +72,8 @@ function printTree(tree: Tree): string {
 }
 
 /**
- * Add `entries` (`["style.opacity: 0.4"]`) to an object literal, in the style it is
- * already written in: a multiline object gets one property per line, indented
- * like its last property, and a single-line one is extended in place with one
- * normalised separator. Trailing commas are respected rather than doubled — the
- * same care `stamp.ts` takes when it appends an id.
+ * Add dotted entries to an object literal in the style it is already written in:
+ * one property per line when multiline, `{ a: 1 }` when single-line.
  */
 function insertProps(
   ms: MagicString,
@@ -176,17 +166,8 @@ function setLeaf(
 }
 
 /**
- * Patch a reference's props in place. Leaves the call already carries are
- * overwritten; missing ones are created, so an inspector can move or resize a
- * node the author wrote short without anyone editing the file by hand. `src` is
- * rewritten as the call's first argument.
- *
- * A created branch is written whole from the leaves in the patch, so a caller
- * that creates `world` must state both coordinates — which the
- * patch schema enforces, because a half-stated rect is a node that silently
- * stops drawing. Throws when there is no such call, when a branch to descend
- * through is not an object literal (a ref cannot be patched field by field), or
- * when the patch is empty.
+ * Patch a reference in place: leaves the call carries are overwritten, missing
+ * ones created, so the inspector can move or resize a node that states little.
  */
 export function patchImageProps(source: string, id: string, props: ImageProps): string {
   const sf = parse(source);

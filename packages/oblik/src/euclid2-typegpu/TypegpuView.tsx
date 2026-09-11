@@ -10,12 +10,13 @@ import {
   type Camera2,
   type PaneSize,
 } from "../euclid2/camera";
-import { describeDrop, droppedImage, pastedImage } from "../euclid2/importImage";
-import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX, traceKey } from "../euclid2/pick";
+import { describeDrop, droppedImage, droppedPath, pastedImage } from "../euclid2/importImage";
+import { hitsNear, isFiniteTrace, PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { hoverTool, mutedForScope, snapFilterOf, toolChrome } from "../euclid2/tool";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
 import { CONSTRUCTION_STROKE_PX } from "../euclid2/view/chrome";
 import { createDragHandler, type DragSession } from "../euclid2/view/createDragHandler";
+import { createElementBox } from "../euclid2/view/elementBox";
 import { isGrabbable, hoverNode } from "../euclid2/view/marks";
 import {
   applyDrag,
@@ -65,6 +66,12 @@ export type TypegpuViewProps = {
    * view it landed in (the pane turns that into a node). */
   onImportImage?: (
     file: File,
+    at: { world: { x: number; y: number }; view: { w: number; h: number; scale: number } },
+  ) => void;
+  /** The same, for a drop that carried a *path* instead of bytes: an embedded
+   * browser hands the drag over as a URI, which only the dev server can read. */
+  onImportImagePath?: (
+    path: string,
     at: { world: { x: number; y: number }; view: { w: number; h: number; scale: number } },
   ) => void;
   scope?: Scope;
@@ -203,19 +210,22 @@ export function TypegpuView(props: TypegpuViewProps) {
   const [paperEl, setPaperEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const [canvasEl, setCanvasEl] = createSignal<HTMLCanvasElement | undefined>(undefined);
   const [gpu, setGpu] = createSignal<GpuState>("init");
-  /**
-   * The scene's declared camera is where the scene opens: switching scenes (a
-   * different declaration) reframes the view, while an edit that leaves the
-   * declaration alone — the HMR re-import that every committed edit triggers —
-   * must not move it. Comparing the *value* is what separates the two, so this
-   * matches `figure/View.tsx`; a pan or zoom is a local override that survives
-   * until the declaration changes.
-   */
+  /** The scene's declared camera is where it opens. Comparing the *value* tells a
+   * scene switch from the HMR re-import every committed edit triggers; a pan or
+   * zoom is a local override that survives both. */
   const initialCamera = createMemo(() => props.initialCamera, {
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   const [camera, setCamera] = createSignal<Camera2>(() => initialCamera() ?? DEFAULT_CAMERA);
-  const [size, setSize] = createSignal<PaneSize>({ w: 800, h: 600 });
+  /** The paper's box in both units; the pane's math takes the logical half, and
+   * the pre-observer default keeps every conversion finite. */
+  const paperBox = createElementBox(
+    () => paperEl(),
+    // A DOM callback, so reading the camera here is current *and* untracked on
+    // purpose: it is how the pane hears that the view moved.
+    { onChange: () => reportView() },
+  );
+  const size = () => paperBox()?.logical ?? { w: 800, h: 600 };
   // Bumped once the renderer+painter exist so reactive effects re-run.
   const [ready, setReady] = createSignal(0);
   const [patchStats, setPatchStats] = createSignal<{ written: number; total: number } | undefined>(
@@ -386,28 +396,28 @@ export function TypegpuView(props: TypegpuViewProps) {
     },
   );
 
-  /** CPU pick at the pointer (shared `pick.ts`, no DOM), restricted to nodes the
-   * pane actually draws — see `isDrawnNode`. */
-  /** Hand a bitmap up with the place it belongs: the world point, and the view
-   * it landed in so the pane can size it to what is on screen. */
-  function importAt(file: File, worldPoint: { x: number; y: number }): void {
+  /** Hand a bitmap up with the place it belongs: the world point and the view it
+   * landed in, so the pane can size it to what is on screen. */
+  function importAt(source: File | string, worldPoint: { x: number; y: number }): void {
     const pane = size();
-    props.onImportImage?.(file, {
+    const at = {
       world: worldPoint,
       view: { w: pane.w, h: pane.h, scale: camera().scale },
-    });
+    };
+    if (typeof source === "string") props.onImportImagePath?.(source, at);
+    else props.onImportImage?.(source, at);
   }
 
   function onDrop(e: DragEvent): void {
     // Always preventDefault: without it on `dragover` the browser navigates to
-    // the file and the scene is gone, image or no image.
+    // the file and the scene is gone.
     e.preventDefault();
     const data = e.dataTransfer ?? undefined;
     const file = droppedImage(data);
-    if (file === undefined) {
-      // A drop that does nothing is indistinguishable from a broken app. Say
-      // what arrived instead: an embedded browser often hands a drag over with
-      // no file in it at all.
+    const path = file === undefined ? droppedPath(data) : undefined;
+    if (file === undefined && path === undefined) {
+      // A drop that does nothing is indistinguishable from a broken app, so say
+      // what arrived instead.
       props.onNotice?.(describeDrop(data));
       return;
     }
@@ -415,17 +425,14 @@ export function TypegpuView(props: TypegpuViewProps) {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const at = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    importAt(file, screenToWorld(at, camera(), size()));
+    const worldPoint = screenToWorld(at, camera(), size());
+    if (file !== undefined) importAt(file, worldPoint);
+    else if (path !== undefined) importAt(path, worldPoint);
   }
 
-  /** Tell the pane where the view is, so an import it triggers itself (the
-   * picker) can land in the middle of what is on screen.
-   *
-   * Called from the handlers that *move* the view — a pan, a zoom, a resize —
-   * rather than from an effect watching the camera: this is the same shape as
-   * every other thing the view tells the pane (`onPick`, `onCursor`, `onPlace`),
-   * it keeps a signal write out of an effect, and the pane only ever needs the
-   * value at click time, which is always after one of these. */
+  /** Called from the handlers that *move* the view — a pan, a zoom, a resize —
+   * not from an effect watching the camera; the pane needs the value at click
+   * time, which is always after one of them. */
   function reportView(): void {
     const pane = size();
     props.onView?.({
@@ -491,38 +498,38 @@ export function TypegpuView(props: TypegpuViewProps) {
     props.onPlace?.(hit);
   }
 
-  // Mirrors the SVG view's pan gesture: a drag pans; releasing without having
-  // panned is a click that picks the hits under the pointer ([] deselects).
+  // Mirrors the SVG view's pan gesture: a drag pans; a click picks the hits
+  // under the pointer ([] deselects). `dragged` is the handler's verdict, so a
+  // pan that returns to its press point is still a pan and picks nothing.
   const startPan = drag.start(
     // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
     (e, hits: TraceNode[]) => {
       const initialStart = panDrag(e, camera());
       const pick = hits.length > 0 ? hits : undefined;
-      let moved = false;
       return {
         onPointerMove(ev) {
-          moved = true;
           const next = applyDrag(initialStart, ev, paperEl(), camera(), size(), props.trace);
           if (next.camera) {
             setCamera(next.camera);
             reportView();
           }
         },
-        onDone() {
-          if (!moved) props.onPick?.(pick ?? []);
+        onDone(end) {
+          if (end && !end.dragged) props.onPick?.(pick ?? []);
         },
       };
     },
-    { deadZoneRadius: 1 },
+    // Pan follows the pointer almost immediately; the click tolerance stays at
+    // the pick distance, so a press that never really moved still selects.
+    { deadZoneRadius: 1, clickTolerance: PICK_CLICK_PX },
   );
 
   /** Grab-cursor while the hovered node is a draggable handle. */
   const grabbingHover = createMemo(() => isGrabbable(hoverNode(props.trace, props.hoverKey)));
 
-  // Handle editing (points, gliders, radii, parallels, offsets) — same session
-  // semantics as the SVG view: live drafts during the drag, a literal commit on
-  // release, and a sub-click release picks the node instead.
-  function editSession(session: EditDrag, down: PointerEvent): DragSession {
+  // Handle editing (points, gliders, radii, parallels, offsets): live drafts
+  // during the drag, a literal commit on release, and a click picks the node.
+  function editSession(session: EditDrag): DragSession {
     let live = false;
     return {
       onPointerMove(ev) {
@@ -535,18 +542,18 @@ export function TypegpuView(props: TypegpuViewProps) {
           props.onDraft(next.draft.id, next.draft.values);
         }
       },
-      onDone(ev) {
+      onDone(end) {
         // Drop live-edit before commit so Solid batches one eval with stacks
         // and the final draft; the sidebar unfreezes on that same tick.
         if (live) props.onLiveEdit?.(false);
-        if (!ev) return;
-        // The 2px dead zone only absorbs jitter; travel past it still counts
-        // toward the release-time click-vs-drag call: sub-click travel selects.
-        if (!movedPastClick(down.clientX, down.clientY, ev.clientX, ev.clientY)) {
+        if (!end) return;
+        // A handle dragged out and returned is still a drag: it commits there
+        // rather than selecting the node it never let go of.
+        if (!end.dragged) {
           props.onPick?.([session.node]);
           return;
         }
-        const next = applyDrag(session, ev, paperEl(), camera(), size(), props.trace);
+        const next = applyDrag(session, end, paperEl(), camera(), size(), props.trace);
         if (next.draft) props.onCommit(next.draft.id, next.draft.values);
       },
     };
@@ -554,8 +561,9 @@ export function TypegpuView(props: TypegpuViewProps) {
 
   const startEdit = drag.start(
     // oxlint-disable-next-line solid/reactivity -- drag.start factory runs at pointerdown; snapshot semantics are intentional.
-    (e, session: EditDrag) => editSession(session, e),
-    { deadZoneRadius: 2 },
+    (_e, session: EditDrag) => editSession(session),
+    // Edit keeps its slightly wider dead zone and picks on the same tolerance.
+    { deadZoneRadius: 2, clickTolerance: PICK_CLICK_PX },
   );
 
   function onPointerDown(e: PointerEvent) {
@@ -624,22 +632,6 @@ export function TypegpuView(props: TypegpuViewProps) {
   }
 
   // Keep the size signal aligned with the paper box (the canvas is inside it).
-  createEffect(
-    (): HTMLDivElement | undefined => paperEl(),
-    (el) => {
-      if (!el) return;
-      const measure = () => {
-        const rect = el.getBoundingClientRect();
-        setSize({ w: rect.width, h: rect.height });
-        reportView();
-      };
-      const ro = new ResizeObserver(measure);
-      ro.observe(el);
-      measure();
-      return () => ro.disconnect();
-    },
-  );
-
   return (
     <div
       ref={setPaperEl}

@@ -1,5 +1,7 @@
 import type { TgpuRoot } from "typegpu";
 
+import { boxFromEntry, boxFromRect, currentDpr } from "../../euclid2/view/elementBox";
+
 export type Rgba = { r: number; g: number; b: number; a: number };
 
 export type GpuRenderer = {
@@ -63,27 +65,22 @@ export function createRenderer(opts: {
   let destroyed = false;
 
   function resize(entries?: ResizeObserverEntry[]) {
-    // devicePixelContentBoxSize gives the exact device-pixel box (no rounding
-    // drift from CSS px * dpr); fall back to the rect when unsupported.
-    const box = entries?.find((e) => e.target === canvas)?.devicePixelContentBoxSize?.[0];
-    let width: number;
-    let height: number;
-    if (box) {
-      width = Math.max(1, box.inlineSize);
-      height = Math.max(1, box.blockSize);
-    } else {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      width = Math.max(1, Math.round(rect.width * dpr));
-      height = Math.max(1, Math.round(rect.height * dpr));
-    }
-    if (width === size.width && height === size.height) return;
-    size.width = width;
-    size.height = height;
-    canvas.width = width;
-    canvas.height = height;
+    // The backing store wants the *physical* box; `elementBox` is the one place
+    // that knows how to read one, fallback included.
+    const entry = entries?.find((e) => e.target === canvas);
+    const { physical } = entry
+      ? boxFromEntry(entry, currentDpr())
+      : boxFromRect(canvas, currentDpr());
+    if (physical.w === size.width && physical.h === size.height) return;
+    size.width = physical.w;
+    size.height = physical.h;
+    canvas.width = physical.w;
+    canvas.height = physical.h;
     currentMsaaView = undefined;
+    // Draw here and now: this runs before paint, so a synchronous draw lands on
+    // time, where `dirty` would paint one frame at the old size.
     dirty = true;
+    drawNow();
   }
 
   /** Swapchain texture view; fetched fresh each frame — the context rotates
@@ -110,8 +107,15 @@ export function createRenderer(opts: {
   function frame() {
     raf = requestAnimationFrame(frame);
     if (!dirty) return;
+    drawNow();
+  }
+
+  /** Render this instant rather than at the next animation frame; safe from any
+   * task, since the queue orders submissions. */
+  function drawNow(resolveOverride?: GPUTextureView) {
+    if (destroyed) return;
     dirty = false;
-    opts.draw(renderer);
+    opts.draw(renderer, resolveOverride);
   }
 
   async function capture(): Promise<{ width: number; height: number; bytes: Uint8Array }> {
@@ -121,8 +125,7 @@ export function createRenderer(opts: {
       format,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
     });
-    dirty = false;
-    opts.draw(renderer, resolve.createView());
+    drawNow(resolve.createView());
     const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
     const staging = root.device.createBuffer({
       size: bytesPerRow * height,

@@ -3,31 +3,14 @@ import { snapImageRot, type ImageValue } from "../eval/image";
 import { sameDrawValue } from "../eval/reuse-trace";
 import type { ImageProps } from "../source/image-edit";
 
-/**
- * Live reference edits, without a source write.
- *
- * A source patch costs a file write and a full HMR round — an 810 KB
- * annotations bundle re-parsed on the client, 32 user sources re-scanned, the
- * scene re-executed and everything re-evaluated — which is fine once per
- * gesture and hopeless once per pointer event. So a drag edits a **pane-local
- * override** instead: the tape the view draws and the inspector reads is the
- * evaluated one with one node's value swapped, and only the release reaches the
- * endpoint. The same mechanism is what drag-to-move needs, which is why it
- * lives here rather than inside the inspector.
- *
- * The override is **self-clearing**: once the evaluated value equals what was
- * previewed, the source has caught up and the node is handed back untouched. So
- * there is no "clear the preview" step to get wrong, and a slow patch cannot
- * flash the old value back on screen.
- */
+/** A live edit that has not reached the source: one node's value swapped in the
+ * evaluated tape, so a drag previews without a write. */
 export type ImageOverride = { id: string; occ: number; value: ImageValue };
 
 /**
- * Apply patch leaves the way `source/image-edit.ts` writes them, to a value
- * instead of to source text — same leaves, same meaning, so a preview and the
- * write it commits to cannot disagree. `rot` and `flip` go through the same
- * normalisation the constructor uses, and a target side is only ever *added*,
- * never dropped: a node stating one side keeps inferring the other.
+ * Patch leaves applied to a value the way `source/image-edit.ts` applies them to
+ * source text — same leaves, same meaning, so a preview and the write it
+ * commits to cannot disagree.
  */
 export function applyImageLeaves(value: ImageValue, leaves: ImageProps): ImageValue {
   const width = leaves["targetSize.width"];

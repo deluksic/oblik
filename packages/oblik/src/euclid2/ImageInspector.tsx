@@ -23,17 +23,7 @@ export type ImageInspectorProps = {
 
 const TURNS: ImageRot[] = [0, 90, 180, 270];
 
-/**
- * The reference inspector: the transform kit, in one section.
- *
- * Every control writes through the patch endpoint and nothing else — there is no
- * draft path for a reference (its numbers live inside an options object, out of
- * reach of the literal patcher) and no on-canvas handles, by design. What it
- * shows is the authored props rather than a resolved rect, which is why the
- * *stated* target side is the one that gets a field: a node written with only a
- * width keeps inferring its height, and the field that would freeze that is not
- * the one on offer.
- */
+/** The reference inspector: the transform kit in one section. */
 export function ImageInspector(props: ImageInspectorProps) {
   /** A button has no "drag": show it at once and write it once. */
   const act = (leaves: ImageProps) => {
@@ -148,19 +138,19 @@ export function ImageInspector(props: ImageInspectorProps) {
   );
 }
 
-/** A quarter turn from `rot`, which is what the buttons are for. */
-function turn(rot: ImageRot, steps: number): ImageRot {
+/**
+ * Advance `rot` by quarter turns **as the screen shows them**: `+1` is clockwise,
+ * which is what a "rotate right" button means.
+ */
+function turn(rot: ImageRot, screenSteps: number): ImageRot {
   const at = TURNS.indexOf(rot);
-  return TURNS[((((at < 0 ? 0 : at) + steps) % TURNS.length) + TURNS.length) % TURNS.length]!;
+  const next = ((((at < 0 ? 0 : at) - screenSteps) % TURNS.length) + TURNS.length) % TURNS.length;
+  return TURNS[next]!;
 }
 
 /**
  * One style dial: a range for the gesture, the number for the record.
  *
- * `input` fires continuously and only *previews* — the canvas follows the
- * thumb with no source write, because a write here would mean a file write and
- * a full HMR round per pointer event. `change` fires once, when the gesture
- * ends, and that is what commits.
  */
 function Dial(props: {
   label: string;

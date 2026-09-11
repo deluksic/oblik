@@ -281,13 +281,6 @@ export function hitTest(
 }
 
 export const PICK_CLICK_PX = 4;
-const PICK_CLICK_PX2 = PICK_CLICK_PX * PICK_CLICK_PX;
-
-export function movedPastClick(fromX: number, fromY: number, toX: number, toY: number): boolean {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  return dx * dx + dy * dy >= PICK_CLICK_PX2;
-}
 
 /** Nearest named line-like stroke under the pointer (ignores points). */
 export function snapLineCarrier(

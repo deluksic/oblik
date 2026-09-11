@@ -71,15 +71,6 @@ export function screenToWorld(
 /**
  * The world width that shows a `image.width` × `image.height` bitmap inside
  * `view`, with `pad` of the shorter axis left as margin.
- *
- * This is what an import writes as its `targetSize.width`. A reference is
- * *placed* at the size of the view you are working in, rather than at one world
- * unit per bitmap pixel: at this app's zoom range (8–280 px per unit) a 400 px
- * screenshot at pixel scale needs a zoom floor far below the one the camera has,
- * so "fit it to the pane" cannot be a camera move without changing the app's
- * whole zoom behaviour. Writing a size keeps the model honest — the node still
- * holds an explicit world rect and eval still never sees a pixel — and the true
- * scale comes from measure, which is the flow that exists for it.
  */
 export function fitWorldWidth(
   view: { w: number; h: number; scale: number },

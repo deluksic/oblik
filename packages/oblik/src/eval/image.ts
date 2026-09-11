@@ -1,41 +1,21 @@
 import type { Aabb, Vec2 } from "../geom";
 
 /**
- * A raster reference traced on the paper. A parallel `TraceValue` arm, like
- * `PaintValue`: **not** a `Geom` and **not** a `CsgOperand`, so nothing composes
- * it and it never enters a CSG tree. Eval therefore never learns the bitmap's
- * pixel dimensions — the world rect is explicit, and the import flow is what
- * preserves the file's aspect ratio.
- *
- * This is the *resolved* form: a concrete world rect, which is what pick and the
- * GPU need and all they see. The authoring form — an anchor, the bitmap's pixel
- * size and a target size — is `ImageOpts`, and `imageRect` is the conversion;
- * nothing downstream of here knows about pixels.
- *
- * `x`/`y` is the **pre-rotation** minimum corner, the one the rect grows `+w`
- * and `+h` from, and `rot` turns the rect about its own centre. World y runs up
- * while image y runs down, so the bitmap's top-left is the rect's `(x, y+h)`
- * corner; a positive `rot` reads as a clockwise turn on screen. `flip` mirrors
- * the sampled image about the vertical centre axis — it changes which way the
- * picture faces, never the rect's geometry. `style` is how the bitmap is drawn:
- * see `ImageStyle`.
- *
- * Loading and decoding stay outside this module: an `ImageValue` is a rect and a
- * URL, which is what keeps eval, pick and the GPU pure and device-free.
+ * A raster reference traced on the paper: a parallel `TraceValue` arm like
+ * `PaintValue`, not a `Geom` and not a `CsgOperand`.
  */
 export type ImageValue = {
   kind: "image";
   src: string;
-  /** Where the reference is pinned — `anchor` is the bitmap pixel that sits
-   * there, and the two place the **pre-rotation** rect (see the charter's open
-   * question about making the anchor the pivot too). */
+  /** The bitmap pixel pinned to `world`; the two place the pre-rotation rect. */
   world: Vec2;
   anchor: Vec2;
   imageSize: { width: number; height: number };
-  /** Exactly the sides the call stated: one of them is derived downstream from
-   * the other and the bitmap's aspect, which is why the value keeps the
-   * authored form rather than a resolved rect. `imageRect` is the conversion,
-   * and the inspector edits what the source says. */
+  /**
+   * State one side and the other follows from `imageSize`'s aspect; state both
+   * and the picture stretches. The tape keeps the authored form so the inspector
+   * can report what the file says — `imageRect` is the conversion.
+   */
   targetSize: { width?: number; height?: number };
   rot: ImageRot;
   flip: 0 | 1;
@@ -43,18 +23,8 @@ export type ImageValue = {
 };
 
 /**
- * How the bitmap is drawn, as three independent dials rather than one "fade".
- * All three are resolved — a value always states them, so nothing downstream
- * has to know what the defaults were.
- *
- * - `opacity` multiplies the bitmap's own alpha. The reference layer draws first
- *   on the cleared paper, so the blend is what mixes a faint reference toward
- *   the paper — no paper colour in the shader, and a theme switch works for
- *   free.
- * - `saturation` mixes between the bitmap's grey and the bitmap: `0` is a
- *   pencil-friendly greywash, `1` is as scanned, above `1` boosts.
- * - `contrast` scales about mid-grey: `0` flattens to grey, `1` is as scanned,
- *   above `1` hardens the line work a trace is reading.
+ * Look dials, resolved on the value: `opacity` is alpha, `saturation` and
+ * `contrast` are 1-is-unchanged multipliers.
  */
 export type ImageStyle = {
   opacity: number;
@@ -65,34 +35,8 @@ export type ImageStyle = {
 /** Quarter turns. Not a free angle: the steps keep the rect axis-aligned at 0/180. */
 export type ImageRot = 0 | 90 | 180 | 270;
 
-/**
- * Everything about a reference but its source: where it is pinned, how big the
- * bitmap is, how big to draw it, and the three look props.
- *
- * `world` is where it goes and `anchor` is the pixel of the bitmap that goes
- * there — the **anchor point**, as After Effects and Figma call it (Flash's
- * *registration point*, Illustrator's *reference point*, a game engine's
- * *pivot*; paired with a world coordinate it is a *control point*). It defaults
- * to the bitmap's top-left, so the picture hangs down and to the right of
- * `world` — the reading every other rect in this system has (SVG, canvas, CSS).
- * Anchor the centre to place a reference by its middle, or a hole to pin the
- * reference to the feature being traced.
- *
- * A **traced point drops straight into `world`**: a `point()` is a `Vec2`, so
- * `image(src, { world: P, … })` pins the reference to it and eval reads its
- * coordinates — move the point and the picture moves with it, the same way
- * `circle(P, r)` does.
- *
- * `imageSize` — the bitmap's own pixel size — is what the aspect comes from, and
- * it is stated here rather than read from the file so that **nothing about
- * evaluation is asynchronous and nothing has to decode**: eval does arithmetic
- * on numbers the script gave it. `targetSize` states the world size; one side
- * infers the other from that aspect, both sides allow deliberate distortion.
- *
- * Image space is **pixels, y running down** from the top-left, the way the
- * bitmap and the uv table are numbered; world y runs up. `imageRect` is the one
- * place that conversion happens.
- */
+/** Everything about a reference but its source: where it is pinned, how big the
+ * bitmap is, how big to draw it, and the look. */
 export type ImageOpts = {
   world: Vec2;
   anchor?: Vec2;
@@ -106,9 +50,8 @@ export type ImageOpts = {
 /** The look a call that states nothing gets: the bitmap as it is. */
 export const DEFAULT_IMAGE_STYLE: ImageStyle = { opacity: 1, saturation: 1, contrast: 1 };
 
-/** The style a call asks for, with the defaults filled in. Values are passed
- * through rather than clamped: `isFiniteImage` decides whether a node with them
- * is drawable, the same as it does for the rect. */
+/** The style a call asks for, defaults filled in — passed through rather than
+ * clamped, since `isFiniteImage` is what decides whether the result is drawable. */
 export function imageStyle(opts: Partial<ImageOpts> | undefined): ImageStyle {
   const style = opts && typeof opts === "object" ? opts.style : undefined;
   return {
@@ -118,9 +61,8 @@ export function imageStyle(opts: Partial<ImageOpts> | undefined): ImageStyle {
   };
 }
 
-/** A prop that is not a number falls back to its default; an explicit NaN stays
- * one, so a computed value that went wrong is a node that stops drawing rather
- * than one that quietly draws at full strength. */
+/** A non-number prop falls back to its default; an explicit NaN stays one, so a
+ * broken computed value stops drawing instead of drawing at full strength. */
 function dial(value: unknown, fallback: number): number {
   return typeof value === "number" ? value : fallback;
 }
@@ -143,19 +85,8 @@ function nanRect(): ImageRect {
 }
 
 /**
- * The world rect a call describes, or an all-NaN rect when the call cannot
- * describe one — no target size at all, a non-positive side, a pixel size that
- * is missing or degenerate, or a `world` that names no point. A NaN rect
- * is not a throw: `isFiniteImage` keeps the node off the tape, which is how
- * every other malformed value in this system behaves.
- *
- * Inference is per-axis scale: `targetSize.width / imageSize.width` is the scale
- * when a width is stated, and the other axis takes the same scale. When both
- * sides are stated the scales are independent, which is the deliberate
- * distortion the rect allows. The rect is then shifted so that the pixel
- * `anchor` lands exactly on `world` — with the default, the bitmap's own (0, 0)
- * sits at the rect's world *maximum* y, because image y runs down and world y
- * runs up.
+ * The world rect a call describes, or an all-NaN rect when the call describes
+ * none: no target size, a non-positive side, a pixel size that is not one.
  */
 export function imageRect(opts: Partial<ImageOpts> | undefined): ImageRect {
   const o = opts && typeof opts === "object" ? opts : {};
@@ -191,12 +122,9 @@ export function isImage(value: unknown): value is ImageValue {
   return !!value && typeof value === "object" && (value as ImageValue).kind === "image";
 }
 
-/**
- * Drawable/pickable: a URL, a positive rect, and numbers everywhere else.
- * A malformed image is recorded on the tape like any other non-finite value
- * (it stays in the trace, and every pick/geom path skips it) rather than being
- * silently coerced — the same contract as a NaN circle.
- */
+/** Drawable and pickable: a URL, a finite positive rect, finite numbers
+ * elsewhere. A malformed reference stays on the tape like any other non-finite
+ * value and simply does not draw. */
 export function isFiniteImage(value: ImageValue): boolean {
   const rect = imageRect(value);
   return (
@@ -235,14 +163,9 @@ function quarterTurns(rot: number): number {
 }
 
 /**
- * The rect's four corners in world space, starting at `(x, y)` and walking
- * `(x+w, y)`, `(x+w, y+h)`, `(x, y+h)` — the rect's own frame, rotated about the
- * centre by `rot`.
- *
- * On screen world y runs **up**, so that walk reads bottom-left, bottom-right,
- * top-right, top-left: the `(x, y)` corner is the rect's *screen* bottom-left,
- * and the picture's own top-left is the corner at `(x, y+h)`. `imageQuad` and
- * the shader's uv table are both written against that order.
+ * The rect's four corners from `(x, y)`, walking `+w` then `+h`, rotated about
+ * the rect's centre. On screen that reads bottom-left, bottom-right, top-right,
+ * top-left.
  */
 export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   const rect = imageRect(value);
@@ -261,36 +184,17 @@ export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
 }
 
 /**
- * The textured quad in **strip order**.
- *
- * Not the walk `imageCorners` returns: a four-vertex triangle strip advances two
- * vertices at a time, so its two triangles are `{v0,v1,v2}` and `{v1,v2,v3}` and
- * they share the edge `v1–v2`. For those two triangles to *tile* the rect, that
- * shared edge has to be a **diagonal** — walking the perimeter instead puts the
- * shared edge on a side, so the triangles overlap on one side and leave a wedge
- * of the rect uncovered. Hence `a, b, d, c` (the zig-zag the fill and grid quads
- * use too), not `a, b, c, d`. `image.test.ts` pins the diagonal.
- *
- * `flip` is folded in here, by swapping the left/right pairs rather than the
- * texture coordinates: the four positions are unchanged, the picture turns over,
- * and the shader has no flip flag to branch on. `rot` is already baked into the
- * corners by `imageCorners`, so the GPU layer receives a quad and samples it.
+ * The quad in **strip order** — `a, b, d, c`: the strip's shared edge has to be
+ * a diagonal to tile the rect. `flip` swaps the left/right pairs, so the rect
+ * itself never moves.
  */
 export function imageQuad(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   const [a, b, c, d] = imageCorners(value);
   return value.flip ? [b, a, c, d] : [a, b, d, c];
 }
 
-/**
- * The texture coordinate each quad vertex samples, in `imageQuad`'s order.
- *
- * These are the corners' *screen* roles, and getting them wrong turns the
- * picture upside down rather than failing loudly: vertex 0 is the rect's screen
- * bottom-left, so it samples the texture's bottom-left `(0, 1)`, and the
- * texture's `(0, 0)` — its top-left, the way WebGPU numbers them — belongs to
- * vertex 2 (the rect's screen top-left, since the strip order puts the two top
- * corners last). The shader derives the same table; `wgsl.test.ts` pins it.
- */
+/** The corner each quad vertex samples, in `imageQuad` order; the picture's
+ * top-left is the rect's `(x, y+h)` corner. */
 export const IMAGE_QUAD_UVS: readonly (readonly [number, number])[] = [
   [0, 1],
   [1, 1],
@@ -314,10 +218,8 @@ export function imageAabb(value: ImageValue): Aabb | undefined {
   return { minX, minY, maxX, maxY };
 }
 
-/**
- * Distance from `world` to the rotated rect, 0 inside — the same shape as
- * `distToRegion`, so an image picks like the filled thing it is.
- */
+/** Distance from `world` to the rotated rect, 0 inside — the same shape as
+ * `distToRegion`, so an image picks like the filled thing it is. */
 export function distToImage(value: ImageValue, world: Vec2): number {
   const rect = imageRect(value);
   const cx = rect.x + rect.w / 2;
@@ -348,11 +250,7 @@ export function flipImage(value: ImageValue): ImageValue {
   return { ...value, flip: value.flip ? 0 : 1 };
 }
 
-/**
- * Scale about `anchor` by `k`. Uniform, so it commutes with `rot`: scaling the
- * pre-rotation rect about `anchor` is the same picture as scaling the visible
- * quad about it. This is what measure mode commits.
- */
+/** Scale about `anchor` by `k`. Uniform, so it commutes with `rot`. */
 export function scaleImage(value: ImageValue, about: Vec2, k: number): ImageValue {
   const { width, height } = value.targetSize;
   return {

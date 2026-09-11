@@ -6,7 +6,7 @@ import { lineBasis, signedDist } from "#geom/ops";
 import { mul, perp, sub } from "#geom/vec";
 
 import { clientToNdc, ndcToWorld, type Camera2, type PaneRect, type PaneSize } from "../camera";
-import { hitsNear, movedPastClick, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
+import { hitsNear, nodeByTraceAttr, traceKey, type SnapFilter } from "../pick";
 import {
   gliderOnTraceNode,
   gliderSnapWorld,
@@ -484,12 +484,6 @@ export function applyDrag(
   return {
     draft: { id: drag.id, values: [round(max(0.05, drag.startR + (now - drag.grabDist)))] },
   };
-}
-
-export function dragMoved(drag: Drag, e: PointerInput): boolean {
-  const fromX = drag.kind === "pan" ? drag.x : drag.downX;
-  const fromY = drag.kind === "pan" ? drag.y : drag.downY;
-  return movedPastClick(fromX, fromY, e.clientX, e.clientY);
 }
 
 export function topHit(

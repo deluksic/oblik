@@ -78,6 +78,7 @@ Static-only: `class={styles.nav}`.
 
 - `createSignal`, `createMemo`, `createEffect`, `Show`, `For`, `Switch`/`Match`, `Loading`, `Errored`, `onCleanup` from `solid-js`; `render` from `@solidjs/web`.
 - Pass reactive inputs as plain props in JSX: `focused={focusedId() === id}` — Solid tracks signal reads at the call site. Reserve function props for callbacks.
+- **An effect's apply must not read a signal or a prop at all** — not even by calling a helper that does. Solid 2's dev build flags it (`STRICT_READ_UNTRACKED`) because such a read is untracked and silently goes stale; the compute is the only tracking scope. Reporting derived state upward is the usual trap: do it from the DOM callback that notices the change (a `ResizeObserver` callback, a pointer handler), not from the apply.
 - **Do not read `props` or signals in imperative code** (`For` map bodies, `if` branches before `return`, helper calls). Use JSX expressions, `createMemo`, or a child component whose template reads props.
 - **Do not write signals in `createEffect` apply** — derive with `createMemo`; scene-driven reset uses **function-form** `createSignal(() => …)` (writable memo).
 - **A memo that returns JSX owns child identity.** If it re-runs, children remount (camera / selection / local signals die). Branch on a **stable** derived value (e.g. `sceneKind` memo of `scene().kind`), then read the changing props in JSX (`scene={scene()}`) so they compile to getters on the _existing_ instance. Host.tsx's `pane` memo does exactly this.

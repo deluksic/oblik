@@ -22,7 +22,6 @@ export {
   hitTest,
   traceKey,
   isFiniteTrace,
-  movedPastClick,
   PICK_CLICK_PX,
   type SnapPoint,
 } from "./pick";

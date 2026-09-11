@@ -3,7 +3,8 @@ import { For, createSignal } from "solid-js";
 import type { SliderValue, TraceNode } from "#eval/context";
 import { formatNum } from "#source/patch";
 
-import { movedPastClick, traceKey } from "../pick";
+import { traceKey } from "../pick";
+import { DragTracker } from "./dragTracker";
 import {
   setSliderDockScrollTop,
   SLIDER_MARGIN,
@@ -15,6 +16,11 @@ import {
 import styles from "./SliderDock.module.css";
 
 const { max, min, round } = Math;
+
+/** Distance the pointer must travel before a slider draft starts. */
+const SLIDER_DEAD_ZONE_PX = 2;
+/** Distance past which a slider release commits instead of selecting. */
+const SLIDER_CLICK_TOLERANCE_PX = 4;
 
 export type SliderDockProps = {
   nodes: readonly TraceNode[];
@@ -101,8 +107,7 @@ function SliderRow(props: {
   const [dragging, setDragging] = createSignal(false);
 
   let trackEl: HTMLDivElement | undefined;
-  let downX = 0;
-  let downY = 0;
+  let gesture: DragTracker | undefined;
   let live = false;
 
   const frac = () => {
@@ -124,8 +129,9 @@ function SliderRow(props: {
 
   function begin(e: PointerEvent) {
     if (props.placing() || e.button !== 0) return;
-    downX = e.clientX;
-    downY = e.clientY;
+    // Sliders drive their own pointer events on this node, so they keep the
+    // same tracker the canvas gestures use rather than a second rule.
+    gesture = new DragTracker(e, SLIDER_CLICK_TOLERANCE_PX);
     live = false;
     setDragging(true);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -133,11 +139,9 @@ function SliderRow(props: {
 
   function move(e: PointerEvent) {
     if (!dragging()) return;
-    // The 2px dead zone absorbs pointer jitter before drafts start; click-vs-
-    // drag is decided at release by total travel (parity with canvas handles).
-    const dx = e.clientX - downX;
-    const dy = e.clientY - downY;
-    if (dx * dx + dy * dy < 4) return;
+    // The dead zone only decides when drafts start; the tracker separately
+    // remembers whether this gesture ever stopped being a click.
+    if (!(gesture?.moved(e, SLIDER_DEAD_ZONE_PX) ?? false)) return;
     if (!live) {
       live = true;
       props.onLiveEdit?.(true);
@@ -153,10 +157,10 @@ function SliderRow(props: {
       props.onHoverAt(e.clientX, e.clientY);
       return;
     }
-    if (!movedPastClick(downX, downY, e.clientX, e.clientY)) {
-      props.onPick?.([props.node()]);
-    } else {
+    if (gesture?.dragged() ?? false) {
       props.onCommit?.(props.node().id, [valueAt(e.clientX)]);
+    } else {
+      props.onPick?.([props.node()]);
     }
     props.onHoverAt(e.clientX, e.clientY);
   }

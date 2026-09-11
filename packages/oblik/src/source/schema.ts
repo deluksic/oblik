@@ -90,16 +90,8 @@ export function parsePaintPatch(raw: SceneValue): PaintPatchBody | string {
 }
 
 /**
- * The image node's patch: plain values at dotted leaves of the options object,
- * flat so the editor has one code path for every prop (see
- * `source/image-edit.ts` and its `IMAGE_LEAVES`).
- *
- * The pairing checks are the guard that a *created* branch is drawable. A patch
- * that states `origin.world.x` on a call that has no `origin` makes the editor
- * write `origin: { world: { x: … } }`; without a `y` that rect is NaN and the
- * node quietly stops drawing, so the wire refuses the half-stated pair instead.
- * `targetSize` is deliberately exempt — one side is a complete instruction, and
- * inferring the other is the point.
+ * The image patch: plain values at dotted leaves of the options object, flat so
+ * the editor has one code path per prop.
  */
 export const imagePatchSchema = v.object({
   file: v.string(),

@@ -180,15 +180,15 @@ export function FigureView(props: FigureViewProps) {
   const startPan = drag.start((e, hits: TraceNode[]) => {
     const initialStart = panDrag(e, camera());
     const pick = hits.length > 0 ? hits : undefined;
-    let moved = false;
     return {
       onPointerMove(ev) {
-        moved = true;
         const next = applyDrag(initialStart, ev, paneEl(), camera(), size(), props.trace);
         if (next.camera) setCamera(next.camera);
       },
-      onDone() {
-        if (!moved) props.onPick?.(pick ?? []);
+      // The handler's verdict, not the release coordinates: a pan that comes
+      // back to its press point has to stay a pan.
+      onDone(end) {
+        if (end && !end.dragged) props.onPick?.(pick ?? []);
       },
     };
   });

@@ -26,7 +26,7 @@ import type { MentionFile } from "../source/mention";
 import { freshSiteId } from "../source/stamp";
 import { ImageInspector } from "./ImageInspector";
 import { applyImageLeaves, withImageOverride, type ImageOverride } from "./imageOverride";
-import { imageArgs, importImage } from "./importImage";
+import { imageArgs, importImage, importImageByPath, type ImportedImage } from "./importImage";
 import { Palette } from "./Palette";
 import { traceKey } from "./pick";
 import {
@@ -274,6 +274,15 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   }
 
   async function commit(id: string, values: number[]) {
+    // `number[]` cannot promise finiteness, and `JSON.stringify` writes NaN or
+    // Infinity as `null`, so a bad coordinate would leave here looking like a
+    // deliberate null and come back as "Invalid type: Expected number but
+    // received null" from the schema — a puzzle with no line of code to blame.
+    // Refuse it here, where the node is still named.
+    if (!values.every((n) => Number.isFinite(n))) {
+      setWriteError(`refused to write ${id}: non-finite value`);
+      return;
+    }
     mergeDraft(id, values);
     const file = world().trace.find((n) => n.id === id)?.module ?? props.file;
     const res = await fetch("/__oblik-patch", {
@@ -289,38 +298,45 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     setWriteError(undefined);
   }
 
-  /**
-   * A pasted or dropped bitmap: upload the bytes, then insert the node that
-   * draws them. Two requests, so a failed insert leaves the asset on disk —
-   * which the status line says, because a silent orphan is worse than a loud one.
-   */
+  const upload = {
+    decode: decodeImage,
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+  };
+
+  /** A pasted or dropped bitmap: store the bytes, then insert the node that draws
+   * them. Two requests, so a failed insert still leaves the asset on disk — the
+   * status line says so, since a silent orphan is worse than a loud one. */
   async function importAt(
     file: File,
     at: { world: Vec2; view: { w: number; h: number; scale: number } },
   ) {
-    const result = await importImage(file, at, {
-      decode: decodeImage,
-      fetch: (input, init) => fetch(input, init),
-    });
+    await finishImport(await importImage(file, at, upload));
+  }
+
+  /** The same for a drop that carried a path: the dev server reads the file. */
+  async function importPathAt(
+    path: string,
+    at: { world: Vec2; view: { w: number; h: number; scale: number } },
+  ) {
+    await finishImport(await importImageByPath(path, at, upload));
+  }
+
+  /** Insert the node for an imported bitmap and select it: a fresh reference
+   * arrives with its inspector and outline ready, which is what makes them
+   * useful immediately. */
+  async function finishImport(result: ImportedImage | string) {
     if (typeof result === "string") {
       setWriteError(result);
       return;
     }
     setWriteError(undefined);
-    // The id is minted here rather than server-side so the node that was just
-    // written can be selected: a pasted reference arrives selected, which is
-    // what makes the inspector and its outline useful immediately.
     const id = freshSiteId();
     await insert({ from: "image", args: imageArgs(result.url, result.opts), id });
     setSelectedKey(`${id}:0`);
   }
 
-  /**
-   * A live edit that has not been written to the source yet. A patch costs a
-   * file write and a full HMR round, so a drag previews here and commits on
-   * release; the evaluated tape is what the view draws and the inspector reads,
-   * so the preview *is* the drag.
-   */
+  /** A live edit that has not reached the source: a drag previews on the
+   * evaluated tape and commits on release. */
   const [imageOverride, setImageOverride] = createSignal<ImageOverride | undefined>(undefined, {
     equals: false,
   });
@@ -332,10 +348,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     { equals: false },
   );
 
-  /** The picker's file input. Import is a pane action — it is about the paper,
-   * not about the selected node — so it lives in the pane's chrome beside the
-   * status line, and a picked file takes the same path as a paste, placed at the
-   * middle of what the user is looking at. */
+  /** The palette's import action opens this picker, and a picked file takes the
+   * same path as a paste, placed at the middle of the view. */
   const [importEl, setImportEl] = createSignal<HTMLInputElement | undefined>(undefined);
 
   function importPicked(file: File) {
@@ -454,12 +468,8 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";
   });
 
-  /** The evaluated tape with the live edit applied — what the view draws and
-   * what the inspector shows, so a drag and its preview are one thing.
-   *
-   * Declared before the memos that read it: `createMemo` runs its body
-   * immediately to establish the initial value, so a memo reading one declared
-   * further down the component is a temporal-dead-zone crash at mount. */
+  /** Declared before the memos that read it: `createMemo` runs its body
+   * immediately, so a lower declaration is a temporal-dead-zone crash at mount. */
   const tape = createMemo(() => withImageOverride(world().trace, imageOverride()));
 
   /** The selected reference, when the selection is one: that is what the
@@ -505,6 +515,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             onPlace={onPlace}
             onCursor={setPlace}
             onImportImage={(file, at) => void importAt(file, at)}
+            onImportImagePath={(path, at) => void importPathAt(path, at)}
             onView={setView}
             onNotice={(text) => setWriteError(text)}
             evalStats={

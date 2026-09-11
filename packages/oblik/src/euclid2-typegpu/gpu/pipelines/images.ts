@@ -27,16 +27,9 @@ const toClip = tgpu.fn(
 });
 
 /**
- * The reference's selection chrome, in the same two bands a fill's boundary
- * carries — *literally* the same functions (`halo.ts`), so a selected reference
- * and a selected region read identically.
- *
- * The only difference is where the distance comes from. A fill has a boundary
- * walk and gets a signed distance to it; a reference has a quad, so its
- * distance is the uv distance to the nearest border, scaled to CSS px by the
- * rect's own world size and the frame's zoom. That conversion in the shader —
- * not in the record — is what keeps a zoom from rewriting anything, and it is
- * why the band follows a rotated quad for free.
+ * The reference's selection chrome: *literally* a fill's own bands (`halo.ts`),
+ * so a selected reference looks like a selected region. The uv distance is
+ * scaled to CSS px in the shader, which keeps a zoom from rewriting records.
  */
 const borderPx = tgpu.fn(
   [vec2f, vec2f, f32],
@@ -48,11 +41,9 @@ const borderPx = tgpu.fn(
 });
 
 /**
- * One reference quad. The record already holds the four world corners in strip
- * order — `rot` and `flip` were folded in on the CPU (`eval/image.ts`) — so the
- * vertex shader picks a corner and hands the fragment its texture coordinate.
- * Nothing here depends on the camera beyond the frame uniform, so a pan or zoom
- * writes no records.
+ * One reference quad. The record already holds its four world corners in strip
+ * order (`rot`/`flip` folded in on the CPU), so this picks a corner and hands
+ * the fragment the matching texture coordinate.
  */
 export const imageVertex = tgpu.vertexFn({
   in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
@@ -103,14 +94,8 @@ export const imageVertex = tgpu.vertexFn({
 });
 
 /**
- * The reference's colour, prepared for tracing over. Three dials, in the order
- * they compose: `saturation` mixes between the bitmap's grey and the bitmap
- * (a photograph that keeps its full chroma fights the sketch), `contrast` scales
- * about mid-grey (hardening line work), and `opacity` scales the bitmap's own
- * alpha — so a faint reference is mixed toward the paper *by the blend*, not in
- * here, which is why this shader has no paper colour and a theme switch needs
- * nothing from it. A transparent PNG still shows the paper through it, twice
- * over.
+ * The reference prepared for tracing over: `saturation`, then `contrast`, each
+ * about mid-grey, then `opacity` as alpha.
  */
 export const imageFragment = tgpu.fragmentFn({
   in: {
@@ -179,8 +164,8 @@ export type ImagePipelines = {
   destroy(): void;
 };
 
-/** One pipeline per bound texture: the bind group is a creation-time constant
- * here, exactly like the grid's colour, and a source is a small, bounded set. */
+/** One pipeline per bound texture — the bind group is a creation-time constant
+ * here, exactly like the grid's colour, and a source is a small bounded set. */
 export function createImagePipelines(
   root: TgpuRoot,
   bindGroup: TgpuBindGroup,

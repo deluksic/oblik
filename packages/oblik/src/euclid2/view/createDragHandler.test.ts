@@ -71,10 +71,14 @@ function pointerEvent(partial: {
       released.push(id);
     },
   };
-  return {
+  const { clientX = 0, clientY = 0, ...own } = partial;
+  // Real pointer events keep `clientX`/`clientY` as accessors on the prototype,
+  // so a spread of one copies neither. Modelling them as own properties would
+  // make this mock more generous than the browser and hide exactly that bug.
+  const proto = {
     button: 0,
-    clientX: 0,
-    clientY: 0,
+    clientX,
+    clientY,
     pointerId: 1,
     currentTarget: target,
     target,
@@ -87,8 +91,8 @@ function pointerEvent(partial: {
     },
     captured,
     released,
-    ...partial,
-  } as Partial<PointerEvent> as PointerEvent;
+  };
+  return Object.assign(Object.create(proto), own) as PointerEvent;
 }
 
 function withHandler<T extends SceneValue[] = []>(
@@ -148,8 +152,8 @@ describe("createDragHandler", () => {
           onPointerMove(ev) {
             moves.push(ev.clientX - x0);
           },
-          onDone(ev) {
-            done.push(ev?.clientX);
+          onDone(end) {
+            done.push(end?.clientX);
           },
         };
       }),
@@ -166,6 +170,141 @@ describe("createDragHandler", () => {
     expect(doc.listenerCount("pointermove")).toBe(0);
     doc.fire("pointermove", pointerEvent({ clientX: 20, clientY: 0 }));
     expect(moves).toEqual([4, 9]);
+    dispose();
+  });
+
+  test("reports a release that never left the click tolerance as a click", () => {
+    const doc = install();
+    const done: Array<{ at: number; dragged: boolean } | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start(() => ({
+        onDone(end) {
+          done.push(end && { at: end.clientX, dragged: end.dragged });
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 2, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 3, clientY: 0 }));
+    expect(done).toEqual([{ at: 3, dragged: false }]);
+    dispose();
+  });
+
+  test("keeps the dead zone and the click tolerance independent", () => {
+    // A pan starts moving after 1px but should still count as a click out to
+    // 4px, so the two thresholds are different questions and take different
+    // values: at 2px this gesture has already panned and is still a click.
+    const doc = install();
+    const moves: number[] = [];
+    const done: boolean[] = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({
+        deadZoneRadius: 1,
+        clickTolerance: 4,
+        preventDefault: false,
+      }).start(() => ({
+        onPointerMove(ev) {
+          moves.push(ev.clientX);
+        },
+        onDone(end) {
+          if (end) done.push(end.dragged);
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 2, clientY: 0 }));
+    expect(moves).toEqual([2]);
+    doc.fire("pointerup", pointerEvent({ clientX: 2, clientY: 0 }));
+    expect(done).toEqual([false]);
+    dispose();
+  });
+
+  test("still reports a drag that returns to its press point as dragged", () => {
+    // The bug this contract exists for: the release lands exactly where the
+    // press was, so any press-to-release distance test would call it a click.
+    const doc = install();
+    const done: Array<{ at: number; dragged: boolean } | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start(() => ({
+        onDone(end) {
+          done.push(end && { at: end.clientX, dragged: end.dragged });
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 40, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 1, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 0, clientY: 0 }));
+    expect(done).toEqual([{ at: 0, dragged: true }]);
+    dispose();
+  });
+
+  test("remembers travel that happened between move events", () => {
+    // A pointer can leave the dead zone and be back inside it by the next
+    // event, so the latch cannot be re-derived from the current position.
+    const doc = install();
+    const done: Array<boolean | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start(() => ({
+        onDone(end) {
+          done.push(end?.dragged);
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 60, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 0, clientY: 0 }));
+    expect(done).toEqual([true]);
+    dispose();
+  });
+
+  test("hands over usable coordinates even though they are prototype getters", () => {
+    // Guards the shape of `DragEnd`: it must carry the two coordinates by
+    // value. Spreading the event instead drops them (they are accessors on
+    // MouseEvent's prototype), which the types cannot see — `{ ...event }` is
+    // structurally typed as the event — so the failure surfaces much later as
+    // NaN in a value. Assert the precondition too, so this test cannot quietly
+    // stop exercising it.
+    const event = pointerEvent({ clientX: 12, clientY: 34 });
+    expect(Object.prototype.hasOwnProperty.call(event, "clientX")).toBe(false);
+    expect({ ...event }).not.toHaveProperty("clientX");
+
+    const doc = install();
+    const done: Array<{ x: number; y: number } | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start(() => ({
+        onDone(end) {
+          done.push(end && { x: end.clientX, y: end.clientY });
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 40, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 12, clientY: 34 }));
+    expect(done).toEqual([{ x: 12, y: 34 }]);
+    dispose();
+  });
+
+  test("keeps forwarding moves after the pointer comes back near the press point", () => {
+    // The dead zone gates only the start. Once the gesture is moving, every
+    // move must reach the session — otherwise the thing being dragged freezes
+    // at the dead-zone edge and can never be returned to where it started.
+    const doc = install();
+    const moves: number[] = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 4, preventDefault: false }).start(() => ({
+        onPointerMove(ev) {
+          moves.push(ev.clientX);
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 10, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 3, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 1, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 0, clientY: 0 }));
+    expect(moves).toEqual([10, 3, 1, 0]);
     dispose();
   });
 
@@ -201,6 +340,32 @@ describe("createDragHandler", () => {
     dispose();
     expect(finished).toBe(1);
     expect(doc.listenerCount("pointermove")).toBe(0);
+  });
+
+  test("finishes exactly once, whether by unmount or by release", () => {
+    // The abort that ends an unmounted session deliberately re-enters `finish`,
+    // and a real pointerup can also arrive in the same turn. `onDone` is the
+    // commit path for a drag, so running it twice would write the value twice.
+    const doc = install();
+    const done: Array<{ x: number } | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 1, preventDefault: false }).start(() => ({
+        onDone(end) {
+          done.push(end && { x: end.clientX });
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 10, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 10, clientY: 0 }));
+    doc.fire("pointerup", pointerEvent({ clientX: 10, clientY: 0 }));
+    expect(done).toEqual([{ x: 10 }]);
+
+    done.length = 0;
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    dispose();
+    doc.fire("pointerup", pointerEvent({ clientX: 3, clientY: 3 }));
+    expect(done).toEqual([undefined]);
   });
 
   test("forwards start arguments into the session factory", () => {
