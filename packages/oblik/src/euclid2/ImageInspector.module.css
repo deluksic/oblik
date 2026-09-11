@@ -7,9 +7,13 @@
  * Everything sizes with `minmax`/`1fr` rather than `max-content`, because the
  * sidebar is `overflow: hidden`: a too-wide row is clipped, not scrolled.
  */
+/* The slots inside the reference block. One step tighter than the sidebar's
+   own 16px between blocks, and one step wider than the 4px inside a group
+   (`.params`, `.dials`), so the three levels read as a hierarchy rather than
+   as one spacing repeated. */
 .stack {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 
 .meta {
