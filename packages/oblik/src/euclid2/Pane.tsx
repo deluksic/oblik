@@ -450,16 +450,20 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     return "Space inserts. Click to inspect (select is scope). Drag handles write literals.";
   });
 
+  /** The evaluated tape with the live edit applied — what the view draws and
+   * what the inspector shows, so a drag and its preview are one thing.
+   *
+   * Declared before the memos that read it: `createMemo` runs its body
+   * immediately to establish the initial value, so a memo reading one declared
+   * further down the component is a temporal-dead-zone crash at mount. */
+  const tape = createMemo(() => withImageOverride(world().trace, imageOverride()));
+
   /** The selected reference, when the selection is one: that is what the
    * inspector edits. */
   const imageNode = createMemo(() => {
     const node = tape().find((n) => traceKey(n) === selectedKey());
     return node?.value.kind === "image" ? node : undefined;
   });
-
-  /** The evaluated tape with the live edit applied — what the view draws and
-   * what the inspector shows, so a drag and its preview are one thing. */
-  const tape = createMemo(() => withImageOverride(world().trace, imageOverride()));
 
   return (
     <div class={workspace}>
