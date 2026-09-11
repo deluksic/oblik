@@ -1,7 +1,7 @@
 import { vec2f, vec3f, vec4f } from "typegpu/data";
 
 import type { TraceNode } from "#eval/context";
-import type { LoopEdge, Vec2 } from "#geom";
+import type { Loop, LoopEdge, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { isGlider } from "#geom/gliders";
 import { infiniteLineAxis, parallelLineValue } from "#geom/ops";
@@ -10,7 +10,7 @@ import { circleDelta } from "#geom/region";
 import { infiniteClip, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isCrossing } from "../../euclid2/place";
 import { SNAP_DIAMOND_R, SNAP_R } from "../../euclid2/view/pointMark";
-import { emptySpans, growSpanBox, newBox, pushLoopSpan, type SpanSet } from "./fillSpans";
+import { emptySpans, growSpanBox, islandSpans, newBox, type SpanSet } from "./fillSpans";
 import {
   CircleInst,
   FillRegion,
@@ -252,38 +252,33 @@ function disc(
 
 // -- fill islands ---------------------------------------------------------------
 
-/** Convert a closed world chain into one normalized (CCW) fill island. */
-function pushFillIsland(
+/** One closed world loop as a ghost fill island, extracted through the world's
+ * own region path (`islandSpans`: outer CCW, holes CW, arc-aware orientation)
+ * so the preview shades exactly like the committed region. */
+function pushGhostLoop(
   fills: FillRegionValue[],
   spans: SpanSet,
-  chain: readonly LoopEdge[],
+  loop: Loop,
   color: Rgb,
   alpha: number,
 ): void {
-  if (chain.length < 3) return;
-  const reversed = chainArea(chain) < 0;
+  if (Array.isArray(loop) && loop.length < 2) return;
+  const set = islandSpans({ kind: "region", outer: loop, holes: [] });
+  const box = newBox();
+  growSpanBox(box, set);
+  if (!Number.isFinite(box.min.x)) return;
   const segOffset = spans.segs.length;
   const arcOffset = spans.arcs.length;
-  for (const e of chain) pushLoopSpan(spans, e, reversed);
-  const segCount = spans.segs.length - segOffset;
-  const arcCount = spans.arcs.length - arcOffset;
-  const box = newBox();
-  growSpanBox(box, spans, { segOffset, segCount, arcOffset, arcCount });
-  if (!Number.isFinite(box.min.x)) {
-    // A non-finite chain contributes no island quad, so it must not leave its
-    // spans behind for the next island's window to swallow.
-    spans.segs.length = segOffset;
-    spans.arcs.length = arcOffset;
-    return;
-  }
+  for (const s of set.segs) spans.segs.push(s);
+  for (const a of set.arcs) spans.arcs.push(a);
   fills.push(
     FillRegion({
       aabbMin: vec2f(box.min.x, box.min.y),
       aabbMax: vec2f(box.max.x, box.max.y),
       segOffset,
-      segCount,
+      segCount: set.segs.length,
       arcOffset,
-      arcCount,
+      arcCount: set.arcs.length,
       color: rgbv(color),
       alpha,
       flags: 0,
@@ -297,13 +292,13 @@ function pushFillIsland(
   );
 }
 
-/** Shoelace over the chain's endpoint polygon (arcs approximated). */
-function chainArea(edges: readonly LoopEdge[]): number {
-  let sum = 0;
-  for (const e of edges) {
-    sum += e.a.x * e.b.y - e.b.x * e.a.y;
-  }
-  return sum / 2;
+/** Close an open ghost chain into one loop, as `region(...)` closes a committed
+ * cycle: a straight span from the last edge's end back to the first's start. */
+function closeChain(chain: readonly LoopEdge[]): Loop[] {
+  const first = chain[0];
+  const last = chain[chain.length - 1];
+  if (!first || !last || chain.length < 2) return [];
+  return [[...chain, straightEdge(last.b, first.a)]];
 }
 
 // -- region ghost ----------------------------------------------------------------
@@ -366,7 +361,7 @@ function pushArrow(
     x: tip.x - ux * head + uy * head * 0.62,
     y: tip.y - uy * head - ux * head * 0.62,
   };
-  pushFillIsland(
+  pushGhostLoop(
     fills,
     spans,
     [
@@ -464,16 +459,14 @@ export function buildOverlay(args: OverlayArgs): OverlayPatch {
     }
   }
 
-  // Region ghost: translucent fill of the partial chain (closed back to its
-  // start), dashed chain including the hover edge, optional offset arrow.
+  // Region ghost: translucent fill of the region as it would commit — the chain
+  // closed back to its start, or the tool's already-closed loops (roundOffset) —
+  // dashed chain including the hover edge, optional offset arrow.
   if (ghost?.kind === "region") {
     const chain = ghost.hover ? [...ghost.edges, ghost.hover] : ghost.edges;
-    if (ghost.edges.length >= 2 && !ghost.loops) {
-      const closeTo = chain.length > 0 ? chain[0]!.a : undefined;
-      const closed = closeTo
-        ? [...ghost.edges, straightEdge(chain[chain.length - 1]!.b, closeTo)]
-        : ghost.edges;
-      pushFillIsland(patch.over.fills, patch.over.spans, closed, colors.ghost, GHOST_FILL_ALPHA);
+    const loops: Loop[] = ghost.loops ?? closeChain(chain);
+    for (const loop of loops) {
+      pushGhostLoop(patch.over.fills, patch.over.spans, loop, colors.ghost, GHOST_FILL_ALPHA);
     }
     dashChain(
       patch.over.strokes,
