@@ -54,7 +54,7 @@ describe("withImageOverride", () => {
 
   test("swaps the node's value and leaves every other node alone", () => {
     const previewed = applyImageLeaves(value, { "world.x": 3 });
-    const out = withImageOverride(trace, { id: "o_img", occ: 0, value: previewed });
+    const out = withImageOverride(trace, { id: "o_img", occ: 0, from: value, value: previewed });
     expect(out[0]!.value).toBe(previewed);
     expect(out[1]).toBe(trace[1]);
     // The node itself is a copy: the tape's identity-keyed reuse is untouched.
@@ -67,6 +67,7 @@ describe("withImageOverride", () => {
     const out = withImageOverride([node(value, "o_img", 1)], {
       id: "o_img",
       occ: 0,
+      from: value,
       value: previewed,
     });
     expect(out[0]!.value).toBe(value);
@@ -81,7 +82,28 @@ describe("withImageOverride", () => {
     const previewed = applyImageLeaves(value, { "world.x": 3 });
     const same = node(previewed);
     // Not a copy: the very same node, so the adapter's byte-diff sees nothing.
-    expect(withImageOverride([same], { id: "o_img", occ: 0, value: previewed })[0]).toBe(same);
+    expect(
+      withImageOverride([same], { id: "o_img", occ: 0, from: value, value: previewed })[0],
+    ).toBe(same);
+  });
+
+  /**
+   * A preview reports one node it was taken from, so it must not outlive it. The
+   * reference can be re-tied to a point in the file, or that point can move:
+   * either way the evaluated value changes under a live preview, and the source
+   * is the truth — without this, the picture keeps the previewed placement and
+   * ignores the point until the next reload.
+   */
+  test("a source that moved on is not masked by an old preview", () => {
+    const previewed = applyImageLeaves(value, { "world.x": 3 });
+    const moved = applyImageLeaves(value, { "world.x": 9 });
+    const out = withImageOverride([node(moved)], {
+      id: "o_img",
+      occ: 0,
+      from: value,
+      value: previewed,
+    });
+    expect(out[0]!.value).toBe(moved);
   });
 
   test("no override, or a node that is not a reference, is a pass-through", () => {
@@ -94,6 +116,6 @@ describe("withImageOverride", () => {
       editable: false,
       stack: [],
     } as TraceNode;
-    expect(withImageOverride([point], { id: "o_p", occ: 0, value })[0]).toBe(point);
+    expect(withImageOverride([point], { id: "o_p", occ: 0, from: value, value })[0]).toBe(point);
   });
 });

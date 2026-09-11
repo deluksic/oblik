@@ -356,15 +356,25 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
     void importAt(file, { world: { x: view().x, y: view().y }, view: view() });
   }
 
-  /** Write reference leaves through the patch endpoint — the only writer a
-   * reference has, since its numbers live inside an options object. */
-  /** Show a live edit without writing it, keyed to the node it belongs to. */
+  /** Show a live edit without writing it, keyed to the node it belongs to. The
+   * preview accumulates on the previewed value but remembers the *source* it
+   * started from, so a source that moves on its own drops the preview instead of
+   * being masked by it. */
   function previewImage(leaves: ImageProps) {
-    const node = imageNode();
-    if (!node || node.value.kind !== "image") return;
-    setImageOverride({ id: node.id, occ: node.occ, value: applyImageLeaves(node.value, leaves) });
+    const previewed = imageNode();
+    if (!previewed || previewed.value.kind !== "image") return;
+    const source = world().trace.find((n) => traceKey(n) === selectedKey());
+    if (source?.value.kind !== "image") return;
+    setImageOverride({
+      id: previewed.id,
+      occ: previewed.occ,
+      from: source.value,
+      value: applyImageLeaves(previewed.value, leaves),
+    });
   }
 
+  /** Write reference leaves through the patch endpoint — the only writer a
+   * reference has, since its numbers live inside an options object. */
   async function patchImage(leaves: ImageProps) {
     const node = imageNode();
     if (!node) return;

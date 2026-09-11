@@ -4,8 +4,15 @@ import { sameDrawValue } from "../eval/reuse-trace";
 import type { ImageProps } from "../source/image-edit";
 
 /** A live edit that has not reached the source: one node's value swapped in the
- * evaluated tape, so a drag previews without a write. */
-export type ImageOverride = { id: string; occ: number; value: ImageValue };
+ * evaluated tape, so a drag previews without a write. `from` is the source value
+ * the preview started from — the override applies only while the source still
+ * says it, so anything else that changes the source wins over a live preview. */
+export type ImageOverride = {
+  id: string;
+  occ: number;
+  from: ImageValue;
+  value: ImageValue;
+};
 
 /**
  * Patch leaves applied to a value the way `source/image-edit.ts` applies them to
@@ -49,8 +56,11 @@ export function applyImageLeaves(value: ImageValue, leaves: ImageProps): ImageVa
   };
 }
 
-/** One node's value swapped for a previewed one — and only while it differs,
- * which is what makes the override clear itself when the source catches up. */
+/** One node's value swapped for a previewed one — and only while the source
+ * still says what the preview started from. That is what makes the override
+ * clear itself when the source catches up, and what stops it from masking a
+ * source it did not come from: an edit in the file, or a point the reference is
+ * tied to moving under it. */
 export function withImageOverride(
   trace: readonly TraceNode[],
   override: ImageOverride | undefined,
@@ -58,7 +68,9 @@ export function withImageOverride(
   if (override === undefined) return trace as TraceNode[];
   return trace.map((node) => {
     if (node.id !== override.id || node.occ !== override.occ) return node;
-    if (node.value.kind !== "image" || sameDrawValue(node.value, override.value)) return node;
+    if (node.value.kind !== "image") return node;
+    if (!sameDrawValue(node.value, override.from)) return node;
+    if (sameDrawValue(node.value, override.value)) return node;
     return { ...node, value: override.value } as TraceNode;
   });
 }
