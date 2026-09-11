@@ -59,7 +59,6 @@ export {
   rotateImage,
   scaleImage,
   snapImageRot,
-  type ImageQuadCorner,
   type ImageRot,
   type ImageValue,
 } from "./eval/image";

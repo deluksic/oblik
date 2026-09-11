@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { circleVertex } from "./circles";
 import { diskVertex } from "./disks";
 import { fillFragment, haloFragment } from "./fills";
+import { imageFragment, imageVertex } from "./images";
 import { strokeVertex } from "./strokes";
 
 /**
@@ -112,5 +113,41 @@ describe("record widths are CSS px", () => {
     // The band is px→world, the outline cull keys off the px band.
     expect(wgsl).toContain("((*inst).halfPx * worldPerPx(frame.scale))");
     expect(wgsl).toContain("((*inst).halfPx <= 0f)");
+  });
+});
+
+/**
+ * The reference layer, resolved device-free. Two properties matter. The quad
+ * arrives already rotated and flipped, so the shader must contain no rotation
+ * and no flip flag — that is what keeps the CPU's geometry and the drawn
+ * geometry the same thing. And the look is exactly two mixes: desaturate, then
+ * toward the paper, with the bitmap's own alpha kept.
+ */
+describe("image WGSL", () => {
+  const code = tgpu.resolve([imageVertex, imageFragment]);
+
+  test("one instance read, corners picked with select, no rotation left", () => {
+    expect(code).toContain("@vertex fn");
+    expect(code).not.toContain("undefined");
+    expect(occurrences(code, "images[")).toBe(1);
+    // Four corners, two selects deep: a ternary over whole storage records is
+    // rejected by TGSL, which is what the layered `select` is for.
+    expect(occurrences(code, "select(")).toBe(5);
+    expect(code).toContain("vec2f(x, y)");
+    expect(code).not.toMatch(/\b(rot|flip)\b/);
+  });
+
+  test("the fragment desaturates, then fades toward the paper", () => {
+    expect(occurrences(code, "textureSample(")).toBe(1);
+    expect(occurrences(code, "dot(")).toBe(1);
+    expect(code).toContain("0.2125999927520752");
+    expect(code).toContain("0.85f");
+    expect(occurrences(code, "mix(")).toBe(2);
+    expect(code).toContain("theme.paper");
+  });
+
+  test("fade is flat across the quad and alpha is the bitmap's own", () => {
+    expect(occurrences(code, "@interpolate(flat) fade")).toBe(2);
+    expect(code).toContain("sampled.a");
   });
 });

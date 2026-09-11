@@ -1,5 +1,5 @@
 import { tgpu } from "typegpu";
-import { arrayOf, u32 } from "typegpu/data";
+import { arrayOf, f32, texture2d, u32 } from "typegpu/data";
 
 import {
   CircleInst,
@@ -10,6 +10,8 @@ import {
   FillSeg,
   Frame,
   GridSpan,
+  ImageInst,
+  ImageTheme,
   MarkerInst,
   MAX_CIRCLES,
   MAX_FIELD_ARCS,
@@ -19,6 +21,7 @@ import {
   MAX_FILL_ARCS,
   MAX_FILL_REGIONS,
   MAX_FILL_SEGS,
+  MAX_IMAGES,
   MAX_MARKERS,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
@@ -78,4 +81,16 @@ export const markerLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
   marks: { storage: arrayOf(MarkerInst, MAX_MARKERS) },
   markOrder: { storage: arrayOf(u32, MAX_MARKERS) },
+});
+
+/** The image layer: the shared frame, the theme's paper colour, every reference
+ * quad, and the one texture a draw is bound to. The texture and sampler live in
+ * the layout because they are the only per-draw input; the painter builds one
+ * bind group per distinct source. */
+export const imageLayout = tgpu.bindGroupLayout({
+  frame: { uniform: Frame },
+  theme: { uniform: ImageTheme },
+  images: { storage: arrayOf(ImageInst, MAX_IMAGES) },
+  tex: { texture: texture2d(f32) },
+  samp: { sampler: "filtering" },
 });

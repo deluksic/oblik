@@ -31,6 +31,10 @@ function img(props: Partial<ImageValue> = {}): ImageValue {
   return { ...base, ...props };
 }
 
+function byXThenY(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return a.x - b.x || a.y - b.y;
+}
+
 /** The visible centre is rotation-invariant. */
 function centre(v: ImageValue): { x: number; y: number } {
   const box = imageAabb(v)!;
@@ -95,22 +99,16 @@ describe("imageCorners", () => {
 });
 
 describe("imageQuad", () => {
-  test("samples the corners in order", () => {
-    expect(imageQuad(base).map((c) => [c.u, c.v])).toEqual([
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-    ]);
+  test("walks the corners in triangle-strip draw order", () => {
+    expect(imageQuad(base)).toEqual(imageCorners(base));
   });
 
-  test("flip swaps u across the vertical centre axis", () => {
-    expect(imageQuad(img({ flip: 1 })).map((c) => [c.u, c.v])).toEqual([
-      [1, 0],
-      [0, 0],
-      [0, 1],
-      [1, 1],
-    ]);
+  test("flip reorders the corners, never the rect", () => {
+    const quad = imageQuad(img({ flip: 1 }));
+    // Vertex 0 now holds what vertex 1 held: the picture is mirrored in place.
+    expect(quad[0]).toEqual(imageCorners(base)[1]);
+    expect(quad[1]).toEqual(imageCorners(base)[0]);
+    expect([...quad].toSorted(byXThenY)).toEqual([...imageCorners(base)].toSorted(byXThenY));
   });
 });
 

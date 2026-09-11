@@ -1,14 +1,14 @@
 import { describe, expect, test } from "vitest";
 
 import type { TraceValue } from "#eval/context";
-import type { Csg2, Region } from "#geom";
-import { isCircleWalk } from "#geom/region";
-
 import type { TraceNode } from "#eval/context";
+import type { Csg2, Region } from "#geom";
 import type { Vec2 } from "#geom";
 import type { PolarRepeat } from "#geom";
 import { csg2Value, polarRepeatValue } from "#geom/csg2";
+import { isCircleWalk } from "#geom/region";
 
+import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb } from "./adapter";
 
 /**
@@ -100,6 +100,26 @@ function node<V extends TraceValue>(
   editable = false,
 ): TraceNode {
   return { id, occ: 0, kind: value.kind, value, bind, editable, stack: [] } as TraceNode;
+}
+
+/** A raster reference: a rect, a turn and a fade, plus the URL it names. */
+function imageValue(over: Partial<ImageValue> = {}): ImageValue {
+  return {
+    kind: "image",
+    src: "/assets/gear-9f3a2c11.png",
+    x: 0,
+    y: 0,
+    w: 4,
+    h: 2,
+    rot: 0,
+    flip: 0,
+    fade: 0.4,
+    ...over,
+  };
+}
+
+function imageNode(id: string, over: Partial<ImageValue> = {}): TraceNode {
+  return node(id, imageValue(over));
 }
 
 /** `diff(circle, region)` — a tree the field compiler takes. */
@@ -692,5 +712,67 @@ describe("zoom and pan write no records", () => {
     expect(zoomed.fields.quads.writes).toHaveLength(1);
     expect(zoomed.fills.writes).toHaveLength(0);
     expect(zoomed.stats.written).toBe(1);
+  });
+});
+
+/**
+ * References are the backdrop: they must not reach the ink band (a stroke
+ * record built from one would be a quad drawn as a polyline), they own one slot
+ * each keyed by the node, and the draw list carries the source the layer binds.
+ */
+describe("adapter image routing", () => {
+  test("a reference draws a quad, not a stroke, and names its source", () => {
+    const patch = createAdapter().tick(input([imageNode("o_img")]));
+
+    expect(patch.images.draws).toEqual([{ slot: 0, src: "/assets/gear-9f3a2c11.png" }]);
+    expect(patch.images.writes).toHaveLength(1);
+    expect(patch.strokes.writes).toHaveLength(0);
+    expect(patch.circles.writes).toHaveLength(0);
+    expect(patch.stats.total).toBe(1);
+  });
+
+  test("the quad is the rotated, flipped rect in draw order", () => {
+    const value = imageValue({ rot: 90, flip: 1 });
+    const patch = createAdapter().tick(input([node("o_img", value)]));
+    const inst = patch.images.writes[0]!.value;
+    const got = [inst.a, inst.b, inst.c, inst.d].map((p) => [p.x, p.y]);
+    expect(got).toEqual(imageQuad(value).map((p) => [p.x, p.y]));
+    expect(inst.fade).toBeCloseTo(0.4, 6);
+  });
+
+  test("an unchanged tick re-uploads nothing but still draws", () => {
+    const adapter = createAdapter();
+    const trace = [imageNode("o_img")];
+    adapter.tick(input(trace));
+    const patch = adapter.tick(input(trace));
+
+    expect(patch.images.writes).toHaveLength(0);
+    expect(patch.images.draws).toHaveLength(1);
+  });
+
+  test("a moved reference rewrites its own record only", () => {
+    const adapter = createAdapter();
+    adapter.tick(input([imageNode("o_img"), imageNode("o_other")]));
+    const patch = adapter.tick(input([imageNode("o_img", { x: 3 }), imageNode("o_other")]));
+
+    expect(patch.images.writes).toHaveLength(1);
+    expect(patch.images.writes[0]!.idx).toBe(0);
+    expect(patch.images.draws.map((d) => d.slot)).toEqual([0, 1]);
+  });
+
+  test("a reference that leaves the scene releases its slot", () => {
+    const adapter = createAdapter();
+    adapter.tick(input([imageNode("o_img"), imageNode("o_other")]));
+    const patch = adapter.tick(input([imageNode("o_other")]));
+
+    // The survivor keeps slot 1 — runs are per key, so the free one is only reused.
+    expect(patch.images.draws).toEqual([{ slot: 1, src: "/assets/gear-9f3a2c11.png" }]);
+    expect(patch.stats.total).toBe(1);
+  });
+
+  test("a collapsed reference is never recorded", () => {
+    const patch = createAdapter().tick(input([imageNode("o_img", { w: 0 })]));
+    expect(patch.images.draws).toHaveLength(0);
+    expect(patch.stats.total).toBe(0);
   });
 });

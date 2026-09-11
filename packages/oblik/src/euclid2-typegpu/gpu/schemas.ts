@@ -30,6 +30,8 @@ export const MAX_FIELD_LEAVES = 4096;
  * `spans` leaf, so this pool carries the region load the span pass used to. */
 export const MAX_FIELD_SEGS = 8192;
 export const MAX_FIELD_ARCS = 2048;
+/** Raster references drawn as textured quads, one slot each. */
+export const MAX_IMAGES = 64;
 
 /** Camera + pane state; k = 2·scale/max(1, pane.y) recovers euclid2/camera.ts NDC mapping. */
 export const Frame = struct({
@@ -223,3 +225,27 @@ export const FieldQuad = struct({
   haloHalfPx: vec2f,
 });
 export type FieldQuadValue = Infer<typeof FieldQuad>;
+
+/** One raster reference: the four world corners in triangle-strip draw order
+ * (vertex 0 samples uv (0,0), then (1,0), (1,1), (0,1)), already rotated and
+ * flipped on the CPU — so the shader has a quad to sample and nothing else.
+ * `fade` mixes the sampled colour toward the theme's paper, which lives in
+ * `ImageTheme`. One instance per node; the texture itself is bound per draw, so
+ * nothing here names a source. */
+export const ImageInst = struct({
+  a: vec2f,
+  b: vec2f,
+  c: vec2f,
+  d: vec2f,
+  fade: f32,
+});
+export type ImageInstValue = Infer<typeof ImageInst>;
+
+/** The image layer's own uniform: the colour a faded reference mixes toward.
+ * Separate from `Frame` so a theme switch is one 16-byte write and never a
+ * frame rewrite, and separate from the pipeline (unlike the grid's colour slot)
+ * because the image pipelines are per-texture and outlive a theme. */
+export const ImageTheme = struct({
+  paper: vec3f,
+});
+export type ImageThemeValue = Infer<typeof ImageTheme>;

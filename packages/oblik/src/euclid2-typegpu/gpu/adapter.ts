@@ -1,7 +1,7 @@
 import { vec2f, vec3f, vec4f } from "typegpu/data";
 import type { v2f, v4f } from "typegpu/data";
 
-import type { TraceNode } from "#eval/context";
+import type { TraceNode, TraceNodeOf } from "#eval/context";
 import type { Circle, CsgOperand, Polygon, Region, Vec2 } from "#geom";
 import { isFillGeom } from "#geom/csg2";
 import { gliderAt, isGlider, type Glider } from "#geom/gliders";
@@ -13,6 +13,7 @@ import type { Ghost, PlaceHit } from "../../euclid2/tool";
 import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
+import { imageQuad, isImage, type ImageValue } from "../../eval/image";
 import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
 import {
   blockWindows,
@@ -32,6 +33,7 @@ import type {
   FillArcValue,
   FillRegionValue,
   FillSegValue,
+  ImageInstValue,
   PointInstValue,
   StrokeDrawValue,
 } from "./schemas";
@@ -40,12 +42,14 @@ import {
   FieldLeaf,
   FieldQuad,
   FillRegion,
+  ImageInst,
   MAX_FIELD_ARCS,
   MAX_FIELD_LEAVES,
   MAX_FIELD_QUADS,
   MAX_FIELD_SEGS,
   MAX_FILL_ARCS,
   MAX_FILL_SEGS,
+  MAX_IMAGES,
   MAX_POINTS,
   PointInst,
   RUN_GEOM_TWO_POINT,
@@ -157,6 +161,13 @@ export type TickPatch = {
   /** World fill draws, in band order (span fills and compiled fields mixed). */
   fillDraws: FillDraw[];
   points: SlotPatch<PointInstValue>;
+  /** Raster references: one byte-diffed quad per node, plus the draw list that
+   * pairs each slot with the source whose texture paints it. The adapter names
+   * the source but never touches a bitmap — loading is the GPU layer's. */
+  images: {
+    writes: { idx: number; value: ImageInstValue }[];
+    draws: { slot: number; src: string }[];
+  };
   /** Tool overlay (ghost previews + snap markers), rebuilt every tick. */
   overlay: OverlayPatch;
   stats: { written: number; total: number };
@@ -196,6 +207,12 @@ function nodeKey(n: TraceNode): string {
  */
 type Upload = { start: number; bytes: Float64Array };
 
+/** Image nodes, narrowed: the quad builder needs the arm's own fields, and the
+ * partition has to leave them out of the ink band. */
+function isImageNode(n: TraceNode): n is TraceNodeOf<"image"> {
+  return isImage(n.value);
+}
+
 function sameBytes(a: Float64Array, b: Float64Array): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < b.length; i++) {
@@ -205,12 +222,7 @@ function sameBytes(a: Float64Array, b: Float64Array): boolean {
 }
 
 /** True when the slot must be rewritten: the payload changed, or it moved. */
-function diff(
-  map: Map<string, Upload>,
-  key: string,
-  start: number,
-  next: Float64Array,
-): boolean {
+function diff(map: Map<string, Upload>, key: string, start: number, next: Float64Array): boolean {
   const prev = map.get(key);
   if (prev && prev.start === start && sameBytes(prev.bytes, next)) return false;
   map.set(key, { start, bytes: next });
@@ -228,6 +240,7 @@ export function createAdapter(): Adapter {
   const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES);
   const fieldSegPool = createSlotPool(MAX_FIELD_SEGS);
   const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
+  const imagePool = createSlotPool(MAX_IMAGES);
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
   const lastStroke = new Map<string, Upload>();
@@ -240,6 +253,7 @@ export function createAdapter(): Adapter {
   const lastFieldLeaf = new Map<string, Upload>();
   const lastFieldSegs = new Map<string, Upload>();
   const lastFieldArcs = new Map<string, Upload>();
+  const lastImage = new Map<string, Upload>();
 
   /** Every record above, for the per-tick prune below. */
   const uploads = [
@@ -281,8 +295,11 @@ export function createAdapter(): Adapter {
 
     const finite = input.trace.filter((n) => isFiniteTrace(n) && n.kind !== "slider");
     const fills = input.hideFills ? [] : finite.filter((n) => isFillGeom(n.value));
+    // A reference is neither ink nor fill: it is the backdrop the ink is drawn
+    // over, so it leaves the partition before the stroke band can claim it.
+    const images = finite.filter(isImageNode);
     const ink = finite.filter(
-      (n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value),
+      (n) => n.kind !== "point" && !isGlider(n.value) && !isFillGeom(n.value) && !isImage(n.value),
     );
     // Mirrors the SVG view's `points()` memo: point nodes and gliders, never sliders.
     const points = finite.filter((n) => n.kind === "point" || isGlider(n.value));
@@ -297,6 +314,8 @@ export function createAdapter(): Adapter {
     fieldLeafPool.sync(present);
     fieldSegPool.sync(present);
     fieldArcPool.sync(present);
+    const imageKeys = new Set(images.map(nodeKey));
+    imagePool.sync(imageKeys);
     // A key that left the scene released its runs, so whatever is in those
     // ranges is no longer its payload — forget the record and write afresh when
     // it returns.
@@ -304,6 +323,23 @@ export function createAdapter(): Adapter {
       for (const key of last.keys()) {
         if (!present.has(key)) last.delete(key);
       }
+    }
+    for (const key of lastImage.keys()) {
+      if (!imageKeys.has(key)) lastImage.delete(key);
+    }
+
+    // --- references (the backdrop). One slot per node, in tape order; the
+    // --- draw list pairs each slot with the source whose texture paints it.
+    const imageWrites: { idx: number; value: ImageInstValue }[] = [];
+    const imageDraws: { slot: number; src: string }[] = [];
+    for (const n of images) {
+      const key = nodeKey(n);
+      const slot = imagePool.alloc(key, 1);
+      if (slot === undefined) continue;
+      const inst = imageInstance(n.value);
+      if (diff(lastImage, key, slot, encodeImage(inst)))
+        imageWrites.push({ idx: slot, value: inst });
+      imageDraws.push({ slot, src: n.value.src });
     }
 
     const white = (n: TraceNode) => isHot(n, input.hoverKey, input.selectedKey);
@@ -658,6 +694,7 @@ export function createAdapter(): Adapter {
         order: Uint32Array.from(pointOrder),
         count: pointOrder.length,
       },
+      images: { writes: imageWrites, draws: imageDraws },
       overlay,
       stats: {
         written:
@@ -670,6 +707,7 @@ export function createAdapter(): Adapter {
           fieldLeafWrites.length +
           fieldSegWrites.length +
           fieldArcWrites.length +
+          imageWrites.length +
           pointWrites.length +
           overlay.under.strokes.length +
           overlay.under.circles.length +
@@ -689,7 +727,8 @@ export function createAdapter(): Adapter {
           fieldQuadPool.used +
           fieldLeafPool.used +
           fieldSegPool.used +
-          fieldArcPool.used,
+          fieldArcPool.used +
+          imagePool.used,
       },
     };
   }
@@ -789,6 +828,7 @@ export function createAdapter(): Adapter {
     lastFieldLeaf.clear();
     lastFieldSegs.clear();
     lastFieldArcs.clear();
+    lastImage.clear();
     strokePool.reset();
     circlePool.reset();
     fillPool.reset();
@@ -799,6 +839,7 @@ export function createAdapter(): Adapter {
     fieldLeafPool.reset();
     fieldSegPool.reset();
     fieldArcPool.reset();
+    imagePool.reset();
   }
 
   return { tick, destroy };
@@ -1206,6 +1247,33 @@ function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
     f[j] = e.span;
   }
   return f;
+}
+
+/** One reference quad: the four corners in draw order (`rot`/`flip` already
+ * folded in by `eval/image.ts`) plus the fade toward paper. */
+function imageInstance(value: ImageValue): ImageInstValue {
+  const [a, b, c, d] = imageQuad(value);
+  return ImageInst({
+    a: vec2f(a.x, a.y),
+    b: vec2f(b.x, b.y),
+    c: vec2f(c.x, c.y),
+    d: vec2f(d.x, d.y),
+    fade: value.fade,
+  });
+}
+
+function encodeImage(inst: ImageInstValue): Float64Array {
+  return Float64Array.of(
+    inst.a.x,
+    inst.a.y,
+    inst.b.x,
+    inst.b.y,
+    inst.c.x,
+    inst.c.y,
+    inst.d.x,
+    inst.d.y,
+    inst.fade,
+  );
 }
 
 function encodePoints(discs: readonly PointInstValue[]): Float64Array {

@@ -97,23 +97,18 @@ export function imageCorners(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   return [at(-hw, -hh), at(hw, -hh), at(hw, hh), at(-hw, hh)];
 }
 
-export type ImageQuadCorner = { at: Vec2; u: number; v: number };
-
 /**
- * The textured quad: the four corners with the UV each samples. `flip` swaps
- * `u`, so the geometry is identical either way and only the picture turns over.
- * The GPU layer draws exactly this, and pickup tests sample the same corners.
+ * The textured quad in **draw order**: vertex 0 samples `(u, v) = (0, 0)`, then
+ * `(1, 0)`, `(1, 1)`, `(0, 1)` — a triangle strip.
+ *
+ * `flip` is folded in here, by swapping the two corner pairs rather than the
+ * texture coordinates: the four positions are unchanged, the picture turns over,
+ * and the shader has no flip flag to branch on. `rot` is already baked into the
+ * corners by `imageCorners`, so the GPU layer receives a quad and samples it.
  */
-export function imageQuad(value: ImageValue): ImageQuadCorner[] {
+export function imageQuad(value: ImageValue): [Vec2, Vec2, Vec2, Vec2] {
   const [a, b, c, d] = imageCorners(value);
-  const u0 = value.flip ? 1 : 0;
-  const u1 = value.flip ? 0 : 1;
-  return [
-    { at: a, u: u0, v: 0 },
-    { at: b, u: u1, v: 0 },
-    { at: c, u: u1, v: 1 },
-    { at: d, u: u0, v: 1 },
-  ];
+  return value.flip ? [b, a, d, c] : [a, b, c, d];
 }
 
 /** World bounds of the rotated rect, or `undefined` when the rect is not finite. */

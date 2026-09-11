@@ -5,6 +5,7 @@ import type { Camera2, PaneSize } from "../../euclid2/camera";
 import type { FillDraw, TickPatch } from "./adapter";
 import { FIELD_QUAD_VERTICES, fieldPipeline } from "./field/assemble";
 import { makeFrameValue } from "./frame";
+import { createImageLayer, type ImageDraw, type ImageLayer } from "./imageLayer";
 import {
   circleLayout,
   diskLayout,
@@ -83,13 +84,18 @@ export type Painter = {
       root: TgpuRoot;
       msaaView(): GPUTextureView;
       swapchainView(): GPUTextureView;
+      /** References arrive asynchronously and ask for a frame when they do. */
+      requestFrame(): void;
     },
     resolveOverride?: GPUTextureView,
   ): void;
   destroy(): void;
 };
 
-export type GridColors = {
+export /** Until a frame has been drawn there is no renderer to ask for one. */
+const NO_FRAME = () => {};
+
+type GridColors = {
   grid: readonly [number, number, number];
   axis: readonly [number, number, number];
 };
@@ -373,6 +379,18 @@ export function createPainter(opts: {
   const underFills: FillPipelines = createFillPipelines(root, underFillGroup, opts.format);
   const overFills: FillPipelines = createFillPipelines(root, overFillGroup, opts.format);
   const markers: MarkerPipelines = createMarkerPipelines(root, markerGroup, opts.format);
+  // References draw first in the pass. Their textures load asynchronously and
+  // ask for a frame when one arrives; until `draw` has seen a renderer there is
+  // nothing to ask, and nothing has loaded yet either.
+  let requestFrame: () => void = NO_FRAME;
+  const images: ImageLayer = createImageLayer({
+    root,
+    format: opts.format,
+    frameBuffer,
+    onReady: () => requestFrame(),
+  });
+  images.setPaper(opts.paper);
+  let imageDraws: readonly ImageDraw[] = [];
 
   // Band sizes from the last applied patch (arrays are rewritten wholesale).
   let strokeRestCount = 0;
@@ -409,6 +427,7 @@ export function createPainter(opts: {
       paper = nextPaper;
       gridColors = nextGridColors;
       grids.setColors(gridColors);
+      images.setPaper(paper);
     },
     sync(cam, size, dpr) {
       frameBuffer.write(makeFrameValue(cam, size, dpr));
@@ -487,8 +506,11 @@ export function createPainter(opts: {
       overFillCount = Math.min(MAX_FILL_REGIONS, ov.over.fills.length);
       markerBuffer.writePartial(seqWrites(ov.over.markers, MAX_MARKERS));
       markerCount = Math.min(MAX_MARKERS, ov.over.markers.length);
+      images.sync(patch.images.writes, patch.images.draws);
+      imageDraws = patch.images.draws;
     },
     draw(renderer, resolveOverride) {
+      requestFrame = renderer.requestFrame;
       const encoder = renderer.root.device.createCommandEncoder();
       const pass = encoder.beginRenderPass({
         colorAttachments: [
@@ -501,6 +523,9 @@ export function createPainter(opts: {
           },
         ],
       });
+      // References are the paper's own furniture: under the grid, the fills,
+      // the strokes and the points, so a sketch reads on top of a photograph.
+      if (imageDraws.length > 0) images.draw(pass);
       if (gridLines > 0) grids.grid(pass).draw(GRID_HAIRLINE_VERTICES, gridLines);
       // Axes land on top of the grid (still under world ink).
       if (axesVisible) grids.axis(pass).draw(GRID_HAIRLINE_VERTICES, 2);
@@ -636,6 +661,7 @@ export function createPainter(opts: {
       markerBuffer.destroy();
       markerOrderId.destroy();
       gridSpanBuffer.destroy();
+      images.destroy();
     },
   };
 }
