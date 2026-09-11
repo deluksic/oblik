@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 
 import { isCsg2, isFiniteOperand, offsetOfCsg, operandSdf } from "../geom/csg2";
-import type { CsgOperand } from "../geom/types";
 import { walkEdges } from "../geom/region";
+import type { CsgOperand } from "../geom/types";
 import { analyze } from "../source/analyze";
 import {
   along,
   circle,
   fillet,
+  image,
   leftOf,
   paint,
   point,
@@ -592,5 +593,76 @@ describe("the operand gate", () => {
 
   test("a wrong pick probe is NaN geometry, not a throw", () => {
     expect(isFiniteOperand(pick(authoredOperand({ x: 0, y: 0 }), { x: 1, y: 1 }))).toBe(false);
+  });
+});
+
+function imageScene(body: () => void) {
+  return defineScene({
+    kind: "euclid2",
+    title: "t",
+    build: body,
+  });
+}
+
+describe("image nodes", () => {
+  test("records one node with the rect it was authored with", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/assets/gear-9f3a2c11.png", 10, 20, 40, 20, 90, 1, 0.25, "o_img");
+      }),
+    );
+    expect(trace.map((n) => n.kind)).toEqual(["image"]);
+    const node = trace[0]!;
+    expect(node.id).toBe("o_img");
+    expect(node.occ).toBe(0);
+    expect(node.value).toEqual({
+      kind: "image",
+      src: "/assets/gear-9f3a2c11.png",
+      x: 10,
+      y: 20,
+      w: 40,
+      h: 20,
+      rot: 90,
+      flip: 1,
+      fade: 0.25,
+    });
+  });
+
+  test("an occurrence counts like any other node", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        for (let i = 0; i < 2; i++) image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_img");
+      }),
+    );
+    expect(trace.map((n) => n.occ)).toEqual([0, 1]);
+  });
+
+  test("a draft row overrides the props in argument order", () => {
+    const draft = new Map([["o_img", [1, 2, 3, 4, 270, 1, 0.9]]]);
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_img");
+      }),
+      { draft },
+    );
+    expect(trace[0]?.value).toMatchObject({
+      x: 1,
+      y: 2,
+      w: 3,
+      h: 4,
+      rot: 270,
+      flip: 1,
+      fade: 0.9,
+    });
+  });
+
+  test("a non-positive rect is evaluated but never recorded", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/a.png", Number.NaN, 0, 10, 10, 0, 0, 0, "o_bad");
+        image("/a.png", 0, 0, 10, 10, 0, 0, 0, "o_good");
+      }),
+    );
+    expect(trace.map((n) => n.id)).toEqual(["o_good"]);
   });
 });

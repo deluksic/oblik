@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseExpose, parseInsert, parseOpen } from "./schema";
+import { parseExpose, parseImageImport, parseImagePatch, parseInsert, parseOpen } from "./schema";
 
 describe("parseInsert", () => {
   test("accepts slider args with props", () => {
@@ -103,5 +103,56 @@ describe("parseOpen", () => {
     expect(typeof parseOpen({ file: "", line: 1 })).toBe("string");
     expect(typeof parseOpen({ file: "a.ts", line: 0 })).toBe("string");
     expect(typeof parseOpen({ file: "a.ts", line: "42" })).toBe("string");
+  });
+});
+
+describe("parseImagePatch", () => {
+  const file = "apps/demo/src/scenes/gear.ts";
+
+  test("accepts a partial patch and keeps only what was sent", () => {
+    const job = parseImagePatch({ file, id: "o_img", props: { x: 1.5, rot: 90 } });
+    expect(typeof job).not.toBe("string");
+    if (typeof job === "string") throw new Error(job);
+    expect(job).toEqual({ file, id: "o_img", props: { x: 1.5, rot: 90 } });
+  });
+
+  test("rejects an empty id and an empty patch", () => {
+    expect(typeof parseImagePatch({ file, id: "", props: { x: 1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: {} })).toBe("string");
+  });
+
+  test("rejects a turn that is not a quarter", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { rot: 45 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { rot: "90" } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { flip: 2 } })).toBe("string");
+  });
+
+  test("rejects a negative side and a fade outside [0, 1]", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { w: -1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: 1.2 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: -0.1 } })).toBe("string");
+  });
+
+  test("rejects a src that is not a non-empty string", () => {
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { src: "" } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { src: 7 } })).toBe("string");
+  });
+});
+
+describe("parseImageImport", () => {
+  test("accepts a decodable extension, with or without its dot", () => {
+    expect(parseImageImport({ slug: "gear", ext: "png" })).toEqual({ slug: "gear", ext: "png" });
+    expect(parseImageImport({ slug: "gear", ext: ".PNG" })).toEqual({ slug: "gear", ext: "png" });
+  });
+
+  test("accepts a missing slug — the server has a fallback for it", () => {
+    expect(parseImageImport({ ext: "webp" })).toEqual({ ext: "webp" });
+  });
+
+  test("rejects a format the browser is not asked to rasterise, and an empty ext", () => {
+    expect(typeof parseImageImport({ slug: "x", ext: "svg" })).toBe("string");
+    expect(typeof parseImageImport({ slug: "x", ext: "../../etc" })).toBe("string");
+    expect(typeof parseImageImport({ slug: "x", ext: "" })).toBe("string");
+    expect(typeof parseImageImport({ slug: "x", ext: 7 })).toBe("string");
   });
 });

@@ -20,6 +20,6 @@ Prototypes (charter + what we learned):
 - [10 — user composite functions as Space tools](./prototypes/10.md) — building. `defineTool` registers one function as a palette verb.
 - [11 — incremental evaluation](./prototypes/11.md) — building. Site memoization, user `memo()`, pick prefilter.
 - [12 — a WebGPU 2D canvas renderer (`euclid2-typegpu`)](./prototypes/12.md) — shipped; closed. Fills, fields, chrome, picking — and the SVG view is gone (`dfc1b86`), so this is the only euclid2 renderer. [Points plan](./prototypes/12-gpu-points-plan.md) (historical).
-- [13 — tracing a raster reference](./prototypes/13.md) — charter. An `image(...)` trace node drawn as a textured quad, import by paste / drop / picker, and the transform kit: measure a known distance, rotate in 90° steps, flip, position, fade toward paper.
+- [13 — tracing a raster reference](./prototypes/13.md) — partly built. An `image(...)` trace node drawn as a textured quad, import by paste / drop / picker, and the transform kit: measure a known distance, rotate in 90° steps, flip, position, fade toward paper. The node, its patch endpoint and the pick arms landed; the GPU layer, the import adapters and the inspector are open.
 
 [Critique](./critique.md) records why unmarked-literal CAD and a single kernel were dropped.

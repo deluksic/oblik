@@ -3,10 +3,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 
 import { transformSync } from "esbuild";
-
-import type { SceneValue } from "../eval/context";
 import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 
+import type { SceneValue } from "../eval/context";
 import {
   scanAnnotationsBundle,
   scanMentionsBundle,
@@ -15,6 +14,9 @@ import {
   sceneLoadersModule,
 } from "./catalog";
 import { patchFrame } from "./frame-edit";
+import { patchImageProps } from "./image-edit";
+import { IMAGE_MAX_BYTES } from "./import-image";
+import { writeImageAsset } from "./import-image.server";
 import { insertCall, exposeReturnBag } from "./insert";
 import { parseStackLocs, remapStackFrames } from "./map-stack";
 import { EDITOR_OPEN_DEFAULT, editorArgv, spawnEditor } from "./open-editor.server";
@@ -25,6 +27,8 @@ import {
   parseErase,
   parseExpose,
   parseFrameEdit,
+  parseImageImport,
+  parseImagePatch,
   parseInsert,
   parseLiteralPatch,
   parseOpen,
@@ -79,6 +83,34 @@ function readBody(req: IncomingMessage): Promise<string> {
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => chunks.push(c));
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+/**
+ * Raw bytes for the image upload — `readBody` would run them through UTF-8 and
+ * destroy any format that is not text. Once the running total crosses the cap
+ * the rest of the body is dropped rather than buffered, and the rejection waits
+ * for `end` so the client still gets the 413 instead of a severed socket.
+ */
+function readBytes(req: IncomingMessage, maxBytes: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let overflow = false;
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > maxBytes) {
+        overflow = true;
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => {
+      if (overflow)
+        reject(new Error(`image is larger than ${Math.floor(maxBytes / (1024 * 1024))} MB`));
+      else resolve(Buffer.concat(chunks));
+    });
     req.on("error", reject);
   });
 }
@@ -331,6 +363,64 @@ export function oblikPlugin(opts: OblikPluginOpts): Plugin {
             const abs = resolveUnder(workspaceRoot, job.file);
             const src = fs.readFileSync(abs, "utf8");
             const patched = patchPaintStyle(src, job.id, job.style);
+            await enqueue(abs, () => fs.writeFileSync(abs, patched));
+            json(res, 200, { ok: true });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url?.startsWith("/__oblik-import-image")) {
+          const url = new URL(req.url, "http://localhost");
+          const query = parseImageImport({
+            slug: url.searchParams.get("slug") ?? undefined,
+            ext: url.searchParams.get("ext") ?? "",
+          });
+          if (typeof query === "string") {
+            json(res, 400, { ok: false, error: query });
+            return;
+          }
+          let bytes: Buffer;
+          try {
+            bytes = await readBytes(req, IMAGE_MAX_BYTES);
+          } catch (err) {
+            json(res, 413, { ok: false, error: err instanceof Error ? err.message : String(err) });
+            return;
+          }
+          if (bytes.length === 0) {
+            json(res, 400, { ok: false, error: "empty body" });
+            return;
+          }
+          try {
+            const publicDir = server.config.publicDir;
+            if (!publicDir) {
+              json(res, 500, { ok: false, error: "vite has no publicDir to store assets in" });
+              return;
+            }
+            const asset = writeImageAsset(publicDir, query.slug ?? "", query.ext, bytes);
+            json(res, 200, { ok: true, url: asset.url, name: asset.name, deduped: asset.deduped });
+          } catch (err) {
+            json(res, 500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__oblik-image") {
+          let body: SceneValue;
+          try {
+            body = JSON.parse(await readBody(req));
+          } catch {
+            json(res, 400, { ok: false, error: "invalid json" });
+            return;
+          }
+          const job = parseImagePatch(body);
+          if (typeof job === "string") {
+            json(res, 400, { ok: false, error: job });
+            return;
+          }
+          try {
+            const abs = resolveUnder(workspaceRoot, job.file);
+            const src = fs.readFileSync(abs, "utf8");
+            const patched = patchImageProps(src, job.id, job.props);
             await enqueue(abs, () => fs.writeFileSync(abs, patched));
             json(res, 200, { ok: true });
           } catch (err) {

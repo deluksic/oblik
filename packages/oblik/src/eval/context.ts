@@ -1,5 +1,6 @@
 import type { Geom, Vec2 } from "../geom";
 import type { Annotation } from "../source/analyze";
+import type { ImageValue } from "./image";
 import type { EvalMemo } from "./memo";
 import type { FigureStyle, PaintValue } from "./paint";
 import { $node } from "./site";
@@ -13,7 +14,7 @@ export type SliderValue = {
   step: number;
 };
 
-export type TraceValue = Geom | SliderValue | FigureStyle | PaintValue;
+export type TraceValue = Geom | SliderValue | FigureStyle | PaintValue | ImageValue;
 
 /**
  * Anything the app hands around as data: a recorded value, a plain

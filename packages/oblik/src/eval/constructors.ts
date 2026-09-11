@@ -65,6 +65,7 @@ import {
   type TraceNode,
   type TraceValue,
 } from "./context";
+import { isFiniteImage, snapImageRot, type ImageRot, type ImageValue } from "./image";
 import { memoized } from "./memo";
 import {
   cloneStyle,
@@ -155,6 +156,8 @@ function isFiniteValue(v: { kind: string }): boolean {
       return isFiniteCsg2(v as Csg2);
     case "pick":
       return isFinitePick(v as Pick);
+    case "image":
+      return isFiniteImage(v as ImageValue);
     default:
       if (isGlider(v)) return isFiniteVec(v);
       return false;
@@ -455,6 +458,49 @@ export const csg2 = mark(
   { dof: [] },
 );
 
+/**
+ * A raster reference on the paper — a screenshot, a photo, a scanned drawing —
+ * drawn under the grid, the fills, the strokes and the points.
+ *
+ * The rect is explicit and **`x`/`y` is the pre-rotation corner**: `rot` turns
+ * the rect about its own centre in 90° steps and `flip` mirrors it about the
+ * vertical centre axis, so the world rect a rotated image occupies is
+ * `h`-wide and `w`-tall. `fade ∈ [0, 1]` mixes the bitmap toward the paper
+ * colour, which is what lets sketch lines read on top of a photograph.
+ *
+ * Not a `Geom` and not a CSG operand: nothing composes an image, so eval never
+ * learns the bitmap's pixel dimensions. The import flow is what keeps the rect's
+ * aspect ratio equal to the file's; uniform scale operations preserve it, and
+ * independent `w`/`h` still allow deliberate distortion.
+ */
+export const image = mark(
+  (
+    src: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    rot: ImageRot,
+    flip: 0 | 1,
+    fade: number,
+    id?: string,
+  ): ImageValue => {
+    const value: ImageValue = {
+      kind: "image",
+      src: typeof src === "string" ? src : "",
+      x: draftAt(id, 0, x),
+      y: draftAt(id, 1, y),
+      w: draftAt(id, 2, w),
+      h: draftAt(id, 3, h),
+      rot: snapImageRot(draftAt(id, 4, rot)),
+      flip: draftAt(id, 5, flip) ? 1 : 0,
+      fade: draftAt(id, 6, fade),
+    };
+    return traced(value, id);
+  },
+  { dof: [1, 2, 3, 4, 5, 6, 7] },
+);
+
 export type SliderOpts = {
   min?: number;
   max?: number;
@@ -547,6 +593,7 @@ export const constructors = {
   polygon,
   roundOffset,
   csg2,
+  image,
   style,
   paint,
 } as const;

@@ -1,4 +1,5 @@
 import type { TraceInv, TraceNode } from "../eval/context";
+import { distToImage, imageAabb, isFiniteImage } from "../eval/image";
 import { isLineLike, type Aabb, type Circle, type LineLike, type Region } from "../geom";
 import {
   distToCsg,
@@ -102,6 +103,7 @@ export function isFiniteTrace(n: TraceNode): boolean {
   if (v.kind === "segment") return Number.isFinite(v.a.x) && Number.isFinite(v.b.x);
   if (v.kind === "line") return Number.isFinite(v.origin.x);
   if (v.kind === "parallelLine") return Number.isFinite(v.distance);
+  if (v.kind === "image") return isFiniteImage(v);
   if (isRegion(v)) return isFiniteRegion(v);
   if (isPolygon(v)) return isFinitePolygon(v);
   if (isCsg2(v)) return isFiniteCsg2(v);
@@ -131,6 +133,7 @@ function geomDistWorld(world: Vec2, n: TraceNode): number {
     const c = v;
     return abs(dist(world, c.center) - abs(c.radius));
   }
+  if (v.kind === "image") return distToImage(v, world);
   if (isRegion(v)) return distToRegion(v, world);
   if (isPolygon(v)) return distToPolygon(v, world);
   if (isCsg2(v) || isPick(v) || isPolarRepeat(v)) return distToCsg(v, world);
@@ -208,6 +211,8 @@ function aabbOf(n: TraceNode): Aabb | undefined {
       maxY = max(maxY, p.y);
     }
     box = Number.isFinite(minX) ? { minX, minY, maxX, maxY } : undefined;
+  } else if (v.kind === "image") {
+    box = imageAabb(v);
   } else if (isRegion(v) || isCsg2(v) || isPick(v) || isPolarRepeat(v)) {
     box = fillAabb(v);
   }
@@ -232,6 +237,8 @@ function pickRank(n: TraceNode): number {
   if (n.value.kind === "point" || isGlider(n.value)) return 0;
   if (isCsg2(n.value) || isPick(n.value) || isPolarRepeat(n.value)) return 2;
   if (isRegion(n.value) || isPolygon(n.value)) return 3;
+  // A reference is the backdrop: grabbed only when nothing drawn is in reach.
+  if (n.value.kind === "image") return 4;
   return 1;
 }
 

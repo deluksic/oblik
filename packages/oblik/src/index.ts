@@ -42,11 +42,27 @@ export {
   pick,
   polarRepeat,
   csg2,
+  image,
   style,
   paint,
   constructors,
 } from "./eval/constructors";
 export type { SliderOpts } from "./eval/constructors";
+export {
+  distToImage,
+  flipImage,
+  imageAabb,
+  imageCorners,
+  imageQuad,
+  isFiniteImage,
+  isImage,
+  rotateImage,
+  scaleImage,
+  snapImageRot,
+  type ImageQuadCorner,
+  type ImageRot,
+  type ImageValue,
+} from "./eval/image";
 export {
   isStyle,
   isPaint,
@@ -72,6 +88,17 @@ export { stamp, freshSiteId } from "./source/stamp";
 export { patchLiterals, formatNum } from "./source/patch";
 export { insertCall, exposeReturnBag, namesInFunctionScope, type Insert } from "./source/insert";
 export { patchPaintStyle, removePaintCall } from "./source/paint-edit";
+export { patchImageProps, type ImageProps } from "./source/image-edit";
+export {
+  IMAGE_EXTENSIONS,
+  IMAGE_MAX_BYTES,
+  extensionForMime,
+  extensionFromName,
+  isImageExtension,
+  sanitizeSlug,
+  slugFromName,
+  type ImageExtension,
+} from "./source/import-image";
 export { patchFrame, type FrameValues } from "./source/frame-edit";
 export { printExpr, member, parsePath, type Expr, type ProductField } from "./source/expr";
 export type { OblikSceneEntry, DuplicateId, DuplicateIdSite } from "./source/catalog";

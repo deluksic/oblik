@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
 
 import type { HotUpdateOptions, Plugin } from "vite";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 
+import { IMAGE_MAX_BYTES } from "./import-image";
+import { contentHash } from "./import-image.server";
 import { oblikPlugin } from "./vite-plugin";
 
 const SCENE_SRC = `import { point, defineScene } from "oblik";
@@ -70,9 +73,9 @@ function hotUpdate(
   // Vite builds the hook's `this` (the plugin context); the test hands it the two
   // fields the plugin reads, through `Reflect.apply` rather than a fake context
   // object typed as the real one.
-  return Reflect.apply(hook, { environment: { name: envName, moduleGraph: graph } }, [
-    options,
-  ]) as FakeNode[] | undefined;
+  return Reflect.apply(hook, { environment: { name: envName, moduleGraph: graph } }, [options]) as
+    | FakeNode[]
+    | undefined;
 }
 
 let tmp = "";
@@ -167,5 +170,200 @@ describe("oblikPlugin hotUpdate", () => {
     const graph = fakeGraph([bundle, lib, entry]);
     const result = hotUpdate(plugin, "client", graph, libFile, [lib]);
     expect(result).toEqual([lib, bundle]);
+  });
+});
+
+type Middleware = (req: unknown, res: unknown, next: (err?: unknown) => void) => void;
+
+type EndpointResult = { status: number; body: string; nextCalled: boolean };
+
+/** The `url` an upload answered with. */
+function storedUrl(res: EndpointResult): string {
+  return (JSON.parse(res.body) as { url: string }).url;
+}
+
+/**
+ * Drive the plugin's own middleware the way Vite does: call `configureServer`
+ * with a server that records what gets registered, then hand the last
+ * registration a fake request carrying real bytes.
+ */
+async function callEndpoint(
+  plugin: Plugin,
+  method: string,
+  url: string,
+  body: Buffer = Buffer.alloc(0),
+): Promise<EndpointResult> {
+  const captured: Middleware[] = [];
+  const hook = plugin.configureServer;
+  if (typeof hook !== "function") {
+    throw new Error("oblikPlugin's configureServer must be a plain hook");
+  }
+  Reflect.apply(hook, {}, [
+    {
+      config: { root: appRoot, publicDir: path.join(appRoot, "public") },
+      middlewares: { use: (fn: Middleware) => captured.push(fn) },
+      watcher: { add: () => {}, on: () => {} },
+      moduleGraph: fakeGraph([]),
+    },
+  ]);
+  const mw = captured[captured.length - 1];
+  if (!mw) throw new Error("the plugin registered no middleware");
+  const req = Readable.from(body.length > 0 ? [body] : []) as unknown as {
+    method: string;
+    url: string;
+  };
+  req.method = method;
+  req.url = url;
+  let status = 0;
+  let text = "";
+  let nextCalled = false;
+  await new Promise<void>((resolve) => {
+    const res = {
+      statusCode: 200,
+      setHeader: () => {},
+      end: (chunk?: unknown) => {
+        status = res.statusCode;
+        text = chunk === undefined ? "" : String(chunk);
+        resolve();
+      },
+    };
+    mw(req, res, () => {
+      nextCalled = true;
+      resolve();
+    });
+  });
+  return { status, body: text, nextCalled };
+}
+
+describe("the image endpoints", () => {
+  // Deliberately not valid UTF-8: `readBody`'s utf8 decode would mangle 0xff.
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01, 0x02, 0x03]);
+  const other = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01, 0x02, 0x04]);
+  const assets = () => path.join(appRoot, "public/assets");
+
+  test("stores the bytes and answers with the URL the node will hold", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-image?slug=Some%20Gear&ext=png",
+      PNG,
+    );
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as {
+      ok: boolean;
+      url: string;
+      name: string;
+      deduped: boolean;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.url).toBe(`/assets/some-gear-${contentHash(PNG)}.png`);
+    expect(body.deduped).toBe(false);
+    expect(fs.readdirSync(assets())).toEqual([body.name]);
+    expect(fs.readFileSync(path.join(assets(), body.name))).toEqual(PNG);
+  });
+
+  test("identical bytes reuse the file; different bytes never collide", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const first = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-image?slug=gear&ext=png",
+      PNG,
+    );
+    const again = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-image?slug=gear&ext=png",
+      PNG,
+    );
+    const other0 = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-import-image?slug=gear&ext=png",
+      other,
+    );
+    expect(storedUrl(again)).toBe(storedUrl(first));
+    expect((JSON.parse(again.body) as { deduped: boolean }).deduped).toBe(true);
+    expect(storedUrl(other0)).not.toBe(storedUrl(first));
+    expect(fs.readdirSync(assets())).toHaveLength(2);
+  });
+
+  test("a format outside the raster list is refused before anything is written", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(plugin, "POST", "/__oblik-import-image?slug=gear&ext=svg", PNG);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false });
+    expect(fs.existsSync(assets())).toBe(false);
+  });
+
+  test("a missing extension is refused", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    expect(
+      (await callEndpoint(plugin, "POST", "/__oblik-import-image?slug=gear", PNG)).status,
+    ).toBe(400);
+  });
+
+  test("an empty body is refused", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(plugin, "POST", "/__oblik-import-image?slug=gear&ext=png");
+    expect(res.status).toBe(400);
+    expect(fs.existsSync(assets())).toBe(false);
+  });
+
+  test("a body over the cap is refused, and still written nowhere", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const big = Buffer.alloc(IMAGE_MAX_BYTES + 1, 7);
+    const res = await callEndpoint(plugin, "POST", "/__oblik-import-image?slug=gear&ext=png", big);
+    expect(res.status).toBe(413);
+    expect(fs.existsSync(assets())).toBe(false);
+  });
+
+  test("patches the node's props in the scene source", async () => {
+    const scene = path.join(sceneDir, "image.ts");
+    const raw = `import { image, defineScene } from "oblik";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "Ref",
+  build() {
+    image("/assets/gear-9f3a2c11.png", 0, 0, 40, 20, 0, 0, 0.5, "o_img");
+  },
+});
+`;
+    fs.writeFileSync(scene, raw);
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(
+      plugin,
+      "POST",
+      "/__oblik-image",
+      Buffer.from(
+        JSON.stringify({
+          file: path.relative(tmp, scene),
+          id: "o_img",
+          props: { x: 5, rot: 90, fade: 1 },
+        }),
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(fs.readFileSync(scene, "utf8")).toContain(
+      'image("/assets/gear-9f3a2c11.png", 5, 0, 40, 20, 90, 0, 1, "o_img")',
+    );
+  });
+
+  test("rejects an empty patch and an id that is not in the file", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const post = (body: object) =>
+      callEndpoint(plugin, "POST", "/__oblik-image", Buffer.from(JSON.stringify(body)));
+    const file = path.relative(tmp, path.join(sceneDir, "alpha.ts"));
+    expect((await post({ file, id: "o_a", props: {} })).status).toBe(400);
+    expect((await post({ file, id: "o_missing", props: { x: 1 } })).status).toBe(500);
+    expect((await post({ file, id: "o_a", props: { fade: 2 } })).status).toBe(400);
+  });
+
+  test("leaves every other route to the next middleware", async () => {
+    const plugin = oblikPlugin({ workspaceRoot: tmp, sceneDir });
+    const res = await callEndpoint(plugin, "POST", "/__oblik-nope", Buffer.from("{}"));
+    expect(res.nextCalled).toBe(true);
   });
 });

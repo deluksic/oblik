@@ -2,6 +2,7 @@ import * as v from "valibot";
 
 import type { SceneValue } from "../eval/context";
 import type { Expr } from "./expr";
+import { isImageExtension, type ImageExtension } from "./import-image";
 
 export const literalPatchSchema = v.object({
   file: v.string(),
@@ -86,6 +87,62 @@ export function parsePaintPatch(raw: SceneValue): PaintPatchBody | string {
   const r = v.safeParse(paintPatchSchema, raw);
   if (r.success) return r.output;
   return r.issues.map((i) => i.message).join("; ");
+}
+
+/**
+ * The image node's patch: any subset of the props the inspector and the
+ * transform gestures write. `rot`/`flip` are the two discrete props, so they are
+ * literals rather than numbers; `w`/`h` cannot be negative and `fade` is the
+ * charter's `[0, 1]`, enforced here because this endpoint is the only writer.
+ * `src` is optional and unused by P13's gestures — it is here so re-pointing a
+ * node is a patch rather than a source edit if a later prototype wants it.
+ */
+export const imagePatchSchema = v.object({
+  file: v.string(),
+  id: v.pipe(v.string(), v.minLength(1)),
+  props: v.object({
+    src: v.optional(v.pipe(v.string(), v.minLength(1))),
+    x: v.optional(v.number()),
+    y: v.optional(v.number()),
+    w: v.optional(v.pipe(v.number(), v.minValue(0))),
+    h: v.optional(v.pipe(v.number(), v.minValue(0))),
+    rot: v.optional(v.union([v.literal(0), v.literal(90), v.literal(180), v.literal(270)])),
+    flip: v.optional(v.union([v.literal(0), v.literal(1)])),
+    fade: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
+  }),
+});
+
+export type ImagePatchBody = v.InferOutput<typeof imagePatchSchema>;
+
+export function parseImagePatch(raw: SceneValue): ImagePatchBody | string {
+  const r = v.safeParse(imagePatchSchema, raw);
+  if (!r.success) return r.issues.map((i) => i.message).join("; ");
+  if (Object.keys(r.output.props).length === 0) return "props is empty";
+  return r.output;
+}
+
+/**
+ * The upload's query string: a slug the client suggests (the server sanitises it
+ * anyway) and the extension it derived from the decoded blob's format.
+ */
+export const imageImportSchema = v.object({
+  slug: v.optional(v.string()),
+  ext: v.pipe(
+    v.string(),
+    v.transform((s) => s.trim().toLowerCase().replace(/^\./, "")),
+    v.check(isImageExtension, "unsupported image extension"),
+  ),
+});
+
+export type ImageImportBody = { slug?: string; ext: ImageExtension };
+
+export function parseImageImport(raw: SceneValue): ImageImportBody | string {
+  const r = v.safeParse(imageImportSchema, raw);
+  if (!r.success) return r.issues.map((i) => i.message).join("; ");
+  // `v.check` rejects a bad value but does not narrow what the schema outputs.
+  const ext = r.output.ext;
+  if (!isImageExtension(ext)) return "unsupported image extension";
+  return { ...(r.output.slug !== undefined ? { slug: r.output.slug } : {}), ext };
 }
 
 export const eraseSchema = v.object({

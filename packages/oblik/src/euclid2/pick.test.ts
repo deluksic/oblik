@@ -4,6 +4,7 @@ import type { TraceNode, TraceNodeOf } from "../eval/context";
 import {
   hitTest,
   hitsNear,
+  isFiniteTrace,
   namedStrokesThrough,
   snapBoundPoint,
   snapLineCarrier,
@@ -407,5 +408,100 @@ describe("region pick", () => {
         print: (n) => n.bind,
       })?.id,
     ).toBe("o_pr");
+  });
+});
+
+describe("image pick", () => {
+  const IMG: TraceNodeOf<"image"> = {
+    id: "o_img",
+    occ: 0,
+    kind: "image",
+    bind: "ref",
+    value: {
+      kind: "image",
+      src: "/assets/gear-9f3a2c11.png",
+      x: 0,
+      y: 0,
+      w: 4,
+      h: 2,
+      rot: 0,
+      flip: 0,
+      fade: 0.4,
+    },
+    editable: false,
+    stack: [{ file: "scene.ts", line: 14, column: 4 }],
+  };
+
+  test("a bare image is picked from inside its rect", () => {
+    expect(hitTest([IMG], { x: 2, y: 1 }, camera, size)?.id).toBe("o_img");
+  });
+
+  test("an image is not picked from outside its rect", () => {
+    expect(hitTest([IMG], { x: 8, y: 1 }, camera, size)).toBeUndefined();
+  });
+
+  test("the edge and corner pick at the stroke radius", () => {
+    expect(hitTest([IMG], { x: 4.05, y: 1 }, camera, size)?.id).toBe("o_img");
+    expect(hitTest([IMG], { x: 4.4, y: 1 }, camera, size)).toBeUndefined();
+  });
+
+  test("a rotated image refuses a point in its unrotated box", () => {
+    const turned: TraceNode = { ...IMG, value: { ...IMG.value, rot: 90 } };
+    // The turned rect spans x ∈ [1, 3], y ∈ [-1, 3]: centre (2, 1), w/h swapped.
+    expect(hitTest([turned], { x: 2, y: 1 }, camera, size)?.id).toBe("o_img");
+    expect(hitTest([turned], { x: 0.2, y: 0.2 }, camera, size)).toBeUndefined();
+  });
+
+  test("a region outranks an image under the same point", () => {
+    const Pa = { x: 0, y: 0 };
+    const Pb = { x: 4, y: 0 };
+    const Pc = { x: 0, y: 3 };
+    const ab = { kind: "segment" as const, a: Pa, b: Pb };
+    const bc = { kind: "segment" as const, a: Pb, b: Pc };
+    const ca = { kind: "segment" as const, a: Pc, b: Pa };
+    const FACE: TraceNodeOf<"region"> = {
+      id: "o_pr",
+      occ: 0,
+      kind: "region",
+      bind: "face",
+      value: {
+        kind: "region",
+        outer: [
+          { a: Pa, b: Pb, carrier: ab },
+          { a: Pb, b: Pc, carrier: bc },
+          { a: Pc, b: Pa, carrier: ca },
+        ],
+        holes: [],
+      },
+      editable: false,
+      stack: [],
+    };
+    const hits = hitsNear([IMG, FACE], { x: 1, y: 1 }, camera, size);
+    expect(hits[0]?.id).toBe("o_pr");
+    expect(hits[hits.length - 1]?.id).toBe("o_img");
+  });
+
+  test("a point outranks an image", () => {
+    const onImage: TraceNodeOf<"point"> = {
+      ...A,
+      id: "o_p",
+      bind: "P",
+      value: { kind: "point", x: 2, y: 1 },
+    };
+    expect(hitsNear([IMG, onImage], { x: 2, y: 1 }, camera, size)[0]?.id).toBe("o_p");
+  });
+
+  test("a collapsed or sourceless image never picks", () => {
+    const collapsed: TraceNode = { ...IMG, value: { ...IMG.value, w: 0 } };
+    const sourceless: TraceNode = { ...IMG, value: { ...IMG.value, src: "" } };
+    expect(isFiniteTrace(collapsed)).toBe(false);
+    expect(isFiniteTrace(sourceless)).toBe(false);
+    expect(hitsNear([collapsed, sourceless], { x: 1, y: 1 }, camera, size)).toEqual([]);
+  });
+
+  test("an image is not a snap carrier for regions or strokes", () => {
+    expect(snapRegion([IMG], { x: 2, y: 1 }, camera, size)).toBeUndefined();
+    expect(snapStrokeCarrier([IMG], { x: 2, y: 1 }, camera, size)).toBeUndefined();
+    expect(snapLineCarrier([IMG], { x: 2, y: 1 }, camera, size)).toBeUndefined();
   });
 });
