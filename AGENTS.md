@@ -7,6 +7,11 @@
 - **Committing and pushing are allowed.** `git add`, `git commit`, and `git push` on the current branch are fine without asking.
 - Do not merge or otherwise move git state unless the user explicitly asks.
 
+## No browser automation — the user verifies in the browser
+
+- **Never run Playwright, Puppeteer, headless Chrome, `npx playwright`, CDP/remote-debugging clients, or any other browser automation.** Do not launch a browser, drive the running page, take screenshots, or call the app's capture hooks (`window.__gpuCapture`) from a script. Do not run `npx` to fetch such a tool either, and do not attach to a debug port someone else left listening.
+- **Browser verification belongs to the user.** What an agent verifies is the device-free side: typecheck, `pnpm lint`, the vitest suite, and the WGSL tests that resolve shaders without a device. When a check genuinely needs a rendering browser, say what to look at and hand it over — that is a gate, not a task to automate.
+
 ## The dev server rewrites scene files while running
 
 The user may have the dev server running (`pnpm demo` → Vite on http://localhost:43127). While it runs, the oblik plugin rewrites scene/layout sources under `apps/demo/src` on its own:
