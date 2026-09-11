@@ -8,7 +8,7 @@ import { formatNum } from "./patch";
  * Every leaf an image patch may set, as a dotted path into the options object.
  *
  * Flat on the wire so that one code path writes a prop at any depth —
- * `world.x` is no different from `fade` — and so that a later prop adds a
+ * `world.x` is no different from `style.opacity` — and so that a later prop adds a
  * name here rather than another case to the editor. Order matters: it is the
  * order missing leaves are created in.
  */
@@ -23,7 +23,9 @@ export const IMAGE_LEAVES = [
   "targetSize.height",
   "rot",
   "flip",
-  "fade",
+  "style.opacity",
+  "style.saturation",
+  "style.contrast",
 ] as const;
 
 export type ImageLeaf = (typeof IMAGE_LEAVES)[number];
@@ -77,7 +79,7 @@ function printTree(tree: Tree): string {
 }
 
 /**
- * Add `entries` (`["fade: 0.4"]`) to an object literal, in the style it is
+ * Add `entries` (`["style.opacity: 0.4"]`) to an object literal, in the style it is
  * already written in: a multiline object gets one property per line, indented
  * like its last property, and a single-line one is extended in place with one
  * normalised separator. Trailing commas are respected rather than doubled — the

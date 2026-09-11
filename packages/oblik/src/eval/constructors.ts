@@ -65,7 +65,14 @@ import {
   type TraceNode,
   type TraceValue,
 } from "./context";
-import { imageRect, isFiniteImage, snapImageRot, type ImageOpts, type ImageValue } from "./image";
+import {
+  imageRect,
+  imageStyle,
+  isFiniteImage,
+  snapImageRot,
+  type ImageOpts,
+  type ImageValue,
+} from "./image";
 import { memoized } from "./memo";
 import {
   cloneStyle,
@@ -469,8 +476,8 @@ export const csg2 = mark(
  * both sides allow deliberate distortion). `imageRect` does that arithmetic and
  * the tape stores the result, so no consumer ever handles pixels. `rot` turns
  * the rect about its own centre in 90° steps and `flip` mirrors it about the
- * vertical centre axis; `fade ∈ [0, 1]` mixes the bitmap toward the paper
- * colour, which is what lets sketch lines read on top of a photograph.
+ * vertical centre axis; `style` (opacity, saturation, contrast) is how the
+ * bitmap is drawn, which is what lets sketch lines read on top of a photograph.
  *
  * Not a `Geom` and not a CSG operand: nothing composes an image, and nothing
  * here decodes anything — evaluation stays synchronous and device-free, because
@@ -490,7 +497,7 @@ export const image = mark(
       ...imageRect(o),
       rot: snapImageRot(o.rot ?? 0),
       flip: o.flip ? 1 : 0,
-      fade: o.fade ?? 0,
+      style: imageStyle(o),
     };
     return traced(value, id);
   },

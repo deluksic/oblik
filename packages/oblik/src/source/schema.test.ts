@@ -113,7 +113,13 @@ describe("parseImagePatch", () => {
     const job = parseImagePatch({
       file,
       id: "o_img",
-      props: { "world.x": 1.5, "world.y": 2.5, "targetSize.width": 20, rot: 90 },
+      props: {
+        "world.x": 1.5,
+        "world.y": 2.5,
+        "targetSize.width": 20,
+        "style.opacity": 0.4,
+        rot: 90,
+      },
     });
     expect(typeof job).not.toBe("string");
     if (typeof job === "string") throw new Error(job);
@@ -121,15 +127,16 @@ describe("parseImagePatch", () => {
       "world.x": 1.5,
       "world.y": 2.5,
       "targetSize.width": 20,
+      "style.opacity": 0.4,
       rot: 90,
     });
   });
 
   test("handles keys with dots in them, rather than nesting them again", () => {
-    const job = parseImagePatch({ file, id: "o_img", props: { fade: 0.5 } });
+    const job = parseImagePatch({ file, id: "o_img", props: { "style.saturation": 0.2 } });
     expect(typeof job).not.toBe("string");
     if (typeof job === "string") throw new Error(job);
-    expect(job.props).toHaveProperty("fade", 0.5);
+    expect(job.props).toHaveProperty("style.saturation", 0.2);
   });
 
   test("accepts a target size on one side only — the other is inferred", () => {
@@ -142,7 +149,7 @@ describe("parseImagePatch", () => {
   });
 
   test("rejects an empty id and an empty patch", () => {
-    expect(typeof parseImagePatch({ file, id: "", props: { fade: 1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "", props: { "style.opacity": 1 } })).toBe("string");
     expect(typeof parseImagePatch({ file, id: "o_img", props: {} })).toBe("string");
   });
 
@@ -175,12 +182,22 @@ describe("parseImagePatch", () => {
     expect(typeof parseImagePatch({ file, id: "o_img", props: { flip: 2 } })).toBe("string");
   });
 
-  test("rejects a negative target size and a fade outside [0, 1]", () => {
+  test("rejects a negative target size and a style dial out of range", () => {
     expect(typeof parseImagePatch({ file, id: "o_img", props: { "targetSize.width": -1 } })).toBe(
       "string",
     );
-    expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: 1.2 } })).toBe("string");
-    expect(typeof parseImagePatch({ file, id: "o_img", props: { fade: -0.1 } })).toBe("string");
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "style.opacity": 1.2 } })).toBe(
+      "string",
+    );
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "style.opacity": -0.1 } })).toBe(
+      "string",
+    );
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "style.saturation": -1 } })).toBe(
+      "string",
+    );
+    expect(typeof parseImagePatch({ file, id: "o_img", props: { "style.contrast": 9 } })).toBe(
+      "string",
+    );
   });
 
   test("rejects a leaf it does not know", () => {

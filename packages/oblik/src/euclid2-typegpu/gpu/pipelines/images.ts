@@ -1,17 +1,17 @@
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { builtin, f32, interpolate, u32, vec2f, vec3f, vec4f } from "typegpu/data";
-import { dot, max, mix, select, textureSample } from "typegpu/std";
+import { dot, max, mix, saturate, select, textureSample } from "typegpu/std";
 
 import { imageLayout } from "../layout";
 
 /** Quad corners per reference (triangle-strip). */
 export const IMAGE_QUAD_VERTICES = 4;
 
-/** Luma weights of the desaturation a reference is always drawn through. */
+/** Luma weights: what "grey" means to the `saturation` dial. */
 const LUMA = vec3f(0.2126, 0.7152, 0.0722);
-/** How far toward grey a reference sits before `fade` is applied. */
-const DESATURATE = 0.85;
+/** Mid-grey: the pivot the `contrast` dial scales about. */
+const MID = 0.5;
 
 /** World → clip, the same mapping every other pipeline uses. */
 const toClip = tgpu.fn(
@@ -36,7 +36,7 @@ export const imageVertex = tgpu.vertexFn({
   out: {
     outPos: builtin.position,
     uv: interpolate("linear", vec2f),
-    fade: interpolate("flat", f32),
+    style: interpolate("flat", vec3f),
   },
 })(({ instanceIndex, vertexIndex }) => {
   "use gpu";
@@ -55,25 +55,31 @@ export const imageVertex = tgpu.vertexFn({
   // down without failing anything, so `wgsl.test.ts` pins both selects.
   const x = vertexIndex === u32(1) || vertexIndex === u32(3) ? f32(1) : f32(0);
   const y = vertexIndex >= u32(2) ? f32(0) : f32(1);
-  return { outPos: toClip(p), uv: vec2f(x, y), fade: inst.fade };
+  return {
+    outPos: toClip(p),
+    uv: vec2f(x, y),
+    style: vec3f(inst.opacity, inst.saturation, inst.contrast),
+  };
 });
 
 /**
- * The reference's colour, prepared for tracing over: first desaturated most of
- * the way to grey (a photograph that keeps its full chroma fights the sketch),
- * then mixed toward the paper by `fade`. Alpha is the bitmap's own, so a
- * transparent PNG still shows the paper through it. The two mixes are the whole
- * look; a theme switch changes `theme.paper` and the reference follows.
+ * The reference's colour, prepared for tracing over. Three dials, in the order
+ * they compose: `saturation` mixes between the bitmap's grey and the bitmap
+ * (a photograph that keeps its full chroma fights the sketch), `contrast` scales
+ * about mid-grey (hardening line work), and `opacity` scales the bitmap's own
+ * alpha — so a faint reference is mixed toward the paper *by the blend*, not in
+ * here, which is why this shader has no paper colour and a theme switch needs
+ * nothing from it. A transparent PNG still shows the paper through it, twice
+ * over.
  */
 export const imageFragment = tgpu.fragmentFn({
-  in: { uv: interpolate("linear", vec2f), fade: interpolate("flat", f32) },
+  in: { uv: interpolate("linear", vec2f), style: interpolate("flat", vec3f) },
   out: vec4f,
-})(({ uv, fade }) => {
+})(({ uv, style }) => {
   "use gpu";
   const sampled = textureSample(imageLayout.$.tex, imageLayout.$.samp, uv);
-  const grey = dot(sampled.rgb, LUMA);
-  const paper = imageLayout.$.theme.paper;
-  return vec4f(mix(mix(sampled.rgb, vec3f(grey), DESATURATE), paper, fade), sampled.a);
+  const grey = mix(vec3f(dot(sampled.rgb, LUMA)), sampled.rgb, style.y);
+  return vec4f(saturate((grey - MID) * style.z + MID), sampled.a * style.x);
 });
 
 const alphaBlend: GPUBlendState = {

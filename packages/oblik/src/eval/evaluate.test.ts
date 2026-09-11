@@ -626,7 +626,11 @@ describe("image nodes", () => {
   test("records one node with the rect the anchor and sizes describe", () => {
     const { trace } = evaluate(
       imageScene(() => {
-        image("/assets/gear-9f3a2c11.png", sizedImage({ rot: 90, flip: 1, fade: 0.25 }), "o_img");
+        image(
+          "/assets/gear-9f3a2c11.png",
+          sizedImage({ rot: 90, flip: 1, style: { opacity: 0.25 } }),
+          "o_img",
+        );
       }),
     );
     expect(trace.map((n) => n.kind)).toEqual(["image"]);
@@ -642,7 +646,7 @@ describe("image nodes", () => {
       h: 20,
       rot: 90,
       flip: 1,
-      fade: 0.25,
+      style: { opacity: 0.25, saturation: 1, contrast: 1 },
     });
   });
 
@@ -704,13 +708,28 @@ describe("image nodes", () => {
     expect(trace[0]?.value).toMatchObject({ x: -100, y: -50, w: 200, h: 100 });
   });
 
-  test("the look props default to their no-op values", () => {
+  test("the look dials default to the bitmap as it is", () => {
     const { trace } = evaluate(
       imageScene(() => {
         image("/a.png", sizedImage(), "o_img");
       }),
     );
-    expect(trace[0]?.value).toMatchObject({ rot: 0, flip: 0, fade: 0 });
+    expect(trace[0]?.value).toMatchObject({
+      rot: 0,
+      flip: 0,
+      style: { opacity: 1, saturation: 1, contrast: 1 },
+    });
+  });
+
+  test("a stated dial is kept and the rest default", () => {
+    const { trace } = evaluate(
+      imageScene(() => {
+        image("/a.png", sizedImage({ style: { saturation: 0.15 } }), "o_img");
+      }),
+    );
+    expect(trace[0]?.value).toMatchObject({
+      style: { opacity: 1, saturation: 0.15, contrast: 1 },
+    });
   });
 
   /**
@@ -761,7 +780,14 @@ describe("image nodes", () => {
       }),
       { draft },
     );
-    expect(trace[0]?.value).toMatchObject({ x: 10, y: 0, w: 40, h: 20, rot: 0, fade: 0 });
+    expect(trace[0]?.value).toMatchObject({
+      x: 10,
+      y: 0,
+      w: 40,
+      h: 20,
+      rot: 0,
+      style: { opacity: 1, saturation: 1, contrast: 1 },
+    });
   });
 
   test("a call that describes no rect is evaluated but never recorded", () => {

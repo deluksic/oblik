@@ -27,7 +27,7 @@ const base: ImageValue = {
   h: 20,
   rot: 0,
   flip: 0,
-  fade: 0.5,
+  style: { opacity: 0.5, saturation: 0.2, contrast: 1.2 },
 };
 
 /** A copy of the fixture: keeps inline props checked against the union fields. */

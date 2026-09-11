@@ -1249,8 +1249,8 @@ function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
   return f;
 }
 
-/** One reference quad: the four corners in draw order (`rot`/`flip` already
- * folded in by `eval/image.ts`) plus the fade toward paper. */
+/** One reference quad: the four corners in strip order (`rot`/`flip` already
+ * folded in by `eval/image.ts`) plus the three style dials. */
 function imageInstance(value: ImageValue): ImageInstValue {
   const [a, b, c, d] = imageQuad(value);
   return ImageInst({
@@ -1258,7 +1258,9 @@ function imageInstance(value: ImageValue): ImageInstValue {
     b: vec2f(b.x, b.y),
     c: vec2f(c.x, c.y),
     d: vec2f(d.x, d.y),
-    fade: value.fade,
+    opacity: value.style.opacity,
+    saturation: value.style.saturation,
+    contrast: value.style.contrast,
   });
 }
 
@@ -1272,7 +1274,9 @@ function encodeImage(inst: ImageInstValue): Float64Array {
     inst.c.y,
     inst.d.x,
     inst.d.y,
-    inst.fade,
+    inst.opacity,
+    inst.saturation,
+    inst.contrast,
   );
 }
 

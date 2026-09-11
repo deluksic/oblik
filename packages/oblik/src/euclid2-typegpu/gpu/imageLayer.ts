@@ -1,11 +1,10 @@
 import type { TgpuBuffer, TgpuRoot, UniformFlag } from "typegpu";
-import { arrayOf, vec3f } from "typegpu/data";
+import { arrayOf } from "typegpu/data";
 
 import { createImageCache, type ImageView } from "./imageCache";
 import { imageLayout } from "./layout";
 import { createImagePipelines, IMAGE_QUAD_VERTICES, type ImagePipelines } from "./pipelines/images";
-import type { Rgba } from "./renderer";
-import { Frame, ImageInst, ImageTheme, MAX_IMAGES, type ImageInstValue } from "./schemas";
+import { Frame, ImageInst, MAX_IMAGES, type ImageInstValue } from "./schemas";
 
 /** The painter's frame uniform. `Frame` is the schema, not the JS value type:
  * a buffer is typed by what it was created from. */
@@ -18,8 +17,6 @@ export type ImageDraw = { slot: number; src: string };
 export type ImageLayer = {
   /** Byte-diffed instance writes, then this tick's draw list. */
   sync(writes: { idx: number; value: ImageInstValue }[], draws: readonly ImageDraw[]): void;
-  /** A theme switch moves the paper a faded reference mixes toward. */
-  setPaper(paper: Rgba): void;
   /** Draw every reference, in tape order, before the grid. */
   draw(pass: GPURenderPassEncoder): void;
   destroy(): void;
@@ -44,7 +41,6 @@ export function createImageLayer(opts: {
 }): ImageLayer {
   const { root, format, frameBuffer, onReady } = opts;
   const imageBuffer = root.createBuffer(arrayOf(ImageInst, MAX_IMAGES)).$usage("storage");
-  const themeBuffer = root.createBuffer(ImageTheme, { paper: vec3f(1, 1, 1) }).$usage("uniform");
   const cache = createImageCache({ root, onReady });
 
   /** One bound pipeline per source. The view it was built for is what says
@@ -59,7 +55,6 @@ export function createImageLayer(opts: {
     hit?.pipelines.destroy();
     const group = root.createBindGroup(imageLayout, {
       frame: frameBuffer,
-      theme: themeBuffer,
       images: imageBuffer,
       tex: view,
       samp: cache.sampler,
@@ -81,9 +76,6 @@ export function createImageLayer(opts: {
         bound.delete(src);
       }
     },
-    setPaper(paper) {
-      themeBuffer.write({ paper: vec3f(paper.r, paper.g, paper.b) });
-    },
     draw(pass) {
       for (const draw of draws) {
         pipelinesFor(draw.src).image(pass).draw(IMAGE_QUAD_VERTICES, 1, 0, draw.slot);
@@ -94,7 +86,6 @@ export function createImageLayer(opts: {
       bound.clear();
       cache.destroy();
       imageBuffer.destroy();
-      themeBuffer.destroy();
     },
   };
 }

@@ -17,9 +17,8 @@ import type { Aabb, Vec2 } from "../geom";
  * while image y runs down, so the bitmap's top-left is the rect's `(x, y+h)`
  * corner; a positive `rot` reads as a clockwise turn on screen. `flip` mirrors
  * the sampled image about the vertical centre axis — it changes which way the
- * picture faces, never the rect's geometry. `fade ∈ [0, 1]` mixes the image
- * toward the paper colour, which is what lets sketch lines read on top of a
- * photograph.
+ * picture faces, never the rect's geometry. `style` is how the bitmap is drawn:
+ * see `ImageStyle`.
  *
  * Loading and decoding stay outside this module: an `ImageValue` is a rect and a
  * URL, which is what keeps eval, pick and the GPU pure and device-free.
@@ -33,7 +32,27 @@ export type ImageValue = {
   h: number;
   rot: ImageRot;
   flip: 0 | 1;
-  fade: number;
+  style: ImageStyle;
+};
+
+/**
+ * How the bitmap is drawn, as three independent dials rather than one "fade".
+ * All three are resolved — a value always states them, so nothing downstream
+ * has to know what the defaults were.
+ *
+ * - `opacity` multiplies the bitmap's own alpha. The reference layer draws first
+ *   on the cleared paper, so the blend is what mixes a faint reference toward
+ *   the paper — no paper colour in the shader, and a theme switch works for
+ *   free.
+ * - `saturation` mixes between the bitmap's grey and the bitmap: `0` is a
+ *   pencil-friendly greywash, `1` is as scanned, above `1` boosts.
+ * - `contrast` scales about mid-grey: `0` flattens to grey, `1` is as scanned,
+ *   above `1` hardens the line work a trace is reading.
+ */
+export type ImageStyle = {
+  opacity: number;
+  saturation: number;
+  contrast: number;
 };
 
 /** Quarter turns. Not a free angle: the steps keep the rect axis-aligned at 0/180. */
@@ -74,8 +93,30 @@ export type ImageOpts = {
   targetSize: { width?: number; height?: number };
   rot?: ImageRot;
   flip?: 0 | 1;
-  fade?: number;
+  style?: Partial<ImageStyle>;
 };
+
+/** The look a call that states nothing gets: the bitmap as it is. */
+export const DEFAULT_IMAGE_STYLE: ImageStyle = { opacity: 1, saturation: 1, contrast: 1 };
+
+/** The style a call asks for, with the defaults filled in. Values are passed
+ * through rather than clamped: `isFiniteImage` decides whether a node with them
+ * is drawable, the same as it does for the rect. */
+export function imageStyle(opts: Partial<ImageOpts> | undefined): ImageStyle {
+  const style = opts && typeof opts === "object" ? opts.style : undefined;
+  return {
+    opacity: dial(style?.opacity, DEFAULT_IMAGE_STYLE.opacity),
+    saturation: dial(style?.saturation, DEFAULT_IMAGE_STYLE.saturation),
+    contrast: dial(style?.contrast, DEFAULT_IMAGE_STYLE.contrast),
+  };
+}
+
+/** A prop that is not a number falls back to its default; an explicit NaN stays
+ * one, so a computed value that went wrong is a node that stops drawing rather
+ * than one that quietly draws at full strength. */
+function dial(value: unknown, fallback: number): number {
+  return typeof value === "number" ? value : fallback;
+}
 
 /** The world rect a reference occupies: its minimum corner, growing `+w`/`+h`. */
 export type ImageRect = { x: number; y: number; w: number; h: number };
@@ -156,7 +197,12 @@ export function isFiniteImage(value: ImageValue): boolean {
     value.h > 0 &&
     Number.isFinite(value.rot) &&
     Number.isFinite(value.flip) &&
-    Number.isFinite(value.fade)
+    Number.isFinite(value.style.opacity) &&
+    value.style.opacity >= 0 &&
+    Number.isFinite(value.style.saturation) &&
+    value.style.saturation >= 0 &&
+    Number.isFinite(value.style.contrast) &&
+    value.style.contrast >= 0
   );
 }
 

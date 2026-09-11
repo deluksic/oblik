@@ -15,7 +15,7 @@ export default defineScene({
         targetSize: { width: 40, height: 20 },
         rot: 0,
         flip: 0,
-        fade: 0.5,
+        style: { opacity: 0.5, saturation: 1 },
       },
       "o_img",
     );
@@ -33,10 +33,17 @@ describe("patchImageProps", () => {
     expect(out).toContain("world: { x: 12.5, y: 20 }");
   });
 
-  test("overwrites a top-level leaf", () => {
-    const out = patchImageProps(SRC, "o_img", { fade: 0.25, rot: 270 });
+  test("overwrites a top-level leaf and a nested one", () => {
+    const out = patchImageProps(SRC, "o_img", { "style.opacity": 0.25, rot: 270 });
     expect(out).toContain("rot: 270,");
-    expect(out).toContain("fade: 0.25,");
+    expect(out).toContain("style: { opacity: 0.25, saturation: 1 }");
+  });
+
+  test("creates the style branch for a call that has none", () => {
+    const out = patchImageProps(SHORT, "o_img", { "style.saturation": 0.15 });
+    expect(out).toBe(
+      `image("/a.png", { targetSize: { width: 20 }, style: { saturation: 0.15 } }, "o_img");\n`,
+    );
   });
 
   test("writes the target size one side at a time", () => {
@@ -67,10 +74,10 @@ describe("patchImageProps", () => {
   });
 
   test("rewrites the call with the id asked for, not the first image", () => {
-    const src = `image("/a.png", { fade: 0 }, "o_one");\nimage("/b.png", { fade: 0 }, "o_two");\n`;
-    const out = patchImageProps(src, "o_two", { fade: 1 });
+    const src = `image("/a.png", { rot: 0 }, "o_one");\nimage("/b.png", { rot: 0 }, "o_two");\n`;
+    const out = patchImageProps(src, "o_two", { rot: 180 });
     expect(out).toBe(
-      `image("/a.png", { fade: 0 }, "o_one");\nimage("/b.png", { fade: 1 }, "o_two");\n`,
+      `image("/a.png", { rot: 0 }, "o_one");\nimage("/b.png", { rot: 180 }, "o_two");\n`,
     );
   });
 
@@ -117,9 +124,9 @@ describe("patchImageProps", () => {
     });
 
     test("a single-line object with a trailing comma keeps one separator", () => {
-      const src = `image("/a.png", { fade: 0, }, "o_img");\n`;
+      const src = `image("/a.png", { rot: 0, }, "o_img");\n`;
       expect(patchImageProps(src, "o_img", { "targetSize.width": 20 })).toBe(
-        `image("/a.png", { fade: 0, targetSize: { width: 20 } }, "o_img");\n`,
+        `image("/a.png", { rot: 0, targetSize: { width: 20 } }, "o_img");\n`,
       );
     });
 
@@ -132,7 +139,7 @@ describe("patchImageProps", () => {
   });
 
   test("refuses a call it cannot find", () => {
-    expect(() => patchImageProps(SRC, "o_nope", { fade: 1 })).toThrow(/no image/);
+    expect(() => patchImageProps(SRC, "o_nope", { "style.opacity": 1 })).toThrow(/no image/);
   });
 
   test("refuses an empty patch", () => {
@@ -146,7 +153,9 @@ describe("patchImageProps", () => {
 
   test("refuses a props argument that is not an object literal", () => {
     const src = `image("/a.png", opts, "o_img");\n`;
-    expect(() => patchImageProps(src, "o_img", { fade: 1 })).toThrow(/no options object/);
+    expect(() => patchImageProps(src, "o_img", { "style.opacity": 1 })).toThrow(
+      /no options object/,
+    );
   });
 
   test("a patch that leaves the source identical is still a rewrite, not a corruption", () => {

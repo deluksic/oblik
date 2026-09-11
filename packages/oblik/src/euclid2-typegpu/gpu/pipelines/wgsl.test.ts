@@ -153,17 +153,20 @@ describe("image WGSL", () => {
     expect(code).not.toContain("select(0f, 1f, (vertexIndex >= 2u))");
   });
 
-  test("the fragment desaturates, then fades toward the paper", () => {
+  test("the fragment applies saturation, contrast, then opacity", () => {
     expect(occurrences(code, "textureSample(")).toBe(1);
     expect(occurrences(code, "dot(")).toBe(1);
     expect(code).toContain("0.2125999927520752");
-    expect(code).toContain("0.85f");
-    expect(occurrences(code, "mix(")).toBe(2);
-    expect(code).toContain("theme.paper");
-  });
-
-  test("fade is flat across the quad and alpha is the bitmap's own", () => {
-    expect(occurrences(code, "@interpolate(flat) fade")).toBe(2);
-    expect(code).toContain("sampled.a");
+    // Luma is what "grey" means to the saturation mix; contrast scales about
+    // mid-grey; opacity is the alpha, so the blend does the paper mixing and the
+    // shader needs no paper colour at all.
+    expect(code).toContain("mix(vec3f(dot(");
+    expect(code).toContain("- 0.5f) * ");
+    expect(code).toContain("saturate(");
+    expect(code).toContain("sampled.a * ");
+    expect(code).not.toContain("paper");
+    // The dials are per-instance constants, so they ride a flat varying rather
+    // than being interpolated corner to corner.
+    expect(occurrences(code, "@interpolate(flat) style")).toBe(2);
   });
 });

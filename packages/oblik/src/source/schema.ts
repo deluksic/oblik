@@ -117,7 +117,9 @@ export const imagePatchSchema = v.object({
       "targetSize.height": v.optional(v.pipe(v.number(), v.minValue(0))),
       rot: v.optional(v.union([v.literal(0), v.literal(90), v.literal(180), v.literal(270)])),
       flip: v.optional(v.union([v.literal(0), v.literal(1)])),
-      fade: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
+      "style.opacity": v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
+      "style.saturation": v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(4))),
+      "style.contrast": v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(4))),
     }),
     v.check(
       (p) => both(p["world.x"], p["world.y"]) && both(p["anchor.x"], p["anchor.y"]),

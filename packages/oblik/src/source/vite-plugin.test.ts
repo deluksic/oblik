@@ -347,16 +347,17 @@ export default defineScene({
           id: "o_img",
           // A drag sends both coordinates of the placement; the other two
           // leaves are single props.
-          props: { "world.x": 5, "world.y": 0, rot: 90, fade: 1 },
+          props: { "world.x": 5, "world.y": 0, rot: 90, "style.opacity": 1 },
         }),
       ),
     );
     expect(res.status).toBe(200);
-    // The leaves existed; the call keeps its shape and only those numbers move.
+    // `world` and `rot` existed and move in place; `style` did not, so the patch
+    // creates the branch around the one dial it was given.
     const patched = fs.readFileSync(scene, "utf8");
     expect(patched).toContain("world: { x: 5, y: 0 }");
     expect(patched).toContain("rot: 90");
-    expect(patched).toContain("fade: 1");
+    expect(patched).toContain("style: { opacity: 1 }");
   });
 
   test("rejects an empty patch and an id that is not in the file", async () => {
@@ -365,8 +366,8 @@ export default defineScene({
       callEndpoint(plugin, "POST", "/__oblik-image", Buffer.from(JSON.stringify(body)));
     const file = path.relative(tmp, path.join(sceneDir, "alpha.ts"));
     expect((await post({ file, id: "o_a", props: {} })).status).toBe(400);
-    expect((await post({ file, id: "o_missing", props: { fade: 1 } })).status).toBe(500);
-    expect((await post({ file, id: "o_a", props: { fade: 2 } })).status).toBe(400);
+    expect((await post({ file, id: "o_missing", props: { "style.opacity": 1 } })).status).toBe(500);
+    expect((await post({ file, id: "o_a", props: { "style.opacity": 2 } })).status).toBe(400);
   });
 
   test("leaves every other route to the next middleware", async () => {

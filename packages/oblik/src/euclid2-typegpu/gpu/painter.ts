@@ -389,7 +389,6 @@ export function createPainter(opts: {
     frameBuffer,
     onReady: () => requestFrame(),
   });
-  images.setPaper(opts.paper);
   let imageDraws: readonly ImageDraw[] = [];
 
   // Band sizes from the last applied patch (arrays are rewritten wholesale).
@@ -427,7 +426,6 @@ export function createPainter(opts: {
       paper = nextPaper;
       gridColors = nextGridColors;
       grids.setColors(gridColors);
-      images.setPaper(paper);
     },
     sync(cam, size, dpr) {
       frameBuffer.write(makeFrameValue(cam, size, dpr));

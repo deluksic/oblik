@@ -102,7 +102,7 @@ function node<V extends TraceValue>(
   return { id, occ: 0, kind: value.kind, value, bind, editable, stack: [] } as TraceNode;
 }
 
-/** A raster reference: a rect, a turn and a fade, plus the URL it names. */
+/** A raster reference: a rect, a turn and a look, plus the URL it names. */
 function imageValue(over: Partial<ImageValue> = {}): ImageValue {
   return {
     kind: "image",
@@ -113,7 +113,7 @@ function imageValue(over: Partial<ImageValue> = {}): ImageValue {
     h: 2,
     rot: 0,
     flip: 0,
-    fade: 0.4,
+    style: { opacity: 0.4, saturation: 0.2, contrast: 1.1 },
     ...over,
   };
 }
@@ -737,7 +737,9 @@ describe("adapter image routing", () => {
     const inst = patch.images.writes[0]!.value;
     const got = [inst.a, inst.b, inst.c, inst.d].map((p) => [p.x, p.y]);
     expect(got).toEqual(imageQuad(value).map((p) => [p.x, p.y]));
-    expect(inst.fade).toBeCloseTo(0.4, 6);
+    expect(inst.opacity).toBeCloseTo(0.4, 6);
+    expect(inst.saturation).toBeCloseTo(0.2, 6);
+    expect(inst.contrast).toBeCloseTo(1.1, 6);
   });
 
   test("an unchanged tick re-uploads nothing but still draws", () => {

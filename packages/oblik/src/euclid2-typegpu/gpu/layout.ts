@@ -11,7 +11,6 @@ import {
   Frame,
   GridSpan,
   ImageInst,
-  ImageTheme,
   MarkerInst,
   MAX_CIRCLES,
   MAX_FIELD_ARCS,
@@ -83,13 +82,13 @@ export const markerLayout = tgpu.bindGroupLayout({
   markOrder: { storage: arrayOf(u32, MAX_MARKERS) },
 });
 
-/** The image layer: the shared frame, the theme's paper colour, every reference
- * quad, and the one texture a draw is bound to. The texture and sampler live in
- * the layout because they are the only per-draw input; the painter builds one
- * bind group per distinct source. */
+/** The image layer: the shared frame, every reference quad, and the one texture
+ * a draw is bound to. The texture and sampler live in the layout because they
+ * are the only per-draw input; the painter builds one bind group per distinct
+ * source. No paper colour: a reference fades through its own alpha against the
+ * cleared attachment, so a theme switch needs nothing here. */
 export const imageLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
-  theme: { uniform: ImageTheme },
   images: { storage: arrayOf(ImageInst, MAX_IMAGES) },
   tex: { texture: texture2d(f32) },
   samp: { sampler: "filtering" },

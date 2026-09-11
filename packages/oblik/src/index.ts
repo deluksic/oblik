@@ -56,14 +56,17 @@ export {
   imageCorners,
   imageQuad,
   imageRect,
+  imageStyle,
   isFiniteImage,
   isImage,
   rotateImage,
   scaleImage,
   snapImageRot,
+  DEFAULT_IMAGE_STYLE,
   type ImageOpts,
   type ImageRect,
   type ImageRot,
+  type ImageStyle,
   type ImageValue,
 } from "./eval/image";
 export {

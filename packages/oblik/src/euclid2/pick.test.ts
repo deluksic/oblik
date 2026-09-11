@@ -426,7 +426,7 @@ describe("image pick", () => {
       h: 2,
       rot: 0,
       flip: 0,
-      fade: 0.4,
+      style: { opacity: 0.4, saturation: 1, contrast: 1 },
     },
     editable: false,
     stack: [{ file: "scene.ts", line: 14, column: 4 }],
