@@ -54,8 +54,8 @@ export type TypegpuViewProps = {
   onLiveEdit?: (live: boolean) => void;
   onPlace?: (hit: PlaceHit) => void;
   onCursor?: (hit: PlaceHit | undefined) => void;
-  /** The live view state, on every change: what the pane needs to place an
-   * import at the middle of what the user is looking at. */
+  /** Where the view is, whenever a pan, a zoom or a resize moves it. The pane
+   * keeps the latest so an import it triggers itself lands in view. */
   onView?: (view: { w: number; h: number; scale: number; x: number; y: number }) => void;
   /** A pasted or dropped bitmap, with where it landed: the world point, and the
    * view it landed in (the pane turns that into a node). */
@@ -407,10 +407,24 @@ export function TypegpuView(props: TypegpuViewProps) {
     importAt(file, screenToWorld(at, camera(), size()));
   }
 
-  createEffect(
-    () => ({ w: size().w, h: size().h, scale: camera().scale, x: camera().x, y: camera().y }),
-    (view) => props.onView?.(view),
-  );
+  /** Tell the pane where the view is, so an import it triggers itself (the
+   * picker) can land in the middle of what is on screen.
+   *
+   * Called from the handlers that *move* the view — a pan, a zoom, a resize —
+   * rather than from an effect watching the camera: this is the same shape as
+   * every other thing the view tells the pane (`onPick`, `onCursor`, `onPlace`),
+   * it keeps a signal write out of an effect, and the pane only ever needs the
+   * value at click time, which is always after one of these. */
+  function reportView(): void {
+    const pane = size();
+    props.onView?.({
+      w: pane.w,
+      h: pane.h,
+      scale: camera().scale,
+      x: camera().x,
+      y: camera().y,
+    });
+  }
 
   createEffect(
     () => 1,
@@ -478,7 +492,10 @@ export function TypegpuView(props: TypegpuViewProps) {
         onPointerMove(ev) {
           moved = true;
           const next = applyDrag(initialStart, ev, paperEl(), camera(), size(), props.trace);
-          if (next.camera) setCamera(next.camera);
+          if (next.camera) {
+            setCamera(next.camera);
+            reportView();
+          }
         },
         onDone() {
           if (!moved) props.onPick?.(pick ?? []);
@@ -592,6 +609,7 @@ export function TypegpuView(props: TypegpuViewProps) {
     if (pane.w < 8 || pane.h < 8) return;
     const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     setCamera(zoomAt(camera(), screen, pane, wheelZoomFactor(e.deltaY, e.deltaMode)));
+    reportView();
   }
 
   // Keep the size signal aligned with the paper box (the canvas is inside it).
@@ -599,13 +617,14 @@ export function TypegpuView(props: TypegpuViewProps) {
     (): HTMLDivElement | undefined => paperEl(),
     (el) => {
       if (!el) return;
-      const ro = new ResizeObserver(() => {
+      const measure = () => {
         const rect = el.getBoundingClientRect();
         setSize({ w: rect.width, h: rect.height });
-      });
+        reportView();
+      };
+      const ro = new ResizeObserver(measure);
       ro.observe(el);
-      const rect = el.getBoundingClientRect();
-      setSize({ w: rect.width, h: rect.height });
+      measure();
       return () => ro.disconnect();
     },
   );

@@ -29,6 +29,21 @@ describe("solid conventions", () => {
     expect(offenders).toEqual([]);
   });
 
+  test("does not return a call result from an effect", () => {
+    // `createEffect(compute, (v) => fn(v))`: Solid reads a returned value as a
+    // cleanup, and a signal setter returns the value it was given — so a concise
+    // arrow around a call is a crash waiting for the first camera move.
+    const offenders: string[] = [];
+    for (const file of walk(root)) {
+      if (!file.endsWith(".tsx")) continue;
+      const src = fs.readFileSync(file, "utf8");
+      if (/createEffect\([\s\S]{0,200}?,\s*\([^)]*\)\s*=>\s*[A-Za-z_$][\w.$]*\s*\(/.test(src)) {
+        offenders.push(path.relative(root, file));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("does not pass live nodes with non-undefined assertions", () => {
     const offenders: string[] = [];
     for (const file of walk(root)) {
