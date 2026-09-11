@@ -226,6 +226,20 @@ export const FieldQuad = struct({
 });
 export type FieldQuadValue = Infer<typeof FieldQuad>;
 
+/**
+ * The three style dials as a record of *named* scalars — they are three
+ * different quantities, not one vector, and the schema is what keeps their
+ * names on both sides of the boundary (`.z` would mean something else the day a
+ * dial is added). The shader flattens them into three `flat` varyings only
+ * because a WGSL varying cannot be a struct.
+ */
+export const ImageStyleFields = struct({
+  opacity: f32,
+  saturation: f32,
+  contrast: f32,
+});
+export type ImageStyleFieldsValue = Infer<typeof ImageStyleFields>;
+
 /** One raster reference: the four world corners in triangle-strip draw order
  * (the zig-zag `imageQuad` returns), already rotated and flipped on the CPU — so
  * the shader has a quad to sample and nothing else — plus the three style dials
@@ -240,9 +254,7 @@ export const ImageInst = struct({
   /** The pre-rotation rect's world size — what turns the uv border into a world
    * distance for the selection outline. */
   size: vec2f,
-  opacity: f32,
-  saturation: f32,
-  contrast: f32,
+  style: ImageStyleFields,
   /** The node's own outline: rgb = state colour, a = 0 for "no outline". A
    * reference has no ink of its own, so unlike a fill it carries none until it
    * is hovered or selected. */

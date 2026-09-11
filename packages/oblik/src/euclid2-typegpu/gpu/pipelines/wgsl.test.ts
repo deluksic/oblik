@@ -169,9 +169,16 @@ describe("image WGSL", () => {
     // (The halo's knockout band carries the paper colour in its own field.)
     expect(code).not.toContain("theme.paper");
     expect(code).toContain("let alpha = (chrome.w + ");
-    // The dials are per-instance constants, so they ride a flat varying rather
-    // than being interpolated corner to corner.
-    expect(occurrences(code, "@interpolate(flat) style")).toBe(2);
+    // The dials are per-instance constants, so they ride flat varyings rather
+    // than being interpolated corner to corner — and they travel *by name*: the
+    // record's `ImageStyleFields` keeps `opacity`/`saturation`/`contrast`
+    // apart, and a WGSL varying cannot be a struct, so the flattening happens
+    // here rather than in the schema.
+    expect(occurrences(code, "@interpolate(flat) opacity")).toBe(2);
+    expect(occurrences(code, "@interpolate(flat) saturation")).toBe(2);
+    expect(occurrences(code, "@interpolate(flat) contrast")).toBe(2);
+    expect(occurrences(code, "@interpolate(flat) style")).toBe(0);
+    expect(code).toContain("(*inst).style.opacity");
   });
 
   /**

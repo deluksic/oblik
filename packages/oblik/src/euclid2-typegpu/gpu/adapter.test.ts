@@ -738,9 +738,9 @@ describe("adapter image routing", () => {
     const inst = patch.images.writes[0]!.value;
     const got = [inst.a, inst.b, inst.c, inst.d].map((p) => [p.x, p.y]);
     expect(got).toEqual(imageQuad(value).map((p) => [p.x, p.y]));
-    expect(inst.opacity).toBeCloseTo(0.4, 6);
-    expect(inst.saturation).toBeCloseTo(0.2, 6);
-    expect(inst.contrast).toBeCloseTo(1.1, 6);
+    expect(inst.style.opacity).toBeCloseTo(0.4, 6);
+    expect(inst.style.saturation).toBeCloseTo(0.2, 6);
+    expect(inst.style.contrast).toBeCloseTo(1.1, 6);
   });
 
   test("an unchanged tick re-uploads nothing but still draws", () => {

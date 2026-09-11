@@ -59,7 +59,10 @@ export const imageVertex = tgpu.vertexFn({
   out: {
     outPos: builtin.position,
     uv: interpolate("linear", vec2f),
-    style: interpolate("flat", vec3f),
+    // A varying cannot be a struct, so the dials travel flat — by name.
+    opacity: interpolate("flat", f32),
+    saturation: interpolate("flat", f32),
+    contrast: interpolate("flat", f32),
     edge: interpolate("flat", vec4f),
     edgeWidthPx: interpolate("flat", f32),
     size: interpolate("flat", vec2f),
@@ -87,7 +90,9 @@ export const imageVertex = tgpu.vertexFn({
   return {
     outPos: toClip(p),
     uv: vec2f(x, y),
-    style: vec3f(inst.opacity, inst.saturation, inst.contrast),
+    opacity: inst.style.opacity,
+    saturation: inst.style.saturation,
+    contrast: inst.style.contrast,
     edge: inst.edge,
     edgeWidthPx: inst.edgeWidthPx,
     size: inst.size,
@@ -110,7 +115,9 @@ export const imageVertex = tgpu.vertexFn({
 export const imageFragment = tgpu.fragmentFn({
   in: {
     uv: interpolate("linear", vec2f),
-    style: interpolate("flat", vec3f),
+    opacity: interpolate("flat", f32),
+    saturation: interpolate("flat", f32),
+    contrast: interpolate("flat", f32),
     edge: interpolate("flat", vec4f),
     edgeWidthPx: interpolate("flat", f32),
     size: interpolate("flat", vec2f),
@@ -119,12 +126,23 @@ export const imageFragment = tgpu.fragmentFn({
     haloHalfPx: interpolate("flat", vec2f),
   },
   out: vec4f,
-})(({ uv, style, edge, edgeWidthPx, size, haloRing, haloKnock, haloHalfPx }) => {
+})(({
+  uv,
+  opacity,
+  saturation,
+  contrast,
+  edge,
+  edgeWidthPx,
+  size,
+  haloRing,
+  haloKnock,
+  haloHalfPx,
+}) => {
   "use gpu";
   const sampled = textureSample(imageLayout.$.tex, imageLayout.$.samp, uv);
-  const grey = mix(vec3f(dot(sampled.rgb, LUMA)), sampled.rgb, style.y);
-  const base = saturate((grey - MID) * style.z + MID);
-  const fa = sampled.a * style.x;
+  const grey = mix(vec3f(dot(sampled.rgb, LUMA)), sampled.rgb, saturation);
+  const base = saturate((grey - MID) * contrast + MID);
+  const fa = sampled.a * opacity;
 
   // Same convention as a fill's boundary: the distance is signed, negative
   // inside, here measured in CSS px from the quad's border inward.

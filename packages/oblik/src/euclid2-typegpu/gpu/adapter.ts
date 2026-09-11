@@ -43,6 +43,7 @@ import {
   FieldQuad,
   FillRegion,
   ImageInst,
+  ImageStyleFields,
   MAX_FIELD_ARCS,
   MAX_FIELD_LEAVES,
   MAX_FIELD_QUADS,
@@ -1293,9 +1294,11 @@ function imageInstance(
     c: vec2f(c.x, c.y),
     d: vec2f(d.x, d.y),
     size: vec2f(rect.w, rect.h),
-    opacity: value.style.opacity,
-    saturation: value.style.saturation,
-    contrast: value.style.contrast,
+    style: ImageStyleFields({
+      opacity: value.style.opacity,
+      saturation: value.style.saturation,
+      contrast: value.style.contrast,
+    }),
     edge: vec4f(edge.color.x, edge.color.y, edge.color.z, hot ? 1 : 0),
     edgeWidthPx: edge.halfPx * 2,
     haloRing: halo.ring,
@@ -1317,9 +1320,10 @@ function encodeImage(inst: ImageInstValue): Float64Array {
   f[j++] = inst.d.y;
   f[j++] = inst.size.x;
   f[j++] = inst.size.y;
-  f[j++] = inst.opacity;
-  f[j++] = inst.saturation;
-  f[j++] = inst.contrast;
+  // Field order follows `ImageStyleFields`, the schema the buffer was made from.
+  f[j++] = inst.style.opacity;
+  f[j++] = inst.style.saturation;
+  f[j++] = inst.style.contrast;
   j = encodeEdge(f, j, { color: inst.edge, halfPx: inst.edgeWidthPx / 2 });
   encodeHalo(f, j, { ring: inst.haloRing, knock: inst.haloKnock, halfPx: inst.haloHalfPx });
   return f;
