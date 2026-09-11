@@ -1,4 +1,5 @@
 export {
+  ACTIONS,
   TOOLS,
   clickTool,
   commitTool,

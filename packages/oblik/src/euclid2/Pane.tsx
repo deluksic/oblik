@@ -47,7 +47,6 @@ import {
 } from "./tool";
 import type { InsertJob } from "./tools/types";
 
-import { btn, secondary } from "../ui/button.module.css";
 import { status as statusLine, statusError, workspace, wrap } from "../ui/pane.module.css";
 import styles from "./Pane.module.css";
 
@@ -473,30 +472,20 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
   return (
     <div class={workspace}>
       <div class={wrap}>
-        <div class={styles.statusRow}>
-          <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>
-            {status()}
-          </p>
-          <button
-            type="button"
-            class={[btn, secondary]}
-            title="Import a raster reference — or paste one, or drop a file on the canvas"
-            onClick={() => importEl()?.click()}
-          >
-            Import image…
-          </button>
-          <input
-            ref={setImportEl}
-            class={styles.hiddenFile}
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.currentTarget.files?.[0];
-              e.currentTarget.value = "";
-              if (file !== undefined) importPicked(file);
-            }}
-          />
-        </div>
+        <p class={[statusLine, { [statusError]: !!(writeError() ?? world().error) }]}>{status()}</p>
+        {/* The palette's "Import image" entry drives this; a reference is
+            imported, not drawn, so it is not a button on the paper either. */}
+        <input
+          ref={setImportEl}
+          class={styles.hiddenFile}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = "";
+            if (file !== undefined) importPicked(file);
+          }}
+        />
         <div class={styles.paperWrap}>
           <TypegpuView
             trace={tape()}
@@ -532,6 +521,13 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             setPicker(false);
             setPlace(undefined);
             setWriteError(undefined);
+            // The palette carries one entry that is not a constructor: a
+            // reference is imported, so it opens a file picker rather than
+            // starting a tool session.
+            if (id === "importImage") {
+              importEl()?.click();
+              return;
+            }
             setToolLock(true);
             setTool(startTool(id));
           }}

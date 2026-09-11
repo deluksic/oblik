@@ -11,21 +11,8 @@
   min-height: 0;
 }
 
-/* The pane's own chrome: the hint line, and the actions that act on the paper
-   rather than on the selection. */
-.statusRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-/* The hint can be long and the button must not be pushed off the pane. */
-.statusRow > p {
-  flex: 1;
-  min-width: 0;
-}
-
+/* The palette's "Import image" entry drives this input: the file picker is a
+   DOM control with no place on the paper, so it is never shown. */
 .hiddenFile {
   display: none;
 }

@@ -135,9 +135,25 @@ function descriptionMatch(t: ToolSpec, q: string): boolean {
   );
 }
 
-/** Built-in specs plus registered user tools, evaluated at read time. */
+/**
+ * The palette's one non-constructor entry: a reference is imported, not drawn,
+ * so it has no ghost, no args and no session — the pane opens a file picker
+ * instead of starting a tool. It sits *beside* `TOOLS` rather than in it so
+ * that nothing which assumes "every entry here is a constructor" sees it.
+ */
+export const ACTIONS: readonly ToolSpec[] = [
+  {
+    id: "importImage",
+    title: "Import image",
+    hint: "Place a raster reference on the paper — or paste one, or drop a file on the canvas",
+    prefix: "im",
+    aliases: ["image", "reference", "raster", "trace"],
+  },
+];
+
+/** Built-in specs, palette actions, and registered user tools, at read time. */
 export function listTools(): ToolSpec[] {
-  return [...TOOLS, ...registeredSpecs()];
+  return [...TOOLS, ...ACTIONS, ...registeredSpecs()];
 }
 
 export function filterTools(query: string) {
