@@ -10,7 +10,7 @@ import {
   type Camera2,
   type PaneSize,
 } from "../euclid2/camera";
-import { pastedImage, droppedImage } from "../euclid2/importImage";
+import { describeDrop, droppedImage, pastedImage } from "../euclid2/importImage";
 import { hitsNear, isFiniteTrace, movedPastClick, PICK_CLICK_PX, traceKey } from "../euclid2/pick";
 import { hoverTool, mutedForScope, snapFilterOf, toolChrome } from "../euclid2/tool";
 import type { Ghost, PlaceHit, Scope, ToolSession } from "../euclid2/tool";
@@ -57,6 +57,10 @@ export type TypegpuViewProps = {
   /** Where the view is, whenever a pan, a zoom or a resize moves it. The pane
    * keeps the latest so an import it triggers itself lands in view. */
   onView?: (view: { w: number; h: number; scale: number; x: number; y: number }) => void;
+  /** Something the user needs to be told — the pane puts it in the status line.
+   * Its own events are the only channel it has, and a drop that carried nothing
+   * is exactly that. */
+  onNotice?: (text: string) => void;
   /** A pasted or dropped bitmap, with where it landed: the world point, and the
    * view it landed in (the pane turns that into a node). */
   onImportImage?: (
@@ -398,8 +402,15 @@ export function TypegpuView(props: TypegpuViewProps) {
     // Always preventDefault: without it on `dragover` the browser navigates to
     // the file and the scene is gone, image or no image.
     e.preventDefault();
-    const file = droppedImage(e.dataTransfer ?? undefined);
-    if (!file) return;
+    const data = e.dataTransfer ?? undefined;
+    const file = droppedImage(data);
+    if (file === undefined) {
+      // A drop that does nothing is indistinguishable from a broken app. Say
+      // what arrived instead: an embedded browser often hands a drag over with
+      // no file in it at all.
+      props.onNotice?.(describeDrop(data));
+      return;
+    }
     const el = paperEl();
     if (!el) return;
     const rect = el.getBoundingClientRect();

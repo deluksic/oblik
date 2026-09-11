@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  checkImage,
+  describeDrop,
+  droppedImage,
   imageArgs,
   importImage,
   importImageOpts,
-  checkImage,
-  droppedImage,
   pastedImage,
 } from "./importImage";
 
@@ -80,6 +81,27 @@ describe("pastedImage / droppedImage", () => {
   test("a real file on the clipboard is found in files", () => {
     expect(pastedImage({ files: [PNG], items: [] })).toBe(PNG);
     expect(droppedImage({ files: [PNG] })).toBe(PNG);
+  });
+
+  test("a drop reads items as well as files — an embedded browser may send either", () => {
+    expect(droppedImage({ files: [PNG] })).toBe(PNG);
+    expect(droppedImage({ files: [], items: [item("image/png", PNG)] })).toBe(PNG);
+    expect(droppedImage({ files: [], items: [item("text/plain", undefined)] })).toBeUndefined();
+  });
+
+  test("an empty drop says what it carried, so the user can act", () => {
+    // Nothing at all: an embedded browser swallowing the drag looks like this.
+    expect(describeDrop(undefined)).toContain("use Import image…");
+    expect(describeDrop({ files: [], items: [], types: [] })).toContain("carried nothing");
+    // A real drag from outside the page: a URI list, and no file the page can read.
+    const uri = { files: [], items: [], types: ["text/uri-list", "text/plain"] };
+    const message = describeDrop(uri);
+    expect(message).toContain("types: text/uri-list, text/plain");
+    expect(message).toContain("use Import image…");
+    // A non-image file is named too.
+    expect(
+      describeDrop({ files: [{ type: "application/pdf", name: "a.pdf", size: 3 }] }),
+    ).toContain("1 file");
   });
 
   test("text and other non-images are left alone", () => {

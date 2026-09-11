@@ -88,11 +88,39 @@ export function pastedImage<T extends ImageFileLike>(
   return imageFromFiles(data);
 }
 
-/** The image a drop carried: drops always arrive as real files. */
+/**
+ * The image a drop carried. Unlike a paste this is usually `files`, but not
+ * always: an embedded browser (VS Code's, for one) can hand a drag over as an
+ * item list, and a drag from outside the page may carry only a URI list. Both
+ * are read — and `describeDrop` is what says so in the status line when neither
+ * holds a file, because a drop that quietly does nothing is the worst version.
+ */
 export function droppedImage<T extends ImageFileLike>(
-  data: { files?: ArrayLike<T> } | undefined,
+  data: TransferLike<T> | undefined,
 ): T | undefined {
+  for (const item of itemsOf(data)) {
+    if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (file !== null && file !== undefined) return file;
+  }
   return imageFromFiles(data);
+}
+
+/** What a drop offered, for a message the user can act on. */
+export function describeDrop(
+  data: (TransferLike & { types?: ArrayLike<string> }) | undefined,
+): string {
+  const types = data?.types === undefined ? [] : Array.from(data.types);
+  const files = data?.files?.length ?? 0;
+  const items = itemsOf(data).length;
+  const carried = [
+    files > 0 ? `${files} file${files === 1 ? "" : "s"}` : "",
+    items > 0 ? `${items} item${items === 1 ? "" : "s"}` : "",
+    types.length > 0 ? `types: ${types.join(", ")}` : "",
+  ].filter((part) => part !== "");
+  return carried.length === 0
+    ? "that drop carried nothing the page could read — use Import image…, or paste the file"
+    : `that drop carried no image (${carried.join("; ")}) — use Import image…, or paste the file`;
 }
 
 function itemsOf<T extends ImageFileLike>(

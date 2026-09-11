@@ -517,6 +517,7 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
             onCursor={setPlace}
             onImportImage={(file, at) => void importAt(file, at)}
             onView={setView}
+            onNotice={(text) => setWriteError(text)}
             evalStats={
               evalstats.value()
                 ? { ms: world().ms, built: world().stats.built, hits: world().stats.hits }
