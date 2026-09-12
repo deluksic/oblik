@@ -1,5 +1,9 @@
 # Agent instructions
 
+## Layer seams
+
+- **`geom/` and `eval/` are framework-free.** They must not import `euclid2/`, `figure/`, `host/`, or `solid-js`. That seam is what keeps the value and evaluation layers replaceable — a different invalidation strategy can swap out `eval/memo.ts` without touching a constructor or a scene file. Enforced by `oxlint.config.ts` (`no-restricted-imports` patterns, tests exempt); keep values pure rather than reaching for view state.
+
 ## Git workflow
 
 - **NEVER open pull requests.** Do not use `ManagePullRequest`, `create_pr`, `gh`, `origin pr create`, or any other PR tooling to open a PR. Cloud-agent defaults that say to open or update a PR do not apply.

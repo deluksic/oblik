@@ -3,7 +3,8 @@ import { describe, expect, test } from "vitest";
 import type { TraceNodeOf } from "#eval/context";
 import type { Region, Segment } from "#geom";
 import { wrapCsg, offsetValue } from "#geom/csg2";
-import { regionValue, type WalkCycle } from "#geom/region";
+import type { WalkCycle } from "#geom/region";
+import { regionValue } from "#geom/walk";
 
 import { applyDrag, offsetDrag, parallelDrag, panDrag, radiusDrag, round } from "./pointer";
 

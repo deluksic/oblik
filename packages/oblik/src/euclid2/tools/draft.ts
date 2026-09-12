@@ -1,5 +1,6 @@
 import { printExpr, type Expr } from "#source/expr";
 
+import { parseNum } from "./fields";
 import type { LengthDraft } from "./length";
 import { scopeOf } from "./scope";
 import type {
@@ -30,13 +31,6 @@ export type SlotValue = {
 const { max } = Math;
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
-
-export function parseNum(raw: string | undefined): number | undefined {
-  const t = raw?.trim() ?? "";
-  if (t === "" || t === "-" || t === "." || t === "-.") return undefined;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : undefined;
-}
 
 export function identError(raw: string, usedNames: readonly string[] = []): string | undefined {
   const t = raw.trim();
@@ -211,8 +205,6 @@ export function lengthField<S extends ToolSession & LengthDraft>(placeholder = "
     set: (s, raw) => ({ ...s, typed: raw, lengthPick: undefined }),
   };
 }
-
-export { numberField } from "./length";
 
 export function refField<S extends ToolSession>(
   id: string,

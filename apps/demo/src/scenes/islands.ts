@@ -67,7 +67,16 @@ export default defineScene({
     const botR = { x: Rc.x, y: Rc.y - r };
     const T = { x: Lc.x, y: Lc.y - r };
     const slot = region(
-      [P, segment(P, Q, "o_c60cbc470b"), Q, along(rightC, -1), botR, segment(botR, T, "o_90507144cb"), T, along(leftC, -1)],
+      [
+        P,
+        segment(P, Q, "o_c60cbc470b"),
+        Q,
+        along(rightC, -1),
+        botR,
+        segment(botR, T, "o_90507144cb"),
+        T,
+        along(leftC, -1),
+      ],
       [],
       "o_953e10b6a8",
     );

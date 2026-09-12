@@ -1,20 +1,18 @@
 import {
   csgAabb,
+  evaluateRegions,
   fillAabb,
+  islandsAabb,
+  islandsSvgPath,
   isFiniteCsg2,
   isFiniteOperand,
   isFinitePick,
   isFinitePolarRepeat,
+  mergeRepeatOutline,
   operandAabb,
   repeatAabb,
   type Aabb,
 } from "./csg2";
-import {
-  evaluateRegions,
-  islandsAabb,
-  islandsSvgPath,
-  mergeRepeatOutline,
-} from "./evaluate-regions";
 import { compileOffsetBoundary } from "./offset";
 import { signedDist } from "./ops";
 import { regionSvgPath } from "./region";

@@ -10,8 +10,8 @@ import {
   nanPolarRepeat,
   repeatAabb,
 } from "./csg2";
-import { evaluateRegions } from "./evaluate-regions";
-import { stampRepeat, mergeRepeatOutline } from "./evaluate-regions";
+import { evaluateRegions } from "./csg2";
+import { stampRepeat, mergeRepeatOutline } from "./csg2";
 import { foldPolar, repeatStep, rotateAbout, rotateRegion } from "./repeat";
 import type { CsgOperand, LoopEdge, PolarRepeat, Region } from "./types";
 import { dist } from "./vec";

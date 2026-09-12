@@ -1,5 +1,5 @@
 import type { Circle, CsgOperand, Loop, LoopEdge, Polygon, Region, Vec2 } from "#geom";
-import { evaluateRegions } from "#geom/evaluate-regions";
+import { evaluateRegions } from "#geom/csg2";
 import { circleDelta, isCircleWalk, tessellateWalk, walkEdges } from "#geom/region";
 
 const TAU = Math.PI * 2;

@@ -1,7 +1,6 @@
 import * as ts from "typescript";
 
 import type { SiteSpec } from "../eval/site";
-
 import { siteSpecs, trailingId } from "./analyze";
 
 export type ReturnField = {

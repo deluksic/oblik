@@ -151,6 +151,8 @@ describe("site memoization", () => {
   test("sweepMemo drops stale entries", () => {
     const m = newEvalMemo();
     m.entries.set("ring:0", {
+      id: "ring",
+      occ: 0,
       fingerprint: [],
       value: { kind: "circle", center: { x: 0, y: 0 }, radius: 1 },
       node: {

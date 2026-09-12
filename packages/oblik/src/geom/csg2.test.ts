@@ -15,17 +15,12 @@ import {
   rightOfValue,
   wrapCsg,
 } from "./csg2";
-import { stampRepeat } from "./evaluate-regions";
+import { stampRepeat } from "./csg2";
 import { roundOffsetValue, compileOffsetBoundary } from "./offset";
-import {
-  alongValue,
-  filletValue,
-  regionContains,
-  regionValue,
-  type WalkCycle,
-} from "./region";
+import { alongValue, regionContains, type WalkCycle } from "./region";
 import type { Circle, Line, LoopEdge, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
+import { filletValue, regionValue } from "./walk";
 
 const { max } = Math;
 function seg(a: Vec2, b: Vec2): Segment {

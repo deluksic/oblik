@@ -30,6 +30,9 @@ export function newEvalMemo(): EvalMemo {
 }
 
 export type MemoEntry = {
+  /** Carried so the sweep need not decode them back out of the key. */
+  id: string;
+  occ: number;
   fingerprint: SceneValue[];
   value: SceneValue;
   node: TraceNode;
@@ -115,7 +118,7 @@ export function memoized<A extends SceneValue[], R extends SceneValue>(
     const value = fn(...args);
     const node = nodeOf(value);
     if (node) {
-      ctx.memo.entries.set(key, { fingerprint, value, node });
+      ctx.memo.entries.set(key, { id, occ, fingerprint, value, node });
       ctx.stats.built++;
     }
     return value;
@@ -125,46 +128,18 @@ export function memoized<A extends SceneValue[], R extends SceneValue>(
 
 /**
  * Drop entries for occurrences that no longer exist (loop shrank, site
- * deleted). Called after a successful eval only — a thrown build leaves the
- * cache untouched. Counts come from the eval's final occ tallies.
+ * deleted). Reads `occ` off each entry rather than decoding the key, and takes
+ * the eval's own occurrence map, so it can run straight after a successful
+ * build — no deferred pass, no snapshot, no tally to merge. A thrown build
+ * never reaches here, so the cache is left untouched.
+ *
+ * Structure rarely shrinks, so this is a cold path: the full pass is cheap and
+ * clarity wins over index arithmetic.
  */
-export function sweepMemo(m: EvalMemo, counts: Map<string, number>): void {
+export function sweepMemo(m: EvalMemo, occ: Map<string, number>): void {
   for (const key of m.entries.keys()) {
-    const cut = key.lastIndexOf(":");
-    const id = key.slice(0, cut);
-    const occ = Number(key.slice(cut + 1));
-    if (occ >= (counts.get(id) ?? 0)) m.entries.delete(key);
-  }
-}
-
-/**
- * Stale entries are never wrong — a hit still requires a fresh fingerprint
- * compare at the same key — so the sweep only reclaims memory and can wait
- * for idle time. Pending sweeps coalesce: consecutive evals merge their occ
- * tallies (max per id) and one idle pass prunes against the union.
- */
-const pendingSweeps = new WeakMap<EvalMemo, { counts: Map<string, number> }>();
-
-export function scheduleSweep(m: EvalMemo, counts: Map<string, number>): void {
-  const pending = pendingSweeps.get(m);
-  if (pending) {
-    for (const [id, n] of counts) {
-      const prev = pending.counts.get(id);
-      if (prev === undefined || n > prev) pending.counts.set(id, n);
-    }
-    return;
-  }
-  const next = { counts: new Map(counts) };
-  pendingSweeps.set(m, next);
-  const run = () => {
-    pendingSweeps.delete(m);
-    sweepMemo(m, next.counts);
-  };
-  // Browser: defer to idle. Node/tests: sweep inline so results are synchronous.
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(() => run(), { timeout: 1000 });
-  } else {
-    run();
+    const entry = m.entries.get(key)!;
+    if (entry.occ >= (occ.get(entry.id) ?? 0)) m.entries.delete(key);
   }
 }
 

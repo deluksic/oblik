@@ -2,7 +2,8 @@ import type { Expr } from "#source/expr";
 
 import { round } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
-import { attachLengthHit, lengthRefName, numberField, resolveNumberExpr } from "./length";
+import { numberField } from "./fields";
+import { attachLengthHit, lengthRefName, resolveNumberExpr } from "./length";
 import type { Field, PlaceHit, Preview, Scope, Tool, ToolSession } from "./types";
 
 const { max, sqrt } = Math;

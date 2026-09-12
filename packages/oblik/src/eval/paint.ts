@@ -137,7 +137,7 @@ export function paintsCovering(trace: readonly TraceNode[], geom: TraceNode): Tr
   const key = paintKey(geom.id, geom.occ);
   return trace.filter((n) => {
     if (n.value.kind !== "paint") return false;
-    return (n.value).targets.some((t) => paintKey(t.id, t.occ) === key);
+    return n.value.targets.some((t) => paintKey(t.id, t.occ) === key);
   });
 }
 

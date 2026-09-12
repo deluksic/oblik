@@ -2,8 +2,8 @@ import { render } from "@solidjs/web";
 import { createEffect, Errored, For, Loading, createMemo, createSignal, Show } from "solid-js";
 
 import { Euclid2Pane } from "../euclid2/Pane";
-import { createVisitCaches } from "../eval/scene-cache";
 import type { Scene } from "../eval/scene";
+import { createVisitCaches } from "../eval/scene-cache";
 import { FigurePane } from "../figure/Pane";
 import { Modal } from "../modal/Modal";
 import type { Annotation } from "../source/analyze";

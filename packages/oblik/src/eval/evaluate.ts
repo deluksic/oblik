@@ -7,7 +7,7 @@ import {
   type SceneResult,
   type TraceNode,
 } from "./context";
-import { scheduleSweep, type EvalMemo } from "./memo";
+import { sweepMemo, type EvalMemo } from "./memo";
 import type { Scene } from "./scene";
 
 export type Draft = Map<string, number[]>;
@@ -51,7 +51,10 @@ export function evaluate(mod: Scene, opts: EvaluateOpts = {}): EvaluateResult {
     stats: { built: 0, hits: 0 },
   };
   const value = withEval(ctx, () => mod.build());
-  if (ctx.memo) scheduleSweep(ctx.memo, ctx.occ);
+  // Straight after a successful build: `ctx.occ` is complete, so pruning needs
+  // no snapshot and no deferral. A throw skips this entirely, leaving the cache
+  // untouched for the next clean eval.
+  if (ctx.memo) sweepMemo(ctx.memo, ctx.occ);
   return { value, trace: ctx.trace, stats: ctx.stats };
 }
 

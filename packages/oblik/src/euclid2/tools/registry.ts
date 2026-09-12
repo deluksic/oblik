@@ -118,7 +118,6 @@ export function defineTool<A extends SceneValue[], R extends SceneValue>(
   }
   const prev = regs.get(reg.name);
   if (prev && prev.module !== reg.module) {
-    // eslint-disable-next-line no-console
     console.warn(
       `defineTool: "${reg.name}" was already registered from ${prev.module}; ` +
         `the new registration from ${reg.module} wins.`,

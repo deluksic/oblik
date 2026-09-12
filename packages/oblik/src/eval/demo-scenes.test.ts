@@ -23,7 +23,7 @@ import { hitsNear } from "../euclid2/pick";
 import { figureToSvg } from "../figure/export";
 import { csgPaint, fillPaint } from "../geom/csg-draw";
 import { csgContains, isCsg2, isFiniteCsg2, isPick, offsetOfCsg } from "../geom/csg2";
-import { evaluateRegions } from "../geom/evaluate-regions";
+import { evaluateRegions } from "../geom/csg2";
 import { compileOffsetBoundary } from "../geom/offset";
 import { isCircleWalk, isFiniteRegion, regionContains, walkEdges } from "../geom/region";
 import { analyze, type Annotation } from "../source/analyze";

@@ -15,6 +15,30 @@ function point(id: string, x: number, y = 0, occ = 0): TraceNode {
 }
 
 describe("reuseUnchangedTrace", () => {
+  test("an all-hits tick returns the previous array by identity", () => {
+    // The memo replays the *same* node objects, so the second array holds the
+    // first array's nodes. The pass must return `prev` itself — not a copy —
+    // without building the key Map or comparing any drawable payload.
+    const prev = [point("o_a", 1, 2), point("o_b", 3, 4)];
+    const next = [...prev];
+    expect(next).not.toBe(prev); // a genuinely different array
+    expect(next[0]).toBe(prev[0]);
+    const out = reuseUnchangedTrace(prev, next);
+    expect(out).toBe(prev);
+  });
+
+  test("one changed node keeps the fast path from firing", () => {
+    // A drag rebuilds one node and replays the rest, so the arrays differ at
+    // exactly one index — the guard must fall through to the payload compare.
+    const prev = [point("o_a", 1, 2), point("o_b", 3, 4)];
+    const moved = point("o_b", 5, 4);
+    const next = [prev[0]!, moved];
+    const out = reuseUnchangedTrace(prev, next);
+    expect(out[0]).toBe(prev[0]);
+    expect(out[1]).toBe(moved);
+    expect(out).not.toBe(prev);
+  });
+
   test("keeps object identity when drawable payload is unchanged", () => {
     const prev = [point("o_a", 1, 2)];
     const next = [point("o_a", 1, 2)];
@@ -106,5 +130,15 @@ describe("carryTraceInv", () => {
     const next = [{ ...point("o_a", 9, 2), inv: fresh }];
     carryTraceInv(prev, next);
     expect(next[0]!.inv).toEqual(fresh);
+  });
+
+  test("identical nodes are left untouched — they carry their own provenance", () => {
+    // The all-hits tick: `next` holds `prev`'s nodes, so there is nothing to
+    // copy and the key Map must not be built.
+    const prev = [point("o_a", 1, 2)];
+    const next = [...prev];
+    expect(next).not.toBe(prev);
+    carryTraceInv(prev, next);
+    expect(next[0]!.stack).toBe(prev[0]!.stack);
   });
 });

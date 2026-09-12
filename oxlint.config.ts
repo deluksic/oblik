@@ -33,6 +33,9 @@ export default defineConfig({
       },
     ],
     "eslint/no-underscore-dangle": "off",
+    // Type-only imports are erased at runtime, so they cannot form a real
+    // dependency cycle — `ignoreTypes` keeps this about runtime coupling.
+    "import/no-cycle": ["error", { ignoreTypes: true }],
     "import/no-unassigned-import": [
       "error",
       {
@@ -60,6 +63,12 @@ export default defineConfig({
     // solidjs skill.
     "eslint/eqeqeq": ["error", "always"],
     "unicorn/no-null": "error",
+    // No debug logging: `console.log` (and its verbosity cousins — `debug`,
+    // `info`, `trace`, …) must not ship. `console.warn` / `console.error` stay
+    // for real diagnostics. CLI entrypoints opt out below, because there stdout
+    // *is* the product. A deliberate one-off (a test dumping a shape census)
+    // opts out in place with `// eslint-disable-next-line no-console`.
+    "eslint/no-console": ["error", { allow: ["warn", "error"] }],
     // eslint-plugin-solid (Solid 2) — the `v2` rule set.
     "solid/jsx-no-duplicate-props": "error",
     "solid/jsx-no-undef": "error",
@@ -90,10 +99,43 @@ export default defineConfig({
   },
   overrides: [
     {
+      // The value and evaluation layers are framework-free by construction:
+      // `geom/` never imports `eval/`, and `eval/` never imports the view or a
+      // UI framework. That seam is what keeps the caching mechanism replaceable
+      // without touching scene files. Enforced here, and stated in AGENTS.md.
+      // Tests are exempt: an integration test legitimately drives the whole
+      // pipeline (e.g. demo-scenes.test.ts renders scenes through the view).
+      files: ["packages/oblik/src/geom/**", "packages/oblik/src/eval/**"],
+      excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["**/euclid2/**", "**/figure/**", "**/host/**", "solid-js", "@solidjs/*"],
+                message:
+                  "geom/ and eval/ are framework-free: no view imports, no solid-js. " +
+                  "Keep values pure so a different invalidation strategy can replace eval/memo.ts.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       files: ["**/*.test.ts", "**/*.test.tsx"],
       plugins: ["vitest"],
       env: {
         vitest: true,
+      },
+    },
+    {
+      // Command-line tools (the scaffolder, one-shot codemods): writing to
+      // stdout/stderr is their interface, not leftover debug output.
+      files: ["scripts/**", "packages/create-oblik/**"],
+      rules: {
+        "eslint/no-console": "off",
       },
     },
     {

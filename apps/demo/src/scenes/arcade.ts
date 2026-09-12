@@ -44,7 +44,11 @@ export default defineScene({
     const tunicRhs = segment(br, tr, "o_ar_tr");
     const tunicTop = segment(tr, tl, "o_ar_tt");
     const tunicLhs = segment(tl, bl, "o_ar_tl");
-    const tunic = region([bl, tunicBot, br, tunicRhs, tr, tunicTop, tl, tunicLhs], [], "o_a8257e99ec");
+    const tunic = region(
+      [bl, tunicBot, br, tunicRhs, tr, tunicTop, tl, tunicLhs],
+      [],
+      "o_a8257e99ec",
+    );
     const scallop = 0.35;
     const s0 = circle(point(left + scallop, bot, "o_ar_s0"), scallop, "o_ar_c0");
     const s1 = circle(point(G.x, bot, "o_ar_s1"), scallop, "o_ar_c1");

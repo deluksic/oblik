@@ -20,16 +20,7 @@ import {
   walkContains,
   walkEdges,
 } from "./region";
-import type {
-  Branch,
-  Circle,
-  CsgOperand,
-  LineLike,
-  Loop,
-  LoopEdge,
-  Offset,
-  Region,
-} from "./types";
+import type { Branch, Circle, CsgOperand, LineLike, Loop, LoopEdge, Offset, Region } from "./types";
 import {
   add,
   cross2,

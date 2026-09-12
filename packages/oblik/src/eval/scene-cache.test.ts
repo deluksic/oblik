@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import { point } from "./constructors";
 import { evaluate } from "./evaluate";
-import { createVisitCaches } from "./scene-cache";
 import { defineScene } from "./scene";
+import { createVisitCaches } from "./scene-cache";
 
 /**
  * A visit's caches have two lifetimes, and this pins both: the visit owns the

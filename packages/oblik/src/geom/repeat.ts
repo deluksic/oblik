@@ -5,7 +5,7 @@ import type { Vec2 } from "./vec";
  * The polar repeat's math, in one place: the **fold** the GPU shader and the CPU
  * reference both run (`foldPolar`), and the **rotation** the geometry side runs
  * when a repeat has to become real islands (`rotateRegion`, used by
- * `evaluate-regions.ts` for SVG paint and island queries).
+ * `csg2.ts` for SVG paint and island queries).
  *
  * The two are the same operation seen from opposite ends, which is the whole
  * point of the construct:

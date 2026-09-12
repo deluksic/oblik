@@ -1,4 +1,15 @@
-import { circle, csg2, defineScene, diff, memo, point, polygon, region, roundOffset, segment } from "oblik";
+import {
+  circle,
+  csg2,
+  defineScene,
+  diff,
+  memo,
+  point,
+  polygon,
+  region,
+  roundOffset,
+  segment,
+} from "oblik";
 
 const { cos, sin } = Math;
 const GRID = 10;
@@ -41,7 +52,10 @@ export default defineScene({
     const R = 2.4;
     const corners = [];
     for (let i = 0; i < 6; i++) {
-      corners.push({ x: cx + R * cos((i / 6) * Math.PI * 2), y: cy + R * sin((i / 6) * Math.PI * 2) });
+      corners.push({
+        x: cx + R * cos((i / 6) * Math.PI * 2),
+        y: cy + R * sin((i / 6) * Math.PI * 2),
+      });
     }
     const cycle = [];
     for (let i = 0; i < 6; i++) {
@@ -53,7 +67,11 @@ export default defineScene({
     const rounded = roundOffset(plate, 0.18, "o_lab_round");
     const holes = [];
     for (let i = 0; i < 5; i++) {
-      const c = point(cx + cos((i / 5) * Math.PI * 2) * 1.1, cy + sin((i / 5) * Math.PI * 2) * 1.1, "o_lab_hc");
+      const c = point(
+        cx + cos((i / 5) * Math.PI * 2) * 1.1,
+        cy + sin((i / 5) * Math.PI * 2) * 1.1,
+        "o_lab_hc",
+      );
       holes.push(circle(c, 0.22, "o_lab_hole"));
     }
     const chain = csg2(diff(rounded, holes), "o_lab_chain");

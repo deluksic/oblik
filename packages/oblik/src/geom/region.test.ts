@@ -3,11 +3,9 @@ import { describe, expect, test } from "vitest";
 import { roundOffsetValue } from "./offset";
 import {
   alongValue,
-  filletValue,
   isCircleWalk,
   regionContains,
   regionSvgPath,
-  regionValue,
   type WalkCycle,
   type WalkItem,
   signedDistToRegion,
@@ -15,6 +13,7 @@ import {
 } from "./region";
 import type { Circle, Segment } from "./types";
 import type { Vec2 } from "./vec";
+import { filletValue, regionValue } from "./walk";
 
 const { PI, cos, sin } = Math;
 const A = { x: 2, y: 0 };

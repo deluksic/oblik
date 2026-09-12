@@ -1,5 +1,4 @@
 import {
-  asWalk,
   distToWalkBoundary,
   isFiniteWalk,
   polyContains,
@@ -12,6 +11,7 @@ import {
 } from "./region";
 import type { Loop, Polygon } from "./types";
 import { dist, distToSegment, isFiniteVec, type Vec2 } from "./vec";
+import { asWalk } from "./walk";
 
 const EPS = 1e-9;
 

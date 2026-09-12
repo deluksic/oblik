@@ -2,11 +2,7 @@ import { Portal } from "@solidjs/web";
 import { For, createEffect, createSignal } from "solid-js";
 import type { ParentProps } from "solid-js";
 
-import {
-  ModalContext,
-  type ModalConfig,
-  type ModalResponse,
-} from "./ModalContext";
+import { ModalContext, type ModalConfig, type ModalResponse } from "./ModalContext";
 
 import { panel } from "../ui/surface.module.css";
 import styles from "./Modal.module.css";

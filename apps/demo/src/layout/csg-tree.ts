@@ -48,13 +48,29 @@ export function csgTreeLayout() {
   const earL = region(
     [
       { x: minX - earW, y: minY + earLift },
-      segment({ x: minX - earW, y: minY + earLift }, { x: minX, y: minY + earLift }, "o_78136e8c62"),
+      segment(
+        { x: minX - earW, y: minY + earLift },
+        { x: minX, y: minY + earLift },
+        "o_78136e8c62",
+      ),
       { x: minX, y: minY + earLift },
-      segment({ x: minX, y: minY + earLift }, { x: minX, y: minY + earLift + earH }, "o_e282a3ab34"),
+      segment(
+        { x: minX, y: minY + earLift },
+        { x: minX, y: minY + earLift + earH },
+        "o_e282a3ab34",
+      ),
       { x: minX, y: minY + earLift + earH },
-      segment({ x: minX, y: minY + earLift + earH }, { x: minX - earW, y: minY + earLift + earH }, "o_2c5091b2de"),
+      segment(
+        { x: minX, y: minY + earLift + earH },
+        { x: minX - earW, y: minY + earLift + earH },
+        "o_2c5091b2de",
+      ),
       { x: minX - earW, y: minY + earLift + earH },
-      segment({ x: minX - earW, y: minY + earLift + earH }, { x: minX - earW, y: minY + earLift }, "o_5670200d1a"),
+      segment(
+        { x: minX - earW, y: minY + earLift + earH },
+        { x: minX - earW, y: minY + earLift },
+        "o_5670200d1a",
+      ),
     ],
     [],
     "o_ct_earL",
@@ -62,13 +78,29 @@ export function csgTreeLayout() {
   const earR = region(
     [
       { x: maxX, y: minY + earLift },
-      segment({ x: maxX, y: minY + earLift }, { x: maxX + earW, y: minY + earLift }, "o_585184f1b7"),
+      segment(
+        { x: maxX, y: minY + earLift },
+        { x: maxX + earW, y: minY + earLift },
+        "o_585184f1b7",
+      ),
       { x: maxX + earW, y: minY + earLift },
-      segment({ x: maxX + earW, y: minY + earLift }, { x: maxX + earW, y: minY + earLift + earH }, "o_a4de4624d9"),
+      segment(
+        { x: maxX + earW, y: minY + earLift },
+        { x: maxX + earW, y: minY + earLift + earH },
+        "o_a4de4624d9",
+      ),
       { x: maxX + earW, y: minY + earLift + earH },
-      segment({ x: maxX + earW, y: minY + earLift + earH }, { x: maxX, y: minY + earLift + earH }, "o_545852a33b"),
+      segment(
+        { x: maxX + earW, y: minY + earLift + earH },
+        { x: maxX, y: minY + earLift + earH },
+        "o_545852a33b",
+      ),
       { x: maxX, y: minY + earLift + earH },
-      segment({ x: maxX, y: minY + earLift + earH }, { x: maxX, y: minY + earLift }, "o_10aa94b6c8"),
+      segment(
+        { x: maxX, y: minY + earLift + earH },
+        { x: maxX, y: minY + earLift },
+        "o_10aa94b6c8",
+      ),
     ],
     [],
     "o_ct_earR",
@@ -102,7 +134,16 @@ export function csgTreeLayout() {
   const botR = { x: Rc.x, y: Rc.y - r };
   const T = { x: Lc.x, y: Lc.y - r };
   const slot = region(
-    [P, segment(P, Q, "o_96017205b2"), Q, along(rightC, -1), botR, segment(botR, T, "o_59b774b5cb"), T, along(leftC, -1)],
+    [
+      P,
+      segment(P, Q, "o_96017205b2"),
+      Q,
+      along(rightC, -1),
+      botR,
+      segment(botR, T, "o_59b774b5cb"),
+      T,
+      along(leftC, -1),
+    ],
     [],
     "o_ct_slot",
   );

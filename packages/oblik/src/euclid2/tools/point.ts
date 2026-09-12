@@ -5,12 +5,12 @@ import { hoistIntersections, printHoist } from "#source/hoist";
 import { isConstructed } from "../place";
 import { constructedInsert, exprOfPlace, hoverPlace, round } from "./common";
 import { inSlot, nameField, previewName, withBind } from "./draft";
+import { numberField } from "./fields";
 import {
   attachLengthHit,
   hasNumberBinding,
   lengthHover,
   lengthRefName,
-  numberField,
   numberValue,
   resolveNumberExpr,
 } from "./length";

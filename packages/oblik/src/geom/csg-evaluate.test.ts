@@ -1,17 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import { csg2Value, csgContains, leftOfValue, offsetValue, pickValue, wrapCsg } from "./csg2";
-import { compileAgrees, evaluateRegions } from "./evaluate-regions";
-import {
-  alongValue,
-  filletValue,
-  isCircleWalk,
-  regionContains,
-  regionValue,
-  type WalkCycle,
-} from "./region";
+import { compileAgrees, evaluateRegions } from "./csg2";
+import { alongValue, isCircleWalk, regionContains, type WalkCycle } from "./region";
 import type { Circle, Line, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
+import { filletValue, regionValue } from "./walk";
 
 const { max } = Math;
 function seg(a: Vec2, b: Vec2): Segment {

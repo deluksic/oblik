@@ -2,17 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import { pointOnCircleValue } from "./gliders";
 import { filletAtVertex, localOffset, regionCorners, roundOffsetValue } from "./offset";
-import {
-  alongValue,
-  filletValue,
-  isCircleWalk,
-  regionContains,
-  regionValue,
-  walkEdges,
-  type WalkCycle,
-} from "./region";
+import { alongValue, isCircleWalk, regionContains, walkEdges, type WalkCycle } from "./region";
 import type { Circle, Region, Segment } from "./types";
 import type { Vec2 } from "./vec";
+import { filletValue, regionValue } from "./walk";
 
 const { PI, cos, sin } = Math;
 function poly(pts: readonly Vec2[]): Region {

@@ -5,9 +5,9 @@ import { hitsNear, nodeByTraceAttr } from "../pick";
 import { isPinnedPoint } from "../place";
 import { hitSlider, sliderNodes } from "../view/sliderHud";
 import { keyByPrint, round } from "./common";
-import { parseNum } from "./draft";
+import { parseNum } from "./fields";
 import { toolScope } from "./scope";
-import type { Field, PlaceCtx, PlaceHit, Scope, ToolSession } from "./types";
+import type { PlaceCtx, PlaceHit, Scope } from "./types";
 
 const { abs, max } = Math;
 export type LengthDraft = { typed: string; lengthPick?: Expr };
@@ -293,13 +293,4 @@ export function lengthHover(hit: PlaceHit, trace: readonly TraceNode[]): string 
     return keyByPrint(trace, e.expr.name) ?? undefined;
   }
   return undefined;
-}
-
-export function numberField<S extends ToolSession>(
-  id: string,
-  placeholder: string,
-  get: (session: S) => string,
-  set: (session: S, raw: string) => S,
-): Field<S> {
-  return { id, kind: "length", placeholder, open: () => true, get, set };
 }

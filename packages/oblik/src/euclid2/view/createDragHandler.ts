@@ -120,8 +120,7 @@ export function createDragHandler(defaults: DragHandlerOptions = {}): DragHandle
     options?: DragHandlerOptions,
   ): (event: PointerEvent, ...args: T) => void {
     const deadZoneRadius = options?.deadZoneRadius ?? defaults.deadZoneRadius ?? 0;
-    const clickTolerance =
-      options?.clickTolerance ?? defaults.clickTolerance ?? deadZoneRadius;
+    const clickTolerance = options?.clickTolerance ?? defaults.clickTolerance ?? deadZoneRadius;
     const preventDefault = options?.preventDefault ?? defaults.preventDefault ?? true;
 
     return (initEvent: PointerEvent, ...args: T) => {

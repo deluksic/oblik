@@ -1,7 +1,21 @@
-import { evaluateRegions, islandsAabb, islandsSdf } from "./evaluate-regions";
-import { signedDist } from "./ops";
-import { isFiniteRegion, regionContains, signedDistToRegion, tessellateRegion } from "./region";
-import { foldIntoCopy, repeatStep } from "./repeat";
+import {
+  classifyIslands,
+  edgeMid,
+  roundOffsetValue,
+  splitWalks,
+  walkFragments,
+  walkTangentAt,
+} from "./offset";
+import { lineBasis, lineIntersectionValue, signedDist } from "./ops";
+import {
+  isCircleWalk,
+  isFiniteRegion,
+  regionContains,
+  regionSvgPath,
+  signedDistToRegion,
+  tessellateRegion,
+} from "./region";
+import { foldIntoCopy, repeatStep, rotateRegion } from "./repeat";
 import type {
   Circle,
   Csg2,
@@ -9,15 +23,22 @@ import type {
   CsgOperand,
   HalfPlane,
   LineLike,
+  Loop,
+  LoopEdge,
   Offset,
   Pick,
   PolarRepeat,
   Polygon,
   Region,
 } from "./types";
-import { dist, isFiniteVec, type Vec2 } from "./vec";
+import { add, dist, isFiniteVec, mul, norm, perp, type Vec2 } from "./vec";
 
 const { abs, max, min } = Math;
+/** Distance below which two seam endpoints are the same point. */
+const EPS = 1e-9;
+/** Below this a radius/length is treated as degenerate. */
+const EDGE_MIN = 1e-6;
+
 export type Aabb = { minX: number; minY: number; maxX: number; maxY: number };
 
 export function isHalfPlane(v: { kind: string }): v is HalfPlane {
@@ -426,4 +447,462 @@ export function distToCsg(op: CsgOperand, q: Vec2): number {
   if (occupiedOperand(op, q)) return 0;
   const d = operandSdf(op, q);
   return Number.isFinite(d) ? max(0, d) : Infinity;
+}
+
+// ---- CSG evaluation ----
+// Mutually recursive with the operand primitives above: a `pick` operand
+// evaluates regions, and evaluating regions resolves leaves through them.
+/** Cheap reject: |sdf(mid)| above this is not a boundary candidate. */
+const COARSE = 1e-3;
+
+function circleRegion(c: Circle): Region | undefined {
+  if (!isFiniteVec(c.center) || !Number.isFinite(c.radius) || abs(c.radius) < EDGE_MIN) {
+    return undefined;
+  }
+  return {
+    kind: "region",
+    outer: { kind: "circle", center: { x: c.center.x, y: c.center.y }, radius: abs(c.radius) },
+    holes: [],
+  };
+}
+
+/** Two semicircles so a full disk participates in splitWalks. */
+function circleAsEdges(c: Circle): LoopEdge[] {
+  const r = abs(c.radius);
+  const e = { x: c.center.x + r, y: c.center.y };
+  const w = { x: c.center.x - r, y: c.center.y };
+  return [
+    { a: e, b: w, carrier: c, k: 1 },
+    { a: w, b: e, carrier: c, k: 1 },
+  ];
+}
+
+function edgesOf(w: Loop): LoopEdge[] {
+  return isCircleWalk(w) ? circleAsEdges(w) : w;
+}
+
+function loopsOf(r: Region): Loop[] {
+  return [r.outer, ...r.holes];
+}
+
+export function islandsSdf(islands: readonly Region[], p: Vec2): number {
+  if (islands.length === 0) return Infinity;
+  let d = signedDistToRegion(islands[0]!, p);
+  if (!Number.isFinite(d)) return Number.NaN;
+  for (let i = 1; i < islands.length; i++) {
+    const b = signedDistToRegion(islands[i]!, p);
+    if (!Number.isFinite(b)) return Number.NaN;
+    d = min(d, b);
+  }
+  return d;
+}
+
+export function islandsSvgPath(islands: readonly Region[]): string {
+  return islands
+    .map((r) => regionSvgPath(r))
+    .filter((d) => d.length > 0)
+    .join(" ");
+}
+
+export function islandsAabb(islands: readonly Region[]): Aabb | undefined {
+  let box: Aabb | undefined = undefined;
+  for (const r of islands) {
+    const b = operandAabb(r);
+    if (!b) continue;
+    box = box
+      ? {
+          minX: min(box.minX, b.minX),
+          minY: min(box.minY, b.minY),
+          maxX: max(box.maxX, b.maxX),
+          maxY: max(box.maxY, b.maxY),
+        }
+      : b;
+  }
+  return box;
+}
+
+function booleanSdf(op: CsgOp, groups: readonly (readonly Region[])[], p: Vec2): number {
+  if (groups.length === 0) return Number.NaN;
+  if (op === "union") {
+    let d = islandsSdf(groups[0]!, p);
+    if (!Number.isFinite(d)) return Number.NaN;
+    for (let i = 1; i < groups.length; i++) {
+      const b = islandsSdf(groups[i]!, p);
+      if (!Number.isFinite(b)) return Number.NaN;
+      d = min(d, b);
+    }
+    return d;
+  }
+  if (op === "intersect") {
+    let d = islandsSdf(groups[0]!, p);
+    if (!Number.isFinite(d)) return Number.NaN;
+    for (let i = 1; i < groups.length; i++) {
+      const b = islandsSdf(groups[i]!, p);
+      if (!Number.isFinite(b)) return Number.NaN;
+      d = max(d, b);
+    }
+    return d;
+  }
+  let d = islandsSdf(groups[0]!, p);
+  if (!Number.isFinite(d)) return Number.NaN;
+  for (let i = 1; i < groups.length; i++) {
+    const b = islandsSdf(groups[i]!, p);
+    if (!Number.isFinite(b)) return Number.NaN;
+    d = max(d, -b);
+  }
+  return d;
+}
+
+function cheapMaybeBoundary(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
+  if (dist(e.a, e.b) < EDGE_MIN) return false;
+  const mid = edgeMid(e);
+  const dm = sdf(mid);
+  if (!Number.isFinite(dm) || abs(dm) > COARSE) return false;
+  const da = sdf(e.a);
+  const db = sdf(e.b);
+  if (Number.isFinite(da) && abs(da) > COARSE * 4) return false;
+  if (Number.isFinite(db) && abs(db) > COARSE * 4) return false;
+  return true;
+}
+
+function transverseHairs(e: LoopEdge): number[] {
+  const span = dist(e.a, e.b);
+  const base = max(1e-5, min(span * 0.05, 1e-3));
+  const hairs = [base];
+  if (e.carrier.kind !== "circle") return hairs;
+  const r = abs(e.carrier.radius);
+  // `signedDistToRegion` signs from a tessellated walk. sampleArc(24) sagittas
+  // ~0.002 r, so a 1e-3 hair can land both samples outside the polygon even
+  // when the true circle is a result boundary. Clear that band.
+  const arc = min(r * 0.02, span * 0.25, 5e-2);
+  if (arc > base * 1.05) hairs.push(max(base, arc));
+  return hairs;
+}
+
+function transverseKeep(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
+  const mid = edgeMid(e);
+  const t = walkTangentAt(e, mid);
+  const n = perp(norm(t));
+  if (!isFiniteVec(n)) return false;
+  for (const hair of transverseHairs(e)) {
+    const left = sdf(add(mid, mul(n, hair)));
+    const right = sdf(add(mid, mul(n, -hair)));
+    if (!Number.isFinite(left) || !Number.isFinite(right)) continue;
+    if (left * right < 0) return true;
+  }
+  return false;
+}
+
+function keepBoundary(e: LoopEdge, sdf: (p: Vec2) => number): boolean {
+  return cheapMaybeBoundary(e, sdf) && transverseKeep(e, sdf);
+}
+
+function sameEnds(a: LoopEdge, b: LoopEdge): boolean {
+  const fwd = dist(a.a, b.a) < 1e-6 && dist(a.b, b.b) < 1e-6;
+  const rev = dist(a.a, b.b) < 1e-6 && dist(a.b, b.a) < 1e-6;
+  return fwd || rev;
+}
+
+function collapseSpans(frags: readonly LoopEdge[]): LoopEdge[] {
+  const n = frags.length;
+  const drop = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (drop[i]) continue;
+    for (let j = i + 1; j < n; j++) {
+      if (drop[j]) continue;
+      if (!sameEnds(frags[i]!, frags[j]!)) continue;
+      // Two semicircles of one disk share poles but not the arc; mids differ.
+      if (dist(edgeMid(frags[i]!), edgeMid(frags[j]!)) > 1e-3) continue;
+      const reversed = dist(frags[i]!.a, frags[j]!.b) < 1e-6;
+      if (reversed) {
+        drop[i] = 1;
+        drop[j] = 1;
+      } else {
+        drop[j] = 1;
+      }
+      break;
+    }
+  }
+  const out: LoopEdge[] = [];
+  for (let i = 0; i < n; i++) if (!drop[i]) out.push(frags[i]!);
+  return out;
+}
+
+function collectWalks(groups: readonly (readonly Region[])[]): LoopEdge[][] {
+  const walks: LoopEdge[][] = [];
+  for (const g of groups) {
+    for (const r of g) {
+      if (!isFiniteRegion(r)) continue;
+      for (const w of loopsOf(r)) walks.push(edgesOf(w));
+    }
+  }
+  return walks;
+}
+
+function booleanRegions(op: CsgOp, groups: readonly (readonly Region[])[]): Region[] {
+  const nonempty = groups.filter((g) => g.some((r) => isFiniteRegion(r)));
+  if (op === "intersect" && nonempty.length !== groups.length) return [];
+  if (nonempty.length === 0) return [];
+  if (nonempty.length === 1 && (op === "union" || op === "diff")) {
+    return nonempty[0]!.filter((r) => isFiniteRegion(r));
+  }
+  const walks = collectWalks(op === "intersect" ? nonempty : groups);
+  if (walks.length === 0) return [];
+  const sdf = (p: Vec2) => booleanSdf(op, groups, p);
+  const kept = splitWalks(walks).filter((e) => keepBoundary(e, sdf));
+  const faces = collapseSpans(kept);
+  if (faces.length < 2) return [];
+  return classifyIslands(walkFragments(faces));
+}
+
+function expandBox(a: Aabb, b: Aabb): Aabb {
+  return {
+    minX: min(a.minX, b.minX),
+    minY: min(a.minY, b.minY),
+    maxX: max(a.maxX, b.maxX),
+    maxY: max(a.maxY, b.maxY),
+  };
+}
+
+function islandsBox(islands: readonly Region[]): Aabb | undefined {
+  let box: Aabb | undefined = undefined;
+  for (const r of islands) {
+    const b = operandAabb(r);
+    if (!b) continue;
+    box = box ? expandBox(box, b) : b;
+  }
+  return box;
+}
+
+function planeSdf(h: HalfPlane, p: Vec2): number {
+  return operandSdf(h, p);
+}
+
+function onSeg(a: Vec2, b: Vec2, p: Vec2): boolean {
+  const ab = dist(a, b);
+  if (ab < EDGE_MIN) return false;
+  return dist(a, p) + dist(p, b) <= ab + 1e-7;
+}
+
+/** Line span covering a padded AABB so a half-plane can join the arrangement. */
+function clipSpan(h: HalfPlane, box: Aabb): LoopEdge | undefined {
+  const { origin, dir } = lineBasis(h.line);
+  const n = norm(dir);
+  if (!isFiniteVec(n) || !isFiniteVec(origin)) return undefined;
+  const pad = max(box.maxX - box.minX, box.maxY - box.minY, 1) * 0.08;
+  const minX = box.minX - pad;
+  const minY = box.minY - pad;
+  const maxX = box.maxX + pad;
+  const maxY = box.maxY + pad;
+  const sides: Array<[Vec2, Vec2]> = [
+    [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+    ],
+    [
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+    ],
+    [
+      { x: maxX, y: maxY },
+      { x: minX, y: maxY },
+    ],
+    [
+      { x: minX, y: maxY },
+      { x: minX, y: minY },
+    ],
+  ];
+  const hits: Vec2[] = [];
+  for (const [a, b] of sides) {
+    const p = lineIntersectionValue(h.line, { kind: "segment", a, b });
+    if (!isFiniteVec(p) || !onSeg(a, b, p)) continue;
+    if (hits.some((q) => dist(q, p) < 1e-8)) continue;
+    hits.push(p);
+  }
+  if (hits.length < 2) return undefined;
+  hits.sort((p, q) => {
+    const tp = (p.x - origin.x) * n.x + (p.y - origin.y) * n.y;
+    const tq = (q.x - origin.x) * n.x + (q.y - origin.y) * n.y;
+    return tp - tq;
+  });
+  const a = hits[0]!;
+  const b = hits[hits.length - 1]!;
+  if (dist(a, b) < EDGE_MIN) return undefined;
+  return { a, b, carrier: h.line };
+}
+
+function clipByPlanes(islands: Region[], planes: readonly HalfPlane[]): Region[] {
+  if (islands.length === 0 || planes.length === 0) return islands;
+  const box = islandsBox(islands);
+  if (!box) return [];
+  const extra: LoopEdge[][] = [];
+  for (const h of planes) {
+    const span = clipSpan(h, box);
+    if (span) extra.push([span]);
+  }
+  const sdf = (p: Vec2) => {
+    let d = islandsSdf(islands, p);
+    if (!Number.isFinite(d)) return Number.NaN;
+    for (const h of planes) {
+      const b = planeSdf(h, p);
+      if (!Number.isFinite(b)) return Number.NaN;
+      d = max(d, b);
+    }
+    return d;
+  };
+  const walks = [...collectWalks([islands]), ...extra];
+  if (walks.length === 0) return [];
+  const kept = splitWalks(walks).filter((e) => keepBoundary(e, sdf));
+  const faces = collapseSpans(kept);
+  if (faces.length < 2) return [];
+  return classifyIslands(walkFragments(faces));
+}
+
+function evaluateCsg(node: Csg2): Region[] {
+  if (node.of.length === 1 && (node.op === "union" || node.op === "diff")) {
+    return evaluateRegions(node.of[0]!);
+  }
+  if (node.op === "intersect") {
+    const planes: HalfPlane[] = [];
+    const groups: Region[][] = [];
+    for (const child of node.of) {
+      if (child.kind === "halfPlane") planes.push(child);
+      else groups.push(evaluateRegions(child));
+    }
+    if (groups.length === 0) return [];
+    const solids = groups.length === 1 ? groups[0]! : booleanRegions("intersect", groups);
+    return planes.length === 0 ? solids : clipByPlanes(solids, planes);
+  }
+  return booleanRegions(
+    node.op,
+    node.of.map((child) => evaluateRegions(child)),
+  );
+}
+
+const compileCache = new WeakMap<CsgOperand, Region[]>();
+
+/**
+ * Compile a CSG operand to declared cheese islands. Experimental: carriers
+ * are split, cheap-filtered, then kept on a transverse SDF sign change.
+ * Circular spans retry a longer hair so tessellated region SDF sagittas
+ * do not drop true cap remnants.
+ */
+export function evaluateRegions(op: CsgOperand): Region[] {
+  const hit = compileCache.get(op);
+  if (hit) return hit;
+  const out = compileOperand(op);
+  compileCache.set(op, out);
+  return out;
+}
+
+function compileOperand(op: CsgOperand): Region[] {
+  if (!isFiniteOperand(op)) return [];
+  if (op.kind === "region") return isFiniteRegion(op) ? [op] : [];
+  if (op.kind === "circle") {
+    const r = circleRegion(op);
+    return r ? [r] : [];
+  }
+  if (op.kind === "halfPlane") return [];
+  if (op.kind === "offset") {
+    const out: Region[] = [];
+    for (const island of evaluateRegions(op.of)) {
+      out.push(...roundOffsetValue(island, op.d));
+    }
+    return out;
+  }
+  if (op.kind === "pick") {
+    return evaluateRegions(op.of).filter((r) => regionContains(r, op.at));
+  }
+  if (op.kind === "polarRepeat") return stampRepeat(op);
+  return evaluateCsg(op);
+}
+
+/**
+ * The copies of a repeat, stamped out as real islands: the cell once, turned
+ * `count` times about the axis. Cheap (no CSG compile) and exact — a rotation is
+ * rigid, so the copies are the child's own spans turned, and disjoint because
+ * the child fits its sector. This is what the SVG view paints (one even-odd
+ * path, the union for disjoint copies, no boolean) and what island queries test.
+ *
+ * The *field* never comes through here: the fill shader folds one copy per pixel
+ * (see `geom/repeat.ts`).
+ */
+export function stampRepeat(op: PolarRepeat): Region[] {
+  const inner = evaluateRegions(op.of);
+  if (inner.length === 0) return [];
+  const out: Region[] = [];
+  const step = repeatStep(op.count);
+  for (let k = 0; k < op.count; k++) {
+    const ang = op.rotation + k * step;
+    for (const island of inner) out.push(rotateRegion(island, op.about, ang));
+  }
+  return out;
+}
+
+/**
+ * The copies' *union outline*: the edges two copies share are the seams between
+ * them — interior to the union, not boundary — so they drop out, and the edges
+ * that survive chain across copies into the ring's own loop.
+ *
+ * This is what a painter needs, because a stroke follows every subpath: stamping
+ * the cells verbatim would trace each seam and draw the repeat's joins as radial
+ * spokes. The field does not need it — there the seams are covered by the hub
+ * disc the fill unions in (see `layout/gear.ts`) — but the SVG view strokes its
+ * path, so the merge has to happen in the geometry.
+ *
+ * Copies that share no edges (a ring of separated teeth) come back one island
+ * per copy, which is what they are. So does a copy whose outer loop is a whole
+ * circle, where there is no vertex to merge on.
+ */
+export function mergeRepeatOutline(op: PolarRepeat): Region[] {
+  const islands = stampRepeat(op);
+  if (islands.length <= 1) return islands;
+  const loops = islands.map((island) => island.outer);
+  if (loops.some((loop) => !Array.isArray(loop))) return islands;
+  const seen = new Map<string, number>();
+  for (const loop of loops) {
+    for (const e of loop as LoopEdge[]) seen.set(edgeKey(e), (seen.get(edgeKey(e)) ?? 0) + 1);
+  }
+  const out: Region[] = [];
+  let run: LoopEdge[] = [];
+  const flush = () => {
+    if (run.length > 0) out.push({ kind: "region", outer: run, holes: [] });
+    run = [];
+  };
+  for (const loop of loops) {
+    for (const e of loop as LoopEdge[]) {
+      // Shared with a neighbouring copy: interior, so it is not boundary.
+      if ((seen.get(edgeKey(e)) ?? 0) > 1) continue;
+      // A run continues while the next surviving edge starts where the last
+      // one ended: copies that tile chain into one loop, copies that do not
+      // start a fresh one.
+      const prev = run[run.length - 1];
+      if (prev && dist(prev.b, e.a) > EPS) flush();
+      run.push(e);
+    }
+  }
+  flush();
+  return out.length > 0 ? out : islands;
+}
+
+/** Undirected edge identity: two copies sharing a seam carry it in opposite
+ * directions, so the key ignores direction. */
+function edgeKey(e: LoopEdge): string {
+  const a = `${e.a.x.toFixed(9)},${e.a.y.toFixed(9)}`;
+  const b = `${e.b.x.toFixed(9)},${e.b.y.toFixed(9)}`;
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/** True when every probe's CSG membership matches some compiled island. */
+export function compileAgrees(op: CsgOperand, probes: readonly Vec2[]): boolean {
+  const islands = evaluateRegions(op);
+  for (const p of probes) {
+    if (!isFiniteVec(p) || !isFiniteOperand(op)) continue;
+    const d = operandSdf(op, p);
+    if (!Number.isFinite(d) || abs(d) < COARSE) continue;
+    const field = d < 0;
+    const compiled = islands.some((r) => regionContains(r, p));
+    if (field !== compiled) return false;
+  }
+  return true;
 }

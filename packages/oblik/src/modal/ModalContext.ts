@@ -1,7 +1,7 @@
 import { createContext, useContext } from "solid-js";
+import type { Component } from "solid-js";
 
 import type { SceneValue } from "../eval/context";
-import type { Component } from "solid-js";
 
 /**
  * What a modal can respond with: any scene value, or nothing at all (`respond()`),
@@ -28,9 +28,7 @@ export function defineModal<T extends ModalResponse>(modal: ModalConfig<T>): Mod
   return modal;
 }
 
-export type RequestModalFn = <T extends ModalResponse = void>(
-  config: ModalConfig<T>,
-) => Promise<T>;
+export type RequestModalFn = <T extends ModalResponse = void>(config: ModalConfig<T>) => Promise<T>;
 
 /** Default-less context: reading it outside a `<Modal>` throws `ContextNotFoundError`. */
 export const ModalContext = createContext<RequestModalFn>();

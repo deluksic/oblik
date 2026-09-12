@@ -8,7 +8,8 @@ import type { Annotation } from "../../source/analyze";
 import { snapLineCarrier, snapRegion, type Vec2 } from "../pick";
 import { isPinnedPoint } from "../place";
 import { asPoint, dist, exprOfPlace, exprOfPrint, hoverPlace, round, snapKey } from "./common";
-import { inSlot, nameField, parseNum, previewName, withBind } from "./draft";
+import { inSlot, nameField, previewName, withBind } from "./draft";
+import { parseNum } from "./fields";
 import { attachLengthHit, evalLengthExpr, lengthHover, parseLengthTyped } from "./length";
 import type {
   CompositeFill,

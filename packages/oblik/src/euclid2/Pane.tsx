@@ -152,7 +152,6 @@ export function Euclid2Pane(props: Euclid2PaneProps) {
 
   const mentions = createMemo(() => props.mentions ?? []);
   const world = createMemo((prev: WorldEval | undefined) => {
-    console.log("Running world");
     const t0 = performance.now();
     const w = tryEvaluate(props.scene, {
       draft: draft(),
