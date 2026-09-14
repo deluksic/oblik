@@ -44,7 +44,7 @@
     "css:dts": "tcm -p '**/*.module.css' src",
     "typecheck": "pnpm css:dts && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "prepare": "node build.mjs",
-    "bake:fonts": "glyph bake --input ../../assets/fonts/NotoSans-Regular.ttf --output ../../apps/demo/public/fonts/noto-sans.font.glb --unicodes U+0020-007E --msdf --yes"
+    "bake:fonts": "glyph bake --input ../../assets/fonts/NotoSans-Regular.ttf --output ../../apps/demo/public/fonts/noto-sans.font.glb --unicodes U+0020-007E --msdf em-size=48,pixel-range=40 --yes"
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",

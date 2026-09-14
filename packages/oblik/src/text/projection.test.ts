@@ -6,6 +6,7 @@ import {
   lookAt,
   multiply,
   orthoPixels,
+  paneProjection,
   perspective,
   pixelTransform,
   project,
@@ -13,6 +14,7 @@ import {
   type Clip4,
   type Mat4,
 } from "./projection";
+import { worldToScreen } from "../euclid2/camera";
 
 const { abs } = Math;
 const near = (a: number, b: number, eps = 1e-9): boolean => abs(a - b) < eps;
@@ -165,5 +167,60 @@ describe("perspective and view", () => {
     expect(isBehind({ x: 0, y: 0, z: 0, w: -2 })).toBe(true);
     expect(isBehind({ x: 0, y: 0, z: 0, w: 2 })).toBe(false);
     expect(toNdc({ x: 1, y: 1, z: 0, w: 0 })).toBeUndefined();
+  });
+});
+
+/**
+ * The GPU text path and the HTML overlay it sits under must agree on where a
+ * label is. The overlay positions its text from `worldToScreen`; the GPU path
+ * projects the *same world anchor* through {@link paneProjection}. So the two
+ * matrices have to be the same map — `paneProjection` is exactly
+ * `orthoPixels ∘ worldToScreen`, and this pins that, at three cameras and three
+ * zooms, for a point far from the origin.
+ */
+describe("paneProjection", () => {
+  const viewport = { width: 1024, height: 768 };
+  /** `worldToScreen` speaks PaneSize (`w`/`h`); the projection speaks width/height. */
+  const pane = { w: viewport.width, h: viewport.height };
+  const cameras = [
+    { x: 0, y: 0, scale: 48 },
+    { x: -12.5, y: 7.25, scale: 8 },
+    { x: 300, y: -180, scale: 280 },
+  ];
+  const points = [
+    { x: 0, y: 0 },
+    { x: 3.5, y: -2.25 },
+    { x: -140, y: 96 },
+  ];
+
+  test("matches orthoPixels applied to worldToScreen", () => {
+    const ortho = orthoPixels(viewport.width, viewport.height);
+    for (const cam of cameras) {
+      const viaMatrix = paneProjection(cam, viewport);
+      for (const world of points) {
+        const screen = worldToScreen(world, cam, pane);
+        const expected = project(ortho, { x: screen.x, y: screen.y });
+        const actual = project(viaMatrix, world);
+        expect(nearClip(actual, expected, 1e-9)).toBe(true);
+      }
+    }
+  });
+
+  test("a pan is a translation of the anchor, not a rescaled one", () => {
+    // The camera must move the anchor without scaling the pixels around it:
+    // that is the property the old single-matrix shader could not express.
+    const a = paneProjection({ x: 0, y: 0, scale: 48 }, viewport);
+    const b = paneProjection({ x: 10, y: -5, scale: 48 }, viewport);
+    const one = project(a, { x: 1, y: 1 });
+    const two = project(b, { x: 1, y: 1 });
+    // A pure pan shifts the projection by the camera delta times the scale.
+    expect(near(two.x - one.x, (2 * 48 * -10) / viewport.width)).toBe(true);
+    expect(near(two.y - one.y, (2 * 48 * 5) / viewport.height)).toBe(true);
+  });
+
+  test("a zoom scales the anchor", () => {
+    const a = project(paneProjection({ x: 0, y: 0, scale: 48 }, viewport), { x: 1, y: 0 });
+    const b = project(paneProjection({ x: 0, y: 0, scale: 96 }, viewport), { x: 1, y: 0 });
+    expect(near(b.x, a.x * 2)).toBe(true);
   });
 });

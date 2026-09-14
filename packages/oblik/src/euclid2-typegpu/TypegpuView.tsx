@@ -1,4 +1,3 @@
-import { msdf } from "@pmndrs/glyph/raster/msdf";
 import { Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
@@ -7,7 +6,6 @@ import { isGlider } from "#geom/gliders";
 import {
   screenToWorld,
   wheelZoomFactor,
-  worldToScreen,
   zoomAt,
   type Camera2,
   type PaneSize,
@@ -34,16 +32,24 @@ import { resolveTheme, type ResolvedTheme } from "../host/theme";
 import {
   createTextLayer,
   loadFont,
-  screenProjection,
   type LabelSpec,
   type LoadedFont,
   type TextLayer,
+  type TextStyle,
 } from "../text/layer";
+import { OBLIK_MSDF_FORMAT } from "../text/msdf/bake";
+import { paneProjection } from "../text/projection";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
 import { clearToPaper, createRenderer, type GpuRenderer, type Rgba } from "./gpu/renderer";
 import { acquireRoot, hasWebGPU, releaseRoot } from "./gpu/root";
-import { labelAnchor, isBindLabelNode, labelBoxAt } from "./labelPlacement";
+import {
+  LABEL_BASELINE_PX,
+  LABEL_DX,
+  LABEL_DY,
+  labelAnchor,
+  isBindLabelNode,
+} from "./labelPlacement";
 
 import styles from "./TypegpuView.module.css";
 
@@ -53,8 +59,22 @@ const LABEL_FONT_URL = "/fonts/noto-sans.font.glb";
 const LABEL_FONT_PX = 12;
 /** The painter draws into a 4× MSAA target, so glyph text must match. */
 const LABEL_SAMPLES = 4;
-/** Knockout ring thickness in CSS px. */
-const LABEL_GAP_PX = 2;
+/**
+ * Knockout ring thickness in CSS px.
+ *
+ * The band is drawn from the glyph's own distance field — the quad is widened by
+ * this much and the field's threshold moved out by the same amount — so it is
+ * one quad and one sample, and this number is the whole of it.
+ *
+ * It is bounded by the **bake**, not by the shader. Glyph packs each glyph's
+ * cell as the ink box plus `pixel-range / 2` texels of distance margin per side,
+ * and the field is only valid over that margin. `pnpm bake:fonts` bakes
+ * `em-size=48,pixel-range=40`, which at `LABEL_FONT_PX` is
+ * `(40 / 2) · 12 / 48 = 5px` of margin. Raising this past that would put the
+ * band's outer edge on clamped texels, where the field goes flat and its edge
+ * stops being antialiased — so if this needs to grow, grow `pixel-range` too.
+ */
+const LABEL_GAP_PX = 2.5;
 
 export type TypegpuViewProps = {
   trace: TraceNode[];
@@ -238,19 +258,44 @@ function cssHex([r, g, b]: Rgb): string {
 }
 
 /**
+ * Label styles by **appearance**, not by label.
+ *
+ * A caller legitimately builds a fresh style object per label per sync, but the
+ * layer's diff compares styles by identity — so a fresh object every time would
+ * mean every label re-shapes whenever anything in this pane changes, including
+ * a hover. Keying the cache on values makes "nothing changed" true, and bounds
+ * the key space by the appearances the pane uses (solid/muted × hot/cold)
+ * rather than by the label count.
+ */
+const styleCache = new Map<string, TextStyle>();
+
+function labelStyle(
+  fontSize: number,
+  lineHeight: number,
+  color: string,
+  opacity: number,
+): TextStyle {
+  const key = `${fontSize}|${lineHeight}|${color}|${opacity}`;
+  const hit = styleCache.get(key);
+  if (hit !== undefined) return hit;
+  const made: TextStyle = Object.freeze({ fontSize, lineHeight, color, opacity });
+  styleCache.set(key, made);
+  return made;
+}
+
+/**
  * Push the bind labels into the glyph layer.
  *
- * The anchors come from the same `labelAnchor` + `worldToScreen` pair the HTML
- * overlay uses, so the two paths are directly comparable — the only difference
- * is who rasterises the glyphs. Muted and hot are separate texts rather than a
- * mutated color so each label's style is declarative and stable across frames.
+ * Each label is handed over as a **world anchor plus a screen offset**, not as a
+ * screen position. The camera is applied to the anchor in the vertex stage, so
+ * this function does not read the camera at all — which is exactly why a pan
+ * costs nothing here. The offsets are the same `LABEL_DX`/`LABEL_DY`/baseline
+ * pair the HTML overlay positions its text with, so the two paths still agree.
  */
 function syncGlyphLabels(
   layer: TextLayer,
   font: LoadedFont,
   trace: TraceNode[],
-  cam: Camera2,
-  pane: PaneSize,
   opts: {
     hoverKey?: string | undefined;
     selectedKey?: string | undefined;
@@ -263,37 +308,37 @@ function syncGlyphLabels(
 ): void {
   const muted = cssHex(opts.mutedInk);
   const hot = cssHex(opts.hotInk);
-  const knockoutHex = cssHex(opts.knockout);
   const labels: LabelSpec[] = [];
   for (const node of trace) {
     if (!isBindLabelNode(node)) continue;
     const at = labelAnchor(node);
     if (!at) continue;
-    const screen = worldToScreen(at, cam, pane);
-    // The HTML label is positioned by its line-box top; the box origin carries
-    // the same dx/dy/baseline offsets so both paths agree.
-    const box = labelBoxAt(screen);
     const key = traceKey(node);
     const isHot = key === opts.hoverKey || key === opts.selectedKey;
     const isMuted = opts.scope !== undefined && mutedForScope(node, opts.scope);
     labels.push({
       key,
       text: node.bind ?? "",
-      x: box.x,
-      y: box.y,
-      style: {
-        fontSize: LABEL_FONT_PX,
-        lineHeight: 1,
-        color: isHot ? hot : muted,
-        // Mirrors `.muted { opacity: 0.32 }`, except a hot label stays solid.
-        opacity: isMuted && !isHot ? 0.32 : 1,
-      },
-      // The glyph is knocked out of the paper by a ring of it, so a label stays
-      // legible wherever it lands without thickening the glyph itself.
+      // World space. Rebuilt only when the trace or the styling changes, never
+      // on a camera move.
+      x: at.x,
+      y: at.y,
+      // The HTML label is positioned by its line-box top; the box origin carries
+      // the same dx/dy/baseline offsets so both paths agree.
+      dx: LABEL_DX,
+      dy: LABEL_DY - LABEL_BASELINE_PX,
+      // Mirrors `.muted { opacity: 0.32 }`, except a hot label stays solid.
+      style: labelStyle(
+        LABEL_FONT_PX,
+        1,
+        isHot ? hot : muted,
+        isMuted && !isHot ? 0.32 : 1,
+      ),
       // Every label is knocked out of the pane, in both themes: the ring is
       // `--oblik-knockout`, which is the paper, so it erases whatever the label
       // lands on where a grid line or a fill would otherwise run through it.
-      knockout: { gap: LABEL_GAP_PX, color: knockoutHex },
+      // One quad: the band is the glyph's own distance field, widened.
+      knockout: { gap: LABEL_GAP_PX, color: opts.knockout },
     });
   }
   layer.syncLabels(font, labels);
@@ -423,7 +468,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       const renderer = gpuRenderer;
       void (async () => {
         try {
-          const loaded = await loadFont(LABEL_FONT_URL, msdf);
+          const loaded = await loadFont(LABEL_FONT_URL, OBLIK_MSDF_FORMAT);
           if (cancelled || !world || !gpuRenderer) {
             loaded.dispose();
             return;
@@ -442,9 +487,9 @@ export function TypegpuView(props: TypegpuViewProps) {
             return;
           }
           textLayer = layer;
-          // 2D is the degenerate case of the same path: one viewport pixel maps
-          // to one pixel, so a label's offset is already its screen position.
-          layer.writeProjection(screenProjection({ width: size().w, height: size().h }));
+          // A world→clip matrix, so the camera is applied to each label's anchor
+          // on the GPU rather than folded into its screen position here.
+          layer.writeProjection(paneProjection(camera(), { width: size().w, height: size().h }));
           setTextEpoch(textEpoch() + 1);
           renderer.requestFrame();
         } catch (err) {
@@ -526,20 +571,10 @@ export function TypegpuView(props: TypegpuViewProps) {
         world.setTheme(paper, gridColors);
       }
       world.sync(cam, sz, window.devicePixelRatio || 1);
-      // The glyph path: same anchors as the HTML overlay, pushed into the layer.
-      if (textLayer && font) {
-        // The projection only depends on the pane box; writing it each tick is a
-        // 64-byte uniform update, not a rebuild.
-        textLayer.writeProjection(screenProjection({ width: sz.w, height: sz.h }));
-        syncGlyphLabels(textLayer, font, trace, cam, sz, {
-          hoverKey,
-          selectedKey,
-          scope,
-          mutedInk: readCssColor(el, "--oblik-text"),
-          hotInk: readCssColor(el, "--oblik-ink"),
-          knockout: readCssColor(el, "--oblik-knockout"),
-        });
-      }
+      // The camera is one matrix. Moving it re-writes 64 bytes and re-projects
+      // nothing: every label keeps its world anchor and the vertex stage applies
+      // this to it. That is the whole per-frame cost of a pan or a zoom.
+      textLayer?.writeProjection(paneProjection(cam, { width: sz.w, height: sz.h }));
       const chrome = toolChrome(placing ? toolSession : undefined);
       const patch = adapter.tick({
         trace,
@@ -573,6 +608,49 @@ export function TypegpuView(props: TypegpuViewProps) {
       world.applyPatch(patch);
       setPatchStats({ written: patch.stats.written, total: patch.stats.total });
       gpuRenderer.requestFrame();
+    },
+  );
+
+  /**
+   * The glyph labels, in **world** space.
+   *
+   * Deliberately not a camera dependency. A label's anchor is where it hangs in
+   * the world, so a pan or a zoom cannot change this list — and because the
+   * list is rebuilt only when the trace, the styling or the theme changes, a
+   * camera move never even allocates one. That is what leaves the camera path
+   * as a single uniform write.
+   */
+  createEffect(
+    (): [
+      HTMLDivElement | undefined,
+      number,
+      TraceNode[],
+      string | undefined,
+      string | undefined,
+      Scope | undefined,
+      ResolvedTheme,
+      number,
+    ] => [
+      paperEl(),
+      ready(),
+      props.trace,
+      props.hoverKey,
+      props.selectedKey,
+      props.scope,
+      resolvedTheme(),
+      textEpoch(),
+    ],
+    ([el, , trace, hoverKey, selectedKey, scope]) => {
+      if (!el || !textLayer || !font) return;
+      syncGlyphLabels(textLayer, font, trace, {
+        hoverKey,
+        selectedKey,
+        scope,
+        mutedInk: readCssColor(el, "--oblik-text"),
+        hotInk: readCssColor(el, "--oblik-ink"),
+        knockout: readCssColor(el, "--oblik-knockout"),
+      });
+      gpuRenderer?.requestFrame();
     },
   );
 

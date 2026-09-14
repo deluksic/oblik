@@ -1,53 +1,54 @@
 /**
  * The one text path: glyf-backed text for both the 2D pane and the 3D scene.
  *
- * A **layer** owns the projection uniform, the glyph handle and every text
- * created through it. A **font** owns a loaded `FontFace`. The two are separate
- * because glyph needs a font's rasters declared before a handle exists, while a
- * layer is what a renderer draws with — so a renderer builds a font once and
- * hands it to one or more layers.
+ * A **layer** owns the glyph handle, the camera uniform and every text created
+ * through it. A **font** owns a loaded `FontFace`. The two are separate because
+ * glyph needs a font's rasters declared before a handle exists, while a layer is
+ * what a renderer draws with — so a renderer builds a font once and hands it to
+ * one or more layers.
  *
- * Why this is *one* path and not two: a 2D label and a 3D label differ only in
- * the matrix written into {@link TextLayer.writeProjection}. The 2D pane writes
- * a screen-space orthographic matrix; a 3D scene writes `viewProj` applied to
- * the label's world anchor. Everything else — the shaders, the shaper, layout,
- * measuring, batching, the draw call — is shared, because glyph's
- * `transformPosition` callback is the only place the projection appears.
+ * ## Where a label lives
  *
- * Depth is the one deliberate difference: a layer is created with or without a
- * `depthStencil` because that is a property of the pass it draws into, not of
- * the text. Passing it lets opaque geometry occlude text while transparent
- * glyph quads keep depth-writes off (see {@link TextLayerOptions.depthStencil}).
+ * A label is **world-anchored**. Its anchor is the world point it hangs off, and
+ * the camera is applied to that point on the GPU, in the vertex stage. The
+ * screen-space part — the label box's own `dx`/`dy` — is a separate offset in
+ * CSS px that the same stage adds *without* the camera.
+ *
+ * That split is the whole reason the CPU goes quiet when the camera moves:
+ *
+ * - A **pan or a zoom** writes one matrix ({@link TextLayer.writeProjection})
+ *   and touches no label, no instance buffer and no glyph state.
+ * - A label that **actually moves** writes twelve floats.
+ * - A label whose **text or style** changes re-shapes, which is the only thing
+ *   here that is expensive and the only thing that should be.
+ *
+ * The reconciliation itself — the part that decides what changed — lives in
+ * `labels.ts`, free of the device, so it can be tested by counting writes. This
+ * module is the wiring: glyph's engine on one side, that diff on the other.
  *
  * Invariants this module owns:
- * - `glyph.shape()` is called once per frame by {@link TextLayer.draw}, after
- *   pending `set`/`style`/`layout` edits — callers never call it themselves.
  * - Disposing a layer disposes its texts and its handle but never the caller's
  *   `TgpuRoot`; glyph treats that root as caller-owned.
  * - The engine (`glyph.init()`) is process-wide and idempotent; it is not a
  *   layer's to dispose.
+ * - `glyph.shape()` is called at most once per draw, and only when a text was
+ *   created, re-shaped or dropped. A camera move and a placement write are
+ *   neither, so neither owes the engine a shape.
  */
 import { glyph } from "@pmndrs/glyph";
-import type { RasterFormatMetadata, TextStyle as GlyphTextStyle } from "@pmndrs/glyph";
-import { defineTypeGpuConfig } from "@pmndrs/glyph/typegpu";
-import type { TypeGpuFontSelection, TypeGpuText } from "@pmndrs/glyph/typegpu";
-import { d, type TgpuRenderPass, type TgpuRoot } from "typegpu";
+import type { FontFaceFormat } from "@pmndrs/glyph";
+import type { TypeGpuFontSelection } from "@pmndrs/glyph/typegpu";
+import type { TgpuRenderPass, TgpuRoot } from "typegpu";
 
-import { orthoPixels, pixelTransform, type Mat4, type PixelTransform } from "./projection";
+import { reconcileLabels, type LabelSpec, type LabelWriter, type LiveLabel } from "./labels";
+import { defineOblikConfig, type OblikRoot } from "./msdf/config";
+import type { OblikText } from "./msdf/text";
+import type { Mat4 } from "./projection";
 
-/**
- * Glyph's text style, minus `decoration`: the TypeGPU adapter does not carry
- * decoration runs yet, and its option type says so with `decoration?: never`.
- * Narrowing here keeps that limitation visible at the call site instead of
- * hiding it behind a cast.
- */
-export type TextStyle = Omit<GlyphTextStyle, "decoration">;
+export type { KnockoutRing, LabelSpec, TextStyle } from "./labels";
 
 /** Viewport in **logical** CSS pixels; the projection callback works in these. */
 export type TextViewport = { readonly width: number; readonly height: number };
-
-/** A world point a label hangs off. `z` is the depth used for occlusion. */
-export type LabelAnchor = { readonly x: number; readonly y: number; readonly z?: number };
 
 export type TextLayerOptions = {
   /** Caller-owned root. The layer never destroys it. */
@@ -74,61 +75,19 @@ export type TextLayerOptions = {
   readonly name?: string | undefined;
 };
 
-/**
- * **Knockout ring**: a band of background colour swept around the glyph, so the
- * label reads as cut out of whatever is behind it rather than laid on top.
- *
- * This is field-free — no shadow, no offset. The ring is the glyph's own shape
- * displaced in every direction by `gap`, drawn in `color` underneath the glyph.
- * The glyph's draw covers the middle, which is what turns the union of shifted
- * shapes into a ring.
- *
- * Glyph's MSDF pipeline already computes a band that would do this in one quad,
- * but the TypeGPU adapter does not wire it: the band's width comes from the span
- * extent, which never widens, so the band falls outside the glyph's quad and is
- * clipped. A displaced copy has a quad of its own that reaches where it is put —
- * see {@link appendKnockoutStack}.
- */
-export type KnockoutRing = {
-  /** Ring thickness in screen px. */
-  readonly gap: number;
-  /** Ring colour — the background the glyph is knocked out of. */
-  readonly color: string;
-};
-
-/**
- * One node in a reconciled label set. `key` is the caller's stable identity
- * (a trace key in the 2D pane); the layer diffs on it so a camera move only
- * writes uniforms instead of rebuilding glyph texts.
- */
-export type LabelSpec = {
-  readonly key: string;
-  readonly text: string;
-  readonly x: number;
-  readonly y: number;
-  readonly style?: TextStyle | undefined;
-  /** A knockout ring around this label, or none. */
-  readonly knockout?: KnockoutRing | undefined;
-};
-
 export type TextLayer = {
   /**
-   * Reconcile a whole label set against the live one: create, reposition,
-   * restyle and dispose as needed. Keys that survive are reused, so a pan or a
-   * zoom never re-shapes text it has already shaped.
-   *
-   * Styling is per-label, which is what keeps distinct styles (muted, hover,
-   * selected) expressible while every label in an equal style still shares a
-   * glyph material.
+   * Reconcile a whole label set against the live one: create, restyle, move and
+   * dispose as needed. Keys that survive are reused, so a pan or a zoom never
+   * re-shapes text it has already shaped — and never touches it at all.
    */
   syncLabels(font: LoadedFont, labels: readonly LabelSpec[]): void;
   /**
-   * Point the layer at a matrix. `pixels` is the projection of one viewport
-   * pixel into clip space; build it with {@link orthoPixels} for the 2D pane or
-   * {@link perspective} × view for 3D.
+   * Point the layer's camera at a **world→clip** matrix. Build it with
+   * `paneProjection` for the 2D pane, or `perspective × view` for 3D.
    *
-   * A label's pixel-space anchor then comes from {@link anchorFor}, which
-   * collapses a world anchor through the same matrix.
+   * This is a 64-byte uniform write. No text is re-shaped, re-laid-out or even
+   * read: the camera is applied to each label's anchor on the GPU.
    */
   writeProjection(m: Mat4): void;
   /** The matrix most recently written. */
@@ -146,101 +105,7 @@ export type LoadedFont = {
   dispose(): void;
 };
 
-const DEFAULT_STYLE: TextStyle = { fontSize: 12 };
-
-/** Directions sampled around the gap ring. See {@link ringOffsets}. */
-const KNOCKOUT_RING = 16;
-
-/**
- * The offsets that sweep a glyph's shape out into an annulus of thickness `gap`.
- *
- * The single `{0,0}` entry is the glyph's own position: because the glyph is
- * painted after the ring, it covers that copy exactly, which is what turns the
- * union of shifted shapes into a ring rather than a blob.
- *
- * Sampling is a fidelity knob, not a correctness one — a sparse ring shows up as
- * a faintly scalloped outer edge, never a hole. `KNOCKOUT_RING` directions at
- * label sizes is indistinguishable from a distance-field band, and each costs
- * one extra quad in a batch that already shares one pipeline.
- */
-function ringOffsets(gap: number): { x: number; y: number }[] {
-  const out: { x: number; y: number }[] = [{ x: 0, y: 0 }];
-  const radius = Math.max(0.5, gap);
-  for (let i = 0; i < KNOCKOUT_RING; i += 1) {
-    const a = (i / KNOCKOUT_RING) * Math.PI * 2;
-    out.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
-  }
-  return out;
-}
-
-/**
- * Ring geometry by appearance: the sweep offsets and the one style they share.
- *
- * Keyed on **values**, not on the style object — a caller legitimately builds a
- * fresh style per label per frame, so an object-keyed cache would never hit. The
- * key space is bounded by the appearances a caller actually animates rather than
- * by label count, so it cannot grow with the scene.
- *
- * Caching this is worth it because the ring is the one part of a label that does
- * not depend on where the label is: 17 offsets plus a spread style, rebuilt for
- * every label on every frame, was most of the per-frame garbage.
- */
-const ringCache = new Map<
-  string,
-  { offsets: { x: number; y: number }[]; band: TextStyle; plain: TextStyle }
->();
-
-function ringData(
-  gap: number,
-  ring: KnockoutRing,
-  style: TextStyle,
-): { offsets: { x: number; y: number }[]; band: TextStyle; plain: TextStyle } {
-  const key = `${gap}|${ring.color}|${style.fontSize ?? 0}|${String(style.color ?? "")}|${style.opacity ?? 1}`;
-  const hit = ringCache.get(key);
-  if (hit !== undefined) return hit;
-
-  // `plain` is the caller's style frozen into a stable identity, so the glyph's
-  // own draw reports "unchanged" on the next frame even though the caller built
-  // a fresh style object for it.
-  const made = {
-    offsets: ringOffsets(gap),
-    band: { ...style, color: ring.color } as TextStyle,
-    plain: { ...style } as TextStyle,
-  };
-  ringCache.set(key, made);
-  return made;
-}
-
-/**
- * The texts one label needs, in **paint order**: the ring, then the glyph.
- *
- * Both entries are normal draws of the string at their own `position`. That is
- * the point: a glyph's quad is exactly glyph-sized, so ink only appears inside
- * it. A displaced copy has a quad of its own that reaches wherever it is put, so
- * the ring needs no widening and no shader work.
- *
- * Appends into a caller-owned array so a hot path can reuse one; with the ring
- * geometry cached, a sync allocates nothing for the stack itself.
- */
-export function appendKnockoutStack(
-  out: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[],
-  x: number,
-  y: number,
-  style: TextStyle,
-  ring: KnockoutRing,
-): void {
-  const gap = Math.max(0, ring.gap);
-  // Both styles come from the cache, so a label's style identity is stable
-  // across frames and the layer's dirty check can act on it.
-  const { offsets, band, plain } = ringData(gap, ring, style);
-
-  for (const at of offsets) {
-    out.push({ role: "gap", x: x + at.x, y: y + at.y, style: band });
-  }
-
-  // The glyph on top: it covers the middle of the swept union, leaving the band.
-  out.push({ role: "glyph", x, y, style: plain });
-}
+const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 /** Once per process; `glyph.init()` is idempotent but the promise is not cheap. */
 let engine: Promise<void> | undefined;
@@ -260,14 +125,16 @@ export function ensureEngine(): Promise<void> {
 /**
  * Load a font and declare the raster format its baked artifact carries.
  *
- * `format` is required and must match how the asset was baked (`--msdf` is the
- * default and the sensible one for scalable labels). Loading without declaring
- * it resolves but fails later at `createText` with "format is not loaded", so
- * the declaration is not optional here.
+ * `format` must match how the asset was baked — including its **options**. Glyph
+ * derives a raster's identity from the format's descriptor, so a bare `msdf`
+ * means the *default* `emSize`/`pixelRange`, and asking for that against a
+ * custom bake finds no artifact and quietly falls back to generating the raster
+ * at runtime, which then fails for want of the source font bytes. Pass
+ * `msdf({ emSize, pixelRange })` matching `pnpm bake:fonts`.
  */
 export async function loadFont(
   src: string | URL,
-  format: RasterFormatMetadata,
+  format: FontFaceFormat,
 ): Promise<LoadedFont> {
   await ensureEngine();
   const face = glyph.fontFace(src, { format });
@@ -279,182 +146,93 @@ export async function loadFont(
   };
 }
 
-/** Screen-space (2D) projection: glyph's pixel space, one viewport pixel = 1px. */
-export function screenProjection(viewport: TextViewport): Mat4 {
-  return orthoPixels(viewport.width, viewport.height);
-}
-
-/**
- * Where a world anchor lands, in the y-down pixels glyph consumes.
- *
- * Returns `undefined` when the anchor is behind the camera, where the
- * perspective divide is meaningless — callers should skip that label.
- */
-export function anchorFor(
-  m: Mat4,
-  world: LabelAnchor,
-  viewport: TextViewport,
-): { position: readonly [number, number]; pixels: PixelTransform } | undefined {
-  const pixels = pixelTransform(m, world);
-  if (pixels.origin.w <= 1e-6) return undefined;
-  return {
-    position: [
-      ((pixels.origin.x / pixels.origin.w + 1) / 2) * viewport.width,
-      ((1 - pixels.origin.y / pixels.origin.w) / 2) * viewport.height,
-    ],
-    pixels,
-  };
-}
-
 export function createTextLayer(options: TextLayerOptions): TextLayer {
   const { root, format } = options;
-  const sampleCount = options.sampleCount ?? 1;
 
-  // The projection is a caller-owned uniform captured by the shader callback, so
-  // a camera move is a 64-byte write and never a rebuild of the pipelines.
-  const projection = root.createUniform(d.mat4x4f);
-  let current: Mat4 = orthoPixels(1, 1);
-  projection.write(current as unknown as number[]);
-
-  const config = defineTypeGpuConfig({
+  const config = defineOblikConfig({
     root,
     format,
-    sampleCount,
+    ...(options.sampleCount === undefined ? {} : { sampleCount: options.sampleCount }),
     ...(options.depthStencil === undefined ? {} : { depthStencil: options.depthStencil }),
-    transformPosition: (position, _viewport) => {
-      "use gpu";
-      // `position` arrives in top-left, y-down logical pixels after the shader
-      // added this text's offset — exactly the space the caller's matrix must
-      // map. Pass z through and keep w for the perspective divide.
-      const p = projection.$ * d.vec4f(position.x, position.y, position.z, 1);
-      return d.vec4f(p.x, p.y, p.z, p.w);
-    },
   });
+  const handle = glyph.handle(options.name ?? "oblik-text", config) as unknown as OblikRoot & {
+    dispose(): void;
+  };
 
-  const handle = glyph.handle(options.name ?? "oblik-text", config);
-  const texts = new Set<TypeGpuText<TypeGpuFontSelection>>();
-  /** Live label stacks by caller key, so `syncLabels` reuses instead of rebuilds. */
-  const synced = new Map<string, TypeGpuText<TypeGpuFontSelection>[]>();
-  /**
-   * What was last written to each text. `update()` is skipped when a text's
-   * text/position/style identity is unchanged, which matters because `update`
-   * is not cheap: glyph spreads and rebuilds its retained options on every call,
-   * so an unconditional update allocates several objects per text per frame.
-   */
-  const written = new WeakMap<
-    TypeGpuText<TypeGpuFontSelection>,
-    { text: string; x: number; y: number; style: TextStyle }
-  >();
-  /** Reused per sync so membership, stacking and positions allocate nothing. */
-  const wanted = new Set<string>();
-  const stack: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] = [];
-  /** glyph copies the values out, so one scratch pair serves every write. */
-  const at: [number, number] = [0, 0];
-  const moving: [number, number] = [0, 0];
+  let current: Mat4 = IDENTITY;
   let disposed = false;
+  /**
+   * A shape is owed to the engine whenever a text was created, re-shaped or
+   * dropped — never for a camera move, and never for a placement write, because
+   * those are uniforms the engine does not see.
+   */
+  let shapeOwed = false;
+  const live = new Map<string, LiveLabel<OblikText>>();
+  const wanted = new Set<string>();
+  /** The font the live texts were built with; a new font re-shapes all of them. */
+  let activeFont: LoadedFont | undefined;
 
   const assertLive = (what: string): void => {
     if (disposed) throw new Error(`TextLayer is disposed; cannot ${what}`);
   };
 
-  /** Drop one text from the live set, exactly once. Its key's group is the
-   * caller's to remove — `syncLabels` owns group membership. */
-  const release = (text: TypeGpuText<TypeGpuFontSelection>): void => {
-    if (!texts.delete(text)) return;
-    text.dispose();
+  const writer: LabelWriter<OblikText> = {
+    create(label, style, placement) {
+      if (activeFont === undefined) throw new Error("TextLayer has no font to shape with");
+      return handle.createText({ font: activeFont.font, text: label.text, style }, placement);
+    },
+    reshape(text, label, style) {
+      text.update({ text: label.text, style });
+    },
+    place(text, placement) {
+      // `Placement` and the renderer's own placement record are the same shape;
+      // the diff stays free of the device, so it declares its own.
+      text.setPlacement(placement);
+    },
+    drop(text) {
+      text.dispose();
+    },
   };
 
   return {
     syncLabels(font, labels) {
       assertLive("sync labels");
-      wanted.clear();
-      for (const label of labels) {
-        wanted.add(label.key);
-        const style = label.style ?? DEFAULT_STYLE;
-        // A knockout label is a stack of draws of the same string; a plain one is
-        // a single draw. Reusing by (key, index) means a camera move rewrites
-        // positions and a style change rewrites styles — never a re-shape.
-        stack.length = 0;
-        if (label.knockout === undefined) {
-          stack.push({ role: "glyph", x: label.x, y: label.y, style });
-        } else {
-          appendKnockoutStack(stack, label.x, label.y, style, label.knockout);
-        }
-
-        let group = synced.get(label.key);
-        if (group === undefined || group.length !== stack.length) {
-          if (group !== undefined) for (const text of group) release(text);
-          group = [];
-          synced.set(label.key, group);
-        }
-        for (let i = 0; i < stack.length; i += 1) {
-          const layer = stack[i]!;
-          const existing = group[i];
-          if (existing === undefined) {
-            at[0] = layer.x;
-            at[1] = layer.y;
-            const created = handle.createText({
-              font: font.font,
-              text: label.text,
-              style: layer.style,
-              position: at,
-            });
-            group.push(created);
-            texts.add(created);
-            written.set(created, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
-            continue;
-          }
-          const was = written.get(existing);
-          if (
-            was !== undefined &&
-            was.text === label.text &&
-            was.x === layer.x &&
-            was.y === layer.y &&
-            was.style === layer.style
-          ) {
-            continue;
-          }
-          moving[0] = layer.x;
-          moving[1] = layer.y;
-          existing.update({
-            text: label.text,
-            position: moving,
-            style: layer.style,
-          });
-          written.set(existing, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
-        }
+      // A different font invalidates every shaped text: drop them so the diff
+      // re-creates against the new face rather than reusing stale glyphs.
+      if (activeFont !== undefined && activeFont !== font) {
+        for (const entry of live.values()) entry.text.dispose();
+        live.clear();
+        shapeOwed = true;
       }
-      for (const [key, group] of synced) {
-        if (wanted.has(key)) continue;
-        synced.delete(key);
-        for (const text of group) release(text);
-      }
+      activeFont = font;
+      if (reconcileLabels(live, writer, labels, wanted)) shapeOwed = true;
     },
     writeProjection(m) {
       assertLive("write the projection");
       current = m;
-      projection.write(m as unknown as number[]);
+      handle.setCamera(m as unknown as readonly number[]);
     },
     get projection() {
       return current;
     },
     draw(pass, viewport) {
       assertLive("draw");
-      if (texts.size === 0) return;
-      // One shape per frame covers every edit since the last draw; glyph batches
-      // the texts into this draw call.
-      glyph.shape();
+      if (live.size === 0) return;
+      // One shape per frame at most, and only when a text was added, re-shaped
+      // or dropped. A pan or a label move owes the engine nothing.
+      if (shapeOwed) {
+        glyph.shape();
+        shapeOwed = false;
+      }
       handle.draw(pass, { width: viewport.width, height: viewport.height });
     },
     dispose() {
       if (disposed) return;
       disposed = true;
-      for (const text of texts) text.dispose();
-      texts.clear();
-      synced.clear();
+      for (const entry of live.values()) entry.text.dispose();
+      live.clear();
       // Destroys the handle's own resources; the caller's root stays alive.
       handle.dispose();
-      projection.buffer.destroy();
     },
   };
 }

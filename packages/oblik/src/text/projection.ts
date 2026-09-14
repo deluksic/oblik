@@ -95,6 +95,49 @@ export function orthoPixels(width: number, height: number): Mat4 {
 }
 
 /**
+ * The pane's camera as **one world→clip matrix**: the exact composite of
+ * `worldToScreen` with {@link orthoPixels}, written down in closed form.
+ *
+ * This is what lets a label keep a world anchor. The text shader projects the
+ * anchor through this matrix and adds the glyph's own quad through a separate,
+ * camera-free pixel mapping, so a pan or a zoom is one 64-byte write and no
+ * label is touched. Deriving it from `worldToScreen` rather than restating the
+ * convention here is what keeps the GPU labels registered with the HTML overlay
+ * that positions its text from the same function.
+ *
+ * `worldToScreen` is `screen = size/2 + (world − cam)·scale`, y flipped; the
+ * pixel→clip half is {@link orthoPixels}. Substituting one into the other
+ * cancels the pane half-size, leaving the scale and the camera centre below.
+ */
+export function paneProjection(camera: {
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+}, viewport: { readonly width: number; readonly height: number }): Mat4 {
+  const w = max(1, viewport.width);
+  const h = max(1, viewport.height);
+  const k = 2 * camera.scale;
+  return [
+    k / w,
+    0,
+    0,
+    0,
+    0,
+    k / h,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    -(k * camera.x) / w,
+    -(k * camera.y) / h,
+    0,
+    1,
+  ];
+}
+
+/**
  * A right-handed perspective projection. `fovY` is the full vertical field of
  * view in radians; the far plane maps to depth 1 (WebGPU's convention), so a
  * smaller `z` is nearer.

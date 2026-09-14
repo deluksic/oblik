@@ -1,82 +1,64 @@
 /**
- * One glyph instance, with a **world anchor** the camera never rewrites.
+ * The bind group every glyph quad draws through, and the split it encodes.
  *
- * Glyph's own instance layout carries paragraph-space rectangles, which is
- * exactly why the built-in adapter has to re-project every label on the CPU
- * whenever the camera moves: its shader computes
- * `clip = M · (glyphLocalPixels + position)`, so `position` is an offset inside
- * the *pixel* space and the camera has to live in the same `M` that also scales
- * the glyphs. An affine map cannot hold a translation still while scaling the
- * displacements around it, so no matrix fixes that — the shader has to change.
+ * Glyph's built-in TypeGPU pipeline puts the camera and the glyph's own pixels
+ * in **one** matrix: its vertex stage computes `clip = M · (glyphLocalPixels +
+ * position)`. An affine map cannot translate a point while scaling the
+ * displacements around it, so with that shader a label cannot hold a world
+ * anchor — `position` has to be the label's screen position, and every label is
+ * re-projected on the CPU whenever the camera moves.
  *
- * This layout therefore carries the anchor explicitly: the vertex shader
- * projects the anchor `worldToClip` (camera) and adds the glyph's own rectangle
- * through a separate, camera-free `pixel` mapping. A pan is then a single matrix
- * write and touches no instance buffer.
+ * This layout splits the two terms:
  *
- * The buffers are semantically glyph's portable MSDF lanes (`rect`, `uvRect`,
- * `uvBounds`, `color`, `effectColor`, `page`); `rect.xy` carries the anchor and
- * `rect.zw` the glyph's paragraph-space top-left.
+ *     clip.xy = worldToClip · anchor  +  view · (glyphLocalPixels + offset)
+ *
+ * - `camera` is written per frame. A pan or a zoom is this one write.
+ * - `label` is **per text**: `xy` the world anchor, `zw` a screen-space offset
+ *   in CSS px (y down) from the anchor to the text's box. It is written only
+ *   when that label actually moves.
+ * - `view` is `(2/width, 2/height)`: one screen pixel in clip space, with no
+ *   camera in it, which is what keeps text screen-sized instead of growing with
+ *   the zoom.
+ * - `ring` and `ringColor` carry the knockout band, per text, so the band costs
+ *   a shader branch rather than sixteen extra texts.
+ *
+ * The instance attributes are glyph's portable MSDF lanes, unchanged: `rect`
+ * and `uvRect` come from the Codec exactly as the built-in renderer reads them,
+ * so the atlas, the layout and the shaping stay glyph's.
  */
-import { f32, mat4x4f, struct, u32, vec2f, vec2u, vec4f } from "typegpu/data";
-import type { Infer } from "typegpu/data";
+import { tgpu } from "typegpu";
+import { f32, mat4x4f, texture2dArray, vec4f } from "typegpu/data";
 
-/** Per-instance attributes, one record per glyph quad. */
-export const OblikMsdfInstance = struct({
-  /** `xy` world anchor; `zw` the glyph's paragraph-space top-left. */
-  rect: vec4f,
-  /** Atlas rect: origin and span in uv space. */
-  uvRect: vec4f,
-  /** Clamp bounds for the MSDF texel reads. */
-  uvBounds: vec4f,
-  /** Straight RGBA fill. */
-  color: vec4f,
-  /** Packed outline and shadow colours (rgba8 in each lane). */
-  effect: vec2u,
-  /** `xy` shadow offset, `z` outline width in em, `w` atlas page. */
-  page: vec4f,
+export const oblikLayout = tgpu.bindGroupLayout({
+  /** `worldToClip` for the pane or the scene. The only thing a camera move writes. */
+  camera: { uniform: mat4x4f },
+  /** `(2/width, 2/height)` — one screen pixel in clip space, camera-free. */
+  view: { uniform: vec4f },
+  /**
+   * `xy` the atlas extent in texels, `z` the baked `pixelRange`, `w` unused.
+   *
+   * The field is scaled so the full `[0, 1]` of a texel spans `pixelRange`
+   * plane units — half of it either side of the outline, which is
+   * `MSDF_MAX_OUTLINE_ATLAS_PIXELS`. One plane unit is one atlas texel at this
+   * bake (`emSize` == `planeUnitsPerEm`), so this uniform is what turns a texel
+   * value into a distance in glyph pixels.
+   */
+  atlasInfo: { uniform: vec4f },
+  /** Per text: `xy` world anchor, `zw` screen offset in CSS px (y down). */
+  label: { uniform: vec4f },
+  /** Per text: `x` knockout gap in px, `y` 1 while a ring is wanted. */
+  ring: { uniform: vec4f },
+  /** Per text: the knockout colour, straight RGBA. */
+  ringColor: { uniform: vec4f },
+  atlas: { texture: texture2dArray(f32) },
+  samp: { sampler: "filtering" },
 });
-
-export type OblikMsdfInstance = Infer<typeof OblikMsdfInstance>;
 
 /**
- * Where the camera lives: written once per frame, never per label.
- *
- * `worldToClip` maps a world point to clip space. `pixel` is the *separate*,
- * camera-free mapping a screen pixel takes. Keeping those apart is the entire
- * point of this shader — applying the camera to glyph-local pixels is what made
- * text scale with zoom.
+ * The knockout band a label asks for: thickness in CSS px, and its colour.
  */
-export const OblikScene = struct({
-  worldToClip: mat4x4f,
-  /** `(2/width, 2/height)`, with y already negated for clip space. */
-  pixel: vec2f,
-  /** Pane half-size in pixels: the clip-space origin of a world point. */
-  half: vec2f,
-  /** Unused lanes kept for alignment-friendly edits. */
-  pad: vec2f,
-  /** `x` = outline width in em; `y` = 1 while a knockout band is wanted. */
-  knockout: vec2f,
-  /** Outline (gap) colour, straight RGBA. */
-  gapColor: vec4f,
-});
-
-export type OblikScene = Infer<typeof OblikScene>;
-
-/** Vertex-stage output; also the fragment's input. */
-export const OblikMsdfVertexOutput = struct({
-  position: vec4f,
-  atlasCoordinate: vec2f,
-  shadowCoordinate: vec2f,
-  uvBounds: vec4f,
-  color: vec4f,
-  outlineColor: vec4f,
-  shadowColor: vec4f,
-  outlineWidth: f32,
-  pageIndex: u32,
-});
-
-export type OblikMsdfVertexOutput = Infer<typeof OblikMsdfVertexOutput>;
-
-/** Uniform lanes the codec compiler is told about, for capacity planning. */
-export const OBLIK_UNIFORM_FLOATS = 4 * 4 + 2 + 2 + 2 + 2 + 4;
+export type OblikRingInput = {
+  readonly gap: number;
+  readonly enabled: boolean;
+  readonly color: readonly [number, number, number];
+};
