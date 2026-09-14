@@ -7,6 +7,7 @@ import { isGlider } from "#geom/gliders";
 import {
   screenToWorld,
   wheelZoomFactor,
+  worldToScreen,
   zoomAt,
   type Camera2,
   type PaneSize,
@@ -31,10 +32,9 @@ import { SliderDock } from "../euclid2/view/SliderDock";
 import { sliderNodes } from "../euclid2/view/sliderHud";
 import { resolveTheme, type ResolvedTheme } from "../host/theme";
 import {
-  cameraProjection,
   createTextLayer,
   loadFont,
-  screenOffsetToWorld,
+  screenProjection,
   type LabelSpec,
   type LoadedFont,
   type TextLayer,
@@ -249,7 +249,8 @@ function syncGlyphLabels(
   layer: TextLayer,
   font: LoadedFont,
   trace: TraceNode[],
-  scale: number,
+  cam: Camera2,
+  pane: PaneSize,
   opts: {
     hoverKey?: string | undefined;
     selectedKey?: string | undefined;
@@ -268,22 +269,18 @@ function syncGlyphLabels(
     if (!isBindLabelNode(node)) continue;
     const at = labelAnchor(node);
     if (!at) continue;
-    // The anchor stays in **world** units: the camera lives in the projection
-    // uniform and is applied per-vertex, so a pan rewrites that one uniform and
-    // touches no label. `labelBoxAt`'s dx/dy/baseline offsets are screen pixels,
-    // so they are converted to world distance at this camera's scale.
-    const box = labelBoxAt(at);
-    const off = screenOffsetToWorld({ x: box.x - at.x, y: box.y - at.y }, scale);
+    const screen = worldToScreen(at, cam, pane);
+    // The HTML label is positioned by its line-box top; the box origin carries
+    // the same dx/dy/baseline offsets so both paths agree.
+    const box = labelBoxAt(screen);
     const key = traceKey(node);
     const isHot = key === opts.hoverKey || key === opts.selectedKey;
     const isMuted = opts.scope !== undefined && mutedForScope(node, opts.scope);
     labels.push({
       key,
       text: node.bind ?? "",
-      x: at.x + off.x,
-      // Screen y runs down, world y runs up, so the offset negates: `labelBoxAt`
-      // puts the box above the anchor (-8) and that must be +y in the world.
-      y: at.y - off.y,
+      x: box.x,
+      y: box.y,
       style: {
         fontSize: LABEL_FONT_PX,
         lineHeight: 1,
@@ -445,8 +442,9 @@ export function TypegpuView(props: TypegpuViewProps) {
             return;
           }
           textLayer = layer;
-          const pane = size();
-          layer.writeProjection(cameraProjection(camera(), { width: pane.w, height: pane.h }));
+          // 2D is the degenerate case of the same path: one viewport pixel maps
+          // to one pixel, so a label's offset is already its screen position.
+          layer.writeProjection(screenProjection({ width: size().w, height: size().h }));
           setTextEpoch(textEpoch() + 1);
           renderer.requestFrame();
         } catch (err) {
@@ -460,74 +458,6 @@ export function TypegpuView(props: TypegpuViewProps) {
         font?.dispose();
         font = undefined;
       };
-    },
-  );
-
-  /**
-   * Labels, and only labels.
-   *
-   * Deliberately **not** in the paint effect above: that one has to re-run on
-   * every camera move (the painter needs the camera), and coupling label work to
-   * it would rebuild every label on every pan tick. Here a pan changes nothing
-   * observable — anchors are world-space and the camera lives in the projection
-   * uniform — so this does not re-run at all.
-   *
-   * `camera().scale` is read because a label's screen-pixel offset has to be
-   * expressed in world distance, and that is the one camera value a label
-   * genuinely depends on. A zoom therefore does re-sync; a pan does not. The
-   * layer's own dirty check makes even that cheap, and moving the offset into
-   * the vertex shader is what would retire this last dependency.
-   */
-  createEffect(
-    (): [
-      number,
-      number,
-      TraceNode[],
-      string | undefined,
-      string | undefined,
-      Scope | undefined,
-      number,
-    ] => [
-      ready(),
-      textEpoch(),
-      props.trace,
-      props.hoverKey,
-      props.selectedKey,
-      props.scope,
-      camera().scale,
-    ],
-    ([, epoch, trace, hoverKey, selectedKey, scope]) => {
-      if (epoch === 0 || !textLayer || !font) return;
-      const el = paperEl();
-      if (!el) return;
-      syncGlyphLabels(textLayer, font, trace, camera().scale, {
-        hoverKey,
-        selectedKey,
-        scope,
-        mutedInk: readCssColor(el, "--oblik-text"),
-        hotInk: readCssColor(el, "--oblik-ink"),
-        knockout: readCssColor(el, "--oblik-knockout"),
-      });
-      gpuRenderer?.requestFrame();
-    },
-  );
-
-  /**
-   * The camera, and only the camera.
-   *
-   * Labels carry world anchors and the projection is a uniform the vertex shader
-   * reads, so a pan or a zoom is this one 64-byte write — no label is touched, no
-   * text is re-shaped, nothing is allocated per label. Keeping it out of the
-   * paint effect below is the whole point: that effect re-runs on every trace
-   * change, and coupling the two would rebuild the label list on every camera
-   * move.
-   */
-  createEffect(
-    (): [Camera2, PaneSize, number, number] => [camera(), size(), ready(), textEpoch()],
-    ([cam, pane, , epoch]) => {
-      if (epoch === 0 || !textLayer) return;
-      textLayer.writeProjection(cameraProjection(cam, { width: pane.w, height: pane.h }));
-      gpuRenderer?.requestFrame();
     },
   );
 
@@ -596,6 +526,20 @@ export function TypegpuView(props: TypegpuViewProps) {
         world.setTheme(paper, gridColors);
       }
       world.sync(cam, sz, window.devicePixelRatio || 1);
+      // The glyph path: same anchors as the HTML overlay, pushed into the layer.
+      if (textLayer && font) {
+        // The projection only depends on the pane box; writing it each tick is a
+        // 64-byte uniform update, not a rebuild.
+        textLayer.writeProjection(screenProjection({ width: sz.w, height: sz.h }));
+        syncGlyphLabels(textLayer, font, trace, cam, sz, {
+          hoverKey,
+          selectedKey,
+          scope,
+          mutedInk: readCssColor(el, "--oblik-text"),
+          hotInk: readCssColor(el, "--oblik-ink"),
+          knockout: readCssColor(el, "--oblik-knockout"),
+        });
+      }
       const chrome = toolChrome(placing ? toolSession : undefined);
       const patch = adapter.tick({
         trace,

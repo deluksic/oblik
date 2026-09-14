@@ -148,84 +148,58 @@ export type LoadedFont = {
 
 const DEFAULT_STYLE: TextStyle = { fontSize: 12 };
 
-/** Directions sampled around the gap ring. See {@link ringData}. */
+/** Directions sampled around the gap ring. See {@link ringOffsets}. */
 const KNOCKOUT_RING = 16;
 
 /**
- * Cached geometry for one ring appearance: the compass offsets and the styles
- * they share.
+ * The offsets that sweep a glyph's shape out into an annulus of thickness `gap`.
  *
- * Both depend only on `(gap, color, style)` — never on where a label sits — so
- * they are computed once and reused across every label and every frame. A pan or
- * a drag must not allocate a ring per label, and with this it does not.
+ * The single `{0,0}` entry is the glyph's own position: because the glyph is
+ * painted after the ring, it covers that copy exactly, which is what turns the
+ * union of shifted shapes into a ring rather than a blob.
  *
- * The single `{0,0}` offset is the glyph's own spot: the glyph is painted after
- * the ring, so it covers that copy exactly, turning the union of shifted shapes
- * into a ring rather than a blob.
- *
- * Sampling is a fidelity knob, not a correctness one — a sparse ring shows a
- * faintly scalloped outer edge, never a hole.
+ * Sampling is a fidelity knob, not a correctness one — a sparse ring shows up as
+ * a faintly scalloped outer edge, never a hole. `KNOCKOUT_RING` directions at
+ * label sizes is indistinguishable from a distance-field band, and each costs
+ * one extra quad in a batch that already shares one pipeline.
  */
-/**
- * Ring geometry by appearance. Keyed on **values**, not on the style object:
- * callers legitimately build a fresh style per label per sync, so an
- * object-keyed cache would never hit. The key space is bounded by the styles a
- * caller actually animates (a handful of colours x a few sizes), not by label
- * count, so this cannot grow with the scene.
- */
-const ringCache = new Map<string, { offsets: { x: number; y: number }[]; band: TextStyle }>();
-
-/** Identity of a ring's appearance: the style it sits on plus the ring colour. */
-function ringKey(gap: number, ring: KnockoutRing, style: TextStyle): string {
-  return `${gap}|${ring.color}|${style.fontSize ?? 0}|${String(style.color ?? "")}|${style.opacity ?? 1}`;
-}
-
-function ringData(
-  gap: number,
-  ring: KnockoutRing,
-  style: TextStyle,
-): { offsets: { x: number; y: number }[]; band: TextStyle } {
-  const key = ringKey(gap, ring, style);
-  const hit = ringCache.get(key);
-  if (hit !== undefined) return hit;
-
+function ringOffsets(gap: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [{ x: 0, y: 0 }];
   const radius = Math.max(0.5, gap);
-  const offsets: { x: number; y: number }[] = [{ x: 0, y: 0 }];
   for (let i = 0; i < KNOCKOUT_RING; i += 1) {
     const a = (i / KNOCKOUT_RING) * Math.PI * 2;
-    offsets.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
+    out.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
   }
-  const made = { offsets, band: { ...style, color: ring.color } as TextStyle };
-  ringCache.set(key, made);
-  return made;
+  return out;
 }
 
 /**
  * The texts one label needs, in **paint order**: the ring, then the glyph.
  *
- * Both are normal draws of the string at their own `position`, and that position
- * is a **world anchor** — the camera lives in the projection uniform and is
- * applied per-vertex, so moving the camera never rewrites a label.
- *
- * The appends rather than returns, so the caller can reuse one stack array and
- * this stays allocation-free on the hot path. A glyph's quad is exactly
- * glyph-sized, so ink only appears inside it; a displaced copy has a quad of its
- * own that reaches wherever it is put, which is why the ring needs no widening.
+ * Both entries are normal draws of the string at their own `position`. That is
+ * the point: a glyph's quad is exactly glyph-sized, so ink only appears inside
+ * it. A displaced copy has a quad of its own that reaches wherever it is put, so
+ * the ring needs no widening and no shader work.
  */
-export function appendKnockoutStack(
-  out: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[],
+export function knockoutStack(
   x: number,
   y: number,
   style: TextStyle,
   ring: KnockoutRing,
-): void {
+): { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] {
   const gap = Math.max(0, ring.gap);
+  const stack: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] = [];
+
   if (gap > 0) {
-    const { offsets, band } = ringData(gap, ring, style);
-    for (const at of offsets) out.push({ role: "gap", x: x + at.x, y: y + at.y, style: band });
+    const band: TextStyle = { ...style, color: ring.color };
+    for (const at of ringOffsets(gap)) {
+      stack.push({ role: "gap", x: x + at.x, y: y + at.y, style: band });
+    }
   }
+
   // The glyph on top: it covers the middle of the swept union, leaving the band.
-  out.push({ role: "glyph", x, y, style });
+  stack.push({ role: "glyph", x, y, style });
+  return stack;
 }
 
 /** Once per process; `glyph.init()` is idempotent but the promise is not cheap. */
@@ -265,64 +239,9 @@ export async function loadFont(
   };
 }
 
-/**
- * A screen-space offset expressed as a world distance.
- *
- * Returning magnitudes, not a signed world vector: a screen offset is y-down and
- * a world anchor is y-up, so the sign is the caller's to apply. Doing it here
- * would hide a flip that is easy to get backwards (and was).
- *
- * The conversion itself is needed because the shader adds its text offset and
- * *then* projects, which makes that offset a screen-space translation carried by
- * the matrix. A label's anchor is world-space, so a screen-pixel offset has to
- * be divided by the camera scale — otherwise the label sits a fixed world
- * distance from its point and slides as you zoom.
- */
-export function screenOffsetToWorld(
-  offset: { x: number; y: number },
-  scale: number,
-): { x: number; y: number } {
-  const s = Math.max(1e-6, scale);
-  return { x: offset.x / s, y: offset.y / s };
-}
-
-/**
- * The 2D pane's projection: world units to clip space through a camera.
- *
- * World units and viewport pixels coincide at the identity camera, and the
- * shader's `clip = orthoPixels(size) × (world + offset)` composes to exactly the
- * world→screen→NDC mapping the HTML overlay used. So a label's offset is its
- * **world** anchor and the camera never has to touch a label.
- */
-export function cameraProjection(
-  cam: { x: number; y: number; scale: number },
-  viewport: TextViewport,
-): Mat4 {
-  const w = Math.max(1, viewport.width);
-  const h = Math.max(1, viewport.height);
-  // The shader yields clip = M·(world + offset), and clip→screen is
-  // sx = (cx+1)/2·w, sy = (1-cy)/2·h. Solving for the pane's own mapping —
-  // sx = w/2 + (x-cam.x)·scale, sy = h/2 - (y-cam.y)·scale — gives this. Note
-  // the y translation is negative: the y row already carries the flip, so cam.y
-  // must be added in clip space, not subtracted.
-  return [
-    (2 * cam.scale) / w,
-    0,
-    0,
-    0,
-    0,
-    (2 * cam.scale) / h,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    (-2 * cam.scale * cam.x) / w,
-    (-2 * cam.scale * cam.y) / h,
-    0,
-    1,
-  ];
+/** Screen-space (2D) projection: glyph's pixel space, one viewport pixel = 1px. */
+export function screenProjection(viewport: TextViewport): Mat4 {
+  return orthoPixels(viewport.width, viewport.height);
 }
 
 /**
@@ -376,22 +295,6 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
   const texts = new Set<TypeGpuText<TypeGpuFontSelection>>();
   /** Live label stacks by caller key, so `syncLabels` reuses instead of rebuilds. */
   const synced = new Map<string, TypeGpuText<TypeGpuFontSelection>[]>();
-  /**
-   * What was last written to each text. `update()` is skipped when a text's
-   * text/position/style identity is unchanged, which is what keeps a static
-   * frame and a camera pan from doing any per-label work at all — and `update`
-   * is not free: glyph spreads its retained options and rebuilds them on every
-   * call, so an unconditional update allocates several objects per text.
-   */
-  const written = new WeakMap<
-    TypeGpuText<TypeGpuFontSelection>,
-    { text: string; x: number; y: number; style: TextStyle }
-  >();
-  /** One stack array, reused for every label: the ring is cached, so this is
-   * the only per-label scratch, and it does not grow after the first sync. */
-  const stack: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] = [];
-  /** Membership scratch, reused for the same reason. */
-  const wanted = new Set<string>();
   let disposed = false;
 
   const assertLive = (what: string): void => {
@@ -408,17 +311,17 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
   return {
     syncLabels(font, labels) {
       assertLive("sync labels");
-      wanted.clear();
+      const wanted = new Set<string>();
       for (const label of labels) {
         wanted.add(label.key);
         const style = label.style ?? DEFAULT_STYLE;
-
-        stack.length = 0;
-        if (label.knockout === undefined) {
-          stack.push({ role: "glyph", x: label.x, y: label.y, style });
-        } else {
-          appendKnockoutStack(stack, label.x, label.y, style, label.knockout);
-        }
+        // A knockout label is a stack of draws of the same string; a plain one is
+        // a single draw. Reusing by (key, index) means a camera move rewrites
+        // positions and a style change rewrites styles — never a re-shape.
+        const stack =
+          label.knockout === undefined
+            ? [{ role: "glyph" as const, x: label.x, y: label.y, style }]
+            : knockoutStack(label.x, label.y, style, label.knockout);
 
         let group = synced.get(label.key);
         if (group === undefined || group.length !== stack.length) {
@@ -438,17 +341,6 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
             });
             group.push(created);
             texts.add(created);
-            written.set(created, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
-            continue;
-          }
-          const was = written.get(existing);
-          if (
-            was !== undefined &&
-            was.text === label.text &&
-            was.x === layer.x &&
-            was.y === layer.y &&
-            was.style === layer.style
-          ) {
             continue;
           }
           existing.update({
@@ -456,7 +348,6 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
             position: [layer.x, layer.y],
             style: layer.style,
           });
-          written.set(existing, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
         }
       }
       for (const [key, group] of synced) {
