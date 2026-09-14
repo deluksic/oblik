@@ -87,7 +87,7 @@ export type TextLayerOptions = {
  * but the TypeGPU adapter does not wire it: the band's width comes from the span
  * extent, which never widens, so the band falls outside the glyph's quad and is
  * clipped. A displaced copy has a quad of its own that reaches where it is put —
- * see {@link knockoutStack}.
+ * see {@link appendKnockoutStack}.
  */
 export type KnockoutRing = {
   /** Ring thickness in screen px. */
@@ -174,32 +174,72 @@ function ringOffsets(gap: number): { x: number; y: number }[] {
 }
 
 /**
+ * Ring geometry by appearance: the sweep offsets and the one style they share.
+ *
+ * Keyed on **values**, not on the style object — a caller legitimately builds a
+ * fresh style per label per frame, so an object-keyed cache would never hit. The
+ * key space is bounded by the appearances a caller actually animates rather than
+ * by label count, so it cannot grow with the scene.
+ *
+ * Caching this is worth it because the ring is the one part of a label that does
+ * not depend on where the label is: 17 offsets plus a spread style, rebuilt for
+ * every label on every frame, was most of the per-frame garbage.
+ */
+const ringCache = new Map<
+  string,
+  { offsets: { x: number; y: number }[]; band: TextStyle; plain: TextStyle }
+>();
+
+function ringData(
+  gap: number,
+  ring: KnockoutRing,
+  style: TextStyle,
+): { offsets: { x: number; y: number }[]; band: TextStyle; plain: TextStyle } {
+  const key = `${gap}|${ring.color}|${style.fontSize ?? 0}|${String(style.color ?? "")}|${style.opacity ?? 1}`;
+  const hit = ringCache.get(key);
+  if (hit !== undefined) return hit;
+
+  // `plain` is the caller's style frozen into a stable identity, so the glyph's
+  // own draw reports "unchanged" on the next frame even though the caller built
+  // a fresh style object for it.
+  const made = {
+    offsets: ringOffsets(gap),
+    band: { ...style, color: ring.color } as TextStyle,
+    plain: { ...style } as TextStyle,
+  };
+  ringCache.set(key, made);
+  return made;
+}
+
+/**
  * The texts one label needs, in **paint order**: the ring, then the glyph.
  *
  * Both entries are normal draws of the string at their own `position`. That is
  * the point: a glyph's quad is exactly glyph-sized, so ink only appears inside
  * it. A displaced copy has a quad of its own that reaches wherever it is put, so
  * the ring needs no widening and no shader work.
+ *
+ * Appends into a caller-owned array so a hot path can reuse one; with the ring
+ * geometry cached, a sync allocates nothing for the stack itself.
  */
-export function knockoutStack(
+export function appendKnockoutStack(
+  out: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[],
   x: number,
   y: number,
   style: TextStyle,
   ring: KnockoutRing,
-): { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] {
+): void {
   const gap = Math.max(0, ring.gap);
-  const stack: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] = [];
+  // Both styles come from the cache, so a label's style identity is stable
+  // across frames and the layer's dirty check can act on it.
+  const { offsets, band, plain } = ringData(gap, ring, style);
 
-  if (gap > 0) {
-    const band: TextStyle = { ...style, color: ring.color };
-    for (const at of ringOffsets(gap)) {
-      stack.push({ role: "gap", x: x + at.x, y: y + at.y, style: band });
-    }
+  for (const at of offsets) {
+    out.push({ role: "gap", x: x + at.x, y: y + at.y, style: band });
   }
 
   // The glyph on top: it covers the middle of the swept union, leaving the band.
-  stack.push({ role: "glyph", x, y, style });
-  return stack;
+  out.push({ role: "glyph", x, y, style: plain });
 }
 
 /** Once per process; `glyph.init()` is idempotent but the promise is not cheap. */
@@ -295,6 +335,22 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
   const texts = new Set<TypeGpuText<TypeGpuFontSelection>>();
   /** Live label stacks by caller key, so `syncLabels` reuses instead of rebuilds. */
   const synced = new Map<string, TypeGpuText<TypeGpuFontSelection>[]>();
+  /**
+   * What was last written to each text. `update()` is skipped when a text's
+   * text/position/style identity is unchanged, which matters because `update`
+   * is not cheap: glyph spreads and rebuilds its retained options on every call,
+   * so an unconditional update allocates several objects per text per frame.
+   */
+  const written = new WeakMap<
+    TypeGpuText<TypeGpuFontSelection>,
+    { text: string; x: number; y: number; style: TextStyle }
+  >();
+  /** Reused per sync so membership, stacking and positions allocate nothing. */
+  const wanted = new Set<string>();
+  const stack: { role: "gap" | "glyph"; x: number; y: number; style: TextStyle }[] = [];
+  /** glyph copies the values out, so one scratch pair serves every write. */
+  const at: [number, number] = [0, 0];
+  const moving: [number, number] = [0, 0];
   let disposed = false;
 
   const assertLive = (what: string): void => {
@@ -311,17 +367,19 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
   return {
     syncLabels(font, labels) {
       assertLive("sync labels");
-      const wanted = new Set<string>();
+      wanted.clear();
       for (const label of labels) {
         wanted.add(label.key);
         const style = label.style ?? DEFAULT_STYLE;
         // A knockout label is a stack of draws of the same string; a plain one is
         // a single draw. Reusing by (key, index) means a camera move rewrites
         // positions and a style change rewrites styles — never a re-shape.
-        const stack =
-          label.knockout === undefined
-            ? [{ role: "glyph" as const, x: label.x, y: label.y, style }]
-            : knockoutStack(label.x, label.y, style, label.knockout);
+        stack.length = 0;
+        if (label.knockout === undefined) {
+          stack.push({ role: "glyph", x: label.x, y: label.y, style });
+        } else {
+          appendKnockoutStack(stack, label.x, label.y, style, label.knockout);
+        }
 
         let group = synced.get(label.key);
         if (group === undefined || group.length !== stack.length) {
@@ -333,21 +391,37 @@ export function createTextLayer(options: TextLayerOptions): TextLayer {
           const layer = stack[i]!;
           const existing = group[i];
           if (existing === undefined) {
+            at[0] = layer.x;
+            at[1] = layer.y;
             const created = handle.createText({
               font: font.font,
               text: label.text,
               style: layer.style,
-              position: [layer.x, layer.y],
+              position: at,
             });
             group.push(created);
             texts.add(created);
+            written.set(created, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
             continue;
           }
+          const was = written.get(existing);
+          if (
+            was !== undefined &&
+            was.text === label.text &&
+            was.x === layer.x &&
+            was.y === layer.y &&
+            was.style === layer.style
+          ) {
+            continue;
+          }
+          moving[0] = layer.x;
+          moving[1] = layer.y;
           existing.update({
             text: label.text,
-            position: [layer.x, layer.y],
+            position: moving,
             style: layer.style,
           });
+          written.set(existing, { text: label.text, x: layer.x, y: layer.y, style: layer.style });
         }
       }
       for (const [key, group] of synced) {
