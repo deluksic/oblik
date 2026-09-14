@@ -78,7 +78,9 @@ export type Painter = {
    * lifted halos, lifted paints, strokes before circles within each band — so
    * a selected edge's chrome lands above hovered circles yet below points.
    * `resolveOverride` redirects the MSAA resolve away from the swapchain
-   * (offscreen capture). */
+   * (offscreen capture). `drawText` is the last recorder in the same pass, so
+   * glyph text shares this frame's color attachment and its single MSAA
+   * resolve instead of opening a second pass. */
   draw(
     renderer: {
       root: TgpuRoot;
@@ -88,6 +90,7 @@ export type Painter = {
       requestFrame(): void;
     },
     resolveOverride?: GPUTextureView,
+    drawText?: (pass: GPURenderPassEncoder) => void,
   ): void;
   destroy(): void;
 };
@@ -507,7 +510,7 @@ export function createPainter(opts: {
       images.sync(patch.images.writes, patch.images.draws);
       imageDraws = patch.images.draws;
     },
-    draw(renderer, resolveOverride) {
+    draw(renderer, resolveOverride, drawText) {
       requestFrame = renderer.requestFrame;
       const encoder = renderer.root.device.createCommandEncoder();
       const pass = encoder.beginRenderPass({
@@ -604,6 +607,9 @@ export function createPainter(opts: {
       }
       if (overCircleCount > 0) overCircles.circles(pass).draw(CIRCLE_VERTEX_COUNT, overCircleCount);
       if (overDiskCount > 0) overDisks.points(pass).draw(DISK_VERTEX_COUNT, overDiskCount);
+      // Labels last: they are annotation on top of every world band, and this
+      // keeps them in the same pass (one MSAA resolve, one submit).
+      drawText?.(pass);
       pass.end();
       renderer.root.device.queue.submit([encoder.finish()]);
     },

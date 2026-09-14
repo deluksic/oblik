@@ -11,7 +11,9 @@
     "lint:fix": "oxlint --fix .",
     "typecheck": "pnpm -r typecheck",
     "fmt": "oxfmt .",
-    "fmt:check": "oxfmt --check ."
+    "fmt:check": "oxfmt --check .",
+    "bake:fonts": "pnpm --filter oblik bake:fonts",
+    "fetch:font": "curl -fsSL -o assets/fonts/NotoSans-Regular.ttf https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
   },
   "devDependencies": {
     "eslint-plugin-solid": "^0.17.0",

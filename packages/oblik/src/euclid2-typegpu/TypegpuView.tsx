@@ -1,3 +1,4 @@
+import { msdf } from "@pmndrs/glyph/raster/msdf";
 import { Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { TraceNode } from "#eval/context";
@@ -6,6 +7,7 @@ import { isGlider } from "#geom/gliders";
 import {
   screenToWorld,
   wheelZoomFactor,
+  worldToScreen,
   zoomAt,
   type Camera2,
   type PaneSize,
@@ -29,13 +31,30 @@ import {
 import { SliderDock } from "../euclid2/view/SliderDock";
 import { sliderNodes } from "../euclid2/view/sliderHud";
 import { resolveTheme, type ResolvedTheme } from "../host/theme";
-import { BindLabels } from "./BindLabels";
+import {
+  createTextLayer,
+  loadFont,
+  screenProjection,
+  type LabelSpec,
+  type LoadedFont,
+  type TextLayer,
+} from "../text/layer";
 import { createAdapter, type Adapter, type Rgb } from "./gpu/adapter";
 import { createPainter, type Painter } from "./gpu/painter";
 import { clearToPaper, createRenderer, type GpuRenderer, type Rgba } from "./gpu/renderer";
 import { acquireRoot, hasWebGPU, releaseRoot } from "./gpu/root";
+import { labelAnchor, isBindLabelNode, labelBoxAt } from "./labelPlacement";
 
 import styles from "./TypegpuView.module.css";
+
+/** Baked MSDF asset served by Vite's `publicDir` (see `pnpm bake:fonts`). */
+const LABEL_FONT_URL = "/fonts/noto-sans.font.glb";
+/** Label font size in CSS px — the HTML overlay's `font-size` for parity. */
+const LABEL_FONT_PX = 12;
+/** The painter draws into a 4× MSAA target, so glyph text must match. */
+const LABEL_SAMPLES = 4;
+/** Knockout ring thickness in CSS px. */
+const LABEL_GAP_PX = 2;
 
 export type TypegpuViewProps = {
   trace: TraceNode[];
@@ -206,6 +225,80 @@ function themeKey(paper: Rgba, grid: { grid: Rgb; axis: Rgb }): string {
   return [paper.r, paper.g, paper.b, paper.a, ...grid.grid, ...grid.axis].join(",");
 }
 
+/** One 0..1 channel as two hex digits. */
+function channelHex(v: number): string {
+  return Math.max(0, Math.min(255, Math.round(v * 255)))
+    .toString(16)
+    .padStart(2, "0");
+}
+
+/** `#rrggbb` from an already-resolved theme color. */
+function cssHex([r, g, b]: Rgb): string {
+  return `#${channelHex(r)}${channelHex(g)}${channelHex(b)}`;
+}
+
+/**
+ * Push the bind labels into the glyph layer.
+ *
+ * The anchors come from the same `labelAnchor` + `worldToScreen` pair the HTML
+ * overlay uses, so the two paths are directly comparable — the only difference
+ * is who rasterises the glyphs. Muted and hot are separate texts rather than a
+ * mutated color so each label's style is declarative and stable across frames.
+ */
+function syncGlyphLabels(
+  layer: TextLayer,
+  font: LoadedFont,
+  trace: TraceNode[],
+  cam: Camera2,
+  pane: PaneSize,
+  opts: {
+    hoverKey?: string | undefined;
+    selectedKey?: string | undefined;
+    scope?: Scope | undefined;
+    mutedInk: Rgb;
+    hotInk: Rgb;
+    /** `--oblik-knockout`: the colour a label is cut out of. */
+    knockout: Rgb;
+  },
+): void {
+  const muted = cssHex(opts.mutedInk);
+  const hot = cssHex(opts.hotInk);
+  const knockoutHex = cssHex(opts.knockout);
+  const labels: LabelSpec[] = [];
+  for (const node of trace) {
+    if (!isBindLabelNode(node)) continue;
+    const at = labelAnchor(node);
+    if (!at) continue;
+    const screen = worldToScreen(at, cam, pane);
+    // The HTML label is positioned by its line-box top; the box origin carries
+    // the same dx/dy/baseline offsets so both paths agree.
+    const box = labelBoxAt(screen);
+    const key = traceKey(node);
+    const isHot = key === opts.hoverKey || key === opts.selectedKey;
+    const isMuted = opts.scope !== undefined && mutedForScope(node, opts.scope);
+    labels.push({
+      key,
+      text: node.bind ?? "",
+      x: box.x,
+      y: box.y,
+      style: {
+        fontSize: LABEL_FONT_PX,
+        lineHeight: 1,
+        color: isHot ? hot : muted,
+        // Mirrors `.muted { opacity: 0.32 }`, except a hot label stays solid.
+        opacity: isMuted && !isHot ? 0.32 : 1,
+      },
+      // The glyph is knocked out of the paper by a ring of it, so a label stays
+      // legible wherever it lands without thickening the glyph itself.
+      // Every label is knocked out of the pane, in both themes: the ring is
+      // `--oblik-knockout`, which is the paper, so it erases whatever the label
+      // lands on where a grid line or a fill would otherwise run through it.
+      knockout: { gap: LABEL_GAP_PX, color: knockoutHex },
+    });
+  }
+  layer.syncLabels(font, labels);
+}
+
 export function TypegpuView(props: TypegpuViewProps) {
   const [paperEl, setPaperEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const [canvasEl, setCanvasEl] = createSignal<HTMLCanvasElement | undefined>(undefined);
@@ -232,6 +325,8 @@ export function TypegpuView(props: TypegpuViewProps) {
     undefined,
   );
   const sliders = createMemo(() => sliderNodes(props.trace));
+  /** Bumped when the glyph font finishes loading, so label sync re-runs. */
+  const [textEpoch, setTextEpoch] = createSignal(0);
 
   // Resolved theme (user override merged with the OS default, driven by Solid
   // signals — see host/theme.ts). Colors re-read whenever it changes.
@@ -242,6 +337,8 @@ export function TypegpuView(props: TypegpuViewProps) {
   let gpuRenderer: GpuRenderer | undefined;
   let world: Painter | undefined;
   let adapter: Adapter | undefined;
+  let font: LoadedFont | undefined;
+  let textLayer: TextLayer | undefined;
   /** Single drag state machine shared by pan and handle-edit sessions. */
   const drag = createDragHandler({ deadZoneRadius: PICK_CLICK_PX, preventDefault: false });
 
@@ -270,7 +367,14 @@ export function TypegpuView(props: TypegpuViewProps) {
             root,
             canvas,
             draw: (r, resolveOverride) =>
-              world ? world.draw(r, resolveOverride) : clearToPaper(r, paper),
+              world
+                ? world.draw(r, resolveOverride, (pass) => {
+                    // Text is the last recorder in this same pass. The pane box
+                    // is read here, at draw time, so it is current for the frame.
+                    const pane = size();
+                    textLayer?.draw(pass, { width: pane.w, height: pane.h });
+                  })
+                : clearToPaper(r, paper),
           });
           (window as { __gpuCapture?: GpuRenderer["capture"] }).__gpuCapture = gpuRenderer.capture;
           world = createPainter({ root, format: gpuRenderer.format, paper, gridColors });
@@ -298,6 +402,65 @@ export function TypegpuView(props: TypegpuViewProps) {
     },
   );
 
+  /**
+   * The glyph path: load the font once and own a text layer sized to the
+   * painter's MSAA target.
+   *
+   * The dependency tuple is deliberately narrow. It must **not** read the trace:
+   * a handle drag re-evaluates every frame, so a trace dependency would tear the
+   * layer down and re-issue `loadFont` on every live draft, and the labels would
+   * blink out for the length of the drag. Nothing moved here depends on how many
+   * labels there are — a scene with none simply syncs an empty list.
+   */
+  createEffect(
+    (): [number, HTMLDivElement | undefined] => [ready(), paperEl()],
+    ([, el]) => {
+      if (!el || !gpuRenderer || !world) return;
+      // The font is an app-lifetime asset; the layer is per-root, so this runs
+      // again on a root change and the previous layer is torn down below.
+      if (textLayer) return;
+      let cancelled = false;
+      const renderer = gpuRenderer;
+      void (async () => {
+        try {
+          const loaded = await loadFont(LABEL_FONT_URL, msdf);
+          if (cancelled || !world || !gpuRenderer) {
+            loaded.dispose();
+            return;
+          }
+          font = loaded;
+          const layer = createTextLayer({
+            root: renderer.root,
+            format: renderer.format,
+            sampleCount: LABEL_SAMPLES,
+            name: "oblik-labels",
+          });
+          if (cancelled) {
+            layer.dispose();
+            font.dispose();
+            font = undefined;
+            return;
+          }
+          textLayer = layer;
+          // 2D is the degenerate case of the same path: one viewport pixel maps
+          // to one pixel, so a label's offset is already its screen position.
+          layer.writeProjection(screenProjection({ width: size().w, height: size().h }));
+          setTextEpoch(textEpoch() + 1);
+          renderer.requestFrame();
+        } catch (err) {
+          console.error("label font failed to load", err);
+        }
+      })();
+      return () => {
+        cancelled = true;
+        textLayer?.dispose();
+        textLayer = undefined;
+        font?.dispose();
+        font = undefined;
+      };
+    },
+  );
+
   createEffect(
     (): [
       Camera2,
@@ -314,6 +477,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       string,
       Ghost | undefined,
       PlaceHit | undefined,
+      number,
     ] => [
       camera(),
       size(),
@@ -329,6 +493,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       drag.phase(),
       props.ghost,
       props.place,
+      textEpoch(),
     ],
     ([
       cam,
@@ -345,6 +510,7 @@ export function TypegpuView(props: TypegpuViewProps) {
       phase,
       ghost,
       place,
+      ,
     ]) => {
       if (!gpuRenderer || !world || !adapter || !el) return;
       // Theme-derived colors the painter bakes in (paper clear + grid/axis
@@ -360,6 +526,20 @@ export function TypegpuView(props: TypegpuViewProps) {
         world.setTheme(paper, gridColors);
       }
       world.sync(cam, sz, window.devicePixelRatio || 1);
+      // The glyph path: same anchors as the HTML overlay, pushed into the layer.
+      if (textLayer && font) {
+        // The projection only depends on the pane box; writing it each tick is a
+        // 64-byte uniform update, not a rebuild.
+        textLayer.writeProjection(screenProjection({ width: sz.w, height: sz.h }));
+        syncGlyphLabels(textLayer, font, trace, cam, sz, {
+          hoverKey,
+          selectedKey,
+          scope,
+          mutedInk: readCssColor(el, "--oblik-text"),
+          hotInk: readCssColor(el, "--oblik-ink"),
+          knockout: readCssColor(el, "--oblik-knockout"),
+        });
+      }
       const chrome = toolChrome(placing ? toolSession : undefined);
       const patch = adapter.tick({
         trace,
@@ -652,20 +832,9 @@ export function TypegpuView(props: TypegpuViewProps) {
       }}
       onWheel={onWheel}
     >
+      {/* Bind labels are drawn by the glyph text layer inside this canvas's own
+          render pass, not as DOM over it — one text path for 2D and 3D alike. */}
       <canvas ref={setCanvasEl} class={styles.canvas} />
-      {/* Bind labels are HTML (never GPU glyphs); hidden until the first frame
-          lands so they never float over a blank canvas. */}
-      <Show when={gpu() === "ok"}>
-        <BindLabels
-          trace={props.trace}
-          camera={camera()}
-          size={size()}
-          hoverKey={props.hoverKey}
-          selectedKey={props.selectedKey}
-          mutePoints={toolChrome(props.placing ? props.toolSession : undefined).mutePoints}
-          scope={props.scope}
-        />
-      </Show>
       <SliderDock
         nodes={sliders()}
         placing={props.placing}
