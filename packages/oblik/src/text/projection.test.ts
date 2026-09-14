@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import { worldToScreen } from "../euclid2/camera";
+import { cameraProjection, screenOffsetToWorld } from "./layer";
 import {
   identity,
   isBehind,
@@ -165,5 +167,65 @@ describe("perspective and view", () => {
     expect(isBehind({ x: 0, y: 0, z: 0, w: -2 })).toBe(true);
     expect(isBehind({ x: 0, y: 0, z: 0, w: 2 })).toBe(false);
     expect(toNdc({ x: 1, y: 1, z: 0, w: 0 })).toBeUndefined();
+  });
+});
+
+describe("cameraProjection", () => {
+  /**
+   * The equivalence the world-anchored label path rests on.
+   *
+   * The pane used to convert a world anchor to screen pixels on the CPU. Now a
+   * label carries a **world** anchor and the shader computes
+   * `cameraProjection(cam) × (world + offset)`, and the result must land in the
+   * same place — otherwise every label shifts the moment this changed, and only
+   * a pan would reveal that the offset direction was wrong.
+   */
+  const panes = [
+    { w: 800, h: 600 },
+    { w: 1233, h: 481 },
+  ];
+  const cameras = [
+    { x: 0, y: 0, scale: 48 },
+    { x: -3.25, y: 7.5, scale: 48 },
+    { x: 12, y: -4, scale: 137.5 },
+    { x: 0, y: 0, scale: 8 },
+  ];
+  const anchors = [
+    { x: 0, y: 0 },
+    { x: 3, y: 4 },
+    { x: -12.5, y: 2.25 },
+  ];
+
+  test("a world anchor plus an offset lands where worldToScreen put it", () => {
+    for (const pane of panes) {
+      for (const cam of cameras) {
+        for (const at of anchors) {
+          const m = cameraProjection(cam, { width: pane.w, height: pane.h });
+          for (const [dx, dy] of [
+            [0, 0],
+            [10, -8],
+            [10, -18],
+          ]) {
+            // Screen pixels -> world distance. The pane's y mapping is
+            // sy = h/2 - (y-cam.y)·scale, so a *negative* screen dy (up) is a
+            // positive world dy — the scale divides without changing the sign.
+            const ow = screenOffsetToWorld({ x: dx, y: dy }, cam.scale);
+            const clip = project(m, { x: at.x + ow.x, y: at.y - ow.y, z: 0 });
+            expect(clip.w).toBe(1);
+            const sx = ((clip.x / clip.w + 1) / 2) * pane.w;
+            const sy = ((1 - clip.y / clip.w) / 2) * pane.h;
+            // Where the old CPU path landed: worldToScreen, then the offset.
+            const want = worldToScreen({ x: at.x, y: at.y }, cam, pane);
+            expect(sx).toBeCloseTo(want.x + dx, 6);
+            expect(sy).toBeCloseTo(want.y + dy, 6);
+          }
+        }
+      }
+    }
+  });
+
+  test("the projection is affine and carries no w", () => {
+    const m = cameraProjection({ x: 1, y: 2, scale: 48 }, { width: 800, height: 600 });
+    expect(project(m, { x: 0, y: 0 }).w).toBe(1);
   });
 });
