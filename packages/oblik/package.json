@@ -68,7 +68,8 @@
     "unplugin-icons": "^23.0.1",
     "unplugin-typegpu": "^0.12.3",
     "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "webgpu": "^0.6.1"
   },
   "peerDependencies": {
     "vite": "^8.2.0"
