@@ -72,7 +72,7 @@ export type RingRecord = {
   readonly color: readonly [number, number, number];
 };
 
-export const NO_RING: RingRecord = { gap: 0, enabled: false, color: [0, 0, 0] };
+const NO_RING: RingRecord = { gap: 0, enabled: false, color: [0, 0, 0] };
 
 /** Where a label hangs, in the terms the shader's uniforms take. */
 export type Placement = {
@@ -114,13 +114,13 @@ export type LabelWriter<Text> = {
 };
 
 /** The placement record a label's ring implies, or an explicit "no ring". */
-export function ringOf(knockout: KnockoutRing | undefined): RingRecord {
+function ringOf(knockout: KnockoutRing | undefined): RingRecord {
   if (knockout === undefined) return NO_RING;
   return { gap: Math.max(0, knockout.gap), enabled: true, color: knockout.color };
 }
 
 /** The `Written` record a fresh label starts with. */
-export function writtenFor(label: LabelSpec, style: TextStyle, ring: RingRecord): Written {
+function writtenFor(label: LabelSpec, style: TextStyle, ring: RingRecord): Written {
   return {
     text: label.text,
     style,

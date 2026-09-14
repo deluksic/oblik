@@ -114,7 +114,7 @@ let engine: Promise<void> | undefined;
  * Boot the shaping engine. Safe to call from every pane; the shaper WASM is
  * ~1.2 MB and is loaded once for the app's lifetime.
  */
-export function ensureEngine(): Promise<void> {
+function ensureEngine(): Promise<void> {
   return (engine ??= glyph.init().catch((err: unknown) => {
     // A failed init must not poison every later caller: clear so a retry can run.
     engine = undefined;

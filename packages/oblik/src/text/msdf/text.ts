@@ -78,7 +78,7 @@ export interface OblikText<Selection extends TypeGpuFontSelection = TypeGpuFontS
 }
 
 /** Write the placement records. The whole of what moving a label costs. */
-export function writePlacement(transform: OblikTransform, placement: OblikPlacement): void {
+function writePlacement(transform: OblikTransform, placement: OblikPlacement): void {
   const { anchor, offset, ring } = placement;
   transform.label.write([anchor[0], anchor[1], offset[0], offset[1]]);
   transform.ring.write([ring.gap, ring.enabled ? 1 : 0, 0, 0]);

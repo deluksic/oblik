@@ -3,14 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { TraceValue } from "#eval/context";
 import type { TraceNode } from "#eval/context";
 
-import {
-  LABEL_BASELINE_PX,
-  LABEL_DX,
-  LABEL_DY,
-  isBindLabelNode,
-  labelAnchor,
-  labelBoxAt,
-} from "./labelPlacement";
+import { isBindLabelNode, labelAnchor } from "./labelPlacement";
 
 /**
  * Only the fields the label path reads. `kind` is derived from `value`, so the
@@ -66,19 +59,5 @@ describe("labelAnchor", () => {
 
   test("has no anchor for other geometry", () => {
     expect(labelAnchor(SEGMENT)).toBeUndefined();
-  });
-});
-
-describe("labelBoxAt", () => {
-  test("offsets the anchor by the SVG text position and lifts to the line-box top", () => {
-    expect(labelBoxAt({ x: 100, y: 50 })).toEqual({
-      x: 100 + LABEL_DX,
-      y: 50 + LABEL_DY - LABEL_BASELINE_PX,
-    });
-  });
-
-  test("matches the SVG baseline: box top + baseline offset lands on y", () => {
-    const box = labelBoxAt({ x: 100, y: 50 });
-    expect(box.y + LABEL_BASELINE_PX).toBe(50 + LABEL_DY);
   });
 });

@@ -22,7 +22,6 @@ import type {
   GlyphInstanceSpanBindingInput,
   GlyphRootInstanceBindingInput,
   GlyphSchema,
-  PortableResource,
 } from "@pmndrs/glyph";
 import { defineGlyphSchema } from "@pmndrs/glyph/config/glyph";
 import type { CodecBufferId } from "@pmndrs/glyph/config/codec";
@@ -146,9 +145,3 @@ export const OblikSchema: GlyphSchema<OblikBindings, OblikRootContext> = defineG
   instance: (_root, input) => Object.freeze({ kind: "oblik-instance", input }),
   instanceSpan: (_root, input) => Object.freeze({ kind: "oblik-span", input }),
 });
-
-/** What `resolve` hands back: the payload plus its own name, for diagnostics. */
-export interface OblikResourceLeaseValue {
-  readonly name: string;
-  readonly resource: PortableResource;
-}

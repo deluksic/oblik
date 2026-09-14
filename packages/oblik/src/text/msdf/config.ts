@@ -21,7 +21,7 @@
  * - `root.create` exposes `createText`, `setCamera` and `draw` — the whole
  *   surface a text layer needs, and nothing about glyph's own types.
  */
-import type { Codec, GlyphConfigFor, GlyphHandle, GlyphRoot } from "@pmndrs/glyph";
+import type { Codec, GlyphConfigFor, GlyphRoot } from "@pmndrs/glyph";
 import { resourceLease, defineGlyphConfig } from "@pmndrs/glyph/config/glyph";
 import { msdf } from "@pmndrs/glyph/raster/msdf";
 import type { TypeGpuFontSelection } from "@pmndrs/glyph/typegpu";
@@ -65,8 +65,6 @@ export type OblikRoot = GlyphRoot & {
     viewport: { readonly width: number; readonly height: number },
   ): void;
 };
-
-export type OblikHandle = GlyphHandle<OblikRoot>;
 
 export type OblikGlyphConfig = GlyphConfigFor<
   typeof OblikSchema,
