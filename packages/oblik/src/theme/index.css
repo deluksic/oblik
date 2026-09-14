@@ -36,6 +36,17 @@
   --oblik-text: oklch(0.93 0.014 var(--oblik-hue-ink));
   --oblik-muted: oklch(0.67 0.019 var(--oblik-hue-ink));
   --oblik-dim: oklch(0.53 0.017 var(--oblik-hue-ink));
+  /*
+   * Bind labels are annotations, not content: they sit on top of whatever the
+   * pane draws, so they read as quieter than body text even though they are
+   * legible. `--oblik-label` is the resting colour and `--oblik-label-hot` is
+   * what a hovered or selected label's own geometry promotes it to — which has
+   * to be the *stronger* of the two, or hovering would dim the label instead.
+   * Light mode gets a bigger step down: near-black on near-white paper is a far
+   * harder read at 12px than the same ratio inverted.
+   */
+  --oblik-label: var(--oblik-ink);
+  --oblik-label-hot: var(--oblik-text);
   --oblik-muted-cool: oklch(0.67 0.019 var(--oblik-hue-ink-cool));
   --oblik-dim-cool: oklch(0.53 0.017 var(--oblik-hue-ink-cool));
   --oblik-accent: oklch(0.59 0.125 var(--oblik-hue-accent));
@@ -75,6 +86,15 @@
   --oblik-text: oklch(0.24 0.005 var(--oblik-hue-ink));
   --oblik-muted: oklch(0.5 0.004 var(--oblik-hue-ink));
   --oblik-dim: oklch(0.62 0.003 var(--oblik-hue-ink));
+  /*
+   * See the dark block for what this pair is for. Light steps much further than
+   * dark, and further than contrast alone suggests it needs: near-black on
+   * near-white is 14.9:1 here, so a resting 7:1 still reads as "dark text" and
+   * a hover is imperceptible. 0.6 puts the resting label at ~3.6:1 — visibly
+   * grey against 14.9:1 for a hovered one, which is the change being asked for.
+   */
+  --oblik-label: oklch(0.6 0.005 var(--oblik-hue-ink));
+  --oblik-label-hot: var(--oblik-text);
   --oblik-muted-cool: oklch(0.5 0.004 var(--oblik-hue-ink-cool));
   --oblik-dim-cool: oklch(0.62 0.003 var(--oblik-hue-ink-cool));
   --oblik-accent: oklch(0.5 0.14 var(--oblik-hue-accent));

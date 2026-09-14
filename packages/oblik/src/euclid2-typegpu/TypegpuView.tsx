@@ -300,13 +300,24 @@ function syncGlyphLabels(
     hoverKey?: string | undefined;
     selectedKey?: string | undefined;
     scope?: Scope | undefined;
-    mutedInk: Rgb;
+    /**
+     * `--oblik-label`: the resting label ink, deliberately softer than
+     * `--oblik-text`.
+     */
+    labelInk: Rgb;
+    /**
+     * `--oblik-label-hot`: what a label becomes when the geometry it names is
+     * hovered or selected. It must be **stronger** than `labelInk`. These two
+     * were previously wired to `--oblik-text` (resting) and `--oblik-ink` (hot),
+     * and since `--oblik-ink` is the softer of that pair in both themes, hovering
+     * a point dimmed its label instead of highlighting it.
+     */
     hotInk: Rgb;
     /** `--oblik-knockout`: the colour a label is cut out of. */
     knockout: Rgb;
   },
 ): void {
-  const muted = cssHex(opts.mutedInk);
+  const resting = cssHex(opts.labelInk);
   const hot = cssHex(opts.hotInk);
   const labels: LabelSpec[] = [];
   for (const node of trace) {
@@ -314,6 +325,8 @@ function syncGlyphLabels(
     const at = labelAnchor(node);
     if (!at) continue;
     const key = traceKey(node);
+    // Hover and selection both promote a label; nothing about the pointer
+    // demotes one.
     const isHot = key === opts.hoverKey || key === opts.selectedKey;
     const isMuted = opts.scope !== undefined && mutedForScope(node, opts.scope);
     labels.push({
@@ -327,11 +340,12 @@ function syncGlyphLabels(
       // the same dx/dy/baseline offsets so both paths agree.
       dx: LABEL_DX,
       dy: LABEL_DY - LABEL_BASELINE_PX,
-      // Mirrors `.muted { opacity: 0.32 }`, except a hot label stays solid.
+      // Out of scope fades the label; a hot one stays solid, because a hover
+      // should never make its own label harder to read.
       style: labelStyle(
         LABEL_FONT_PX,
         1,
-        isHot ? hot : muted,
+        isHot ? hot : resting,
         isMuted && !isHot ? 0.32 : 1,
       ),
       // Every label is knocked out of the pane, in both themes: the ring is
@@ -646,8 +660,8 @@ export function TypegpuView(props: TypegpuViewProps) {
         hoverKey,
         selectedKey,
         scope,
-        mutedInk: readCssColor(el, "--oblik-text"),
-        hotInk: readCssColor(el, "--oblik-ink"),
+        labelInk: readCssColor(el, "--oblik-label"),
+        hotInk: readCssColor(el, "--oblik-label-hot"),
         knockout: readCssColor(el, "--oblik-knockout"),
       });
       gpuRenderer?.requestFrame();
