@@ -31,4 +31,23 @@ describe("slot pool", () => {
     // just forget the keys.
     expect(pool.alloc("c", 10)).toBe(0);
   });
+
+  test("a released run is reported, whatever released it", () => {
+    // A record pool keys its staged bytes by slot, so it has to hear about every
+    // way a range can change hands: a key leaving the scene, and a key whose run
+    // has to grow (which releases before it reallocates).
+    const released: string[] = [];
+    const pool = createSlotPool(10, {
+      onRelease: (key, run) => released.push(`${key}@${run.start}+${run.count}`),
+    });
+
+    pool.alloc("a", 3);
+    pool.alloc("b", 2);
+    pool.sync(new Set(["a"])); // b leaves
+    expect(released).toEqual(["b@3+2"]);
+
+    released.length = 0;
+    pool.alloc("a", 4); // 3 slots are not enough: release first
+    expect(released).toEqual(["a@0+3"]);
+  });
 });

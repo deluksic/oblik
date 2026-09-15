@@ -1,3 +1,5 @@
+import { readFromArrayBuffer } from "typegpu";
+import { sizeOf } from "typegpu/data";
 import { describe, expect, test } from "vitest";
 
 import type { TraceValue } from "#eval/context";
@@ -9,7 +11,8 @@ import { csg2Value, polarRepeatValue } from "#geom/csg2";
 import { isCircleWalk } from "#geom/region";
 
 import { imageQuad, type ImageValue } from "../../eval/image";
-import { createAdapter, type AdapterInput, type Rgb } from "./adapter";
+import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
+import { StrokeDraw, type StrokeDrawValue } from "./schemas";
 
 /**
  * The adapter is pure CPU (no device), so the routing between the compiled-field
@@ -78,6 +81,33 @@ function polygonValue() {
 /** Slot indices a patch wrote, in ascending order. */
 function slotsOf(writes: readonly { idx: number }[]): number[] {
   return writes.map((w) => w.idx).toSorted((p, q) => p - q);
+}
+
+/** The record stride, straight from the schema the buffer is laid out as. */
+const STROKE_STRIDE = sizeOf(StrokeDraw);
+
+/** Every slot a stroke patch stages, in run order — the chunk's unchanged
+ * neighbours included, because those bytes go up with it. */
+function stagedStrokes(patch: TickPatch): number[] {
+  const slots: number[] = [];
+  for (const run of patch.strokes.chunks) {
+    const count = run.bytes.byteLength / STROKE_STRIDE;
+    for (let i = 0; i < count; i++) slots.push(run.startOffset / STROKE_STRIDE + i);
+  }
+  return slots;
+}
+
+/** Shadow the GPU buffer the way the bytes would: decode every staged run back
+ * into records at the slots it names. */
+function uploadStrokes(shadow: Map<number, StrokeDrawValue>, patch: TickPatch): void {
+  for (const run of patch.strokes.chunks) {
+    const first = run.startOffset / STROKE_STRIDE;
+    const count = run.bytes.byteLength / STROKE_STRIDE;
+    for (let i = 0; i < count; i++) {
+      const one = run.bytes.slice(i * STROKE_STRIDE, (i + 1) * STROKE_STRIDE).buffer;
+      shadow.set(first + i, readFromArrayBuffer(one, StrokeDraw));
+    }
+  }
 }
 
 /** Triangle polygon shifted along x: a second scene with the same shape. */
@@ -236,10 +266,10 @@ describe("adapter fill routing", () => {
     const a = node("o_a", { kind: "segment", a: { x: 0, y: 0 }, b: { x: 1, y: 0 } }, "a");
     const b = node("o_b", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "b");
 
-    // The GPU buffer is exactly what the writes put there, so shadow it.
-    const buffer = new Map<number, unknown>();
-    const upload = (patch: ReturnType<typeof adapter.tick>) => {
-      for (const w of patch.strokes.writes) buffer.set(w.idx, w.value);
+    // The GPU buffer is exactly the bytes the runs carry, so shadow them.
+    const buffer = new Map<number, StrokeDrawValue>();
+    const upload = (patch: TickPatch) => {
+      uploadStrokes(buffer, patch);
       return patch;
     };
 
@@ -255,7 +285,7 @@ describe("adapter fill routing", () => {
     // Back to A, with identical geometry. Its slot index is the same, so only
     // the diff decides whether the buffer gets A's discs back.
     const back = adapter.tick(input([a]));
-    expect(back.strokes.writes.filter((w) => aSlots.includes(w.idx))).not.toHaveLength(0);
+    expect(stagedStrokes(back).filter((i) => aSlots.includes(i))).not.toHaveLength(0);
     upload(back);
     for (const i of aSlots) expect(buffer.get(i)).toEqual(aInk.get(i));
   });
@@ -273,9 +303,9 @@ describe("adapter fill routing", () => {
     const y = node("o_y", { kind: "segment", a: { x: 0, y: 2 }, b: { x: 1, y: 2 } }, "y");
     const z = node("o_z", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "z");
 
-    const buffer = new Map<number, unknown>();
-    const upload = (patch: ReturnType<typeof adapter.tick>) => {
-      for (const w of patch.strokes.writes) buffer.set(w.idx, w.value);
+    const buffer = new Map<number, StrokeDrawValue>();
+    const upload = (patch: TickPatch) => {
+      uploadStrokes(buffer, patch);
       return patch;
     };
 
@@ -285,7 +315,7 @@ describe("adapter fill routing", () => {
 
     upload(adapter.tick(input([z, y]))); // x leaves; y takes its range
     const back = adapter.tick(input([x, z])); // x returns
-    expect(back.strokes.writes.filter((w) => xSlots.includes(w.idx))).not.toHaveLength(0);
+    expect(stagedStrokes(back).filter((i) => xSlots.includes(i))).not.toHaveLength(0);
     upload(back);
     for (const i of xSlots) expect(buffer.get(i)).toEqual(xInk.get(i));
   });
@@ -727,7 +757,7 @@ describe("adapter image routing", () => {
 
     expect(patch.images.draws).toEqual([{ slot: 0, src: "/assets/gear-9f3a2c11.png" }]);
     expect(patch.images.writes).toHaveLength(1);
-    expect(patch.strokes.writes).toHaveLength(0);
+    expect(patch.strokes.chunks).toHaveLength(0);
     expect(patch.circles.writes).toHaveLength(0);
     expect(patch.stats.total).toBe(1);
   });

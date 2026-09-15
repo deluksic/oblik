@@ -34,6 +34,7 @@ import {
   type MarkerPipelines,
 } from "./pipelines/markers";
 import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
+import { writeChunkRuns } from "./recordPool";
 import type { Rgba } from "./renderer";
 /** Sample count every pipeline in this painter is built for (renderer target). */
 const MSAA_SAMPLES = 4;
@@ -446,7 +447,7 @@ export function createPainter(opts: {
       axesVisible = span.axis.x + span.axis.y > 0;
     },
     applyPatch(patch) {
-      strokeBuffer.writePartial(patch.strokes.writes);
+      writeChunkRuns(strokeBuffer, patch.strokes.chunks);
       strokeRestOrderBuffer.write(patch.strokes.bands.rest);
       strokeHoverHaloOrderBuffer.write(patch.strokes.bands.hoverHalo);
       strokeHoverPaintOrderBuffer.write(patch.strokes.bands.hoverPaint);
@@ -468,7 +469,7 @@ export function createPainter(opts: {
       circleHoverPaintCount = patch.circles.bands.hoverPaint.length;
       circleLiftedHaloCount = patch.circles.bands.liftedHalo.length;
       circleLiftedPaintCount = patch.circles.bands.liftedPaint.length;
-      pointBuffer.writePartial(patch.points.writes);
+      writeChunkRuns(pointBuffer, patch.points.chunks);
       pointOrderBuffer.write(patch.points.order);
       pointCount = patch.points.count;
       fillBuffer.writePartial(patch.fills.writes);

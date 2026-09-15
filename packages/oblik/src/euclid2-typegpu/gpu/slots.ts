@@ -25,7 +25,16 @@ export type SlotPool = {
   reset(): void;
 };
 
-export function createSlotPool(capacity: number): SlotPool {
+export type SlotPoolOpts = {
+  /**
+   * A released run's slots stop being their key's, so whatever a record pool
+   * cached against them has to be forgotten: the next key to take the range
+   * stages afresh whatever its own inputs are (`recordPool.ts`).
+   */
+  onRelease?: (key: string, run: Range) => void;
+};
+
+export function createSlotPool(capacity: number, opts?: SlotPoolOpts): SlotPool {
   const runs = new Map<string, Range>();
   /** Sorted by start, non-overlapping, never adjacent; starts as one full run. */
   const free: Range[] = [{ start: 0, count: capacity }];
@@ -59,6 +68,7 @@ export function createSlotPool(capacity: number): SlotPool {
     runs.delete(key);
     addFree(run);
     freeSlots += run.count;
+    opts?.onRelease?.(key, run);
   }
 
   function findRun(count: number): number | undefined {
