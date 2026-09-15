@@ -86,11 +86,11 @@ function slotsOf(writes: readonly { idx: number }[]): number[] {
 /** The record stride, straight from the schema the buffer is laid out as. */
 const STROKE_STRIDE = sizeOf(StrokeNode);
 
-/** Every slot a stroke patch stages, in run order — the chunk's unchanged
+/** Every slot a stroke patch stages, in run order — a span's unchanged
  * neighbours included, because those bytes go up with it. */
 function stagedStrokes(patch: TickPatch): number[] {
   const slots: number[] = [];
-  for (const run of patch.strokes.chunks) {
+  for (const run of patch.strokes.runs) {
     const count = run.bytes.byteLength / STROKE_STRIDE;
     for (let i = 0; i < count; i++) slots.push(run.startOffset / STROKE_STRIDE + i);
   }
@@ -100,7 +100,7 @@ function stagedStrokes(patch: TickPatch): number[] {
 /** Shadow the GPU buffer the way the bytes would: decode every staged run back
  * into records at the slots it names. */
 function uploadStrokes(shadow: Map<number, StrokeNodeValue>, patch: TickPatch): void {
-  for (const run of patch.strokes.chunks) {
+  for (const run of patch.strokes.runs) {
     const first = run.startOffset / STROKE_STRIDE;
     const count = run.bytes.byteLength / STROKE_STRIDE;
     for (let i = 0; i < count; i++) {
@@ -757,7 +757,7 @@ describe("adapter image routing", () => {
 
     expect(patch.images.draws).toEqual([{ slot: 0, src: "/assets/gear-9f3a2c11.png" }]);
     expect(patch.images.writes).toHaveLength(1);
-    expect(patch.strokes.chunks).toHaveLength(0);
+    expect(patch.strokes.runs).toHaveLength(0);
     expect(patch.circles.writes).toHaveLength(0);
     expect(patch.stats.total).toBe(1);
   });

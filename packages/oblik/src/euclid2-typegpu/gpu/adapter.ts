@@ -38,7 +38,7 @@ import {
 } from "./fillSpans";
 import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
-import { createRecordPool, type ChunkRun } from "./recordPool";
+import { createRecordPool, type RecordRun } from "./recordPool";
 import type {
   ChromeValue,
   CircleInstValue,
@@ -130,9 +130,9 @@ export type FillDraw =
 export type FillLayer = "paint" | "halo";
 
 export type TickPatch = {
-  /** Pooled ink records: the runs of the record buffer whose chunk flags say
-   * they moved this tick, plus the draw-order bands that address them. */
-  strokes: { chunks: ChunkRun[]; bands: InkBands };
+  /** Pooled ink records: the spans of the record buffer that moved this tick,
+   * plus the draw-order bands that address them. */
+  strokes: { runs: RecordRun[]; bands: InkBands };
   circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
   fills: SlotPatch<FillRegionValue>;
   /** Boundary spans backing the fill regions — one array per record kind, so the
@@ -149,8 +149,8 @@ export type TickPatch = {
   };
   /** World fill draws, in band order (span fills and compiled fields mixed). */
   fillDraws: FillDraw[];
-  /** Pooled point/glider marks, on the same chunked path and bands. */
-  points: { chunks: ChunkRun[]; bands: InkBands };
+  /** Pooled point/glider marks, on the same staged-span path and bands. */
+  points: { runs: RecordRun[]; bands: InkBands };
   /** Raster references: one byte-diffed quad per node, plus the draw list that
    * pairs each slot with the source whose texture paints it. The adapter names
    * the source but never touches a bitmap — loading is the GPU layer's. */
@@ -621,15 +621,15 @@ export function createAdapter(): Adapter {
     for (const n of pointBand.hover) emitPointInk(n, "hover");
     for (const n of pointBand.lifted) emitPointInk(n, "lifted");
 
-    // Every record has been touched: the pools hand back the runs of the buffer
-    // that moved, one write each, and say how many records those runs carry.
-    const strokeRuns: ChunkRun[] = [];
-    const pointRuns: ChunkRun[] = [];
+    // Every record has been touched: the pools hand back the spans of the buffer
+    // that moved, one write each, and say how many records those spans carry.
+    const strokeRuns: RecordRun[] = [];
+    const pointRuns: RecordRun[] = [];
     const strokeStaged = strokeRecords.flush((run) => strokeRuns.push(run));
     const pointStaged = pointRecords.flush((run) => pointRuns.push(run));
 
     return {
-      strokes: { chunks: strokeRuns, bands: bandArrays(strokeLists) },
+      strokes: { runs: strokeRuns, bands: bandArrays(strokeLists) },
       circles: { writes: circleWrites, bands: bandArrays(circleLists) },
       fills: {
         writes: fillWrites,
@@ -649,7 +649,7 @@ export function createAdapter(): Adapter {
         arcs: { writes: fieldArcWrites },
       },
       fillDraws,
-      points: { chunks: pointRuns, bands: bandArrays(pointLists) },
+      points: { runs: pointRuns, bands: bandArrays(pointLists) },
       images: { writes: imageWrites, draws: imageDraws },
       overlay,
       chrome: makeChromeValue(colors, strokePx),

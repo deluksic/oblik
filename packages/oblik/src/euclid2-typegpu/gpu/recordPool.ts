@@ -4,53 +4,48 @@ import { arrayOf, sizeOf } from "typegpu/data";
 import type { AnyWgslData, Infer } from "typegpu/data";
 
 /**
- * A CPU mirror of one record buffer, written in fixed-size chunks.
+ * A CPU mirror of one record buffer, uploading only the spans that changed.
  *
  * A record is built once per slot and mutated in place afterwards, and a slot is
  * only serialized when its inputs actually moved: `touch` compares a signature of
  * a handful of numbers *before* anything is built, so an unchanged node costs N
- * comparisons and allocates nothing. Serializing and marking dirty happen inside
- * that same call, which is why the pooled record and the staged bytes cannot
- * drift apart — a record is never mutated without also being staged.
+ * comparisons and allocates nothing. Serializing and recording the change happen
+ * inside that same call, which is why the pooled record and the staged bytes
+ * cannot drift apart — a record is never mutated without also being staged.
  *
- * What changed is tracked per *chunk*, not per record, and `flush` writes each
- * run of adjacent dirty chunks as one raw byte copy. That is the only write shape
- * WebGPU makes cheap: one write per record measured ~4.7 ms for a scene, one
- * contiguous write ~6 µs. The granularity it costs is bounded and small — a
- * changed record drags up to CHUNK-1 unchanged neighbours along with it (< 1 KiB
- * for the records here) — and in exchange the flush is a scan over nChunks flags
- * with no sorting, no per-frame bookkeeping arrays and no per-record calls. A
- * whole-scene drag is one run; a hover is one chunk.
+ * The changed *spans* are carried as edits arrive, ascending and disjoint, and
+ * `flush` walks the work rather than the capacity: one raw byte copy per span and
+ * nothing else, whatever the pool's size. There is no flag array to sweep and
+ * nothing to sort — an edit either extends the span it lands in, joins two spans,
+ * or is inserted into the list, and a span's place in the list is its place in
+ * the buffer. The list is bounded by `count / (GAP_RECORDS + 1)`: bridging edits
+ * is what keeps it short, and `GAP_RECORDS` is where it stops paying.
  *
- * Everything here is schema-derived. The two byte numbers are the size of one
- * record and of one chunk *of the very array the buffer was laid out with*, which
- * is the only thing `writeToArrayBuffer` will accept; nothing computes a field
- * offset. Note the shape it must be called with: the element schema form
- * (`writeToArrayBuffer(staging, StrokeDraw, record, { startOffset })`) silently
- * writes *nothing* at a non-zero offset, because `calculateOffsets` clamps
- * `endOffset` to one element — so a record is always carried in a one-element
- * array of the array schema, which round-trips exactly (`recordPool.test.ts`).
+ * Everything here is schema-derived. The byte numbers are `sizeOf` of the very
+ * array the buffer was laid out with, and of one record of it; nothing computes a
+ * field offset. Note the shape the writer must be called with: the *element*
+ * schema form (`writeToArrayBuffer(staging, StrokeDraw, record, { startOffset })`)
+ * silently writes **nothing** at a non-zero offset, because `calculateOffsets`
+ * clamps `endOffset` to one element — so a record is always carried in a
+ * one-element array of the array schema, which round-trips exactly
+ * (`recordPool.test.ts`).
  */
-
-/** Records per chunk. Small enough that a lone change wastes little, big enough
- * that a scene is a handful of runs. */
-export const CHUNK = 16;
 
 /**
- * How many records of clean gap a run absorbs before a new run is cheaper.
+ * How many records of clean gap a span absorbs before opening a second one.
  *
- * From the measurement above: a call is worth ~120 records of copy, so this sits
- * just above the break-even. A trailing gap is never absorbed — there is no
- * following call to save, and those bytes would go up for nothing.
+ * Measured on this device: a `writeBuffer` call costs ~1.2 µs and a 48-byte
+ * record ~10 ns of that, so absorbing is cheaper while a gap is worth fewer than
+ * ~120 records of copy. The rule is self-limiting — at the threshold the extra
+ * bytes and the saved call cancel — so this sits just above the break-even.
  */
-const GAP_RECORDS = 128;
-const GAP_CHUNKS = Math.ceil(GAP_RECORDS / CHUNK);
+export const GAP_RECORDS = 128;
 
-/** One run of adjacent dirty chunks: the bytes to upload, and where they go. */
-export type ChunkRun = {
+/** One changed span of the buffer: the bytes to upload, and where they go. */
+export type RecordRun = {
   /** The staged bytes, in slot order — a view of the pool's mirror. */
   bytes: Uint8Array;
-  /** **Byte** offset into the record buffer (`chunk * bytesPerChunk`). */
+  /** **Byte** offset into the record buffer (`firstSlot * bytesPerRecord`). */
   startOffset: number;
 };
 
@@ -72,10 +67,9 @@ export type RecordPool<T> = {
   /** Forget a slot: whatever was staged there was another key's, so the next
    * `touch` stages again whatever its inputs are. */
   retire(slot: number): void;
-  /** Hand every run to `write` — dirty chunks and the small gaps between them —
-   * clear the flags, and report how many records were staged since the last
-   * flush. */
-  flush(write: (run: ChunkRun) => void): number;
+  /** Hand every changed span to `write` in buffer order, and report how many
+   * records were staged since the last flush. */
+  flush(write: (run: RecordRun) => void): number;
   reset(): void;
 };
 
@@ -85,45 +79,84 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
   make: () => Infer<TData>;
 }): RecordPool<Infer<TData>> {
   const { element, count, make } = opts;
-  if (count % CHUNK !== 0) {
-    throw new Error(`record capacity ${count} is not a whole number of ${CHUNK}-record chunks`);
-  }
   const schema = arrayOf(element, count);
-  /** One record, and one chunk, of the array the buffer is laid out as. Both are
-   * `sizeOf` of that array's own shapes rather than lengths times a literal. */
+  /** One record of the array the buffer is laid out as — the stride every byte
+   * offset here is a multiple of. */
   const bytesPerRecord = sizeOf(arrayOf(element, 1));
-  const bytesPerChunk = sizeOf(arrayOf(element, CHUNK));
-  const nChunks = count / CHUNK;
 
   const records: (Infer<TData> | undefined)[] = Array.from({ length: count });
   /** The inputs of whatever last got staged at this slot, or undefined. */
   const signatures: (Float64Array | undefined)[] = Array.from({ length: count });
-  const dirty = new Uint8Array(nChunks);
-  const staging = new ArrayBuffer(bytesPerChunk * nChunks);
+  const staging = new ArrayBuffer(bytesPerRecord * count);
   const stagingView = new Uint8Array(staging);
   /** A one-element carrier, reused: serializing a record allocates nothing. */
   const single: Infer<TData>[] = [];
+  /** The changed spans, `[start, end)` in records: ascending, disjoint, and
+   * never closer together than `GAP_RECORDS`. Reused across flushes, so a steady
+   * frame allocates nothing here either. */
+  const runs: { start: number; end: number }[] = [];
+  let runCount = 0;
   let staged = 0;
 
+  /** Put `[start, end)` at `index`, reusing the object that was beyond the end
+   * of the list when the list last had this many spans. */
+  function insertRun(index: number, start: number, end: number): void {
+    const spare = runs[runCount];
+    const run = spare ?? { start: 0, end: 0 };
+    runs[runCount] = run;
+    for (let i = runCount; i > index; i--) runs[i] = runs[i - 1]!;
+    run.start = start;
+    run.end = end;
+    runs[index] = run;
+    runCount++;
+  }
+
   /**
-   * The end (exclusive) of the run that starts at `chunk`: its own dirty chunks,
-   * plus every clean gap short enough that absorbing it costs less than the call
-   * it saves. A gap with no dirty chunk after it is a tail and ends the run —
-   * those bytes would be uploaded for nothing.
+   * Record `slot` as changed.
+   *
+   * The fast path is the common one: nodes are visited in the order their slots
+   * were handed out, so an edit usually lands at or after the last span, where
+   * recording it is a comparison and a store. Everything else — a node that came
+   * back to an earlier slot, a hover that moved — searches for the span it
+   * belongs in, joining its neighbours when the gaps allow and bridging them when
+   * it lands between two.
    */
-  function runEnd(chunk: number): number {
-    let end = chunk;
-    while (end < nChunks) {
-      if (dirty[end] === 1) {
-        end++;
-        continue;
-      }
-      let next = end;
-      while (next < nChunks && dirty[next] === 0) next++;
-      if (next === nChunks || next - end > GAP_CHUNKS) break;
-      end = next;
+  function markChanged(slot: number): void {
+    const end = slot + 1;
+    const last = runCount > 0 ? runs[runCount - 1]! : undefined;
+    if (last !== undefined && slot >= last.start && slot - last.end <= GAP_RECORDS) {
+      if (end > last.end) last.end = end;
+      return;
     }
-    return end;
+    // The first span that does not end before this slot.
+    let lo = 0;
+    let hi = runCount;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (runs[mid]!.end < slot) lo = mid + 1;
+      else hi = mid;
+    }
+    const next = lo < runCount ? runs[lo]! : undefined;
+    if (next !== undefined && slot >= next.start) return; // already covered
+    const prev = lo > 0 ? runs[lo - 1]! : undefined;
+    const joinsPrev = prev !== undefined && slot - prev.end <= GAP_RECORDS;
+    const joinsNext = next !== undefined && next.start - end <= GAP_RECORDS;
+    if (joinsPrev && joinsNext) {
+      // Between two spans, close enough to both: one span now.
+      prev!.end = next!.end;
+      for (let i = lo; i < runCount - 1; i++) runs[i] = runs[i + 1]!;
+      runCount--;
+      return;
+    }
+    if (joinsPrev) {
+      if (end > prev!.end) prev!.end = end;
+      return;
+    }
+    if (joinsNext) {
+      next!.start = slot;
+      return;
+    }
+    insertRun(lo, slot, end);
   }
 
   function changed(slot: number, signature: ArrayLike<number>): boolean {
@@ -161,7 +194,7 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
       single.length = 0;
       single.push(record);
       writeToArrayBuffer(staging, schema, single, { startOffset: slot * bytesPerRecord });
-      dirty[Math.floor(slot / CHUNK)] = 1;
+      markChanged(slot);
       staged++;
     },
     recordAt(slot) {
@@ -171,42 +204,37 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
       signatures[slot] = undefined;
     },
     flush(write) {
-      for (let chunk = 0; chunk < nChunks;) {
-        if (dirty[chunk] === 0) {
-          chunk++;
-          continue;
-        }
-        const end = runEnd(chunk);
-        const startOffset = chunk * bytesPerChunk;
-        write({ bytes: stagingView.subarray(startOffset, end * bytesPerChunk), startOffset });
-        dirty.fill(0, chunk, end);
-        chunk = end;
+      for (let i = 0; i < runCount; i++) {
+        const run = runs[i]!;
+        const startOffset = run.start * bytesPerRecord;
+        write({ bytes: stagingView.subarray(startOffset, run.end * bytesPerRecord), startOffset });
       }
+      runCount = 0;
       const written = staged;
       staged = 0;
       return written;
     },
     reset() {
       signatures.fill(undefined);
-      dirty.fill(0);
+      runCount = 0;
       staged = 0;
     },
   };
 }
 
 /**
- * Hand a patch's staged runs to their buffer.
+ * Hand a patch's staged spans to their buffer.
  *
  * The cast is a typings gap, not a shortcut: `TgpuBuffer.write` declares an
  * `ArrayBuffer` overload and a record-array overload, while `writeToArrayBuffer`
  * routes any `ArrayBufferView` through the same raw byte copy — the fastest path
- * there is, and the one a run of staged records wants. Passing the run's view
- * keeps its own byte offset and length; passing its `.buffer` would upload the
- * whole mirror from the wrong place.
+ * there is, and the one a staged span wants. Passing the span's view keeps its
+ * own byte offset and length; passing its `.buffer` would upload the whole mirror
+ * from the wrong place.
  */
-export function writeChunkRuns<TData extends AnyWgslData>(
+export function writeRuns<TData extends AnyWgslData>(
   buffer: TgpuBuffer<TData>,
-  runs: readonly ChunkRun[],
+  runs: readonly RecordRun[],
 ): void {
   const write = buffer.write.bind(buffer) as unknown as (
     data: Uint8Array,

@@ -42,7 +42,7 @@ import {
   type MarkerPipelines,
 } from "./pipelines/markers";
 import { createStrokePipelines, type StrokePipelines } from "./pipelines/strokes";
-import { writeChunkRuns } from "./recordPool";
+import { writeRuns } from "./recordPool";
 import type { Rgba } from "./renderer";
 /** Sample count every pipeline in this painter is built for (renderer target). */
 const MSAA_SAMPLES = 4;
@@ -394,7 +394,7 @@ export function createPainter(opts: {
       axesVisible = span.axis.x + span.axis.y > 0;
     },
     applyPatch(patch) {
-      writeChunkRuns(strokeBuffer, patch.strokes.chunks);
+      writeRuns(strokeBuffer, patch.strokes.runs);
       for (const band of INK_BAND_ORDER) {
         strokeOrder[band].write(patch.strokes.bands[band]);
         strokeCounts[band] = patch.strokes.bands[band].length;
@@ -404,7 +404,7 @@ export function createPainter(opts: {
         circleOrder[band].write(patch.circles.bands[band]);
         circleCounts[band] = patch.circles.bands[band].length;
       }
-      writeChunkRuns(pointBuffer, patch.points.chunks);
+      writeRuns(pointBuffer, patch.points.runs);
       for (const band of INK_BAND_ORDER) {
         pointOrder[band].write(patch.points.bands[band]);
         pointCounts[band] = patch.points.bands[band].length;
