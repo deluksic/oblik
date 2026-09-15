@@ -21,7 +21,7 @@ import { StrokeNode } from "./schemas";
 const Pair = struct({ x: f32, y: f32 });
 type PairValue = ReturnType<typeof Pair>;
 
-const CAPACITY = 64;
+const CAPACITY = 256;
 const STRIDE = sizeOf(arrayOf(Pair, 1));
 const CHUNK_BYTES = sizeOf(arrayOf(Pair, CHUNK));
 const POOL_BYTES = sizeOf(arrayOf(Pair, CAPACITY));
@@ -99,21 +99,48 @@ describe("record pool staging", () => {
     expect(back[1]!.x).toBe(8);
   });
 
-  test("a scattered change costs one run per dirty chunk", () => {
+  test("a gap small enough to be cheaper than a call is absorbed", () => {
+    // A `writeBuffer` call is worth ~120 records of copy, so a run walks across
+    // a gap that costs less than opening a second one.
     const pool = makePool();
-    pool.touch(3, [1, 1], fillPair, args(1, 1));
-    pool.touch(40, [2, 2], fillPair, args(2, 2));
+    pool.touch(3, [1, 1], fillPair, args(1, 1)); // chunk 0
+    pool.touch(40, [2, 2], fillPair, args(2, 2)); // chunk 2
     const runs: ChunkRun[] = [];
     expect(pool.flush((run) => runs.push(run))).toBe(2);
 
-    expect(runs.map((run) => run.startOffset)).toEqual([0, 2 * CHUNK_BYTES]);
-    expect(runs.every((run) => run.bytes.byteLength === CHUNK_BYTES)).toBe(true);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.startOffset).toBe(0);
+    expect(runs[0]!.bytes.byteLength).toBe(3 * CHUNK_BYTES);
     const back = replay(runs);
     expect(back[3]!.x).toBe(1);
     expect(back[40]!.x).toBe(2);
   });
 
-  test("adjacent dirty chunks go up as one run", () => {
+  test("a gap wider than the break-even opens its own run", () => {
+    // Absorbing this much clean space would cost more bytes than the call it
+    // saves, so it is left as a gap.
+    const pool = makePool();
+    pool.touch(0, [1, 1], fillPair, args(1, 1)); // chunk 0
+    pool.touch(208, [2, 2], fillPair, args(2, 2)); // chunk 13
+    const runs: ChunkRun[] = [];
+    expect(pool.flush((run) => runs.push(run))).toBe(2);
+
+    expect(runs.map((run) => run.startOffset)).toEqual([0, 13 * CHUNK_BYTES]);
+    expect(runs.every((run) => run.bytes.byteLength === CHUNK_BYTES)).toBe(true);
+    const back = replay(runs);
+    expect(back[0]!.x).toBe(1);
+    expect(back[208]!.x).toBe(2);
+  });
+
+  test("a slot outside the pool is loud, not a write that never happens", () => {
+    // The two pools' capacities have to agree; a slot past the end would be
+    // dropped by the typed arrays and the record would simply never reach the
+    // buffer.
+    const pool = makePool();
+    expect(() => pool.touch(CAPACITY, [1, 2], fillPair, args(1, 2))).toThrow(/outside/);
+  });
+
+  test("adjacent dirty chunks go up as one run, and a tail is not absorbed", () => {
     const pool = makePool();
     pool.touch(2, [1, 1], fillPair, args(1, 1));
     pool.touch(20, [2, 2], fillPair, args(2, 2));
@@ -122,6 +149,8 @@ describe("record pool staging", () => {
 
     expect(runs).toHaveLength(1);
     expect(runs[0]!.startOffset).toBe(0);
+    // Two chunks, not the rest of the buffer: a gap with nothing after it saves
+    // no call, so its bytes are not uploaded.
     expect(runs[0]!.bytes.byteLength).toBe(2 * CHUNK_BYTES);
   });
 

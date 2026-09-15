@@ -36,6 +36,16 @@ import type { AnyWgslData, Infer } from "typegpu/data";
  * that a scene is a handful of runs. */
 export const CHUNK = 16;
 
+/**
+ * How many records of clean gap a run absorbs before a new run is cheaper.
+ *
+ * From the measurement above: a call is worth ~120 records of copy, so this sits
+ * just above the break-even. A trailing gap is never absorbed — there is no
+ * following call to save, and those bytes would go up for nothing.
+ */
+const GAP_RECORDS = 128;
+const GAP_CHUNKS = Math.ceil(GAP_RECORDS / CHUNK);
+
 /** One run of adjacent dirty chunks: the bytes to upload, and where they go. */
 export type ChunkRun = {
   /** The staged bytes, in slot order — a view of the pool's mirror. */
@@ -62,8 +72,9 @@ export type RecordPool<T> = {
   /** Forget a slot: whatever was staged there was another key's, so the next
    * `touch` stages again whatever its inputs are. */
   retire(slot: number): void;
-  /** Hand every run of dirty chunks to `write`, clear the flags, and report how
-   * many records were staged since the last flush. */
+  /** Hand every run to `write` — dirty chunks and the small gaps between them —
+   * clear the flags, and report how many records were staged since the last
+   * flush. */
   flush(write: (run: ChunkRun) => void): number;
   reset(): void;
 };
@@ -94,6 +105,27 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
   const single: Infer<TData>[] = [];
   let staged = 0;
 
+  /**
+   * The end (exclusive) of the run that starts at `chunk`: its own dirty chunks,
+   * plus every clean gap short enough that absorbing it costs less than the call
+   * it saves. A gap with no dirty chunk after it is a tail and ends the run —
+   * those bytes would be uploaded for nothing.
+   */
+  function runEnd(chunk: number): number {
+    let end = chunk;
+    while (end < nChunks) {
+      if (dirty[end] === 1) {
+        end++;
+        continue;
+      }
+      let next = end;
+      while (next < nChunks && dirty[next] === 0) next++;
+      if (next === nChunks || next - end > GAP_CHUNKS) break;
+      end = next;
+    }
+    return end;
+  }
+
   function changed(slot: number, signature: ArrayLike<number>): boolean {
     const prev = signatures[slot];
     if (prev === undefined || prev.length !== signature.length) return true;
@@ -105,6 +137,12 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
 
   return {
     touch(slot, signature, fill, args) {
+      // A slot past the end would be ignored by the typed arrays below — an
+      // upload that never happens, drawn from whatever the buffer already held.
+      // The two pools' capacities have to agree, and this is where that is said.
+      if (slot >= count || slot < 0) {
+        throw new Error(`record slot ${slot} is outside this pool's ${count} records`);
+      }
       if (!changed(slot, signature)) return;
       const prev = signatures[slot];
       if (prev !== undefined && prev.length === signature.length) {
@@ -138,8 +176,7 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
           chunk++;
           continue;
         }
-        let end = chunk + 1;
-        while (end < nChunks && dirty[end] === 1) end++;
+        const end = runEnd(chunk);
         const startOffset = chunk * bytesPerChunk;
         write({ bytes: stagingView.subarray(startOffset, end * bytesPerChunk), startOffset });
         dirty.fill(0, chunk, end);
