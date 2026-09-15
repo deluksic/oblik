@@ -1,17 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, test } from "vitest";
 
-import type { CsgOperand, Loop, LoopEdge, Vec2 } from "#geom";
-import { isFillGeom } from "#geom/csg2";
+import type { Loop, LoopEdge, Vec2 } from "#geom";
 
-import { evaluate } from "../../eval/evaluate";
-import type { Scene } from "../../eval/scene";
-import { analyze, type Annotation } from "../../source/analyze";
-import { mergeAnnotationBundle } from "../../source/catalog";
 import { buildFieldInstance, fieldPlan } from "./field/plan";
+import { FILL_CORPUS } from "./fillCorpus.fixture";
 import {
   blockWindows,
   emptySpans,
@@ -22,11 +14,6 @@ import {
   type SpanWindow,
 } from "./fillSpans";
 import { MAX_FIELD_ARCS, MAX_FIELD_SEGS, MAX_FILL_ARCS, MAX_FILL_SEGS } from "./schemas";
-
-const demoSrc = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../../apps/demo/src",
-);
 
 /** Square loop of segment edges, corners given CCW. */
 function squareLoop(half: number): LoopEdge[] {
@@ -42,62 +29,48 @@ function squareLoop(half: number): LoopEdge[] {
   });
 }
 
-const circleLoop = (radius: number): Loop => ({
-  kind: "circle",
-  center: { x: 0, y: 0 },
-  radius,
-});
+const circleLoop = (radius: number): Loop => ({ kind: "circle", center: { x: 0, y: 0 }, radius });
 
-/** Every fill node of every demo scene, split into span-path and field-path. */
-async function demoFills(): Promise<{
+/** The corpus splits into the two paths the adapter routes fills to: a plan
+ * compiles to a field, and anything the plan refuses (a pick) keeps its spans. */
+function corpusFills(): {
   spanSegs: number;
   spanArcs: number;
   fieldSegs: number;
   fieldArcs: number;
   nodes: number;
   rows: string[];
-}> {
-  const names = readdirSync(path.join(demoSrc, "scenes"))
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => f.replace(/\.ts$/, ""));
+  worst: { name: string; segs: number; arcs: number; field: boolean }[];
+} {
   const totals = { spanSegs: 0, spanArcs: 0, fieldSegs: 0, fieldArcs: 0, nodes: 0 };
   const rows: string[] = [];
-  for (const name of names) {
-    const rel = `apps/demo/src/scenes/${name}.ts`;
-    const src = readFileSync(path.join(demoSrc, `scenes/${name}.ts`), "utf8");
-    const bundle: Record<string, Record<string, Annotation>> = {
-      [rel]: Object.fromEntries(analyze(src, rel)),
-    };
-    const mod = (await import(`../../../../../apps/demo/src/scenes/${name}.ts`)) as {
-      default: Scene;
-    };
-    const trace = evaluate(mod.default, { annotations: mergeAnnotationBundle(bundle) }).trace;
-    for (const n of trace) {
-      if (!isFillGeom(n.value)) continue;
-      totals.nodes++;
-      const plan = fieldPlan(n.value as CsgOperand);
-      if (plan) {
-        const inst = buildFieldInstance(plan);
-        totals.fieldSegs += inst.spans.segs.length;
-        totals.fieldArcs += inst.spans.arcs.length;
-        rows.push(
-          `${name}.${n.bind ?? n.id} field segs=${inst.spans.segs.length} arcs=${inst.spans.arcs.length}`,
-        );
-        continue;
-      }
-      let segs = 0;
-      let arcs = 0;
-      // The span path allocates exactly what `islandGeomOf` hands the adapter.
-      for (const block of islandGeomOf(n.value).spans) {
-        segs += block.segs.length;
-        arcs += block.arcs.length;
-      }
-      totals.spanSegs += segs;
-      totals.spanArcs += arcs;
-      rows.push(`${name}.${n.bind ?? n.id} spans segs=${segs} arcs=${arcs}`);
+  const worst: { name: string; segs: number; arcs: number; field: boolean }[] = [];
+  for (const { name, value } of FILL_CORPUS) {
+    totals.nodes++;
+    const plan = fieldPlan(value);
+    if (plan) {
+      const inst = buildFieldInstance(plan);
+      const segs = inst.spans.segs.length;
+      const arcs = inst.spans.arcs.length;
+      totals.fieldSegs += segs;
+      totals.fieldArcs += arcs;
+      worst.push({ name, segs, arcs, field: true });
+      rows.push(`${name} field segs=${segs} arcs=${arcs}`);
+      continue;
     }
+    let segs = 0;
+    let arcs = 0;
+    // The span path allocates exactly what `islandGeomOf` hands the adapter.
+    for (const block of islandGeomOf(value).spans) {
+      segs += block.segs.length;
+      arcs += block.arcs.length;
+    }
+    totals.spanSegs += segs;
+    totals.spanArcs += arcs;
+    worst.push({ name, segs, arcs, field: false });
+    rows.push(`${name} spans segs=${segs} arcs=${arcs}`);
   }
-  return { ...totals, rows };
+  return { ...totals, rows, worst };
 }
 
 describe("span records", () => {
@@ -151,19 +124,27 @@ describe("span records", () => {
     expect(windows.map((w) => w.segOffset)).toEqual([0, 4, 8]);
   });
 
-  test("the demo's span load fits both pools, per node and in total", async () => {
-    const t = await demoFills();
+  test("the corpus load fits both pools, per node and in total", () => {
+    const t = corpusFills();
     // eslint-disable-next-line no-console
     console.log(
-      `${t.nodes} demo fills: span path ${t.spanSegs} segs / ${t.spanArcs} arcs, ` +
+      `${t.nodes} corpus fills: span path ${t.spanSegs} segs / ${t.spanArcs} arcs, ` +
         `field path ${t.fieldSegs} segs / ${t.fieldArcs} arcs\n${t.rows.join("\n")}`,
     );
-    // Pools are shared across nodes, so the totals are what the caps must hold.
+    // A pool is shared across nodes, so the totals are what the caps must hold —
+    // and each node's window has to fit the array on its own.
+    for (const w of t.worst) {
+      const segCap = w.field ? MAX_FIELD_SEGS : MAX_FILL_SEGS;
+      const arcCap = w.field ? MAX_FIELD_ARCS : MAX_FILL_ARCS;
+      expect(`${w.name} ${w.segs}/${segCap} ${w.arcs}/${arcCap}`).toBe(
+        `${w.name} ${Math.min(w.segs, segCap)}/${segCap} ${Math.min(w.arcs, arcCap)}/${arcCap}`,
+      );
+    }
     expect(t.spanSegs).toBeLessThanOrEqual(MAX_FILL_SEGS);
     expect(t.spanArcs).toBeLessThanOrEqual(MAX_FILL_ARCS);
     expect(t.fieldSegs).toBeLessThanOrEqual(MAX_FIELD_SEGS);
     expect(t.fieldArcs).toBeLessThanOrEqual(MAX_FIELD_ARCS);
-    // Both record kinds are actually exercised by the demo set.
+    // Both record kinds are actually exercised by the corpus.
     expect(t.spanSegs).toBeGreaterThan(0);
     expect(t.fieldArcs).toBeGreaterThan(0);
   });

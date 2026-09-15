@@ -25,6 +25,8 @@ The user may have the dev server running (`pnpm demo` → Vite on http://localho
 
 So `apps/demo/src/scenes/*.ts` and `src/layout/*.ts` can change at any moment with no agent action. Do not treat an unexpected diff there as corruption or as your own work: check for a listener on port 43127 (`lsof -nP -iTCP:43127`) before diagnosing, and leave server-generated churn out of commits. Plugin code is read at server start — after a plugin change the user must restart `pnpm demo`, and a stale server (started before the change) keeps the old behavior.
 
+**No test may import or read `apps/demo/src/**`.** Those files are user content, so a test pinned to one fails for an edit instead of for a bug. Cover scene-shaped behaviour with fixtures the test owns — `eval/scene-pipeline.test.ts` builds its own `defineScene` scenes, `euclid2-typegpu/gpu/fillCorpus.fixture.ts` is the fill compiler's corpus — and pass demo-shaped paths only as opaque labels (`module: "apps/demo/src/scenes/x.ts"`), which no filesystem call touches.
+
 ## Skills
 
 Project skills live in `.agents/skills/` (pinned by `skills-lock.json`); agent-specific dirs like `.claude/skills/` are symlinks into it, restorable with `npx skills experimental_install`. There is no skills CLI for DeepSeek — if you run DeepSeek here, treat `.agents/skills/<name>/SKILL.md` as the skill entrypoint and read it when the topic matches.

@@ -146,7 +146,7 @@ createEffect(
 ## Testing
 
 - Vitest colocated next to source (`*.test.ts`), run with `pnpm --filter oblik test`. Environment is `node` and does not compile `.tsx` — keep the logic under test in a `.ts` module (pure helpers, e.g. `host/stored-signals.ts` with a fake `StorageLike`); never import a `.tsx` component from a test.
-- Scene programs are exercised headlessly: `packages/oblik/src/eval/demo-scenes.test.ts` evaluates `apps/demo` scene modules.
+- Scene programs are exercised headlessly, but from fixtures the tests own (`packages/oblik/src/eval/scene-pipeline.test.ts` builds its own `defineScene` scenes). A test must never import an `apps/demo` scene: the dev server rewrites those files while it runs and the GUI edits them in place, so pinning one turns a scene edit into a test failure.
 - `packages/oblik/src/solid-conventions.test.ts` greps the tree for banned patterns (e.g. `onSettled`, non-null-asserted live nodes).
 
 ## Linting (`pnpm lint`, oxlint)

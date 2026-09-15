@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vitest";
 
@@ -146,14 +145,67 @@ describe("findDuplicateIds", () => {
   });
 });
 
+/** A scene that draws on the layout helper, so a bundle spans two user files. */
+const userScene = (id: string) => `import { point, defineScene } from "oblik";
+import { mount } from "../layout/mounting-plate";
+
+export default defineScene({
+  kind: "euclid2",
+  title: "Shelf",
+  build() {
+    const A = point(0, 0, "${id}");
+    mount(1);
+    return { A };
+  },
+});
+`;
+
+/** A helper holding a constructor call of its own. */
+const userLayout = (id: string) => `import { point } from "oblik";
+
+export function mount(offset: number) {
+  return point(offset, 0, "${id}");
+}
+`;
+
+/**
+ * A throwaway app tree, so the scan reads sources this test owns rather than the
+ * real `apps/demo`, which the dev server rewrites while it runs. `root` is the
+ * workspace the bundle's relative paths are reported against.
+ */
+function writeUserApp(files: Record<string, string>): { root: string; appRoot: string } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "oblik-bundle-"));
+  const appRoot = path.join(root, "apps/demo");
+  for (const [rel, source] of Object.entries(files)) {
+    const abs = path.join(appRoot, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, source);
+  }
+  return { root, appRoot };
+}
+
 describe("scanAnnotationsBundle", () => {
-  test("demo user sources have unique ids", () => {
-    const demo = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "../../../../apps/demo",
-    );
-    const workspace = path.resolve(demo, "../..");
-    const { collisions } = scanAnnotationsBundle(listUserAppSources(demo), workspace);
+  test("user sources with unique ids have no collisions", () => {
+    const { root, appRoot } = writeUserApp({
+      "src/scenes/shelf.ts": userScene("o_shelf"),
+      "src/layout/mounting-plate.ts": userLayout("o_mount"),
+    });
+    const { collisions } = scanAnnotationsBundle(listUserAppSources(appRoot), root);
     expect(collisions).toEqual([]);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the same id in two user files is a collision", () => {
+    const { root, appRoot } = writeUserApp({
+      "src/scenes/shelf.ts": userScene("o_shared"),
+      "src/layout/mounting-plate.ts": userLayout("o_shared"),
+    });
+    const { collisions } = scanAnnotationsBundle(listUserAppSources(appRoot), root);
+    expect(collisions.map((c) => c.id)).toEqual(["o_shared"]);
+    expect(collisions[0]?.sites.map((s) => s.file)).toEqual([
+      "apps/demo/src/layout/mounting-plate.ts",
+      "apps/demo/src/scenes/shelf.ts",
+    ]);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });

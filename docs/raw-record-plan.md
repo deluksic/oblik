@@ -16,22 +16,22 @@ Measured on `main` with a V8 CPU profile of the real `round-offset` scene
 (183 nodes: 78 segments, 78 points, 11 regions, 11 `csg2`, 2 circles), driven through the
 real eval pipeline (`evaluate(scene)` → `adapter.tick()`), median of 9 runs:
 
-| | ms/frame |
-|---|---|
-| whole tick | **3.37** |
+|                                    | ms/frame |
+| ---------------------------------- | -------- |
+| whole tick                         | **3.37** |
 | `emitStrokeLayers` (incl. callees) | **1.65** |
-| `emitPointLayers` | **0.56** |
-| `emitFillBand` | 0.22 |
+| `emitPointLayers`                  | **0.56** |
+| `emitFillBand`                     | 0.22     |
 
 `emitStrokeLayers` was **49% of the tick** and ~21 µs per segment. The cost was not the
 adapter's own arithmetic — `encodeStrokes`, `twoPointStroke`, `strokeValue`, `diff` and
 `alloc` together were ~0.2 ms. It was TypeGPU's record constructors:
 
-| leaf | ms/frame |
-|---|---|
-| `cpuConstruct` (`typegpu/data/vector.js:218`) | 1.72 |
-| `structSchema` (`typegpu/data/struct.js:37`) | 0.79 |
-| `get x` / `get y` (`vectorImpl.js`) | 0.19 |
+| leaf                                          | ms/frame |
+| --------------------------------------------- | -------- |
+| `cpuConstruct` (`typegpu/data/vector.js:218`) | 1.72     |
+| `structSchema` (`typegpu/data/struct.js:37`)  | 0.79     |
+| `get x` / `get y` (`vectorImpl.js`)           | 0.19     |
 
 Isolated per-op costs on `main`'s shapes: one `StrokeCtrl` 690 ns, one `StrokeRun` 975 ns,
 one full `StrokeDraw` **6 900 ns**, `strokeInkDiscs` (3 discs) **22 600 ns**.
@@ -43,7 +43,7 @@ The multiplicity is the other half. `emitStrokeLayers` and `emitPointLayers` bui
 record per band** (`INK_DISC_COUNT = 3` for ink, `POINT_DISC_COUNT = 4` for marks), then
 byte-diff them to suppress the upload. So a stroke builds and encodes 3 records / frame
 (234 for round-offset's 78 segments) and a mark builds 4 (312 for 78 points), to express
-what is really *one* geometry plus a per-band width and colour. The diff only ever saved
+what is really _one_ geometry plus a per-band width and colour. The diff only ever saved
 the upload, never the construction.
 
 Target: **one record per node**, bands derived on the GPU, records pooled and mutated in
@@ -86,12 +86,12 @@ Keep `main`'s record shapes. Change only how records get built and uploaded.
 
 Measured justification, on this codebase:
 
-| approach | per frame (78 records) |
-|---|---|
-| fresh object per record per frame | ~10 µs |
-| pooled record, mutated in place | **~0.15 µs** |
-| one contiguous `write()` of staged records | ~6 µs |
-| one `write()` **per** record | ~**4.7 ms** |
+| approach                                   | per frame (78 records) |
+| ------------------------------------------ | ---------------------- |
+| fresh object per record per frame          | ~10 µs                 |
+| pooled record, mutated in place            | **~0.15 µs**           |
+| one contiguous `write()` of staged records | ~6 µs                  |
+| one `write()` **per** record               | ~**4.7 ms**            |
 
 The last row is why staging must be batched. The third row is for 4096 records; it scales
 with the staged count.
@@ -143,7 +143,7 @@ four, and each is preventable by a rule plus a test.
 No packing several fields into one element; no reusing a lane for a second meaning; no
 byte offsets computed by hand; no hand-rolled bit codec for a record. Put the fields in
 the schema and let TypeGPU's writer place them. Use `sizeOf(schema)` for strides.
-*Failures this caused:* `f32` field carrying a bit-cast `u32`; `state` riding
+_Failures this caused:_ `f32` field carrying a bit-cast `u32`; `state` riding
 `radiusPx`; a `(slot << 16) | layer` codec; hand-computed field offsets that silently
 stopped matching the schema when fields were reordered.
 
@@ -159,13 +159,14 @@ invisible. Derive it: `slots[0] * sizeOf(schema)`. `batch.test.ts` must assert b
 value and `% 4 === 0`, with a stub that throws on unaligned offsets.
 
 **G3 — Never let a missing value render as "nothing".**
-Sentinels that mean *invisible* fail as a blank canvas, which is indistinguishable from
+Sentinels that mean _invisible_ fail as a blank canvas, which is indistinguishable from
 ten other bugs. Failures this caused: frame band offsets defaulting to `0` so every band
 collapsed onto the mark's radius; a negative radius as a cull flag. Prefer:
+
 - required inputs, so omission is a compile error, or
 - a zero **width/radius** for a dead band (draws nothing, no flag), or
 - a loud debug colour for a missing palette entry.
-No cull path is needed at this scene size; a zero-width run already draws nothing.
+  No cull path is needed at this scene size; a zero-width run already draws nothing.
 
 **G4 — Validate the generated WGSL, do not merely resolve it.**
 `tgpu.resolve()` returning text proves nothing. A type error in the generated shader
@@ -257,9 +258,11 @@ cost ~9% of the tick and is worth it.
   bisected.
 - The dev server (`pnpm demo`, port 43127) rewrites `apps/demo/src/scenes/*` and
   `src/layout/*` while running. Do not commit that churn, and do not treat it as your own
-  diff. Two `demo-scenes.test.ts` failures are caused by it: the `round-offset` and
-  `fillet` scenes are rewritten mid-run (e.g. `roundOffset(circHole, -0.12)` → `-0.15`,
-  which changes an expected radius from 0.64 to 0.67). Confirm with
+  diff. It used to break `demo-scenes.test.ts`, which evaluated the real scenes and pinned
+  the exact shapes they produced — that test is gone, and the scene-shaped seams it covered
+  now run against fixtures the tests own (`eval/scene-pipeline.test.ts`, and the fill
+  compiler's corpus in `euclid2-typegpu/gpu/fillCorpus.fixture.ts`). No test reads
+  `apps/demo` any more, so scene churn cannot regress the suite; confirm with
   `git diff apps/demo/src/scenes` before blaming a code change.
 - A prior attempt at this work exists as branch `proto/raw-stroke-records`. It is
   **not** a starting point and should not be merged — it broke rendering. Mine it for the

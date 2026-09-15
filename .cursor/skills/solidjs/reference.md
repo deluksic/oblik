@@ -90,7 +90,7 @@ Space verbs are objects in `euclid2/tool.ts` + `tools/*`. Each verb owns click, 
 
 - Pure logic colocated: `*.test.ts` next to the source (vitest, `environment: "node"` — see `packages/oblik/vitest.config.ts`). The node env does **not** compile `.tsx`: keep tested logic in `.ts` modules (e.g. `host/stored-signals.ts` with a fake `StorageLike`, `host/resizable.ts`) and never import a `.tsx` component from a test.
 - View modules export pure helpers for tests (`figure/Ink.test.ts`, `figure/chips.test.ts`, `euclid2/pick.test.ts`, `geom/*.test.ts`, …).
-- `eval/demo-scenes.test.ts` imports and evaluates the real `apps/demo` scenes headlessly — scene edits can break these tests.
+- Scene-shaped coverage uses fixtures the tests own (`eval/scene-pipeline.test.ts` defines its own `defineScene` scenes; `euclid2-typegpu/gpu/fillCorpus.fixture.ts` is the fill compiler's corpus). Tests never import an `apps/demo` scene: the dev server rewrites those files while it runs, and a GUI edit must not be able to fail the suite.
 - Conventions are enforced by `solid-conventions.test.ts` (no `onSettled`, no `node={…()!}`).
 
 ## Versions (pin together)

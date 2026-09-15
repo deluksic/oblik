@@ -235,7 +235,7 @@ Consequences worth recording:
 
 **Verification:** `npx vitest run` (unit), `npx tsc -p tsconfig.build.json --noEmit`, `-p tsconfig.test.json --noEmit`, `(cd apps/demo && npx tsc --noEmit)`, `npx oxlint src`. No pixel change is expected: the GPU path is already the default, and the only behavioural change is that a scene cannot be switched back to SVG.
 
-**Pre-existing, unrelated:** `src/eval/demo-scenes.test.ts` ("mounting plate traces constructors from the layout helper") fails from live dev-server scene edits; it is not part of this work. `apps/demo/src/**` churn from the running dev server stays out of commits.
+**Pre-existing, unrelated:** `src/eval/demo-scenes.test.ts` used to fail from live dev-server scene edits; it has since been deleted and replaced with fixture scenes (`eval/scene-pipeline.test.ts`), so `apps/demo/src/**` churn can no longer reach the suite. That churn still stays out of commits.
 
 ---
 

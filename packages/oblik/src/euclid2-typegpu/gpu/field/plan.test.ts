@@ -1,18 +1,10 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, test } from "vitest";
 
 import type { CsgOperand, Region, Vec2 } from "#geom";
-import { isFillGeom } from "#geom/csg2";
 import { operandAabb, operandSdf, polarRepeatValue } from "#geom/csg2";
 import { walkEdges } from "#geom/region";
 
-import { evaluate } from "../../../eval/evaluate";
-import type { Scene } from "../../../eval/scene";
-import { analyze, type Annotation } from "../../../source/analyze";
-import { mergeAnnotationBundle } from "../../../source/catalog";
+import { FILL_CORPUS } from "../fillCorpus.fixture";
 import { evaluateField } from "./eval";
 import {
   buildFieldInstance,
@@ -22,50 +14,15 @@ import {
   type FieldPlan,
 } from "./plan";
 
-const demoSrc = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../apps/demo/src",
-);
+type Case = { name: string; value: CsgOperand; plan: FieldPlan };
 
-/** Every scene with a fill in it (the demo set the GPU pane actually runs). */
-const SCENES = [
-  "arcade",
-  "cache-lab",
-  "csg-tree",
-  "fillet",
-  "gear",
-  "islands",
-  "mounting-plate",
-  "mounting-plate-grid",
-  "pie",
-  "round-offset",
-  "stock-cutters",
-  "truss",
-];
-
-type Case = { scene: string; bind: string; value: CsgOperand; plan: FieldPlan };
-
-function sceneTrace(mod: Scene, name: string) {
-  const rel = `apps/demo/src/scenes/${name}.ts`;
-  const src = readFileSync(path.join(demoSrc, rel.replace(/^apps\/demo\/src\//, "")), "utf8");
-  const bundle: Record<string, Record<string, Annotation>> = {
-    [rel]: Object.fromEntries(analyze(src, rel)),
-  };
-  return evaluate(mod, { annotations: mergeAnnotationBundle(bundle) }).trace;
-}
-
-async function csgCases(): Promise<Case[]> {
+/** The corpus cases a plan compiles. A pick has no scalar field — it keeps its
+ * island restriction on the span path — so it is not one of these. */
+function csgCases(): Case[] {
   const cases: Case[] = [];
-  for (const name of SCENES) {
-    const mod = (await import(`../../../../../../apps/demo/src/scenes/${name}.ts`)) as {
-      default: Scene;
-    };
-    for (const n of sceneTrace(mod.default, name)) {
-      if (!isFillGeom(n.value) || n.value.kind !== "csg2") continue;
-      const plan = fieldPlan(n.value);
-      if (!plan) continue;
-      cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
-    }
+  for (const { name, value } of FILL_CORPUS) {
+    const plan = fieldPlan(value);
+    if (plan) cases.push({ name, value, plan });
   }
   return cases;
 }
@@ -181,8 +138,8 @@ function arcBand(inst: FieldInstance): number {
 }
 
 describe("field plan", () => {
-  test("every demo CSG fill compiles, and the shapes collapse hard", async () => {
-    const cases = await csgCases();
+  test("every corpus fill compiles, and the shapes collapse hard", () => {
+    const cases = csgCases();
     expect(cases.length).toBeGreaterThan(20);
     const shapes = new Map<string, number>();
     for (const c of cases) shapes.set(c.plan.shape, (shapes.get(c.plan.shape) ?? 0) + 1);
@@ -199,8 +156,8 @@ describe("field plan", () => {
     expect(shapes.size).toBeLessThan(cases.length);
   });
 
-  test("leaf data changes never move the shape", async () => {
-    const cases = await csgCases();
+  test("leaf data changes never move the shape", () => {
+    const cases = csgCases();
     for (const c of cases) {
       const moved = JSON.parse(JSON.stringify(c.value));
       nudgeLeafData(moved);
@@ -263,8 +220,8 @@ describe("field plan", () => {
     expect(box.max.x).toBeGreaterThan(2);
   });
 
-  test("parity with operandSdf on every demo CSG tree", async () => {
-    const cases = await csgCases();
+  test("parity with operandSdf on every corpus tree", () => {
+    const cases = csgCases();
     let probes = 0;
     let inBand = 0;
     let worstInside = 0;
@@ -289,12 +246,10 @@ describe("field plan", () => {
         if (cpu < 0) worstInside = Math.max(worstInside, delta);
         else worstOutside = Math.max(worstOutside, delta);
         if (cpu < 0 !== gpu < 0) {
-          signBreaks.push(
-            `${c.scene}.${c.bind} sign at (${p.x},${p.y}) cpu=${cpu} gpu=${gpu} band=${band}`,
-          );
+          signBreaks.push(`${c.name} sign at (${p.x},${p.y}) cpu=${cpu} gpu=${gpu} band=${band}`);
         }
         if (delta > band) {
-          breaks.push(`${c.scene}.${c.bind} Δ=${delta} at (${p.x},${p.y}) cpu=${cpu} gpu=${gpu}`);
+          breaks.push(`${c.name} Δ=${delta} at (${p.x},${p.y}) cpu=${cpu} gpu=${gpu}`);
         }
       }
     }

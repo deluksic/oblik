@@ -104,7 +104,7 @@ export default defineConfig({
       // UI framework. That seam is what keeps the caching mechanism replaceable
       // without touching scene files. Enforced here, and stated in AGENTS.md.
       // Tests are exempt: an integration test legitimately drives the whole
-      // pipeline (e.g. demo-scenes.test.ts renders scenes through the view).
+      // pipeline end to end, which is not the seam this rule is about.
       files: ["packages/oblik/src/geom/**", "packages/oblik/src/eval/**"],
       excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
       rules: {

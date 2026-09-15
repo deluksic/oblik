@@ -1,20 +1,31 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, test } from "vitest";
 
 import { analyzeMentions, fnNamed, insertPointNames } from "./mention";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const plateSrc = fs.readFileSync(
-  path.resolve(here, "../../../../apps/demo/src/layout/mounting-plate.ts"),
-  "utf8",
-);
+/**
+ * Frozen stand-in for a layout helper. The demo plate is user-editable and rewritten by the dev
+ * server at any moment, so the parser tests own their input instead of reading a live source.
+ */
+const PLATE_SRC = `import { circle, lineIntersection, parallelLine, point, region, segment } from "oblik";
+
+export function mountingPlateLayout(ox = 0, oy = 0) {
+  const origin = point(0.13 + ox, 0.25 + oy, "o_origin");
+  const opp = point(3.86 + ox, 3.02 + oy, "o_opp");
+  const bottom = segment(origin, opp, "o_bot");
+  const hBottom = parallelLine(bottom, 0.49, "o_in");
+  const hLeft = parallelLine(bottom, hBottom.distance, "o_inl");
+  const c0 = lineIntersection(hBottom, hLeft, "o_c0");
+  const c3 = lineIntersection(hBottom, hLeft, "o_c3");
+  const drill = circle(c0, 0.18, "o_drill");
+  const h3 = circle(c3, drill.radius, "o_h3");
+  const face = region([origin, bottom, opp], [drill, h3], "o_face");
+  return { origin, opp, hBottom, drill, c0, c3, face };
+}
+`;
 
 describe("analyzeMentions", () => {
   test("reads the mounting plate helper bag and once-ids", () => {
-    const file = analyzeMentions(plateSrc, "apps/demo/src/layout/mounting-plate.ts");
+    const file = analyzeMentions(PLATE_SRC, "plate.ts");
     const plate = fnNamed(file, "mountingPlateLayout");
     expect(plate).toBeDefined();
     expect(plate!.params).toEqual(["ox", "oy"]);
@@ -50,7 +61,7 @@ export default defineScene({
   },
 });
 `;
-    const file = analyzeMentions(src, "apps/demo/src/scenes/mounting-plate.ts");
+    const file = analyzeMentions(src, "scene.ts");
     const build = fnNamed(file, "build");
     expect(build?.calls).toEqual([
       {

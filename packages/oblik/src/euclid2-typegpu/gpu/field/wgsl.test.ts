@@ -1,60 +1,23 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
 import type { CsgOperand, Region, Vec2 } from "#geom";
-import { isFillGeom, polarRepeatValue } from "#geom/csg2";
+import { polarRepeatValue } from "#geom/csg2";
 import { walkEdges } from "#geom/region";
 
-import { evaluate } from "../../../eval/evaluate";
-import type { Scene } from "../../../eval/scene";
-import { analyze, type Annotation } from "../../../source/analyze";
-import { mergeAnnotationBundle } from "../../../source/catalog";
+import { FILL_CORPUS } from "../fillCorpus.fixture";
 import { fieldFragment } from "./assemble";
 import { fieldPlan, type FieldNodePlan, type FieldPlan } from "./plan";
 
-const demoSrc = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../apps/demo/src",
-);
+type Case = { name: string; value: CsgOperand; plan: FieldPlan };
 
-const SCENES = [
-  "arcade",
-  "cache-lab",
-  "csg-tree",
-  "fillet",
-  "gear",
-  "islands",
-  "mounting-plate",
-  "mounting-plate-grid",
-  "pie",
-  "round-offset",
-  "stock-cutters",
-  "truss",
-];
-
-type Case = { scene: string; bind: string; value: CsgOperand; plan: FieldPlan };
-
-async function csgCases(): Promise<Case[]> {
+/** The corpus cases a plan compiles. A pick has no scalar field — it keeps its
+ * island restriction on the span path — so it is not one of these. */
+function csgCases(): Case[] {
   const cases: Case[] = [];
-  for (const name of SCENES) {
-    const rel = `apps/demo/src/scenes/${name}.ts`;
-    const src = readFileSync(path.join(demoSrc, rel.replace(/^apps\/demo\/src\//, "")), "utf8");
-    const bundle: Record<string, Record<string, Annotation>> = {
-      [rel]: Object.fromEntries(analyze(src, rel)),
-    };
-    const mod = (await import(`../../../../../../apps/demo/src/scenes/${name}.ts`)) as {
-      default: Scene;
-    };
-    const trace = evaluate(mod.default, { annotations: mergeAnnotationBundle(bundle) }).trace;
-    for (const n of trace) {
-      if (!isFillGeom(n.value) || n.value.kind !== "csg2") continue;
-      const plan = fieldPlan(n.value);
-      if (plan) cases.push({ scene: name, bind: n.bind ?? n.id, value: n.value, plan });
-    }
+  for (const { name, value } of FILL_CORPUS) {
+    const plan = fieldPlan(value);
+    if (plan) cases.push({ name, value, plan });
   }
   return cases;
 }
@@ -116,8 +79,8 @@ function occurrences(haystack: string, needle: string): number {
 }
 
 describe("compiled field WGSL", () => {
-  test("every demo shape resolves; leaves are comptime offsets, the tree never loops", async () => {
-    const cases = await csgCases();
+  test("every corpus shape resolves; leaves are comptime offsets, the tree never loops", () => {
+    const cases = csgCases();
     const seen = new Map<string, string>();
     for (const c of cases) {
       // Both layers of every shape: the halo is the same compiled evaluation
@@ -200,8 +163,8 @@ describe("compiled field WGSL", () => {
     expect(occurrences(halo, "round(")).toBe(1);
   });
 
-  test("leaf data never reaches the shader", async () => {
-    const cases = await csgCases();
+  test("leaf data never reaches the shader", () => {
+    const cases = csgCases();
     for (const c of cases) {
       const moved = JSON.parse(JSON.stringify(c.value));
       nudgeLeafData(moved, 1.7);
@@ -217,8 +180,8 @@ describe("compiled field WGSL", () => {
     }
   });
 
-  test("different shapes compile to different WGSL", async () => {
-    const cases = await csgCases();
+  test("different shapes compile to different WGSL", () => {
+    const cases = csgCases();
     const byShape = new Map<string, string>();
     for (const c of cases) {
       if (!byShape.has(c.plan.shape))
@@ -228,8 +191,8 @@ describe("compiled field WGSL", () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  test("the fold is inlined: one min/max call per extra operand, no dispatch", async () => {
-    const cases = await csgCases();
+  test("the fold is inlined: one min/max call per extra operand, no dispatch", () => {
+    const cases = csgCases();
     let total = 0;
     for (const c of cases) {
       const code = tgpu.resolve([fieldFragment(c.plan)]);
