@@ -12,7 +12,7 @@ import { isCircleWalk } from "#geom/region";
 
 import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
-import { StrokeDraw, type StrokeDrawValue } from "./schemas";
+import { StrokeNode, type StrokeNodeValue } from "./schemas";
 
 /**
  * The adapter is pure CPU (no device), so the routing between the compiled-field
@@ -84,7 +84,7 @@ function slotsOf(writes: readonly { idx: number }[]): number[] {
 }
 
 /** The record stride, straight from the schema the buffer is laid out as. */
-const STROKE_STRIDE = sizeOf(StrokeDraw);
+const STROKE_STRIDE = sizeOf(StrokeNode);
 
 /** Every slot a stroke patch stages, in run order — the chunk's unchanged
  * neighbours included, because those bytes go up with it. */
@@ -99,13 +99,13 @@ function stagedStrokes(patch: TickPatch): number[] {
 
 /** Shadow the GPU buffer the way the bytes would: decode every staged run back
  * into records at the slots it names. */
-function uploadStrokes(shadow: Map<number, StrokeDrawValue>, patch: TickPatch): void {
+function uploadStrokes(shadow: Map<number, StrokeNodeValue>, patch: TickPatch): void {
   for (const run of patch.strokes.chunks) {
     const first = run.startOffset / STROKE_STRIDE;
     const count = run.bytes.byteLength / STROKE_STRIDE;
     for (let i = 0; i < count; i++) {
       const one = run.bytes.slice(i * STROKE_STRIDE, (i + 1) * STROKE_STRIDE).buffer;
-      shadow.set(first + i, readFromArrayBuffer(one, StrokeDraw));
+      shadow.set(first + i, readFromArrayBuffer(one, StrokeNode));
     }
   }
 }
@@ -267,7 +267,7 @@ describe("adapter fill routing", () => {
     const b = node("o_b", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "b");
 
     // The GPU buffer is exactly the bytes the runs carry, so shadow them.
-    const buffer = new Map<number, StrokeDrawValue>();
+    const buffer = new Map<number, StrokeNodeValue>();
     const upload = (patch: TickPatch) => {
       uploadStrokes(buffer, patch);
       return patch;
@@ -303,7 +303,7 @@ describe("adapter fill routing", () => {
     const y = node("o_y", { kind: "segment", a: { x: 0, y: 2 }, b: { x: 1, y: 2 } }, "y");
     const z = node("o_z", { kind: "segment", a: { x: 0, y: 1 }, b: { x: 1, y: 1 } }, "z");
 
-    const buffer = new Map<number, StrokeDrawValue>();
+    const buffer = new Map<number, StrokeNodeValue>();
     const upload = (patch: TickPatch) => {
       uploadStrokes(buffer, patch);
       return patch;

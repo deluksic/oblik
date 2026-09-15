@@ -1,8 +1,16 @@
 import type { TgpuRoot } from "typegpu";
-import { arrayOf, u32, vec2f, vec2u } from "typegpu/data";
+import { arrayOf, u32, vec2f, vec2u, vec3f } from "typegpu/data";
+import type { v3f } from "typegpu/data";
 
 import type { Camera2, PaneSize } from "../../euclid2/camera";
 import type { FillDraw, TickPatch } from "./adapter";
+import {
+  INK_BAND_ORDER,
+  instancesPerEntry,
+  POINT_BAND_LAYERS,
+  STROKE_BAND_LAYERS,
+  type InkBandName,
+} from "./bands";
 import { FIELD_QUAD_VERTICES, fieldPipeline } from "./field/assemble";
 import { makeFrameValue } from "./frame";
 import { createImageLayer, type ImageDraw, type ImageLayer } from "./imageLayer";
@@ -40,6 +48,7 @@ import type { Rgba } from "./renderer";
 const MSAA_SAMPLES = 4;
 
 import {
+  Chrome,
   CircleInst,
   FieldLeaf,
   FieldQuad,
@@ -48,6 +57,7 @@ import {
   FillSeg,
   Frame,
   GridSpan,
+  LAYER_PAINT,
   MarkerInst,
   MAX_CIRCLES,
   MAX_FIELD_ARCS,
@@ -60,8 +70,9 @@ import {
   MAX_MARKERS,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
-  PointInst,
-  StrokeDraw,
+  PointNode,
+  StrokeNode,
+  type ChromeValue,
 } from "./schemas";
 import { spanWrites } from "./spanRecords";
 
@@ -115,39 +126,22 @@ export function createPainter(opts: {
   const frameBuffer = root
     .createBuffer(Frame, makeFrameValue({ x: 0, y: 0, scale: 48 }, { w: 800, h: 600 }, 1))
     .$usage("uniform");
-  const strokeBuffer = root.createBuffer(arrayOf(StrokeDraw, MAX_STROKE_DRAWS)).$usage("storage");
-  // One order buffer per draw-order band; each band pipeline binds its own
-  // buffer, and band instances always index their band from 0. The five bands
-  // per kind mirror the SVG chrome pass order (rest, hover halo, hover paint,
-  // lifted halo, lifted paint) so the painter can interleave strokes and
-  // circles state-by-state instead of shape-by-shape.
-  const strokeRestOrderBuffer = root.createBuffer(arrayOf(u32, MAX_STROKE_DRAWS)).$usage("storage");
-  const strokeHoverHaloOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_STROKE_DRAWS))
-    .$usage("storage");
-  const strokeHoverPaintOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_STROKE_DRAWS))
-    .$usage("storage");
-  const strokeLiftedHaloOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_STROKE_DRAWS))
-    .$usage("storage");
-  const strokeLiftedPaintOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_STROKE_DRAWS))
-    .$usage("storage");
+  /** The band widths and the palette the record shaders derive their layers
+   * from. The first patch always writes it, and after that only a theme or a
+   * metric change does — so a camera move still writes one uniform. */
+  const chromeBuffer = root.createBuffer(Chrome, blankChrome()).$usage("uniform");
+  const strokeBuffer = root.createBuffer(arrayOf(StrokeNode, MAX_STROKE_DRAWS)).$usage("storage");
+  // One order buffer per draw-order band; a band's entries are the slots its
+  // nodes draw from, and band instances always index their band from 0. The
+  // bands come from the same table the adapter queues into, so the painter
+  // cannot play a band nothing fills, or miss one that something does.
+  const strokeOrder = byBand(() =>
+    root.createBuffer(arrayOf(u32, MAX_STROKE_DRAWS)).$usage("storage"),
+  );
   const circleBuffer = root.createBuffer(arrayOf(CircleInst, MAX_CIRCLES)).$usage("storage");
-  const circleRestOrderBuffer = root.createBuffer(arrayOf(u32, MAX_CIRCLES)).$usage("storage");
-  const circleHoverHaloOrderBuffer = root.createBuffer(arrayOf(u32, MAX_CIRCLES)).$usage("storage");
-  const circleHoverPaintOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_CIRCLES))
-    .$usage("storage");
-  const circleLiftedHaloOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_CIRCLES))
-    .$usage("storage");
-  const circleLiftedPaintOrderBuffer = root
-    .createBuffer(arrayOf(u32, MAX_CIRCLES))
-    .$usage("storage");
-  const pointBuffer = root.createBuffer(arrayOf(PointInst, MAX_POINTS)).$usage("storage");
-  const pointOrderBuffer = root.createBuffer(arrayOf(u32, MAX_POINTS)).$usage("storage");
+  const circleOrder = byBand(() => root.createBuffer(arrayOf(u32, MAX_CIRCLES)).$usage("storage"));
+  const pointBuffer = root.createBuffer(arrayOf(PointNode, MAX_POINTS)).$usage("storage");
+  const pointOrder = byBand(() => root.createBuffer(arrayOf(u32, MAX_POINTS)).$usage("storage"));
   const fillBuffer = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const fillOrderBuffer = root.createBuffer(arrayOf(u32, MAX_FILL_REGIONS)).$usage("storage");
   const fillSegBuffer = root.createBuffer(arrayOf(FillSeg, MAX_FILL_SEGS)).$usage("storage");
@@ -176,12 +170,12 @@ export function createPainter(opts: {
     .createBuffer(arrayOf(u32, MAX_FILL_REGIONS), identityOrder(MAX_FILL_REGIONS))
     .$usage("storage");
   const underStrokesBuf = root
-    .createBuffer(arrayOf(StrokeDraw, MAX_STROKE_DRAWS))
+    .createBuffer(arrayOf(StrokeNode, MAX_STROKE_DRAWS))
     .$usage("storage");
-  const overStrokesBuf = root.createBuffer(arrayOf(StrokeDraw, MAX_STROKE_DRAWS)).$usage("storage");
+  const overStrokesBuf = root.createBuffer(arrayOf(StrokeNode, MAX_STROKE_DRAWS)).$usage("storage");
   const underCirclesBuf = root.createBuffer(arrayOf(CircleInst, MAX_CIRCLES)).$usage("storage");
   const overCirclesBuf = root.createBuffer(arrayOf(CircleInst, MAX_CIRCLES)).$usage("storage");
-  const overPointsBuf = root.createBuffer(arrayOf(PointInst, MAX_POINTS)).$usage("storage");
+  const overPointsBuf = root.createBuffer(arrayOf(PointNode, MAX_POINTS)).$usage("storage");
   const underFillsBuf = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const overFillsBuf = root.createBuffer(arrayOf(FillRegion, MAX_FILL_REGIONS)).$usage("storage");
   const underEdgesBuf = root.createBuffer(arrayOf(FillSeg, MAX_FILL_SEGS)).$usage("storage");
@@ -214,56 +208,29 @@ export function createPainter(opts: {
     frame: frameBuffer,
     gridSpan: gridSpanBuffer,
   });
-  const strokeRestGroup = root.createBindGroup(strokeLayout, {
-    frame: frameBuffer,
-    strokes: strokeBuffer,
-    strokeOrder: strokeRestOrderBuffer,
-  });
-  const strokeHoverHaloGroup = root.createBindGroup(strokeLayout, {
-    frame: frameBuffer,
-    strokes: strokeBuffer,
-    strokeOrder: strokeHoverHaloOrderBuffer,
-  });
-  const strokeHoverPaintGroup = root.createBindGroup(strokeLayout, {
-    frame: frameBuffer,
-    strokes: strokeBuffer,
-    strokeOrder: strokeHoverPaintOrderBuffer,
-  });
-  const strokeLiftedHaloGroup = root.createBindGroup(strokeLayout, {
-    frame: frameBuffer,
-    strokes: strokeBuffer,
-    strokeOrder: strokeLiftedHaloOrderBuffer,
-  });
-  const strokeLiftedPaintGroup = root.createBindGroup(strokeLayout, {
-    frame: frameBuffer,
-    strokes: strokeBuffer,
-    strokeOrder: strokeLiftedPaintOrderBuffer,
-  });
-  const circleRestGroup = root.createBindGroup(circleLayout, {
-    frame: frameBuffer,
-    circles: circleBuffer,
-    circleOrder: circleRestOrderBuffer,
-  });
-  const circleHoverHaloGroup = root.createBindGroup(circleLayout, {
-    frame: frameBuffer,
-    circles: circleBuffer,
-    circleOrder: circleHoverHaloOrderBuffer,
-  });
-  const circleHoverPaintGroup = root.createBindGroup(circleLayout, {
-    frame: frameBuffer,
-    circles: circleBuffer,
-    circleOrder: circleHoverPaintOrderBuffer,
-  });
-  const circleLiftedHaloGroup = root.createBindGroup(circleLayout, {
-    frame: frameBuffer,
-    circles: circleBuffer,
-    circleOrder: circleLiftedHaloOrderBuffer,
-  });
-  const circleLiftedPaintGroup = root.createBindGroup(circleLayout, {
-    frame: frameBuffer,
-    circles: circleBuffer,
-    circleOrder: circleLiftedPaintOrderBuffer,
-  });
+  const strokeGroups = byBand((band) =>
+    root.createBindGroup(strokeLayout, {
+      frame: frameBuffer,
+      chrome: chromeBuffer,
+      strokes: strokeBuffer,
+      strokeOrder: strokeOrder[band],
+    }),
+  );
+  const circleGroups = byBand((band) =>
+    root.createBindGroup(circleLayout, {
+      frame: frameBuffer,
+      circles: circleBuffer,
+      circleOrder: circleOrder[band],
+    }),
+  );
+  const pointGroups = byBand((band) =>
+    root.createBindGroup(diskLayout, {
+      frame: frameBuffer,
+      chrome: chromeBuffer,
+      points: pointBuffer,
+      pointOrder: pointOrder[band],
+    }),
+  );
   const fillGroup = root.createBindGroup(fillLayout, {
     frame: frameBuffer,
     fills: fillBuffer,
@@ -279,18 +246,15 @@ export function createPainter(opts: {
     fieldSegs: fieldSegBuffer,
     fieldArcs: fieldArcBuffer,
   });
-  const diskGroup = root.createBindGroup(diskLayout, {
-    frame: frameBuffer,
-    points: pointBuffer,
-    pointOrder: pointOrderBuffer,
-  });
   const underStrokeGroup = root.createBindGroup(strokeLayout, {
     frame: frameBuffer,
+    chrome: chromeBuffer,
     strokes: underStrokesBuf,
     strokeOrder: strokeOrderId,
   });
   const overStrokeGroup = root.createBindGroup(strokeLayout, {
     frame: frameBuffer,
+    chrome: chromeBuffer,
     strokes: overStrokesBuf,
     strokeOrder: strokeOrderId,
   });
@@ -306,6 +270,7 @@ export function createPainter(opts: {
   });
   const overDiskGroup = root.createBindGroup(diskLayout, {
     frame: frameBuffer,
+    chrome: chromeBuffer,
     points: overPointsBuf,
     pointOrder: pointOrderId,
   });
@@ -329,57 +294,45 @@ export function createPainter(opts: {
     markOrder: markerOrderId,
   });
 
-  const strokeRest: StrokePipelines = createStrokePipelines(root, strokeRestGroup, opts.format);
-  const strokeHoverHalo: StrokePipelines = createStrokePipelines(
-    root,
-    strokeHoverHaloGroup,
-    opts.format,
+  // One pipeline per (kind × band), each built for the band's layers: the base
+  // layer and the instance count are baked into the shader, so a record never
+  // has to say which layer it is. `byBand` walks the table, so every band the
+  // adapter can queue into has a pipeline here.
+  const strokeBands: Record<InkBandName, StrokePipelines> = byBand((band) =>
+    createStrokePipelines(root, strokeGroups[band], opts.format, STROKE_BAND_LAYERS[band]!),
   );
-  const strokeHoverPaint: StrokePipelines = createStrokePipelines(
-    root,
-    strokeHoverPaintGroup,
-    opts.format,
+  const circleBands: Record<InkBandName, CirclePipelines> = byBand((band) =>
+    createCirclePipelines(root, circleGroups[band], opts.format),
   );
-  const strokeLiftedHalo: StrokePipelines = createStrokePipelines(
-    root,
-    strokeLiftedHaloGroup,
-    opts.format,
+  const pointBands: Record<InkBandName, DiskPipelines> = byBand((band) =>
+    createDiskPipelines(root, pointGroups[band], opts.format, POINT_BAND_LAYERS[band]!),
   );
-  const strokeLiftedPaint: StrokePipelines = createStrokePipelines(
-    root,
-    strokeLiftedPaintGroup,
-    opts.format,
-  );
-  const circleRest: CirclePipelines = createCirclePipelines(root, circleRestGroup, opts.format);
-  const circleHoverHalo: CirclePipelines = createCirclePipelines(
-    root,
-    circleHoverHaloGroup,
-    opts.format,
-  );
-  const circleHoverPaint: CirclePipelines = createCirclePipelines(
-    root,
-    circleHoverPaintGroup,
-    opts.format,
-  );
-  const circleLiftedHalo: CirclePipelines = createCirclePipelines(
-    root,
-    circleLiftedHaloGroup,
-    opts.format,
-  );
-  const circleLiftedPaint: CirclePipelines = createCirclePipelines(
-    root,
-    circleLiftedPaintGroup,
-    opts.format,
-  );
-  const disks: DiskPipelines = createDiskPipelines(root, diskGroup, opts.format);
   const fills: FillPipelines = createFillPipelines(root, fillGroup, opts.format);
   const grids: GridPipelines = createGridPipelines(root, gridGroup, opts.format, opts.gridColors);
 
-  const underStrokes: StrokePipelines = createStrokePipelines(root, underStrokeGroup, opts.format);
-  const overStrokes: StrokePipelines = createStrokePipelines(root, overStrokeGroup, opts.format);
+  /** A band of one paint layer: what an overlay draw replays, since a ghost
+   * carries its own colour and has no chrome of its own. */
+  const PAINT_ONLY = [LAYER_PAINT];
+  const underStrokes: StrokePipelines = createStrokePipelines(
+    root,
+    underStrokeGroup,
+    opts.format,
+    PAINT_ONLY,
+  );
+  const overStrokes: StrokePipelines = createStrokePipelines(
+    root,
+    overStrokeGroup,
+    opts.format,
+    PAINT_ONLY,
+  );
   const underCircles: CirclePipelines = createCirclePipelines(root, underCircleGroup, opts.format);
   const overCircles: CirclePipelines = createCirclePipelines(root, overCircleGroup, opts.format);
-  const overDisks: DiskPipelines = createDiskPipelines(root, overDiskGroup, opts.format);
+  const overDisks: DiskPipelines = createDiskPipelines(
+    root,
+    overDiskGroup,
+    opts.format,
+    PAINT_ONLY,
+  );
   const underFills: FillPipelines = createFillPipelines(root, underFillGroup, opts.format);
   const overFills: FillPipelines = createFillPipelines(root, overFillGroup, opts.format);
   const markers: MarkerPipelines = createMarkerPipelines(root, markerGroup, opts.format);
@@ -395,20 +348,14 @@ export function createPainter(opts: {
   });
   let imageDraws: readonly ImageDraw[] = [];
 
-  // Band sizes from the last applied patch (arrays are rewritten wholesale).
-  let strokeRestCount = 0;
-  let strokeHoverHaloCount = 0;
-  let strokeHoverPaintCount = 0;
-  let strokeLiftedHaloCount = 0;
-  let strokeLiftedPaintCount = 0;
-  let circleRestCount = 0;
-  let circleHoverHaloCount = 0;
-  let circleHoverPaintCount = 0;
-  let circleLiftedHaloCount = 0;
-  let circleLiftedPaintCount = 0;
+  // Band sizes from the last applied patch (arrays are rewritten wholesale), one
+  // per band per kind, plus the chrome the last patch carried.
+  const strokeCounts: Record<InkBandName, number> = byBand(() => 0);
+  const circleCounts: Record<InkBandName, number> = byBand(() => 0);
+  const pointCounts: Record<InkBandName, number> = byBand(() => 0);
+  let lastChrome: ChromeValue | undefined;
   let gridLines = 0;
   let axesVisible = false;
-  let pointCount = 0;
   /** World fill draws in band order (span fills and compiled fields mixed). */
   let fillDraws: readonly FillDraw[] = [];
   let underStrokeCount = 0;
@@ -448,30 +395,27 @@ export function createPainter(opts: {
     },
     applyPatch(patch) {
       writeChunkRuns(strokeBuffer, patch.strokes.chunks);
-      strokeRestOrderBuffer.write(patch.strokes.bands.rest);
-      strokeHoverHaloOrderBuffer.write(patch.strokes.bands.hoverHalo);
-      strokeHoverPaintOrderBuffer.write(patch.strokes.bands.hoverPaint);
-      strokeLiftedHaloOrderBuffer.write(patch.strokes.bands.liftedHalo);
-      strokeLiftedPaintOrderBuffer.write(patch.strokes.bands.liftedPaint);
-      strokeRestCount = patch.strokes.bands.rest.length;
-      strokeHoverHaloCount = patch.strokes.bands.hoverHalo.length;
-      strokeHoverPaintCount = patch.strokes.bands.hoverPaint.length;
-      strokeLiftedHaloCount = patch.strokes.bands.liftedHalo.length;
-      strokeLiftedPaintCount = patch.strokes.bands.liftedPaint.length;
+      for (const band of INK_BAND_ORDER) {
+        strokeOrder[band].write(patch.strokes.bands[band]);
+        strokeCounts[band] = patch.strokes.bands[band].length;
+      }
       circleBuffer.writePartial(patch.circles.writes);
-      circleRestOrderBuffer.write(patch.circles.bands.rest);
-      circleHoverHaloOrderBuffer.write(patch.circles.bands.hoverHalo);
-      circleHoverPaintOrderBuffer.write(patch.circles.bands.hoverPaint);
-      circleLiftedHaloOrderBuffer.write(patch.circles.bands.liftedHalo);
-      circleLiftedPaintOrderBuffer.write(patch.circles.bands.liftedPaint);
-      circleRestCount = patch.circles.bands.rest.length;
-      circleHoverHaloCount = patch.circles.bands.hoverHalo.length;
-      circleHoverPaintCount = patch.circles.bands.hoverPaint.length;
-      circleLiftedHaloCount = patch.circles.bands.liftedHalo.length;
-      circleLiftedPaintCount = patch.circles.bands.liftedPaint.length;
+      for (const band of INK_BAND_ORDER) {
+        circleOrder[band].write(patch.circles.bands[band]);
+        circleCounts[band] = patch.circles.bands[band].length;
+      }
       writeChunkRuns(pointBuffer, patch.points.chunks);
-      pointOrderBuffer.write(patch.points.order);
-      pointCount = patch.points.count;
+      for (const band of INK_BAND_ORDER) {
+        pointOrder[band].write(patch.points.bands[band]);
+        pointCounts[band] = patch.points.bands[band].length;
+      }
+      // The chrome is a handful of numbers a theme or a metric change moves, so
+      // a camera move still writes `Frame` alone. The first patch always writes
+      // it: nothing may draw before a band width has been stated.
+      if (lastChrome === undefined || !sameChrome(lastChrome, patch.chrome)) {
+        chromeBuffer.write(patch.chrome);
+        lastChrome = patch.chrome;
+      }
       fillBuffer.writePartial(patch.fills.writes);
       fillOrderBuffer.write(patch.fills.order);
       fillSegBuffer.writePartial(patch.fillSegs.writes);
@@ -559,44 +503,33 @@ export function createPainter(opts: {
       // Ink chrome bands, back-to-front per SVG pass order: every edge's paint
       // (rest), hover halos, hover paints, lifted halos, lifted paints —
       // strokes before circles within each band — so a selected edge's chrome
-      // stacks above a hovered circle's paint, and points stay topmost.
-      if (strokeRestCount > 0) {
-        const p = strokeRest.strokes(pass);
-        p.drawIndexed(strokeRest.indexCount, strokeRestCount);
+      // stacks above a hovered circle's paint, and points stay topmost. Each
+      // band's instance count is its entry count times the layers one entry
+      // draws, both from the same table the adapter queued into.
+      for (const band of INK_BAND_ORDER) {
+        const strokeCount = strokeCounts[band];
+        if (strokeCount > 0) {
+          const p = strokeBands[band].strokes(pass);
+          p.drawIndexed(
+            strokeBands[band].indexCount,
+            strokeCount * instancesPerEntry("strokes", band),
+          );
+        }
+        const circleCount = circleCounts[band];
+        if (circleCount > 0) {
+          circleBands[band].circles(pass).draw(CIRCLE_VERTEX_COUNT, circleCount);
+        }
       }
-      if (circleRestCount > 0) {
-        circleRest.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleRestCount);
+      // Points/gliders land topmost (render model: fills → ink → points), in the
+      // same pass order within the mark.
+      for (const band of INK_BAND_ORDER) {
+        const markCount = pointCounts[band];
+        if (markCount > 0) {
+          pointBands[band]
+            .points(pass)
+            .draw(DISK_VERTEX_COUNT, markCount * instancesPerEntry("points", band));
+        }
       }
-      if (strokeHoverHaloCount > 0) {
-        const p = strokeHoverHalo.strokes(pass);
-        p.drawIndexed(strokeHoverHalo.indexCount, strokeHoverHaloCount);
-      }
-      if (circleHoverHaloCount > 0) {
-        circleHoverHalo.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleHoverHaloCount);
-      }
-      if (strokeHoverPaintCount > 0) {
-        const p = strokeHoverPaint.strokes(pass);
-        p.drawIndexed(strokeHoverPaint.indexCount, strokeHoverPaintCount);
-      }
-      if (circleHoverPaintCount > 0) {
-        circleHoverPaint.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleHoverPaintCount);
-      }
-      if (strokeLiftedHaloCount > 0) {
-        const p = strokeLiftedHalo.strokes(pass);
-        p.drawIndexed(strokeLiftedHalo.indexCount, strokeLiftedHaloCount);
-      }
-      if (circleLiftedHaloCount > 0) {
-        circleLiftedHalo.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleLiftedHaloCount);
-      }
-      if (strokeLiftedPaintCount > 0) {
-        const p = strokeLiftedPaint.strokes(pass);
-        p.drawIndexed(strokeLiftedPaint.indexCount, strokeLiftedPaintCount);
-      }
-      if (circleLiftedPaintCount > 0) {
-        circleLiftedPaint.circles(pass).draw(CIRCLE_VERTEX_COUNT, circleLiftedPaintCount);
-      }
-      // Points/gliders land topmost (render model: fills → ink → points).
-      if (pointCount > 0) disks.points(pass).draw(DISK_VERTEX_COUNT, pointCount);
       // Tool ghost + snap overlay above the world (SVG ghost/snap marks).
       if (overFillCount > 0) overFills.fills(pass).draw(FILL_QUAD_VERTICES, overFillCount);
       // Square markers (snap diamonds) sit under the ghost marks, above the
@@ -615,30 +548,22 @@ export function createPainter(opts: {
       renderer.root.device.queue.submit([encoder.finish()]);
     },
     destroy() {
-      strokeRest.destroy();
-      strokeHoverHalo.destroy();
-      strokeHoverPaint.destroy();
-      strokeLiftedHalo.destroy();
-      strokeLiftedPaint.destroy();
+      for (const band of INK_BAND_ORDER) strokeBands[band].destroy();
+      underStrokes.destroy();
       underStrokes.destroy();
       overStrokes.destroy();
       fills.destroy();
       grids.destroy();
       frameBuffer.destroy();
+      chromeBuffer.destroy();
       strokeBuffer.destroy();
-      strokeRestOrderBuffer.destroy();
-      strokeHoverHaloOrderBuffer.destroy();
-      strokeHoverPaintOrderBuffer.destroy();
-      strokeLiftedHaloOrderBuffer.destroy();
-      strokeLiftedPaintOrderBuffer.destroy();
+      for (const band of INK_BAND_ORDER) {
+        strokeOrder[band].destroy();
+        circleOrder[band].destroy();
+        pointOrder[band].destroy();
+      }
       circleBuffer.destroy();
-      circleRestOrderBuffer.destroy();
-      circleHoverHaloOrderBuffer.destroy();
-      circleHoverPaintOrderBuffer.destroy();
-      circleLiftedHaloOrderBuffer.destroy();
-      circleLiftedPaintOrderBuffer.destroy();
       pointBuffer.destroy();
-      pointOrderBuffer.destroy();
       fillBuffer.destroy();
       fillOrderBuffer.destroy();
       fillSegBuffer.destroy();
@@ -669,6 +594,67 @@ export function createPainter(opts: {
       images.destroy();
     },
   };
+}
+
+/** One entry per band, keyed by `bands.ts`'s order. Anything a band needs — an
+ * order buffer, a bind group, a pipeline, a count — is built through this, so a
+ * band the table gains cannot be missing one of them here. */
+function byBand<T>(make: (band: InkBandName) => T): Record<InkBandName, T> {
+  return Object.fromEntries(INK_BAND_ORDER.map((band) => [band, make(band)])) as Record<
+    InkBandName,
+    T
+  >;
+}
+
+/**
+ * What the chrome uniform holds before any tick has said what the theme is.
+ *
+ * Every width is zero, so a band drawn from this state draws nothing at all:
+ * the view applies a patch before it asks for the first frame, and a frame
+ * without one has no world to draw either. The first patch always overwrites
+ * this (`applyPatch` compares against `undefined`, not against these numbers).
+ */
+function blankChrome(): ChromeValue {
+  return Chrome({
+    haloHalfPx: 0,
+    knockHalfPx: 0,
+    pointRingAddPx: 0,
+    pointKnockAddPx: 0,
+    pointOutlineAddPx: 0,
+    hoverAlpha: 0,
+    selectAlpha: 1,
+    mutedAlpha: 1,
+    ink: vec3f(0, 0, 0),
+    accent: vec3f(0, 0, 0),
+    selectedPaint: vec3f(0, 0, 0),
+    ring: vec3f(0, 0, 0),
+    paper: vec3f(0, 0, 0),
+  });
+}
+
+function sameRgb(a: v3f, b: v3f): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+/** Whether the chrome uniform has to be rewritten. Deliberately explicit rather
+ * than a serialized key: this runs once a tick, and a camera move should not
+ * allocate to discover that nothing about the theme changed. */
+function sameChrome(a: ChromeValue, b: ChromeValue): boolean {
+  return (
+    a.haloHalfPx === b.haloHalfPx &&
+    a.knockHalfPx === b.knockHalfPx &&
+    a.pointRingAddPx === b.pointRingAddPx &&
+    a.pointKnockAddPx === b.pointKnockAddPx &&
+    a.pointOutlineAddPx === b.pointOutlineAddPx &&
+    a.hoverAlpha === b.hoverAlpha &&
+    a.selectAlpha === b.selectAlpha &&
+    a.mutedAlpha === b.mutedAlpha &&
+    sameRgb(a.ink, b.ink) &&
+    sameRgb(a.accent, b.accent) &&
+    sameRgb(a.selectedPaint, b.selectedPaint) &&
+    sameRgb(a.ring, b.ring) &&
+    sameRgb(a.paper, b.paper)
+  );
 }
 
 /** [0..n-1] — overlay instances are always contiguous from slot 0. */

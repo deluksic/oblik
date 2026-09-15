@@ -1,3 +1,4 @@
+import { sizeOf } from "typegpu/data";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -17,6 +18,7 @@ import {
   inkSlotOf,
   instancesPerEntry,
   makeChromeValue,
+  MUTED_ALPHA,
   POINT_BAND_LAYERS,
   POINT_RIM_EXTRA_PX,
   STROKE_BAND_LAYERS,
@@ -24,6 +26,7 @@ import {
   type InkState,
 } from "./bands";
 import {
+  Chrome,
   LAYER_COUNT,
   LAYER_HALO,
   LAYER_KNOCKOUT,
@@ -222,6 +225,7 @@ describe("chrome widths", () => {
     expect(chrome.knockHalfPx).toBeCloseTo(edges.knockout / 2, 9);
     expect(chrome.hoverAlpha).toBe(DEFAULT_CHROME_METRICS.hoverOutlineOpacity);
     expect(chrome.selectAlpha).toBe(DEFAULT_CHROME_METRICS.selectOutlineOpacity);
+    expect(chrome.mutedAlpha).toBeCloseTo(MUTED_ALPHA, 6);
   });
 
   test("a mark's bands are measured from its own radius, not from a stroke's", () => {
@@ -308,6 +312,13 @@ describe("state and layer numbering", () => {
         expect(inkSlotOf(layer)).toBeLessThan(INK_LAYER_COUNT);
       }
     }
+  });
+
+  test("the chrome uniform is laid out for the uniform address space", () => {
+    // Every member naturally aligned, and the struct a multiple of its own
+    // 16-byte alignment: the rule WGSL's uniform layout imposes and TypeGPU's
+    // schema layout computes, so the shader's struct and the buffer agree.
+    expect(sizeOf(Chrome) % 16).toBe(0);
   });
 
   test("the state bits are single, distinct bits", () => {

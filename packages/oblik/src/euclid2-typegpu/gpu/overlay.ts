@@ -15,11 +15,9 @@ import {
   CircleInst,
   FillRegion,
   MarkerInst,
-  PointInst,
-  StrokeCtrl,
-  StrokeDraw,
-  StrokeRun,
-  RUN_GEOM_TWO_POINT,
+  PointNode,
+  STATE_EXPLICIT,
+  StrokeNode,
 } from "./schemas";
 
 const TAU = Math.PI * 2;
@@ -52,8 +50,8 @@ export type Rgb = readonly [number, number, number];
 
 export type CircleInstValue = ReturnType<typeof CircleInst>;
 export type FillRegionValue = ReturnType<typeof FillRegion>;
-export type PointInstValue = ReturnType<typeof PointInst>;
-export type StrokeDrawValue = ReturnType<typeof StrokeDraw>;
+export type PointNodeValue = ReturnType<typeof PointNode>;
+export type StrokeNodeValue = ReturnType<typeof StrokeNode>;
 export type MarkerInstValue = ReturnType<typeof MarkerInst>;
 
 /** Per-frame ghost/snap geometry. `under` sits between the grid and the world
@@ -64,15 +62,15 @@ export type OverlayPatch = {
   under: {
     fills: FillRegionValue[];
     spans: SpanSet;
-    strokes: StrokeDrawValue[];
+    strokes: StrokeNodeValue[];
     circles: CircleInstValue[];
   };
   over: {
     fills: FillRegionValue[];
     spans: SpanSet;
-    strokes: StrokeDrawValue[];
+    strokes: StrokeNodeValue[];
     circles: CircleInstValue[];
-    disks: PointInstValue[];
+    disks: PointNodeValue[];
     markers: MarkerInstValue[];
   };
 };
@@ -94,14 +92,17 @@ const px = (cssPx: number, scale: number) => cssPx / scale;
 const rgbv = (c: Rgb) => vec3f(c[0], c[1], c[2]);
 const centerOf = (p: Vec2) => vec2f(p.x, p.y);
 
-function twoPoint(a: Vec2, b: Vec2, color: Rgb, alpha: number, radiusPx: number): StrokeDrawValue {
-  const ctrl = (p: Vec2) => StrokeCtrl({ position: centerOf(p), radiusPx });
-  return StrokeDraw({
-    a: ctrl(a),
-    b: ctrl(a),
-    c: ctrl(b),
-    d: ctrl(b),
-    run: StrokeRun({ color: rgbv(color), alpha, start: 0, count: 0, flags: RUN_GEOM_TWO_POINT }),
+/** A ghost's own run: both endpoints, its own colour and alpha, and the
+ * `STATE_EXPLICIT` bit that tells the shader to use them instead of deriving a
+ * layer from the node's state (a ghost has no state to derive from). */
+function twoPoint(a: Vec2, b: Vec2, color: Rgb, alpha: number, radiusPx: number): StrokeNodeValue {
+  return StrokeNode({
+    a: centerOf(a),
+    b: centerOf(b),
+    halfPx: radiusPx,
+    state: STATE_EXPLICIT,
+    color: rgbv(color),
+    alpha,
   });
 }
 
@@ -139,7 +140,7 @@ function forEachDash(
 /** Straight dashes between `a` and `b` (dash pattern starts at `a`). Dash
  * lengths are constant on screen: 5/4 CSS px → world 5/4 per `scale`. */
 function dashSegment(
-  out: StrokeDrawValue[],
+  out: StrokeNodeValue[],
   a: Vec2,
   b: Vec2,
   color: Rgb,
@@ -170,7 +171,7 @@ function dashSegment(
  * ends. */
 function dashArc(
   circles: CircleInstValue[],
-  disks: PointInstValue[],
+  disks: PointNodeValue[],
   center: Vec2,
   radius: number,
   a0: number,
@@ -187,10 +188,8 @@ function dashArc(
     x: center.x + Math.cos(ang) * radius,
     y: center.y + Math.sin(ang) * radius,
   });
-  const cap = (p: Vec2) =>
-    disks.push(
-      PointInst({ center: centerOf(p), radiusPx: halfWidthPx, color: rgbv(color), alpha }),
-    );
+  // A dash's round cap is its own dot, drawn with the dash's colour.
+  const cap = (p: Vec2) => disks.push(dot(p, halfWidthPx, color, alpha));
   forEachDash(arcLen, DASH_ON / scale, DASH_GAP / scale, (s0, s1) => {
     if (s1 - s0 < 1e-6) return true;
     const ang0 = a0 + dir * (s0 / radius);
@@ -240,14 +239,25 @@ function ring(
 }
 
 function disc(
-  out: PointInstValue[],
+  out: PointNodeValue[],
   center: Vec2,
   radiusPx: number,
   color: Rgb,
   alpha: number,
 ): void {
   if (radiusPx <= 0) return;
-  out.push(PointInst({ center: centerOf(center), radiusPx, color: rgbv(color), alpha }));
+  out.push(dot(center, radiusPx, color, alpha));
+}
+
+/** The overlay's own dot: one explicit mark record, no chrome of its own. */
+function dot(at: Vec2, radiusPx: number, color: Rgb, alpha: number): PointNodeValue {
+  return PointNode({
+    center: centerOf(at),
+    markRadiusPx: radiusPx,
+    state: STATE_EXPLICIT,
+    color: rgbv(color),
+    alpha,
+  });
 }
 
 // -- fill islands ---------------------------------------------------------------
@@ -306,9 +316,9 @@ function closeChain(chain: readonly LoopEdge[]): LoopEdge[] | undefined {
 
 /** Dashed outline over a chain of world edges (arcs along their carriers). */
 function dashChain(
-  strokes: StrokeDrawValue[],
+  strokes: StrokeNodeValue[],
   circles: CircleInstValue[],
-  disks: PointInstValue[],
+  disks: PointNodeValue[],
   edges: readonly LoopEdge[],
   color: Rgb,
   alpha: number,
@@ -339,9 +349,9 @@ function dashChain(
 /** Dashed outline of one closed ghost loop: a carrier walk closed back to its
  * start, or a full circle. */
 function dashLoop(
-  strokes: StrokeDrawValue[],
+  strokes: StrokeNodeValue[],
   circles: CircleInstValue[],
-  disks: PointInstValue[],
+  disks: PointNodeValue[],
   loop: Loop,
   color: Rgb,
   alpha: number,
@@ -368,7 +378,7 @@ function dashLoop(
 
 /** Solid shaft + filled arrowhead (SVG ghostArrow + ghostArrowHead). */
 function pushArrow(
-  strokes: StrokeDrawValue[],
+  strokes: StrokeNodeValue[],
   fills: FillRegionValue[],
   spans: SpanSet,
   arrow: { at: Vec2; tx: number; ty: number },
@@ -411,7 +421,7 @@ function pushArrow(
 /** Straight/arcless paint for one ghost trace node (mirrors SVG TraceGhost:
  * fills + muted ink, whole band at 0.55). */
 function pushTraceNode(
-  strokes: StrokeDrawValue[],
+  strokes: StrokeNodeValue[],
   circles: CircleInstValue[],
   node: TraceNode,
   cam: Camera2,
@@ -442,15 +452,9 @@ function pushTraceNode(
   if (!ends) return;
   const a = ends.a;
   const b = ends.b;
-  strokes.push(
-    StrokeDraw({
-      a: StrokeCtrl({ position: vec2f(2 * a.x - b.x, 2 * a.y - b.y), radiusPx: halfStrokePx }),
-      b: StrokeCtrl({ position: vec2f(a.x, a.y), radiusPx: halfStrokePx }),
-      c: StrokeCtrl({ position: vec2f(b.x, b.y), radiusPx: halfStrokePx }),
-      d: StrokeCtrl({ position: vec2f(2 * b.x - a.x, 2 * b.y - a.y), radiusPx: halfStrokePx }),
-      run: StrokeRun({ color: rgbv(color), alpha, start: 0, count: 0, flags: 0 }),
-    }),
-  );
+  // A preview is a plain run between the two clipped endpoints: the shader's
+  // own round caps make the ends, so there are no mirrored neighbours to build.
+  strokes.push(twoPoint(a, b, color, alpha, halfStrokePx));
 }
 
 function nodeEnds(node: TraceNode, cam: Camera2, size: PaneSize): { a: Vec2; b: Vec2 } | undefined {

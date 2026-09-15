@@ -4,17 +4,26 @@ import {
   lineSegmentIndices,
   LineControlPoint,
   lineVariableWidth,
-  polylineVariableWidth,
   startCapSlot,
 } from "@typegpu/geometry";
 import { tgpu } from "typegpu";
 import type { TgpuBindGroup, TgpuRoot } from "typegpu";
 import { arrayOf, builtin, f32, interpolate, u16, u32, vec2f, vec3f, vec4f } from "typegpu/data";
-import { max } from "typegpu/std";
+import { max, select } from "typegpu/std";
 
 import { worldPerPx } from "../frame";
 import { strokeLayout } from "../layout";
-import { MAX_JOIN_COUNT, RUN_GEOM_TWO_POINT } from "../schemas";
+import {
+  LAYER_HALO,
+  LAYER_KNOCKOUT,
+  LAYER_PAINT,
+  MAX_JOIN_COUNT,
+  STATE_EDITABLE,
+  STATE_EXPLICIT,
+  STATE_HOT,
+  STATE_MUTED,
+  STATE_SELECTED,
+} from "../schemas";
 
 /** World → clip through the Frame uniform; affine, so it commutes with the
  * library's homogeneous w-multiply trick. Matches euclid2/camera.ts worldToScreen:
@@ -32,49 +41,86 @@ const toClip = tgpu.fn(
   return vec4f(ndc * w, 0, w);
 });
 
-export const strokeVertex = tgpu.vertexFn({
-  in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
-  out: {
-    outPos: builtin.position,
-    color: interpolate("flat", vec3f),
-    alpha: interpolate("flat", f32),
-  },
-})(({ instanceIndex, vertexIndex }) => {
-  "use gpu";
-  const draw = strokeLayout.$.strokes[strokeLayout.$.strokeOrder[instanceIndex]];
-  if (draw.a.radiusPx < 0 || draw.b.radiusPx < 0 || draw.c.radiusPx < 0 || draw.d.radiusPx < 0) {
-    return { outPos: vec4f(), color: vec3f(), alpha: 0 };
-  }
-  // Half widths are CSS px in the record: the expander works in world units, so
-  // one zoom-independent conversion here covers all four ctrl points.
-  const w = worldPerPx(strokeLayout.$.frame.scale);
-  // Two-point geometry (halo/knockout chrome of a straight stroke): a plain
-  // round-capped segment between draw.b and draw.c, via lineVariableWidth.
-  // Paint instances use the mirrored-neighbour polyline encoding (draw.a/d),
-  // whose round joins produce the paint's round caps.
-  if ((draw.run.flags & RUN_GEOM_TWO_POINT) !== u32(0)) {
+/**
+ * A stroke band's vertex shader, compiled for that band's layers.
+ *
+ * The record says what is true of the *node* — its run, its paint half width,
+ * and a state word — and the band says which layer is drawing. So the shader has
+ * its base layer and its layer count baked in, and picks an instance's layer from
+ * the instance's parity: a band's layers are adjacent by construction, which is
+ * what `bands.ts` promises and what lets one record stand for all of them. There
+ * is nothing in a record that says "halo" or "paint", and nothing here that
+ * renumbers a layer.
+ */
+function makeStrokeVertex(base: number, count: number) {
+  return tgpu.vertexFn({
+    in: { instanceIndex: builtin.instanceIndex, vertexIndex: builtin.vertexIndex },
+    out: {
+      outPos: builtin.position,
+      color: interpolate("flat", vec3f),
+      alpha: interpolate("flat", f32),
+    },
+  })(({ instanceIndex, vertexIndex }) => {
+    "use gpu";
+    const layer = u32(base) + (instanceIndex % u32(count));
+    const rec = strokeLayout.$.strokes[strokeLayout.$.strokeOrder[instanceIndex / u32(count)]];
+    const chrome = strokeLayout.$.chrome;
+    const hot = (rec.state & u32(STATE_HOT)) !== u32(0);
+    const selected = (rec.state & u32(STATE_SELECTED)) !== u32(0);
+    const editable = (rec.state & u32(STATE_EDITABLE)) !== u32(0);
+    const muted = (rec.state & u32(STATE_MUTED)) !== u32(0);
+    const explicit = (rec.state & u32(STATE_EXPLICIT)) !== u32(0);
+    // The record's half width is the paint's; the chrome bands take theirs from
+    // the frame, and a band that is not drawing is a zero width, never a flag.
+    let halfPx = rec.halfPx;
+    let color = select(chrome.ink, select(chrome.accent, chrome.selectedPaint, hot), editable);
+    let alpha = select(f32(1), chrome.mutedAlpha, muted);
+    if (explicit) {
+      // The tool overlay's own colour and alpha. Scene ink never sets the bit,
+      // so its colour lane stays empty and the state derives it instead.
+      color = vec3f(rec.color);
+      alpha = f32(rec.alpha);
+    } else if (layer === u32(LAYER_HALO)) {
+      halfPx = f32(chrome.haloHalfPx);
+      color = vec3f(chrome.ring);
+      alpha = select(chrome.hoverAlpha, chrome.selectAlpha, selected);
+    } else if (layer === u32(LAYER_KNOCKOUT)) {
+      halfPx = select(f32(0), chrome.knockHalfPx, selected);
+      color = vec3f(chrome.paper);
+      alpha = f32(1);
+    }
+    // A dead band draws nothing, and it has to be culled here: the expander's
+    // homogeneous weight is `1 / radius`.
+    if (halfPx <= 0) {
+      return { outPos: vec4f(), color: vec3f(), alpha: 0 };
+    }
+    // Half widths are CSS px in the record: the expander works in world units, so
+    // one zoom-independent conversion here covers both endpoints.
+    const w = worldPerPx(strokeLayout.$.frame.scale);
     const r = lineVariableWidth(
-      LineControlPoint({ position: draw.b.position, radius: draw.b.radiusPx * w }),
-      LineControlPoint({ position: draw.c.position, radius: draw.c.radiusPx * w }),
+      LineControlPoint({ position: rec.a, radius: halfPx * w }),
+      LineControlPoint({ position: rec.b, radius: halfPx * w }),
       vertexIndex,
       MAX_JOIN_COUNT,
     );
-    return { outPos: toClip(r.vertexPosition, r.w), color: draw.run.color, alpha: draw.run.alpha };
-  }
-  const result = polylineVariableWidth(
-    LineControlPoint({ position: draw.a.position, radius: draw.a.radiusPx * w }),
-    LineControlPoint({ position: draw.b.position, radius: draw.b.radiusPx * w }),
-    LineControlPoint({ position: draw.c.position, radius: draw.c.radiusPx * w }),
-    LineControlPoint({ position: draw.d.position, radius: draw.d.radiusPx * w }),
-    vertexIndex,
-    MAX_JOIN_COUNT,
-  );
-  return {
-    outPos: toClip(result.vertexPosition, result.w),
-    color: draw.run.color,
-    alpha: draw.run.alpha,
-  };
-});
+    return { outPos: toClip(r.vertexPosition, r.w), color, alpha };
+  });
+}
+
+/** The paint band replays the record itself. */
+export const strokeVertexPaint = makeStrokeVertex(LAYER_PAINT, 1);
+/** A chrome band replays the adjacent halo/knockout pair off one entry. */
+export const strokeVertexHalo = makeStrokeVertex(LAYER_HALO, 2);
+
+/** The shader a band draws with, from the band's layers (`bands.ts`). Throwing
+ * rather than defaulting is deliberate: a band whose base layer has no shader is
+ * a band that would draw nothing. */
+export function strokeVertexFor(layers: readonly number[]): typeof strokeVertexPaint {
+  const base = layers[0]!;
+  if (base === LAYER_PAINT) return strokeVertexPaint;
+  if (base === LAYER_HALO) return strokeVertexHalo;
+  throw new Error(`no stroke shader is built for a band based on layer ${base}`);
+}
 
 const strokeFragment = tgpu.fragmentFn({
   in: { color: interpolate("flat", vec3f), alpha: interpolate("flat", f32) },
@@ -102,6 +148,7 @@ export function createStrokePipelines(
   root: TgpuRoot,
   bindGroup: TgpuBindGroup,
   format: GPUTextureFormat,
+  layers: readonly number[],
 ): StrokePipelines {
   const indices = lineSegmentIndices(MAX_JOIN_COUNT);
   const indexBuffer = root.createBuffer(arrayOf(u16, indices.length), indices).$usage("index");
@@ -109,14 +156,13 @@ export function createStrokePipelines(
 
   const targets = { format, blend: alphaBlend };
 
-  // Round caps: two-point chrome instances end at their real endpoints, so the
-  // cap slots draw the semicircles. Paint instances never hit the cap path
-  // (their mirrored neighbours are never contained), so round is safe there too.
+  // Round caps: the run's own endpoints are what the record carries, so the cap
+  // slots draw the semicircles at both ends.
   const strokePipeline = root
     .with(startCapSlot, caps.round)
     .with(endCapSlot, caps.round)
     .createRenderPipeline({
-      vertex: strokeVertex,
+      vertex: strokeVertexFor(layers),
       fragment: strokeFragment,
       targets,
       multisample: { count: 4 },

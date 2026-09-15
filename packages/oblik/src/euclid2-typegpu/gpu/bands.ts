@@ -122,6 +122,11 @@ export function inkSlotOf(layer: number): number {
 export const POINT_RADIUS_TRIM_PX = 1;
 export const POINT_RIM_EXTRA_PX = 0.5;
 
+/** Opacity of muted ink (chrome.mutePoints/scope) — the SVG's `.muted` element
+ * opacity. The shaders derive it from the record's `STATE_MUTED` bit, so it is
+ * a chrome number like any other rather than a constant in two shaders. */
+export const MUTED_ALPHA = 0.32;
+
 export type InkPalette = {
   ink: readonly [number, number, number];
   accent: readonly [number, number, number];
@@ -168,6 +173,7 @@ export function makeChromeValue(
     pointOutlineAddPx: finite("pointOutlineAddPx", POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX),
     hoverAlpha: finite("hoverAlpha", metrics.hoverOutlineOpacity),
     selectAlpha: finite("selectAlpha", metrics.selectOutlineOpacity),
+    mutedAlpha: MUTED_ALPHA,
     ink: token(colors, "ink"),
     accent: token(colors, "accent"),
     selectedPaint: token(colors, "selectedPaint"),

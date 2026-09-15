@@ -3,7 +3,7 @@ import { arrayOf, f32, sizeOf, struct } from "typegpu/data";
 import { describe, expect, test } from "vitest";
 
 import { CHUNK, createRecordPool, type ChunkRun } from "./recordPool";
-import { StrokeDraw } from "./schemas";
+import { StrokeNode } from "./schemas";
 
 /**
  * The batch contract, which a GPU error once enforced the hard way: the offset
@@ -175,8 +175,8 @@ describe("record pool staging", () => {
     // `sizeOf` of the very shapes the buffer was laid out with.
     expect(CHUNK_BYTES).toBe(CHUNK * STRIDE);
     expect(POOL_BYTES).toBe(CAPACITY * STRIDE);
-    const strokeStride = sizeOf(arrayOf(StrokeDraw, 1));
-    expect(sizeOf(arrayOf(StrokeDraw, CHUNK))).toBe(CHUNK * strokeStride);
+    const strokeStride = sizeOf(arrayOf(StrokeNode, 1));
+    expect(sizeOf(arrayOf(StrokeNode, CHUNK))).toBe(CHUNK * strokeStride);
     expect(CHUNK_BYTES % 4).toBe(0);
   });
 });

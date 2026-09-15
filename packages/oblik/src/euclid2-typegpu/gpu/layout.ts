@@ -2,6 +2,7 @@ import { tgpu } from "typegpu";
 import { arrayOf, f32, texture2d, u32 } from "typegpu/data";
 
 import {
+  Chrome,
   CircleInst,
   FieldLeaf,
   FieldQuad,
@@ -24,14 +25,17 @@ import {
   MAX_MARKERS,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
-  PointInst,
-  StrokeDraw,
+  PointNode,
+  StrokeNode,
 } from "./schemas";
 
 /** One bind group layout per pipeline: WebGPU caps storage buffers at 8 per
  * shader stage, and a pipeline counts every binding its layout makes visible,
  * so each pipeline binds only the buffers its shaders actually read. The
- * `frame` uniform is repeated per layout and shared buffer across groups. */
+ * `frame` and `chrome` uniforms are repeated per layout and shared across
+ * groups — a record shader reads a band's width and its colour from the chrome,
+ * which is why the ink and mark layouts carry it and the fill/field ones do
+ * not. */
 
 export const gridLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
@@ -40,7 +44,8 @@ export const gridLayout = tgpu.bindGroupLayout({
 
 export const strokeLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
-  strokes: { storage: arrayOf(StrokeDraw, MAX_STROKE_DRAWS) },
+  chrome: { uniform: Chrome },
+  strokes: { storage: arrayOf(StrokeNode, MAX_STROKE_DRAWS) },
   strokeOrder: { storage: arrayOf(u32, MAX_STROKE_DRAWS) },
 });
 
@@ -71,7 +76,8 @@ export const fieldLayout = tgpu.bindGroupLayout({
 
 export const diskLayout = tgpu.bindGroupLayout({
   frame: { uniform: Frame },
-  points: { storage: arrayOf(PointInst, MAX_POINTS) },
+  chrome: { uniform: Chrome },
+  points: { storage: arrayOf(PointNode, MAX_POINTS) },
   pointOrder: { storage: arrayOf(u32, MAX_POINTS) },
 });
 

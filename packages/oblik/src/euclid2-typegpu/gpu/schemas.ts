@@ -17,8 +17,8 @@ export const MAX_FILL_SEGS = 8192;
 /** Arc boundary spans of the span-pass fills; rare (≤ 50 in the demo) because
  * arcs are their own record kind now, so they get their own gate. */
 export const MAX_FILL_ARCS = 1024;
-/** Instanced disc slots (up to 4 per point node: halo ring, knockout, paper
- * outline, paint); shared by all layered discs of a point. */
+/** Pooled mark slots: one per point/glider node, whose four disc layers the
+ * shader derives from the record and the frame's chrome. */
 export const MAX_POINTS = 4096;
 /** Screen-space square markers (snap diamonds and friends). */
 export const MAX_MARKERS = 256;
@@ -72,6 +72,9 @@ export const Chrome = struct({
   /** Ring opacity while hovered, and while selected. */
   hoverAlpha: f32,
   selectAlpha: f32,
+  /** Element opacity of muted ink (chrome.mutePoints/scope), the one the SVG
+   * writes as `.muted`. */
+  mutedAlpha: f32,
   /** The palette a record's state selects from (see `STATE_*`), in the theme's
    * own terms: `--oblik-ink`, `--oblik-accent`, `--oblik-selected-paint`,
    * `--oblik-ring`, `--oblik-paper`. */
@@ -171,52 +174,6 @@ export const GridSpan = struct({
   axis: vec2u,
 });
 export type GridSpanValue = Infer<typeof GridSpan>;
-
-/** Bit flags on StrokeRun.flags. */
-export const RUN_MUTED = 1 << 0;
-export const RUN_DASHED = 1 << 1;
-/** Instance geometry is a plain two-point segment (lineVariableWidth on b→c),
- * not the mirrored-neighbour polyline encoding. */
-export const RUN_GEOM_TWO_POINT = 1 << 2;
-
-export const StrokeCtrl = struct({
-  position: vec2f,
-  /** Half width in CSS px (see `MarkerInst`); negative disconnects the run. */
-  radiusPx: f32,
-});
-export type StrokeCtrlValue = Infer<typeof StrokeCtrl>;
-
-export const StrokeRun = struct({
-  color: vec3f,
-  alpha: f32,
-  /** Ctrl-point range within the run's ctrl array (adapter bookkeeping). */
-  start: u32,
-  count: u32,
-  flags: u32,
-});
-export type StrokeRunValue = Infer<typeof StrokeRun>;
-
-/** One instanced polyline segment: 4 ctrl points (prev, from, to, next). */
-export const StrokeDraw = struct({
-  a: StrokeCtrl,
-  b: StrokeCtrl,
-  c: StrokeCtrl,
-  d: StrokeCtrl,
-  run: StrokeRun,
-});
-export type StrokeDrawValue = Infer<typeof StrokeDraw>;
-
-/** One layered disc of a point/glider mark: paint, paper outline, knockout,
- * or hover/select halo. Instances draw in `pointOrder` so discs stack
- * back-to-front like the SVG PointMark; radiusPx <= 0 culls the disc. */
-export const PointInst = struct({
-  center: vec2f,
-  /** Disc radius in CSS px. */
-  radiusPx: f32,
-  color: vec3f,
-  alpha: f32,
-});
-export type PointInstValue = Infer<typeof PointInst>;
 
 /** One screen-space square marker: `center` is world, the extents are CSS px
  * along the square's local axes, `angle` rotates in screen space (π/4 draws a

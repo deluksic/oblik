@@ -2,10 +2,10 @@ import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
 import { circleVertex } from "./circles";
-import { diskVertex } from "./disks";
+import { markVertexExplicit, markVertexHalo, markVertexPaint } from "./disks";
 import { fillFragment, haloFragment } from "./fills";
 import { imageFragment, imageVertex } from "./images";
-import { strokeVertex } from "./strokes";
+import { strokeVertexHalo, strokeVertexPaint } from "./strokes";
 
 /**
  * The span-pass fragments, resolved device-free. The interesting property is
@@ -84,21 +84,102 @@ describe("record widths are CSS px", () => {
     expect(wgsl).toContain("((*region).edgeWidthPx * w)");
   });
 
-  test("the stroke vertex shader converts all four ctrl radii", () => {
-    const wgsl = tgpu.resolve([strokeVertex]);
-    expect(occurrences(wgsl, "radiusPx: f32")).toBe(1);
-    // Four cull reads by name, then every radius that reaches the expander goes
-    // through the px→world conversion: two for the two-point pair, four for the
-    // mirrored-neighbour quad. One shared conversion for all six.
-    expect(occurrences(wgsl, "radiusPx * w")).toBe(6);
-    expect(occurrences(wgsl, "radiusPx < 0f")).toBe(4);
-    expect(occurrences(wgsl, "worldPerPx(frame.scale)")).toBe(1);
+  /**
+   * One record stands for several layers without any of them being renumbered:
+   * a band's base layer and its layer count are immediates in the generated
+   * code, and an instance picks its layer by parity. That is the property the
+   * prototype broke — a rest band that asked for the halo layer of a cold
+   * stroke — so it is pinned here as text, and by `bands.test.ts` as data.
+   */
+  test("a stroke band's layer comes from the band and the instance", () => {
+    const paint = tgpu.resolve([strokeVertexPaint]);
+    const halo = tgpu.resolve([strokeVertexHalo]);
+
+    // The paint band replays the paint layer, one instance per entry.
+    expect(paint).toContain("let layer = (3u + (instanceIndex % 1u));");
+    expect(paint).toContain("strokeOrder[u32((f32(instanceIndex) / 1f))]");
+    // The chrome band replays the adjacent pair: halo, then knockout.
+    expect(halo).toContain("let layer = (0u + (instanceIndex % 2u));");
+    expect(halo).toContain("strokeOrder[u32((f32(instanceIndex) / 2f))]");
+
+    // The record holds the run and the state; nothing per layer.
+    expect(paint).toContain("let rec = (&strokes[");
+    expect(paint).not.toContain("radiusPx");
+    expect(paint).not.toContain(".run");
+    expect(paint).not.toContain("flags");
+    // One expander call (the second occurrence is its own declaration), and no
+    // mirrored-neighbour polyline left anywhere.
+    expect(occurrences(paint, "= lineVariableWidth(")).toBe(1);
+    expect(paint).not.toContain("polylineVariableWidth");
   });
 
-  test("the disk vertex shader converts its px radius", () => {
-    const wgsl = tgpu.resolve([diskVertex]);
-    expect(occurrences(wgsl, "radiusPx: f32")).toBe(1);
-    expect(wgsl).toContain("worldPerPx(frame.scale)");
+  test("the chrome bands read their width and colour from the frame", () => {
+    const halo = tgpu.resolve([strokeVertexHalo]);
+    // The halo's width and colour are the frame's, at the state's opacity...
+    expect(halo).toContain("halfPx = (*chrome).haloHalfPx;");
+    expect(halo).toContain("color = (*chrome).ring;");
+    expect(halo).toContain(
+      "alpha = select((*chrome).hoverAlpha, (*chrome).selectAlpha, selected);",
+    );
+    // ...and a knockout that is not selected is a zero width, not a flag.
+    expect(halo).toContain("halfPx = select(0f, (*chrome).knockHalfPx, selected);");
+    expect(halo).toContain("color = (*chrome).paper;");
+    // Scene ink derives its paint from the palette, in the SVG's promotion order.
+    const paint = tgpu.resolve([strokeVertexPaint]);
+    expect(paint).toContain(
+      "select((*chrome).ink, select((*chrome).accent, (*chrome).selectedPaint, hot), editable)",
+    );
+    expect(paint).toContain("select(1f, (*chrome).mutedAlpha, muted)");
+    // The overlay's records carry their own colour through the explicit bit.
+    expect(paint).toContain("if (explicit_1) {");
+    // A dead band culls before the expander: its weight is `1 / radius`.
+    expect(paint).toContain("if ((halfPx <= 0f)) {");
+  });
+
+  test("every record width is CSS px, converted once through the zoom", () => {
+    for (const code of [tgpu.resolve([strokeVertexPaint]), tgpu.resolve([markVertexPaint])]) {
+      expect(occurrences(code, "worldPerPx(frame.scale)")).toBe(1);
+      expect(code).toContain("worldPerPx(frame.scale)");
+    }
+    // The stroke's two radii go through one shared conversion; the record's own
+    // width, never a world-space number.
+    const paint = tgpu.resolve([strokeVertexPaint]);
+    expect(paint).toContain("let w = worldPerPx(frame.scale);");
+    expect(occurrences(paint, "(halfPx * w)")).toBe(2);
+  });
+
+  /**
+   * A mark's four discs are four layers of one record, each measured from the
+   * mark's own paint radius. The rim is the SVG's paint stroke, the ring and the
+   * knockout are chrome, and the overlay's dots are a one-layer band whose
+   * record carries its colour — which is why the base layer is what decides.
+   */
+  test("a mark band offsets one record's radius by the frame's chrome", () => {
+    const paint = tgpu.resolve([markVertexPaint]);
+    const halo = tgpu.resolve([markVertexHalo]);
+    const explicit = tgpu.resolve([markVertexExplicit]);
+
+    expect(paint).toContain("let layer = (2u + (instanceIndex % 2u));");
+    expect(paint).toContain("radiusPx = ((*rec).markRadiusPx + (*chrome).pointOutlineAddPx);");
+    expect(paint).toContain("color = (*chrome).paper;");
+
+    expect(halo).toContain("let layer = (0u + (instanceIndex % 2u));");
+    expect(halo).toContain("select(0f, ((*rec).markRadiusPx + (*chrome).pointRingAddPx), hot)");
+    expect(halo).toContain(
+      "select(0f, ((*rec).markRadiusPx + (*chrome).pointKnockAddPx), selected)",
+    );
+
+    // One instance per entry, and the record's own colour: a ghost's dot.
+    expect(explicit).toContain("let layer = (3u + (instanceIndex % 1u));");
+    expect(explicit).toContain("pointOrder[u32((f32(instanceIndex) / 1f))]");
+    expect(explicit).toContain("color = (*rec).color;");
+    expect(explicit).toContain("radiusPx = (*rec).markRadiusPx;");
+
+    // Every mark layer is a disc of the record's own radius: no per-layer record.
+    for (const code of [paint, halo, explicit]) {
+      expect(code).toContain("let pos = ((*rec).center + (circle(vertexIndex) * radius));");
+      expect(code).not.toContain(".radiusPx");
+    }
   });
 
   test("the circle vertex shader derives the band and the fan budget", () => {

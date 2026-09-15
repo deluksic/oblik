@@ -10,11 +10,22 @@ import { infiniteLineAxis } from "#geom/ops";
 import { infiniteClip, screenToWorld, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
 import type { Ghost, PlaceHit } from "../../euclid2/tool";
-import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euclid2/view/chrome";
+import { DEFAULT_CHROME_METRICS, overlayBands } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
 import { imageQuad, imageRect, isImage, type ImageValue } from "../../eval/image";
-import { POINT_RADIUS_TRIM_PX, POINT_RIM_EXTRA_PX } from "./bands";
+import {
+  bandsFor,
+  CIRCLE_BAND_LAYERS,
+  INK_BAND_ORDER,
+  INK_LAYER_COUNT,
+  inkSlotOf,
+  makeChromeValue,
+  MUTED_ALPHA,
+  POINT_RADIUS_TRIM_PX,
+  type InkBandName,
+  type InkState,
+} from "./bands";
 import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
 import {
   blockWindows,
@@ -29,6 +40,7 @@ import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
 import { createRecordPool, type ChunkRun } from "./recordPool";
 import type {
+  ChromeValue,
   CircleInstValue,
   FieldLeafValue,
   FieldQuadValue,
@@ -36,9 +48,8 @@ import type {
   FillRegionValue,
   FillSegValue,
   ImageInstValue,
-  PointInstValue,
-  StrokeCtrlValue,
-  StrokeDrawValue,
+  PointNodeValue,
+  StrokeNodeValue,
 } from "./schemas";
 import {
   CircleInst,
@@ -57,34 +68,17 @@ import {
   MAX_IMAGES,
   MAX_POINTS,
   MAX_STROKE_DRAWS,
-  PointInst,
-  RUN_GEOM_TWO_POINT,
-  RUN_MUTED,
-  StrokeCtrl,
-  StrokeDraw,
-  StrokeRun,
+  PointNode,
+  STATE_EDITABLE,
+  STATE_HOT,
+  STATE_MUTED,
+  STATE_SELECTED,
+  StrokeNode,
 } from "./schemas";
 import { createSlotPool } from "./slots";
 import { pushArcWrites, pushSegWrites, type SpanWrite } from "./spanRecords";
 
 const TAU = Math.PI * 2;
-/** Muted (chrome.mutePoints/scope) opacity — matches the SVG `.muted` rule. */
-const MUTED_ALPHA = 0.32;
-
-/** Layered disc slots of one point/glider node, back-to-front: halo ring,
- * selected knockout, paper outline, paint. Culled layers carry radiusPx <= 0. */
-const POINT_DISC_COUNT = 4;
-const RING = 0;
-const KNOCKOUT = 1;
-const OUTLINE = 2;
-const PAINT = 3;
-
-/** Layered draw slots of one ink (stroke/circle) node, back-to-front: halo
- * ring, selected knockout, paint. Culled layers carry radiusPx <= 0. */
-const INK_DISC_COUNT = 3;
-const INK_HALO = 0;
-const INK_KNOCKOUT = 1;
-const INK_PAINT = 2;
 
 export type Rgb = readonly [number, number, number];
 
@@ -119,23 +113,10 @@ export type SlotPatch<T> = {
   count: number;
 };
 
-/** Draw-order bands per ink kind, mirroring the SVG chrome pass order: rest
- * paints, hover halos, hover paints, lifted halos, lifted paints. The painter
- * plays these bands back-to-front per kind so a hovered/selected node's chrome
- * lands above every rest paint yet below points, and selected chrome lands
- * above hovered chrome regardless of shape kind. */
-export type InkBands = {
-  /** Paint draws of idle nodes. */
-  rest: Uint32Array;
-  /** Halo ring + knockout draws of hovered (not selected) nodes. */
-  hoverHalo: Uint32Array;
-  /** Paint draws of hovered (not selected) nodes. */
-  hoverPaint: Uint32Array;
-  /** Halo ring + knockout draws of selected nodes. */
-  liftedHalo: Uint32Array;
-  /** Paint draws of selected nodes. */
-  liftedPaint: Uint32Array;
-};
+/** One order list per draw-order band. The bands and their order come from
+ * `bands.ts`'s table, so the painter plays what the adapter queued and neither
+ * side lists the five names twice. */
+export type InkBands = Record<InkBandName, Uint32Array>;
 
 /** One world fill draw: a node's fill or its halo chrome. Fills are
  * translucent, so paint order is the SVG's band order; a compiled field and a
@@ -168,8 +149,8 @@ export type TickPatch = {
   };
   /** World fill draws, in band order (span fills and compiled fields mixed). */
   fillDraws: FillDraw[];
-  /** Pooled point/glider marks, on the same chunked path as the strokes. */
-  points: { chunks: ChunkRun[]; order: Uint32Array; count: number };
+  /** Pooled point/glider marks, on the same chunked path and bands. */
+  points: { chunks: ChunkRun[]; bands: InkBands };
   /** Raster references: one byte-diffed quad per node, plus the draw list that
    * pairs each slot with the source whose texture paints it. The adapter names
    * the source but never touches a bitmap — loading is the GPU layer's. */
@@ -179,6 +160,10 @@ export type TickPatch = {
   };
   /** Tool overlay (ghost previews + snap markers), rebuilt every tick. */
   overlay: OverlayPatch;
+  /** The band widths and palette the record shaders derive their layers from:
+   * a function of the theme and the chrome metrics rather than of any node, so
+   * a theme switch rewrites this and no record at all. */
+  chrome: ChromeValue;
   stats: { written: number; total: number };
 };
 
@@ -242,14 +227,14 @@ export function createAdapter(): Adapter {
   // Pooled records come first: a released range stops being its key's, so what
   // was staged there has to be forgotten — that is the hooks below.
   const strokeRecords = createRecordPool({
-    element: StrokeDraw,
+    element: StrokeNode,
     count: MAX_STROKE_DRAWS,
-    make: makeStrokeDraw,
+    make: makeStrokeNode,
   });
   const pointRecords = createRecordPool({
-    element: PointInst,
+    element: PointNode,
     count: MAX_POINTS,
-    make: makePointInst,
+    make: makePointNode,
   });
 
   const strokePool = createSlotPool(MAX_STROKE_DRAWS, {
@@ -272,18 +257,11 @@ export function createAdapter(): Adapter {
   const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
   const imagePool = createSlotPool(MAX_IMAGES);
 
-  // Per-tick scratch, owned here and reused: a node's layers, the payload a
-  // layer's record is filled from, and the signature it is compared by. None of
-  // these is allocated per node, which is the point of pooling the records.
-  const strokeInputs = blankLayers(INK_DISC_COUNT) as StrokeLayers;
-  const pointInputs = blankLayers(POINT_DISC_COUNT) as PointLayers;
-  const strokeFill: StrokeFill = {
-    a: { x: 0, y: 0 },
-    b: { x: 0, y: 0 },
-    twoPoint: false,
-    layer: blankLayer(),
-  };
-  const pointFill: PointFill = { at: { x: 0, y: 0 }, layer: blankLayer() };
+  // Per-tick scratch, owned here and reused: the payload a pooled record is
+  // filled from, and the signature it is compared by. Neither is allocated per
+  // node, which is the point of pooling the records.
+  const strokeFill: StrokeFill = { a: { x: 0, y: 0 }, b: { x: 0, y: 0 }, halfPx: 0, state: 0 };
+  const pointFill: PointFill = { at: { x: 0, y: 0 }, markRadiusPx: 0, state: 0 };
   const strokeSig = new Float64Array(STROKE_SIG_LANES);
   const pointSig = new Float64Array(POINT_SIG_LANES);
 
@@ -377,17 +355,9 @@ export function createAdapter(): Adapter {
     // --- lifted halos, lifted paints. The painter interleaves strokes and
     // --- circles within each band so chrome stacks per-state, not per-shape:
     // --- a hovered circle's paint sits under a selected edge's halo.
-    const strokeRest: number[] = [];
-    const strokeHoverHalo: number[] = [];
-    const strokeHoverPaint: number[] = [];
-    const strokeLiftedHalo: number[] = [];
-    const strokeLiftedPaint: number[] = [];
+    const strokeLists = blankLists();
     const circleWrites: { idx: number; value: CircleInstValue }[] = [];
-    const circleRest: number[] = [];
-    const circleHoverHalo: number[] = [];
-    const circleHoverPaint: number[] = [];
-    const circleLiftedHalo: number[] = [];
-    const circleLiftedPaint: number[] = [];
+    const circleLists = blankLists();
 
     const inkBand = splitChrome(ink, (n) => isSelected(n, input.selectedKey), white);
     // Every width below is CSS px, not world units: the shaders scale them by
@@ -427,47 +397,42 @@ export function createAdapter(): Adapter {
     const edgeWidthPx = strokePx;
 
     /**
-     * One pooled record per layer of a stroke node, staged only if the layer's
-     * inputs moved. The layers are derived as numbers first, so an unchanged node
-     * never builds a record at all; each `touch` compares the signature, fills the
-     * pooled record from the same scratch payload and serializes it, in one call.
+     * One pooled record per stroke node, staged only if its inputs moved.
+     *
+     * The record says what is true of the node — its run, its half width, and the
+     * state word both shaders derive the rest of the layer from — while the band
+     * says which layer is drawing. That is what turns three records per stroke
+     * into one, and why a hover moves a state word rather than rebuilding a
+     * record's geometry.
      */
-    const emitStrokeLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
+    const emitStrokeInk = (n: TraceNode, state: InkState): void => {
       const ends = strokeEndpoints(n, cam, size);
       if (!ends) return;
-      const start = strokePool.alloc(nodeKey(n), INK_DISC_COUNT);
-      if (start === undefined) return;
-      const hot = white(n);
-      const selected = isSelected(n, input.selectedKey);
-      strokeLayersInto(
-        strokeInputs,
-        colors,
-        hot,
-        selected,
-        n.editable,
-        input.muted(n) && !hot,
-        halfStrokePx,
-        outlineHalfPx,
-        knockoutHalfPx,
-      );
-      for (let i = 0; i < INK_DISC_COUNT; i++) {
-        const layer = strokeInputs[i]!;
-        writeStrokeSig(strokeSig, ends.a, ends.b, layer);
-        strokeFill.a = ends.a;
-        strokeFill.b = ends.b;
-        strokeFill.twoPoint = i !== INK_PAINT;
-        strokeFill.layer = layer;
-        strokeRecords.touch(start + i, strokeSig, fillStroke, strokeFill);
-      }
-      for (const layer of layers) {
-        if (strokeInputs[layer]!.radiusPx > 0) into.push(start + layer);
-      }
+      const slot = strokePool.alloc(nodeKey(n), 1);
+      if (slot === undefined) return;
+      const hot = state !== "rest";
+      const selected = state === "lifted";
+      const word = stateWord(n, hot, selected, input.muted(n) && !hot);
+      writeStrokeSig(strokeSig, ends.a, ends.b, halfStrokePx, word);
+      strokeFill.a = ends.a;
+      strokeFill.b = ends.b;
+      strokeFill.halfPx = halfStrokePx;
+      strokeFill.state = word;
+      strokeRecords.touch(slot, strokeSig, fillStroke, strokeFill);
+      queue(strokeLists, bandsFor(state, input.showHalos), slot);
     };
-    const emitCircleLayers = (n: TraceNode, layers: readonly number[], into: number[]): void => {
-      const start = circlePool.alloc(nodeKey(n), INK_DISC_COUNT);
+    /**
+     * A circle still keeps one record per layer: its three bands carry what a
+     * stroke's single record would have to derive (a half width, a colour, an
+     * alpha each), and its geometry is analytic rather than a record of two
+     * endpoints. The shared layer numbers map to its slots through `inkSlotOf`,
+     * so there is still only one numbering.
+     */
+    const emitCircleInk = (n: TraceNode, state: InkState): void => {
+      const start = circlePool.alloc(nodeKey(n), INK_LAYER_COUNT);
       if (start === undefined) return;
-      const hot = white(n);
-      const selected = isSelected(n, input.selectedKey);
+      const hot = state !== "rest";
+      const selected = state === "lifted";
       const discs = circleInkDiscs(
         n,
         colors,
@@ -479,62 +444,22 @@ export function createAdapter(): Adapter {
         input.muted(n) && !hot,
       );
       if (diff(lastCircle, nodeKey(n), start, encodeCircles(discs))) {
-        for (let i = 0; i < INK_DISC_COUNT; i++) {
+        for (let i = 0; i < INK_LAYER_COUNT; i++) {
           circleWrites.push({ idx: start + i, value: discs[i]! });
         }
       }
-      for (const layer of layers) {
-        if (discs[layer]!.halfPx > 0) into.push(start + layer);
+      for (const band of bandsFor(state, input.showHalos)) {
+        for (const layer of CIRCLE_BAND_LAYERS[band]) {
+          const slot = inkSlotOf(layer);
+          if (discs[slot]!.halfPx > 0) circleLists[band]!.push(start + slot);
+        }
       }
     };
-    const emitInk = (n: TraceNode, layers: readonly number[], sInto: number[], cInto: number[]) =>
-      n.value.kind === "circle"
-        ? emitCircleLayers(n, layers, cInto)
-        : emitStrokeLayers(n, layers, sInto);
-    // Halos off while dragging (SVG parity): the five chrome passes collapse
-    // to paint-only rest/hover/lifted passes.
-    const passes: { nodes: TraceNode[]; layers: readonly number[]; s: number[]; c: number[] }[] =
-      input.showHalos
-        ? [
-            { nodes: inkBand.rest, layers: [INK_PAINT], s: strokeRest, c: circleRest },
-            {
-              nodes: inkBand.hover,
-              layers: [INK_HALO, INK_KNOCKOUT],
-              s: strokeHoverHalo,
-              c: circleHoverHalo,
-            },
-            {
-              nodes: inkBand.hover,
-              layers: [INK_PAINT],
-              s: strokeHoverPaint,
-              c: circleHoverPaint,
-            },
-            {
-              nodes: inkBand.lifted,
-              layers: [INK_HALO, INK_KNOCKOUT],
-              s: strokeLiftedHalo,
-              c: circleLiftedHalo,
-            },
-            {
-              nodes: inkBand.lifted,
-              layers: [INK_PAINT],
-              s: strokeLiftedPaint,
-              c: circleLiftedPaint,
-            },
-          ]
-        : [
-            { nodes: inkBand.rest, layers: [INK_PAINT], s: strokeRest, c: circleRest },
-            { nodes: inkBand.hover, layers: [INK_PAINT], s: strokeHoverPaint, c: circleHoverPaint },
-            {
-              nodes: inkBand.lifted,
-              layers: [INK_PAINT],
-              s: strokeLiftedPaint,
-              c: circleLiftedPaint,
-            },
-          ];
-    for (const pass of passes) {
-      for (const n of pass.nodes) emitInk(n, pass.layers, pass.s, pass.c);
-    }
+    const emitInk = (n: TraceNode, state: InkState): void =>
+      n.value.kind === "circle" ? emitCircleInk(n, state) : emitStrokeInk(n, state);
+    for (const n of inkBand.rest) emitInk(n, "rest");
+    for (const n of inkBand.hover) emitInk(n, "hover");
+    for (const n of inkBand.lifted) emitInk(n, "lifted");
 
     // --- fills (rest → hover → lifted). A `csg2` tree whose operands are all
     // --- single scalar fields is drawn by the compiled-field pass (no island
@@ -667,49 +592,34 @@ export function createAdapter(): Adapter {
 
     // --- points (SVG PointMark passes: rest dots, hover halo, hover dot,
     // --- lifted halos, lifted dots — each node's discs stack back-to-front)
-    const pointOrder: number[] = [];
+    const pointLists = blankLists();
     const pointBand = splitChrome(
       points,
       (n) => isSelected(n, input.selectedKey),
       (n) => isHot(n, input.hoverKey, input.selectedKey),
     );
-    /** Allocate a mark's 4 disc slots, stage the layers whose inputs moved, and
-     * queue the back-to-front subset `layers` (only active discs reach the
-     * order) — the same pooled path the strokes take, one payload per layer. */
-    const emitPointLayers = (n: TraceNode, layers: readonly number[]) => {
+    /** One pooled record per mark, on the same bands as the strokes: the four
+     * concentric discs are the mark's layers, and a band replays the two that
+     * belong to it (rim+paint, or ring+knockout). */
+    const emitPointInk = (n: TraceNode, state: InkState): void => {
       const at = pointCenter(n);
       if (!at) return;
-      const start = pointPool.alloc(nodeKey(n), POINT_DISC_COUNT);
-      if (start === undefined) return;
-      const hot = isHot(n, input.hoverKey, input.selectedKey);
-      const selected = isSelected(n, input.selectedKey);
-      pointLayersInto(pointInputs, input.colors, n.editable, hot, selected, input.muted(n) && !hot);
-      for (let i = 0; i < POINT_DISC_COUNT; i++) {
-        const layer = pointInputs[i]!;
-        writePointSig(pointSig, at, layer);
-        pointFill.at = at;
-        pointFill.layer = layer;
-        pointRecords.touch(start + i, pointSig, fillPoint, pointFill);
-      }
-      for (const layer of layers) {
-        if (pointInputs[layer]!.radiusPx > 0) pointOrder.push(start + layer);
-      }
+      const slot = pointPool.alloc(nodeKey(n), 1);
+      if (slot === undefined) return;
+      const hot = state !== "rest";
+      const selected = state === "lifted";
+      const word = stateWord(n, hot, selected, input.muted(n) && !hot);
+      const markRadiusPx = pointMarkRadius(n.editable) - POINT_RADIUS_TRIM_PX;
+      writePointSig(pointSig, at, markRadiusPx, word);
+      pointFill.at = at;
+      pointFill.markRadiusPx = markRadiusPx;
+      pointFill.state = word;
+      pointRecords.touch(slot, pointSig, fillPoint, pointFill);
+      queue(pointLists, bandsFor(state, input.showHalos), slot);
     };
-    // Back-to-front per SVG PointMark passes: a node's halo/knockout discs are
-    // queued *before* its outline+paint so the chrome sits under the paint
-    // (a halo disc is a full disc out to R+outline — drawn after the paint it
-    // would cover the dot). While dragging, halos are skipped entirely.
-    if (input.showHalos) {
-      for (const n of pointBand.rest) emitPointLayers(n, [OUTLINE, PAINT]);
-      for (const n of pointBand.hover) emitPointLayers(n, [RING, KNOCKOUT]);
-      for (const n of pointBand.hover) emitPointLayers(n, [OUTLINE, PAINT]);
-      for (const n of pointBand.lifted) emitPointLayers(n, [RING, KNOCKOUT]);
-      for (const n of pointBand.lifted) emitPointLayers(n, [OUTLINE, PAINT]);
-    } else {
-      for (const n of pointBand.rest) emitPointLayers(n, [OUTLINE, PAINT]);
-      for (const n of pointBand.hover) emitPointLayers(n, [OUTLINE, PAINT]);
-      for (const n of pointBand.lifted) emitPointLayers(n, [OUTLINE, PAINT]);
-    }
+    for (const n of pointBand.rest) emitPointInk(n, "rest");
+    for (const n of pointBand.hover) emitPointInk(n, "hover");
+    for (const n of pointBand.lifted) emitPointInk(n, "lifted");
 
     // Every record has been touched: the pools hand back the runs of the buffer
     // that moved, one write each, and say how many records those runs carry.
@@ -719,26 +629,8 @@ export function createAdapter(): Adapter {
     const pointStaged = pointRecords.flush((run) => pointRuns.push(run));
 
     return {
-      strokes: {
-        chunks: strokeRuns,
-        bands: {
-          rest: Uint32Array.from(strokeRest),
-          hoverHalo: Uint32Array.from(strokeHoverHalo),
-          hoverPaint: Uint32Array.from(strokeHoverPaint),
-          liftedHalo: Uint32Array.from(strokeLiftedHalo),
-          liftedPaint: Uint32Array.from(strokeLiftedPaint),
-        },
-      },
-      circles: {
-        writes: circleWrites,
-        bands: {
-          rest: Uint32Array.from(circleRest),
-          hoverHalo: Uint32Array.from(circleHoverHalo),
-          hoverPaint: Uint32Array.from(circleHoverPaint),
-          liftedHalo: Uint32Array.from(circleLiftedHalo),
-          liftedPaint: Uint32Array.from(circleLiftedPaint),
-        },
-      },
+      strokes: { chunks: strokeRuns, bands: bandArrays(strokeLists) },
+      circles: { writes: circleWrites, bands: bandArrays(circleLists) },
       fills: {
         writes: fillWrites,
         order: Uint32Array.from(fillOrder),
@@ -757,13 +649,10 @@ export function createAdapter(): Adapter {
         arcs: { writes: fieldArcWrites },
       },
       fillDraws,
-      points: {
-        chunks: pointRuns,
-        order: Uint32Array.from(pointOrder),
-        count: pointOrder.length,
-      },
+      points: { chunks: pointRuns, bands: bandArrays(pointLists) },
       images: { writes: imageWrites, draws: imageDraws },
       overlay,
+      chrome: makeChromeValue(colors, strokePx),
       stats: {
         written:
           strokeStaged +
@@ -934,166 +823,45 @@ function strokeEndpoints(
 
 // -- ink layers: inputs first, then pooled records ---------------------------
 
-/** One layer of a node's ink: the numbers its record holds, minus the geometry
- * every layer of that node shares. Layers are derived into these *first* and
- * compared as a signature, so a node whose inputs stood still never builds a
- * record at all — which is the whole cost this pool removes. */
-type InkLayer = { radiusPx: number; color: Rgb; alpha: number; flags: number };
-
-/** A stroke's layers, back to front: halo, knockout, paint. */
-type StrokeLayers = [InkLayer, InkLayer, InkLayer];
-
-/** A mark's layers, back to front: ring, knockout, paper rim, paint. */
-type PointLayers = [InkLayer, InkLayer, InkLayer, InkLayer];
-
-function blankLayer(): InkLayer {
-  return { radiusPx: 0, color: [0, 0, 0], alpha: 1, flags: 0 };
+/** The state word a node's record carries. Both pooled shaders read it instead
+ * of the geometry the old per-layer records encoded, so a hover, a select or an
+ * editability flip moves a word rather than rebuilding a record's geometry. */
+function stateWord(n: TraceNode, hot: boolean, selected: boolean, muted: boolean): number {
+  let state = 0;
+  if (hot) state |= STATE_HOT;
+  if (selected) state |= STATE_SELECTED;
+  if (n.editable) state |= STATE_EDITABLE;
+  if (muted) state |= STATE_MUTED;
+  return state;
 }
 
-function blankLayers(count: number): InkLayer[] {
-  return Array.from({ length: count }, blankLayer);
+/** A pooled stroke record's payload: the run, and the state the shader derives
+ * the rest of the layer from. Reused per node so filling one allocates nothing. */
+type StrokeFill = { a: Vec2; b: Vec2; halfPx: number; state: number };
+
+/** A pooled mark's payload. */
+type PointFill = { at: Vec2; markRadiusPx: number; state: number };
+
+/** Write one pooled stroke record in place. Colour and alpha stay empty: scene
+ * ink derives both from the state, and the overlay's records — which fill them —
+ * live in their own buffers. */
+function fillStroke(record: StrokeNodeValue, args: StrokeFill): void {
+  record.a.x = args.a.x;
+  record.a.y = args.a.y;
+  record.b.x = args.b.x;
+  record.b.y = args.b.y;
+  record.halfPx = args.halfPx;
+  record.state = args.state;
 }
 
-function setLayer(
-  target: InkLayer,
-  color: Rgb,
-  alpha: number,
-  radiusPx: number,
-  flags: number,
-): void {
-  target.radiusPx = radiusPx;
-  target.color = color;
-  target.alpha = alpha;
-  target.flags = flags;
-}
-
-/** The three stroke layers of one node: halo ring (hot), knockout (selected),
- * paint. An inactive layer carries radiusPx -1 and never reaches the draw order.
- * The chrome layers take the two-point shape and the paint takes the
- * mirrored-neighbour polyline, both of which produce the same round caps. */
-function strokeLayersInto(
-  out: StrokeLayers,
-  colors: AdapterInput["colors"],
-  hot: boolean,
-  selected: boolean,
-  editable: boolean,
-  muted: boolean,
-  halfStrokePx: number,
-  outlineHalfPx: number,
-  knockoutHalfPx: number,
-): void {
-  const haloAlpha = selected
-    ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
-    : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
-  setLayer(out[INK_HALO]!, colors.ring, haloAlpha, hot ? outlineHalfPx : -1, RUN_GEOM_TWO_POINT);
-  setLayer(out[INK_KNOCKOUT]!, colors.paper, 1, selected ? knockoutHalfPx : -1, RUN_GEOM_TWO_POINT);
-  setLayer(
-    out[INK_PAINT]!,
-    hot ? colors.selectedPaint : editable ? colors.accent : colors.ink,
-    muted ? MUTED_ALPHA : 1,
-    halfStrokePx,
-    muted ? RUN_MUTED : 0,
-  );
-}
-
-/** The four concentric discs of one mark, back to front: halo ring (hot),
- * selected knockout, the always-on paper rim under the paint, then the paint
- * itself. Inactive layers carry radiusPx -1 so the vertex shader culls them;
- * muted fades the mark (rim and paint) like the SVG `.muted` element opacity. */
-function pointLayersInto(
-  out: PointLayers,
-  colors: AdapterInput["colors"],
-  editable: boolean,
-  hot: boolean,
-  selected: boolean,
-  muted: boolean,
-): void {
-  const markR = pointMarkRadius(editable) - POINT_RADIUS_TRIM_PX;
-  const markAlpha = muted ? MUTED_ALPHA : 1;
-  // Halo ring: hover at 0.5, selected at 1.0 (chrome pointOutlinePx).
-  setLayer(
-    out[RING]!,
-    colors.ring,
-    selected
-      ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
-      : DEFAULT_CHROME_METRICS.hoverOutlineOpacity,
-    hot ? markR + DEFAULT_CHROME_METRICS.pointOutlinePx / 2 : -1,
-    0,
-  );
-  // Selected knockout gap in paper (chrome pointKnockoutPx).
-  setLayer(
-    out[KNOCKOUT]!,
-    colors.paper,
-    1,
-    selected ? markR + DEFAULT_CHROME_METRICS.pointKnockoutPx / 2 : -1,
-    0,
-  );
-  // Normal knockout: paper rim beneath the paint disc (SVG paint stroke,
-  // POINT_STROKE_PX + 0.5).
-  setLayer(
-    out[OUTLINE]!,
-    colors.paper,
-    markAlpha,
-    markR + POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX,
-    0,
-  );
-  // The paint disc itself.
-  setLayer(
-    out[PAINT]!,
-    hot ? colors.selectedPaint : editable ? colors.accent : colors.ink,
-    markAlpha,
-    markR,
-    0,
-  );
-}
-
-/** A pooled stroke record's payload: the run, its shape, and the layer's own
- * numbers. Reused per node so filling one costs no allocation. */
-type StrokeFill = { a: Vec2; b: Vec2; twoPoint: boolean; layer: InkLayer };
-
-/** A mark's pooled-record payload. */
-type PointFill = { at: Vec2; layer: InkLayer };
-
-function setCtrl(ctrl: StrokeCtrlValue, x: number, y: number, radiusPx: number): void {
-  ctrl.position.x = x;
-  ctrl.position.y = y;
-  ctrl.radiusPx = radiusPx;
-}
-
-/** Write one pooled stroke record in place: the two-point shape (`a↔b` twice,
- * the endpoints themselves) or the mirrored-neighbour polyline
- * (`2b−c, b, c, 2c−b`) whose round joins make the paint's round caps. Both
- * expanders put the same shape on screen for a straight run; the two-point one
- * is what a chrome layer uses because it needs no neighbours. */
-function fillStroke(record: StrokeDrawValue, args: StrokeFill): void {
-  const { a, b, layer } = args;
-  if (args.twoPoint) {
-    setCtrl(record.a, a.x, a.y, layer.radiusPx);
-    setCtrl(record.b, a.x, a.y, layer.radiusPx);
-    setCtrl(record.c, b.x, b.y, layer.radiusPx);
-    setCtrl(record.d, b.x, b.y, layer.radiusPx);
-  } else {
-    setCtrl(record.a, 2 * a.x - b.x, 2 * a.y - b.y, layer.radiusPx);
-    setCtrl(record.b, a.x, a.y, layer.radiusPx);
-    setCtrl(record.c, b.x, b.y, layer.radiusPx);
-    setCtrl(record.d, 2 * b.x - a.x, 2 * b.y - a.y, layer.radiusPx);
-  }
-  record.run.color.r = layer.color[0];
-  record.run.color.g = layer.color[1];
-  record.run.color.b = layer.color[2];
-  record.run.alpha = layer.alpha;
-  record.run.flags = layer.flags;
-}
-
-/** Write one pooled mark record in place. */
-function fillPoint(record: PointInstValue, args: PointFill): void {
+/** Write one pooled mark record in place. The paint radius is the record's own,
+ * because it is the one number the SVG's chrome recipe measures every layer's
+ * offset from; the rest of the mark is the frame's. */
+function fillPoint(record: PointNodeValue, args: PointFill): void {
   record.center.x = args.at.x;
   record.center.y = args.at.y;
-  record.radiusPx = args.layer.radiusPx;
-  record.color.r = args.layer.color[0];
-  record.color.g = args.layer.color[1];
-  record.color.b = args.layer.color[2];
-  record.alpha = args.layer.alpha;
+  record.markRadiusPx = args.markRadiusPx;
+  record.state = args.state;
 }
 
 /** Where a mark sits: a point's own position, or the spot a glider is on. */
@@ -1103,55 +871,72 @@ function pointCenter(n: TraceNode): Vec2 | undefined {
   return isGlider(v) ? gliderAt(v) : undefined;
 }
 
-function blankCtrl(): StrokeCtrlValue {
-  return StrokeCtrl({ position: vec2f(0, 0), radiusPx: 0 });
-}
-
 /** A blank stroke record: the pool's `make`, called once per slot that ever
  * stages and mutated in place from then on. */
-function makeStrokeDraw(): StrokeDrawValue {
-  return StrokeDraw({
-    a: blankCtrl(),
-    b: blankCtrl(),
-    c: blankCtrl(),
-    d: blankCtrl(),
-    run: StrokeRun({ color: vec3f(0, 0, 0), alpha: 1, start: 0, count: 0, flags: 0 }),
+function makeStrokeNode(): StrokeNodeValue {
+  return StrokeNode({
+    a: vec2f(0, 0),
+    b: vec2f(0, 0),
+    halfPx: 0,
+    state: 0,
+    color: vec3f(0, 0, 0),
+    alpha: 1,
   });
 }
 
-function makePointInst(): PointInstValue {
-  return PointInst({ center: vec2f(0, 0), radiusPx: 0, color: vec3f(0, 0, 0), alpha: 0 });
+function makePointNode(): PointNodeValue {
+  return PointNode({
+    center: vec2f(0, 0),
+    markRadiusPx: 0,
+    state: 0,
+    color: vec3f(0, 0, 0),
+    alpha: 1,
+  });
+}
+
+/** The per-tick order lists, one array per band, filled by the emission and
+ * turned into the patch's `Uint32Array`s at the end of the tick. */
+type InkLists = Record<InkBandName, number[]>;
+
+function blankLists(): InkLists {
+  return { rest: [], hoverHalo: [], hoverPaint: [], liftedHalo: [], liftedPaint: [] };
+}
+
+/** Queue a slot into every band its state draws in: `bandsFor` is the one place
+ * that set is decided, and these lists are the only thing a draw reads. */
+function queue(lists: InkLists, bands: readonly InkBandName[], slot: number): void {
+  for (const band of bands) lists[band]!.push(slot);
+}
+
+function bandArrays(lists: InkLists): InkBands {
+  const out = {} as InkBands;
+  for (const band of INK_BAND_ORDER) out[band] = Uint32Array.from(lists[band]!);
+  return out;
 }
 
 // -- signatures ---------------------------------------------------------------
 
-/** Every number a stroke layer's record is made of, and nothing else: compare
- * these and the upload is decided before anything is built. */
-const STROKE_SIG_LANES = 10;
+/** Every number a stroke record is made of, and nothing else: compare these and
+ * the upload is decided before anything is built. Scene ink's colour and alpha
+ * are not here because the shader derives them from the state. */
+const STROKE_SIG_LANES = 6;
 
-function writeStrokeSig(sig: Float64Array, a: Vec2, b: Vec2, layer: InkLayer): void {
+function writeStrokeSig(sig: Float64Array, a: Vec2, b: Vec2, halfPx: number, state: number): void {
   sig[0] = a.x;
   sig[1] = a.y;
   sig[2] = b.x;
   sig[3] = b.y;
-  sig[4] = layer.radiusPx;
-  sig[5] = layer.color[0];
-  sig[6] = layer.color[1];
-  sig[7] = layer.color[2];
-  sig[8] = layer.alpha;
-  sig[9] = layer.flags;
+  sig[4] = halfPx;
+  sig[5] = state;
 }
 
-const POINT_SIG_LANES = 7;
+const POINT_SIG_LANES = 4;
 
-function writePointSig(sig: Float64Array, at: Vec2, layer: InkLayer): void {
+function writePointSig(sig: Float64Array, at: Vec2, markRadiusPx: number, state: number): void {
   sig[0] = at.x;
   sig[1] = at.y;
-  sig[2] = layer.radiusPx;
-  sig[3] = layer.color[0];
-  sig[4] = layer.color[1];
-  sig[5] = layer.color[2];
-  sig[6] = layer.alpha;
+  sig[2] = markRadiusPx;
+  sig[3] = state;
 }
 
 /** The three layered annuli of one circle node (halo ring, knockout, paint),
@@ -1173,7 +958,7 @@ function circleInkDiscs(
   const r = Math.abs(v.radius);
   const cx = v.center.x;
   const cy = v.center.y;
-  const disc = (band: number, color: Rgb, alpha: number, flags = 0): CircleInstValue =>
+  const disc = (band: number, color: Rgb, alpha: number): CircleInstValue =>
     CircleInst({
       center: vec2f(cx, cy),
       radius: r,
@@ -1182,7 +967,7 @@ function circleInkDiscs(
       a1: TAU,
       color: vec3f(color[0], color[1], color[2]),
       alpha,
-      flags,
+      flags: 0,
     });
   const haloAlpha = selected
     ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
@@ -1191,7 +976,7 @@ function circleInkDiscs(
   return [
     disc(hot ? outlineHalfPx : -1, colors.ring, haloAlpha),
     disc(selected ? knockoutHalfPx : -1, colors.paper, 1),
-    disc(halfPx, paintColor, muted ? MUTED_ALPHA : 1, muted ? RUN_MUTED : 0),
+    disc(halfPx, paintColor, muted ? MUTED_ALPHA : 1),
   ];
 }
 
