@@ -14,12 +14,21 @@ import { isCircleWalk } from "#geom/region";
 import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
 import type { StagedRecords } from "./adapter";
-import { FillArc, FillRegion, FillSeg, StrokeNode, type StrokeNodeValue } from "./schemas";
+import {
+  FieldLeaf,
+  FieldQuad,
+  FillArc,
+  FillRegion,
+  FillSeg,
+  StrokeNode,
+  type StrokeNodeValue,
+} from "./schemas";
 
 /**
  * The adapter is pure CPU (no device), so the routing between the compiled-field
- * pass and the span pass, the band order of the draws, and the byte-diffs that
- * keep a drag from re-uploading are all testable here.
+ * pass and the span pass, the band order of the draws, and what a drag stages are
+ * all testable here — the staged records are decoded back out of the bytes the
+ * patch would send, which is what the GPU ends up with.
  */
 
 const COLORS = {
@@ -210,11 +219,11 @@ describe("adapter fill routing", () => {
     // One quad, two leaves (circle + region spans), four straight spans — and
     // no arc record at all: the split keeps the segment array branch-free.
     expect(patch.fields.quads.count).toBe(1);
-    expect(patch.fields.quads.writes).toHaveLength(1);
-    expect(patch.fields.leaves.writes).toHaveLength(2);
-    expect(patch.fields.segs.writes).toHaveLength(4);
-    expect(patch.fields.arcs.writes).toHaveLength(0);
-    const quad = patch.fields.quads.writes[0]!.value;
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(1);
+    expect(staged(patch.fields.leaves, FieldLeaf)).toHaveLength(2);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(4);
+    expect(staged(patch.fields.arcs, FillArc)).toHaveLength(0);
+    const quad = staged(patch.fields.quads, FieldQuad)[0]!.value;
     expect(quad.leafBase).toBe(0);
     expect(quad.alpha).toBeCloseTo(0.16);
     expect([quad.color.x, quad.color.y, quad.color.z]).toEqual([0, 0, 0]);
@@ -235,8 +244,8 @@ describe("adapter fill routing", () => {
     expect(patch.fillDraws).toHaveLength(1);
     const draw = patch.fillDraws[0]!;
     expect(draw.path === "field" && draw.plan.shape).toBe("region");
-    expect(patch.fields.leaves.writes).toHaveLength(1);
-    expect(patch.fields.segs.writes).toHaveLength(4);
+    expect(staged(patch.fields.leaves, FieldLeaf)).toHaveLength(1);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(4);
   });
 
   test("arc carriers get their own records and their own window", () => {
@@ -253,7 +262,7 @@ describe("adapter fill routing", () => {
         "ring",
       );
     const patch = createAdapter().tick(input([ring("o_a"), ring("o_b")]));
-    const [first, second] = patch.fields.leaves.writes.map((w) => w.value);
+    const [first, second] = staged(patch.fields.leaves, FieldLeaf).map((w) => w.value);
     expect(first!.arcCount).toBe(1);
     expect(first!.segCount).toBe(4);
     expect(first!.segOffset).toBe(0);
@@ -261,10 +270,10 @@ describe("adapter fill routing", () => {
     // The second node's windows move in each array by that array's own count.
     expect(second!.segOffset).toBe(4);
     expect(second!.arcOffset).toBe(1);
-    expect(patch.fields.arcs.writes.map((w) => w.idx)).toEqual([0, 1]);
-    expect(patch.fields.segs.writes.map((w) => w.idx)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(staged(patch.fields.arcs, FillArc).map((w) => w.idx)).toEqual([0, 1]);
+    expect(staged(patch.fields.segs, FillSeg).map((w) => w.idx)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     // The arc record carries the carrier; the hole's spans carry none.
-    const arc = patch.fields.arcs.writes[0]!.value;
+    const arc = staged(patch.fields.arcs, FillArc)[0]!.value;
     expect(arc.radius).toBeCloseTo(2, 6);
     expect(Math.abs(arc.span)).toBeCloseTo(Math.PI * 2, 6);
   });
@@ -275,10 +284,10 @@ describe("adapter fill routing", () => {
     adapter.tick(input(trace));
     const patch = adapter.tick(input(trace));
 
-    expect(patch.fields.quads.writes).toHaveLength(0);
-    expect(patch.fields.leaves.writes).toHaveLength(0);
-    expect(patch.fields.segs.writes).toHaveLength(0);
-    expect(patch.fields.arcs.writes).toHaveLength(0);
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(0);
+    expect(staged(patch.fields.leaves, FieldLeaf)).toHaveLength(0);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(0);
+    expect(staged(patch.fields.arcs, FillArc)).toHaveLength(0);
     expect(patch.fillDraws).toHaveLength(1);
   });
 
@@ -360,17 +369,17 @@ describe("adapter fill routing", () => {
     const b = csgNode("o_b", 1.5, "pac"); // same shape, different geometry
     const first = adapter.tick(input([a]));
     const firstIdx = {
-      quads: slotsOf(first.fields.quads.writes),
-      leaves: slotsOf(first.fields.leaves.writes),
-      segs: slotsOf(first.fields.segs.writes),
+      quads: slotsOf(staged(first.fields.quads, FieldQuad)),
+      leaves: slotsOf(staged(first.fields.leaves, FieldLeaf)),
+      segs: slotsOf(staged(first.fields.segs, FillSeg)),
     };
     for (const slots of Object.values(firstIdx)) expect(slots.length).toBeGreaterThan(0);
 
     adapter.tick(input([b])); // takes over every range A freed
     const back = adapter.tick(input([a]));
-    expect(slotsOf(back.fields.quads.writes)).toEqual(firstIdx.quads);
-    expect(slotsOf(back.fields.leaves.writes)).toEqual(firstIdx.leaves);
-    expect(slotsOf(back.fields.segs.writes)).toEqual(firstIdx.segs);
+    expect(slotsOf(staged(back.fields.quads, FieldQuad))).toEqual(firstIdx.quads);
+    expect(slotsOf(staged(back.fields.leaves, FieldLeaf))).toEqual(firstIdx.leaves);
+    expect(slotsOf(staged(back.fields.segs, FillSeg))).toEqual(firstIdx.segs);
   });
 
   /** And on the span path, whose record is the region slab plus its spans. */
@@ -406,23 +415,28 @@ describe("adapter fill routing", () => {
     if (first?.kind !== "circle") throw new Error("fixture: first operand is a circle");
     first.radius = 2.5;
     const moved = adapter.tick(input([dragged]));
-    // Same shape, new numbers: leaves and the AABB move, the spans do not.
-    expect(moved.fields.quads.writes).toHaveLength(1);
-    expect(moved.fields.leaves.writes).toHaveLength(2);
-    expect(moved.fields.segs.writes).toHaveLength(0);
-    expect(moved.fields.arcs.writes).toHaveLength(0);
+    // Same shape, new numbers: the circle's leaf and the AABB move, the spans do
+    // not — and the region's leaf does not either, because a leaf is signed on
+    // its own numbers. The byte diff this replaced rewrote the node's whole leaf
+    // run whenever any of it moved.
+    expect(staged(moved.fields.quads, FieldQuad)).toHaveLength(1);
+    const leaves = staged(moved.fields.leaves, FieldLeaf);
+    expect(leaves).toHaveLength(1);
+    expect(leaves[0]!.value.r).toBeCloseTo(2.5, 6);
+    expect(staged(moved.fields.segs, FillSeg)).toHaveLength(0);
+    expect(staged(moved.fields.arcs, FillArc)).toHaveLength(0);
     const draw = moved.fillDraws[0]!;
     expect(draw.path === "field" && draw.plan.shape).toBe("diff(circle,region)");
 
     const hovered = adapter.tick(input([dragged], { hoverKey: "o_csg:0" }));
-    expect(hovered.fields.quads.writes).toHaveLength(1);
-    const hoverColor = hovered.fields.quads.writes[0]!.value.color;
+    expect(staged(hovered.fields.quads, FieldQuad)).toHaveLength(1);
+    const hoverColor = staged(hovered.fields.quads, FieldQuad)[0]!.value.color;
     expect([hoverColor.x, hoverColor.y, hoverColor.z]).toEqual([...COLORS.selectedPaint]);
-    expect(hovered.fields.quads.writes[0]!.value.alpha).toBeCloseTo(0.28);
+    expect(staged(hovered.fields.quads, FieldQuad)[0]!.value.alpha).toBeCloseTo(0.28);
     // Chrome is data too: no leaf or span traffic for a hover.
-    expect(hovered.fields.leaves.writes).toHaveLength(0);
-    expect(hovered.fields.segs.writes).toHaveLength(0);
-    expect(hovered.fields.arcs.writes).toHaveLength(0);
+    expect(staged(hovered.fields.leaves, FieldLeaf)).toHaveLength(0);
+    expect(staged(hovered.fields.segs, FillSeg)).toHaveLength(0);
+    expect(staged(hovered.fields.arcs, FillArc)).toHaveLength(0);
   });
 
   test("a dragged arc leaf rewrites only the arc array", () => {
@@ -441,8 +455,8 @@ describe("adapter fill routing", () => {
     outer.radius = 2.5;
     const moved = adapter.tick(input(trace));
     // The carrier moved, the hole did not: half the record kinds re-upload.
-    expect(moved.fields.arcs.writes).toHaveLength(1);
-    expect(moved.fields.segs.writes).toHaveLength(0);
+    expect(staged(moved.fields.arcs, FillArc)).toHaveLength(1);
+    expect(staged(moved.fields.segs, FillSeg)).toHaveLength(0);
   });
 
   test("slots are keyed by the node, not by the object it arrives in", () => {
@@ -453,14 +467,18 @@ describe("adapter fill routing", () => {
     // object would re-upload everything a node owns on every edit (rotating the
     // demo's gear cost 106 of its 128 records that way, 10 of which had moved).
     const again = adapter.tick(input([csgNode("o_csg")]));
-    expect(again.fields.quads.writes).toHaveLength(0);
-    expect(again.fields.leaves.writes).toHaveLength(0);
+    expect(staged(again.fields.quads, FieldQuad)).toHaveLength(0);
+    expect(staged(again.fields.leaves, FieldLeaf)).toHaveLength(0);
     expect(again.stats.written).toBe(0);
     // The same key with new numbers: that node's payload, and nothing else.
     const moved = adapter.tick(input([csgNode("o_csg", 1.5)]));
-    expect(moved.fields.quads.writes).toHaveLength(1);
-    expect(moved.fields.leaves.writes).toHaveLength(2);
-    expect(moved.fields.segs.writes).toHaveLength(0);
+    expect(staged(moved.fields.quads, FieldQuad)).toHaveLength(1);
+    // The circle moved; the region leaf it is cut against did not, and it is
+    // signed on its own numbers now rather than on its node's.
+    const leaves = staged(moved.fields.leaves, FieldLeaf);
+    expect(leaves).toHaveLength(1);
+    expect(leaves[0]!.value.a.x).toBeCloseTo(1.5, 6);
+    expect(staged(moved.fields.segs, FillSeg)).toHaveLength(0);
     expect(moved.stats.total).toBe(again.stats.total);
   });
 
@@ -472,7 +490,7 @@ describe("adapter fill routing", () => {
 
     const hidden = createAdapter().tick(input([csgNode("o_csg", 0)], { hideFills: true }));
     expect(hidden.fillDraws).toHaveLength(0);
-    expect(hidden.fields.quads.writes).toHaveLength(0);
+    expect(staged(hidden.fields.quads, FieldQuad)).toHaveLength(0);
   });
 
   test("a pick node keeps the span pass (island-restricted, not a scalar field)", () => {
@@ -483,7 +501,7 @@ describe("adapter fill routing", () => {
     });
     const patch = createAdapter().tick(input([pick]));
     expect(patch.fillDraws.map((d) => d.path)).toEqual(["spans"]);
-    expect(patch.fields.quads.writes).toHaveLength(0);
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(0);
   });
 });
 
@@ -495,7 +513,7 @@ describe("fill halo chrome", () => {
     const trace = [csgNode("o_csg", 0, "pac")];
     const cold = createAdapter().tick(input(trace));
     expect(cold.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
-    const coldQuad = cold.fields.quads.writes[0]!.value;
+    const coldQuad = staged(cold.fields.quads, FieldQuad)[0]!.value;
     expect(coldQuad.haloRing.w).toBe(0);
     expect(coldQuad.haloHalfPx.x).toBe(0);
 
@@ -510,7 +528,7 @@ describe("fill halo chrome", () => {
     ]);
     // Both runs are the node's one quad slot, so the halo costs no extra state.
     expect(hovered.fillDraws.map((d) => d.first)).toEqual([0, 0]);
-    const hoverQuad = hovered.fields.quads.writes[0]!.value;
+    const hoverQuad = staged(hovered.fields.quads, FieldQuad)[0]!.value;
     expect([hoverQuad.haloRing.x, hoverQuad.haloRing.y, hoverQuad.haloRing.z]).toEqual([
       ...COLORS.ring,
     ]);
@@ -523,7 +541,7 @@ describe("fill halo chrome", () => {
     // inside it.
     const selected = createAdapter().tick(input(trace, { selectedKey: "o_csg:0" }));
     expect(selected.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
-    const liftedQuad = selected.fields.quads.writes[0]!.value;
+    const liftedQuad = staged(selected.fields.quads, FieldQuad)[0]!.value;
     expect(liftedQuad.haloRing.w).toBe(1);
     expect([liftedQuad.haloKnock.x, liftedQuad.haloKnock.y, liftedQuad.haloKnock.z]).toEqual([
       ...COLORS.paper,
@@ -548,7 +566,7 @@ describe("fill halo chrome", () => {
       input([csgNode("o_csg", 0, "pac")], { hoverKey: "o_csg:0", showHalos: false }),
     );
     expect(patch.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
-    expect(patch.fields.quads.writes[0]!.value.haloRing.w).toBe(0);
+    expect(staged(patch.fields.quads, FieldQuad)[0]!.value.haloRing.w).toBe(0);
   });
 });
 
@@ -559,19 +577,19 @@ describe("fill outline (state colors)", () => {
 
   test("every fill carries an outline: ink, accent when editable, cream when hot", () => {
     const plain = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate")]));
-    const inkEdge = plain.fields.quads.writes[0]!.value;
+    const inkEdge = staged(plain.fields.quads, FieldQuad)[0]!.value;
     expect([inkEdge.edge.x, inkEdge.edge.y, inkEdge.edge.z]).toEqual([...COLORS.ink]);
     expect(inkEdge.edge.w).toBe(1);
     expect(inkEdge.edgeWidthPx).toBeCloseTo(strokeWidthPx, 9);
 
     const editable = createAdapter().tick(input([node("o_flat", squareRegion(1), "plate", true)]));
-    const accentEdge = editable.fields.quads.writes[0]!.value;
+    const accentEdge = staged(editable.fields.quads, FieldQuad)[0]!.value;
     expect([accentEdge.edge.x, accentEdge.edge.y, accentEdge.edge.z]).toEqual([...COLORS.accent]);
 
     const hot = createAdapter().tick(
       input([node("o_flat", squareRegion(1), "plate", true)], { hoverKey: "o_flat:0" }),
     );
-    const creamEdge = hot.fields.quads.writes[0]!.value;
+    const creamEdge = staged(hot.fields.quads, FieldQuad)[0]!.value;
     expect([creamEdge.edge.x, creamEdge.edge.y, creamEdge.edge.z]).toEqual([
       ...COLORS.selectedPaint,
     ]);
@@ -592,10 +610,10 @@ describe("fill outline (state colors)", () => {
     // state color, so it rides the existing byte diff.
     (flat as { editable: boolean }).editable = true;
     const patch = adapter.tick(input([flat]));
-    const quad = patch.fields.quads.writes[0]!.value;
+    const quad = staged(patch.fields.quads, FieldQuad)[0]!.value;
     expect([quad.edge.x, quad.edge.y, quad.edge.z]).toEqual([...COLORS.accent]);
-    expect(patch.fields.quads.writes).toHaveLength(1);
-    expect(patch.fields.segs.writes).toHaveLength(0);
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(1);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(0);
   });
 });
 
@@ -656,8 +674,8 @@ describe("polar repeat fills", () => {
     // The compiled field, never the span path: 24 copies on the span path would
     // be 96 boundary spans walking every pixel, against 4 for the folded tooth.
     expect(patch.fillDraws.map((d) => d.path)).toEqual(["field"]);
-    expect(patch.fields.quads.writes).toHaveLength(1);
-    expect(patch.fields.segs.writes).toHaveLength(4);
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(1);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(4);
     expect(staged(patch.fills, FillRegion)).toHaveLength(0);
     const draw = patch.fillDraws[0]!;
     // The shape key names the structure, not the numbers: one tooth, a ring.
@@ -680,11 +698,13 @@ describe("polar repeat fills", () => {
     // boundary in the record, never re-upload.
     rep.count = 40;
     const patch = adapter.tick(input([ring]));
-    // The node's whole leaf payload re-uploads (the tooth's window, the spacing
-    // and the bore) — a handful of floats either way.
-    expect(patch.fields.leaves.writes).toHaveLength(3);
-    expect(patch.fields.quads.writes).toHaveLength(1);
-    expect(patch.fields.segs.writes).toHaveLength(0);
+    // The spacing leaf carries the new step; the tooth's window and the bore do
+    // not move, and each leaf is signed on its own numbers.
+    const leaves = staged(patch.fields.leaves, FieldLeaf);
+    expect(leaves).toHaveLength(1);
+    expect(leaves[0]!.value.b.y).toBeCloseTo((Math.PI * 2) / 40, 6);
+    expect(staged(patch.fields.quads, FieldQuad)).toHaveLength(1);
+    expect(staged(patch.fields.segs, FillSeg)).toHaveLength(0);
     expect(staged(patch.fills, FillRegion)).toHaveLength(0);
   });
 
@@ -698,8 +718,8 @@ describe("polar repeat fills", () => {
       "field:paint",
       "field:halo",
     ]);
-    expect(hovered.fields.quads.writes).toHaveLength(1);
-    expect(hovered.fields.segs.writes).toHaveLength(0);
+    expect(staged(hovered.fields.quads, FieldQuad)).toHaveLength(1);
+    expect(staged(hovered.fields.segs, FillSeg)).toHaveLength(0);
   });
 });
 
@@ -768,7 +788,7 @@ describe("zoom and pan write no records", () => {
     );
     // Only the half-plane's quad: the span fill holds still, so this is the
     // whole exception, not a rule.
-    expect(zoomed.fields.quads.writes).toHaveLength(1);
+    expect(staged(zoomed.fields.quads, FieldQuad)).toHaveLength(1);
     expect(staged(zoomed.fills, FillRegion)).toHaveLength(0);
     expect(zoomed.stats.written).toBe(1);
   });

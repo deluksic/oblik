@@ -26,7 +26,13 @@ import {
   type InkBandName,
   type InkState,
 } from "./bands";
-import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
+import {
+  buildFieldInstance,
+  fieldBox,
+  fieldPlan,
+  type FieldLeafData,
+  type FieldPlan,
+} from "./field/plan";
 import {
   blockWindows,
   islandGeomOf,
@@ -79,7 +85,6 @@ import {
 } from "./schemas";
 import { createSlotPool } from "./slots";
 import type { SlotPoolOpts } from "./slots";
-import { pushArcWrites, pushSegWrites, type SpanWrite } from "./spanRecords";
 
 const TAU = Math.PI * 2;
 
@@ -155,10 +160,10 @@ export type TickPatch = {
   /** CSG fills compiled to GPU fields: an AABB quad per node, the leaf records
    * it reads, and the boundary spans of its region leaves. */
   fields: {
-    quads: SlotPatch<FieldQuadValue>;
-    leaves: { writes: { idx: number; value: FieldLeafValue }[] };
-    segs: { writes: SpanWrite<FillSegValue>[] };
-    arcs: { writes: SpanWrite<FillArcValue>[] };
+    quads: StagedDraw;
+    leaves: StagedRecords;
+    segs: StagedRecords;
+    arcs: StagedRecords;
   };
   /** World fill draws, in band order (span fills and compiled fields mixed). */
   fillDraws: FillDraw[];
@@ -266,16 +271,37 @@ export function createAdapter(): Adapter {
     make: makeFillArc,
   });
 
+  const fieldQuadRecords = createRecordPool({
+    element: FieldQuad,
+    count: MAX_FIELD_QUADS,
+    make: makeFieldQuad,
+  });
+  const fieldLeafRecords = createRecordPool({
+    element: FieldLeaf,
+    count: MAX_FIELD_LEAVES,
+    make: makeFieldLeaf,
+  });
+  const fieldSegRecords = createRecordPool({
+    element: FillSeg,
+    count: MAX_FIELD_SEGS,
+    make: makeFillSeg,
+  });
+  const fieldArcRecords = createRecordPool({
+    element: FillArc,
+    count: MAX_FIELD_ARCS,
+    make: makeFillArc,
+  });
+
   const strokePool = createSlotPool(MAX_STROKE_DRAWS, retireRun(strokeRecords));
   const pointPool = createSlotPool(MAX_POINTS, retireRun(pointRecords));
   const circlePool = createSlotPool(MAX_CIRCLES);
   const fillPool = createSlotPool(MAX_FILL_REGIONS, retireRun(fillRecords));
   const fillSegPool = createSlotPool(MAX_FILL_SEGS, retireRun(fillSegRecords));
   const fillArcPool = createSlotPool(MAX_FILL_ARCS, retireRun(fillArcRecords));
-  const fieldQuadPool = createSlotPool(MAX_FIELD_QUADS);
-  const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES);
-  const fieldSegPool = createSlotPool(MAX_FIELD_SEGS);
-  const fieldArcPool = createSlotPool(MAX_FIELD_ARCS);
+  const fieldQuadPool = createSlotPool(MAX_FIELD_QUADS, retireRun(fieldQuadRecords));
+  const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES, retireRun(fieldLeafRecords));
+  const fieldSegPool = createSlotPool(MAX_FIELD_SEGS, retireRun(fieldSegRecords));
+  const fieldArcPool = createSlotPool(MAX_FIELD_ARCS, retireRun(fieldArcRecords));
   const imagePool = createSlotPool(MAX_IMAGES);
 
   // Per-tick scratch, owned here and reused: the payload a pooled record is
@@ -288,6 +314,29 @@ export function createAdapter(): Adapter {
   const fillSig = new Float64Array(FILL_SIG_LANES);
   const segSig = new Float64Array(SEG_SIG_LANES);
   const arcSig = new Float64Array(ARC_SIG_LANES);
+  const leafSig = new Float64Array(LEAF_SIG_LANES);
+  const quadSig = new Float64Array(QUAD_SIG_LANES);
+  const leafFill: LeafFill = {
+    leaf: {
+      a: { x: 0, y: 0 },
+      b: { x: 0, y: 0 },
+      r: 0,
+      segOffset: 0,
+      segCount: 0,
+      arcOffset: 0,
+      arcCount: 0,
+    },
+    segBase: 0,
+    arcBase: 0,
+  };
+  const quadFill: QuadFill = {
+    box: { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } },
+    leafBase: 0,
+    color: [0, 0, 0],
+    alpha: 0,
+    edge: { color: vec4f(0, 0, 0, 0), halfPx: 0 },
+    halo: NO_HALO,
+  };
   const regionFill: RegionFill = {
     bounds: { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } },
     window: { segOffset: 0, segCount: 0, arcOffset: 0, arcCount: 0 },
@@ -503,11 +552,7 @@ export function createAdapter(): Adapter {
     // --- hot node's halo run is queued *after* its paint run: the halo band
     // --- knocks the fill out rather than being washed by it.
     const fillOrder: number[] = [];
-    const fieldQuadWrites: { idx: number; value: FieldQuadValue }[] = [];
     const fieldOrder: number[] = [];
-    const fieldLeafWrites: { idx: number; value: FieldLeafValue }[] = [];
-    const fieldSegWrites: SpanWrite<FillSegValue>[] = [];
-    const fieldArcWrites: SpanWrite<FillArcValue>[] = [];
     const fillDraws: FillDraw[] = [];
     const visible = visibleWorldBox(cam, size);
 
@@ -531,19 +576,7 @@ export function createAdapter(): Adapter {
         );
         const plan = fieldPlan(n.value as CsgOperand);
         if (plan) {
-          const draw = emitField(
-            n,
-            plan,
-            color,
-            alpha,
-            edge,
-            halo,
-            visible,
-            fieldQuadWrites,
-            fieldLeafWrites,
-            fieldSegWrites,
-            fieldArcWrites,
-          );
+          const draw = emitField(n, plan, color, alpha, edge, halo, visible);
           if (draw) {
             fieldOrder.push(draw.slot);
             const first = fieldOrder.length - 1;
@@ -646,11 +679,19 @@ export function createAdapter(): Adapter {
     const fillRuns: RecordRun[] = [];
     const fillSegRuns: RecordRun[] = [];
     const fillArcRuns: RecordRun[] = [];
+    const quadRuns: RecordRun[] = [];
+    const leafRuns: RecordRun[] = [];
+    const fieldSegRuns: RecordRun[] = [];
+    const fieldArcRuns: RecordRun[] = [];
     const strokeStaged = strokeRecords.flush((run) => strokeRuns.push(run));
     const pointStaged = pointRecords.flush((run) => pointRuns.push(run));
     const fillStaged = fillRecords.flush((run) => fillRuns.push(run));
     const fillSegStaged = fillSegRecords.flush((run) => fillSegRuns.push(run));
     const fillArcStaged = fillArcRecords.flush((run) => fillArcRuns.push(run));
+    const quadStaged = fieldQuadRecords.flush((run) => quadRuns.push(run));
+    const leafStaged = fieldLeafRecords.flush((run) => leafRuns.push(run));
+    const fieldSegStaged = fieldSegRecords.flush((run) => fieldSegRuns.push(run));
+    const fieldArcStaged = fieldArcRecords.flush((run) => fieldArcRuns.push(run));
 
     return {
       strokes: { runs: strokeRuns, bands: bandArrays(strokeLists) },
@@ -659,14 +700,10 @@ export function createAdapter(): Adapter {
       fillSegs: { runs: fillSegRuns },
       fillArcs: { runs: fillArcRuns },
       fields: {
-        quads: {
-          writes: fieldQuadWrites,
-          order: Uint32Array.from(fieldOrder),
-          count: fieldOrder.length,
-        },
-        leaves: { writes: fieldLeafWrites },
-        segs: { writes: fieldSegWrites },
-        arcs: { writes: fieldArcWrites },
+        quads: { runs: quadRuns, order: Uint32Array.from(fieldOrder), count: fieldOrder.length },
+        leaves: { runs: leafRuns },
+        segs: { runs: fieldSegRuns },
+        arcs: { runs: fieldArcRuns },
       },
       fillDraws,
       points: { runs: pointRuns, bands: bandArrays(pointLists) },
@@ -680,10 +717,10 @@ export function createAdapter(): Adapter {
           fillStaged +
           fillSegStaged +
           fillArcStaged +
-          fieldQuadWrites.length +
-          fieldLeafWrites.length +
-          fieldSegWrites.length +
-          fieldArcWrites.length +
+          quadStaged +
+          leafStaged +
+          fieldSegStaged +
+          fieldArcStaged +
           imageWrites.length +
           pointStaged +
           overlay.under.strokes.length +
@@ -721,10 +758,6 @@ export function createAdapter(): Adapter {
     edge: EdgeFields,
     halo: HaloFields,
     visible: Box,
-    quadWrites: { idx: number; value: FieldQuadValue }[],
-    leafWrites: { idx: number; value: FieldLeafValue }[],
-    segWrites: SpanWrite<FillSegValue>[],
-    arcWrites: SpanWrite<FillArcValue>[],
   ): { slot: number } | undefined {
     const instance = buildFieldInstance(plan);
     // The superset box is the field's own world extent, so it holds still under
@@ -754,43 +787,35 @@ export function createAdapter(): Adapter {
     ) {
       return undefined;
     }
-    const leaves = instance.leaves.map((leaf) =>
-      FieldLeaf({
-        a: vec2f(leaf.a.x, leaf.a.y),
-        b: vec2f(leaf.b.x, leaf.b.y),
-        r: leaf.r,
-        // Span windows are rebased onto the shared arrays; the diff below
-        // rewrites them when the pools move the runs.
-        segOffset: segStart + leaf.segOffset,
-        segCount: leaf.segCount,
-        arcOffset: arcStart + leaf.arcOffset,
-        arcCount: leaf.arcCount,
-      }),
-    );
-    if (diff(lastFieldLeaf, nodeKey(n), leafStart, encodeFieldLeaves(leaves))) {
-      leaves.forEach((value, i) => leafWrites.push({ idx: leafStart + i, value }));
+    // Every record is signed from the same numbers that fill it, and the windows
+    // it carries are the rebased ones — so a run that moves restages whatever
+    // reads it, without comparing a byte.
+    leafFill.segBase = segStart;
+    leafFill.arcBase = arcStart;
+    for (let i = 0; i < instance.leaves.length; i++) {
+      leafFill.leaf = instance.leaves[i]!;
+      writeLeafSig(leafSig, leafFill);
+      fieldLeafRecords.touch(leafStart + i, leafSig, fillLeaf, leafFill);
     }
     const { segs, arcs } = instance.spans;
-    if (segs.length > 0 && diff(lastFieldSegs, nodeKey(n), segStart, encodeSpanSegs(segs))) {
-      pushSegWrites(segWrites, segStart, segs);
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i]!;
+      writeSegSig(segSig, seg);
+      fieldSegRecords.touch(segStart + i, segSig, fillSeg, seg);
     }
-    if (arcs.length > 0 && diff(lastFieldArcs, nodeKey(n), arcStart, encodeSpanArcs(arcs))) {
-      pushArcWrites(arcWrites, arcStart, arcs);
+    for (let i = 0; i < arcs.length; i++) {
+      const arc = arcs[i]!;
+      writeArcSig(arcSig, arc);
+      fieldArcRecords.touch(arcStart + i, arcSig, fillArc, arc);
     }
-    const quad = FieldQuad({
-      aabbMin: vec2f(box.min.x, box.min.y),
-      aabbMax: vec2f(box.max.x, box.max.y),
-      leafBase: leafStart,
-      color: vec3f(color[0], color[1], color[2]),
-      alpha,
-      edge: edge.color,
-      edgeWidthPx: edge.halfPx,
-      haloRing: halo.ring,
-      haloKnock: halo.knock,
-      haloHalfPx: halo.halfPx,
-    });
-    if (diff(lastFieldQuad, nodeKey(n), slot, encodeFieldQuad(quad)))
-      quadWrites.push({ idx: slot, value: quad });
+    quadFill.box = box;
+    quadFill.leafBase = leafStart;
+    quadFill.color = color;
+    quadFill.alpha = alpha;
+    quadFill.edge = edge;
+    quadFill.halo = halo;
+    writeQuadSig(quadSig, quadFill);
+    fieldQuadRecords.touch(slot, quadSig, fillQuad, quadFill);
     return { slot };
   }
 
@@ -1009,6 +1034,127 @@ function makeFillArc(): FillArcValue {
   });
 }
 
+/** A field leaf's payload: its primitive parameters and its *rebased* windows
+ * into the shared span arrays. */
+type LeafFill = {
+  leaf: FieldLeafData;
+  segBase: number;
+  arcBase: number;
+};
+
+/** The leaves' signature and their record, field for field — see
+ * `writeRegionSig` for why the two sit together. The windows are the rebased
+ * ones the record carries, so a run that moves restages the leaf that reads it. */
+function writeLeafSig(sig: Float64Array, args: LeafFill): void {
+  const { leaf } = args;
+  sig[0] = leaf.a.x;
+  sig[1] = leaf.a.y;
+  sig[2] = leaf.b.x;
+  sig[3] = leaf.b.y;
+  sig[4] = leaf.r;
+  sig[5] = args.segBase + leaf.segOffset;
+  sig[6] = leaf.segCount;
+  sig[7] = args.arcBase + leaf.arcOffset;
+  sig[8] = leaf.arcCount;
+}
+
+const LEAF_SIG_LANES = 9;
+
+function fillLeaf(record: FieldLeafValue, args: LeafFill): void {
+  const { leaf } = args;
+  record.a.x = leaf.a.x;
+  record.a.y = leaf.a.y;
+  record.b.x = leaf.b.x;
+  record.b.y = leaf.b.y;
+  record.r = leaf.r;
+  record.segOffset = args.segBase + leaf.segOffset;
+  record.segCount = leaf.segCount;
+  record.arcOffset = args.arcBase + leaf.arcOffset;
+  record.arcCount = leaf.arcCount;
+}
+
+function makeFieldLeaf(): FieldLeafValue {
+  return FieldLeaf({
+    a: vec2f(0, 0),
+    b: vec2f(0, 0),
+    r: 0,
+    segOffset: 0,
+    segCount: 0,
+    arcOffset: 0,
+    arcCount: 0,
+  });
+}
+
+/** A compiled field's quad: the box it covers, the leaf window it reads, and the
+ * fill's colour and chrome. */
+type QuadFill = {
+  box: Box;
+  leafBase: number;
+  color: Rgb;
+  alpha: number;
+  edge: EdgeFields;
+  halo: HaloFields;
+};
+
+function writeQuadSig(sig: Float64Array, args: QuadFill): void {
+  let i = 0;
+  sig[i++] = args.box.min.x;
+  sig[i++] = args.box.min.y;
+  sig[i++] = args.box.max.x;
+  sig[i++] = args.box.max.y;
+  sig[i++] = args.leafBase;
+  sig[i++] = args.color[0];
+  sig[i++] = args.color[1];
+  sig[i++] = args.color[2];
+  sig[i++] = args.alpha;
+  i = encodeEdge(sig, i, args.edge);
+  i = encodeHalo(sig, i, args.halo);
+}
+
+const QUAD_SIG_LANES = 23;
+
+function fillQuad(record: FieldQuadValue, args: QuadFill): void {
+  record.aabbMin.x = args.box.min.x;
+  record.aabbMin.y = args.box.min.y;
+  record.aabbMax.x = args.box.max.x;
+  record.aabbMax.y = args.box.max.y;
+  record.leafBase = args.leafBase;
+  record.color.r = args.color[0];
+  record.color.g = args.color[1];
+  record.color.b = args.color[2];
+  record.alpha = args.alpha;
+  record.edge.x = args.edge.color.x;
+  record.edge.y = args.edge.color.y;
+  record.edge.z = args.edge.color.z;
+  record.edge.w = args.edge.color.w;
+  record.edgeWidthPx = args.edge.halfPx;
+  record.haloRing.x = args.halo.ring.x;
+  record.haloRing.y = args.halo.ring.y;
+  record.haloRing.z = args.halo.ring.z;
+  record.haloRing.w = args.halo.ring.w;
+  record.haloKnock.x = args.halo.knock.x;
+  record.haloKnock.y = args.halo.knock.y;
+  record.haloKnock.z = args.halo.knock.z;
+  record.haloKnock.w = args.halo.knock.w;
+  record.haloHalfPx.x = args.halo.halfPx.x;
+  record.haloHalfPx.y = args.halo.halfPx.y;
+}
+
+function makeFieldQuad(): FieldQuadValue {
+  return FieldQuad({
+    aabbMin: vec2f(0, 0),
+    aabbMax: vec2f(0, 0),
+    leafBase: 0,
+    color: vec3f(0, 0, 0),
+    alpha: 0,
+    edge: vec4f(0, 0, 0, 0),
+    edgeWidthPx: 0,
+    haloRing: vec4f(0, 0, 0, 0),
+    haloKnock: vec4f(0, 0, 0, 0),
+    haloHalfPx: vec2f(0, 0),
+  });
+}
+
 /** The state word a node's record carries. Both pooled shaders read it instead
  * of the geometry the old per-layer records encoded, so a hover, a select or an
  * editability flip moves a word rather than rebuilding a record's geometry. */
@@ -1217,87 +1363,6 @@ function clipBox(box: Box, clip: Box): Box | undefined {
     max: { x: Math.min(box.max.x, clip.max.x), y: Math.min(box.max.y, clip.max.y) },
   };
   return out.min.x >= out.max.x || out.min.y >= out.max.y ? undefined : out;
-}
-
-/** Byte-encoded field quad for the change check: AABB, leaf window, color, halo. */
-function encodeFieldQuad(q: FieldQuadValue): Float64Array {
-  return Float64Array.of(
-    q.aabbMin.x,
-    q.aabbMin.y,
-    q.aabbMax.x,
-    q.aabbMax.y,
-    q.leafBase,
-    q.color[0],
-    q.color[1],
-    q.color[2],
-    q.alpha,
-    q.edge.x,
-    q.edge.y,
-    q.edge.z,
-    q.edge.w,
-    q.edgeWidthPx,
-    q.haloRing.x,
-    q.haloRing.y,
-    q.haloRing.z,
-    q.haloRing.w,
-    q.haloKnock.x,
-    q.haloKnock.y,
-    q.haloKnock.z,
-    q.haloKnock.w,
-    q.haloHalfPx.x,
-    q.haloHalfPx.y,
-  );
-}
-
-/** Byte-encoded leaf records for the change check (a, b, r, span windows). */
-function encodeFieldLeaves(leaves: readonly FieldLeafValue[]): Float64Array {
-  const f = new Float64Array(leaves.length * 9);
-  for (let i = 0; i < leaves.length; i++) {
-    const leaf = leaves[i]!;
-    let j = i * 9;
-    f[j++] = leaf.a.x;
-    f[j++] = leaf.a.y;
-    f[j++] = leaf.b.x;
-    f[j++] = leaf.b.y;
-    f[j++] = leaf.r;
-    f[j++] = leaf.segOffset;
-    f[j++] = leaf.segCount;
-    f[j++] = leaf.arcOffset;
-    f[j] = leaf.arcCount;
-  }
-  return f;
-}
-
-/** Byte-encoded segment records (a, b) — half the doubles the old combined
- * `FillEdge` encode walked, since a segment has no carrier to compare. */
-function encodeSpanSegs(segs: readonly SpanSeg[]): Float64Array {
-  const f = new Float64Array(segs.length * 4);
-  for (let i = 0; i < segs.length; i++) {
-    const e = segs[i]!;
-    let j = i * 4;
-    f[j++] = e.a.x;
-    f[j++] = e.a.y;
-    f[j++] = e.b.x;
-    f[j] = e.b.y;
-  }
-  return f;
-}
-
-function encodeSpanArcs(arcs: readonly SpanArc[]): Float64Array {
-  const f = new Float64Array(arcs.length * 8);
-  for (let i = 0; i < arcs.length; i++) {
-    const e = arcs[i]!;
-    let j = i * 8;
-    f[j++] = e.a.x;
-    f[j++] = e.a.y;
-    f[j++] = e.b.x;
-    f[j++] = e.b.y;
-    f[j++] = e.center.x;
-    f[j++] = e.center.y;
-    f[j++] = e.radius;
-    f[j] = e.span;
-  }
-  return f;
 }
 
 /**

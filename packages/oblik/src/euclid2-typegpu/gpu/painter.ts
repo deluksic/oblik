@@ -420,11 +420,11 @@ export function createPainter(opts: {
       fillOrderBuffer.write(patch.fills.order);
       writeRuns(fillSegBuffer, patch.fillSegs.runs);
       writeRuns(fillArcBuffer, patch.fillArcs.runs);
-      fieldQuadBuffer.writePartial(patch.fields.quads.writes);
+      writeRuns(fieldQuadBuffer, patch.fields.quads.runs);
       fieldOrderBuffer.write(patch.fields.quads.order);
-      fieldLeafBuffer.writePartial(patch.fields.leaves.writes);
-      fieldSegBuffer.writePartial(patch.fields.segs.writes);
-      fieldArcBuffer.writePartial(patch.fields.arcs.writes);
+      writeRuns(fieldLeafBuffer, patch.fields.leaves.runs);
+      writeRuns(fieldSegBuffer, patch.fields.segs.runs);
+      writeRuns(fieldArcBuffer, patch.fields.arcs.runs);
       fillDraws = patch.fillDraws;
       // Tool overlay: phase buffers are rewritten wholesale each tick (small
       // counts; the static identity order arrays need no writes). Sliced to
