@@ -14,6 +14,7 @@ import { DEFAULT_CHROME_METRICS, overlayBands, POINT_STROKE_PX } from "../../euc
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
 import { imageQuad, imageRect, isImage, type ImageValue } from "../../eval/image";
+import { POINT_RADIUS_TRIM_PX, POINT_RIM_EXTRA_PX } from "./bands";
 import { buildFieldInstance, fieldBox, fieldPlan, type FieldPlan } from "./field/plan";
 import {
   blockWindows,
@@ -994,15 +995,6 @@ function strokeLayersInto(
     muted ? RUN_MUTED : 0,
   );
 }
-
-/** GPU-only visual tuning over the shared SVG point metrics: paint dots read
- * ~1 CSS px large on the GPU, so each paint radius is trimmed by 1 CSS px
- * (most visible on the wider draggable dots); the always-on paper rim under
- * the paint (the "normal knockout", POINT_STROKE_PX) reads thin on the GPU,
- * so it is widened by 0.5 CSS px. The selected knockout gap and halo ring
- * keep their standard chrome widths. */
-const POINT_RADIUS_TRIM_PX = 1;
-const POINT_RIM_EXTRA_PX = 0.5;
 
 /** The four concentric discs of one mark, back to front: halo ring (hot),
  * selected knockout, the always-on paper rim under the paint, then the paint

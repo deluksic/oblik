@@ -46,6 +46,117 @@ export const Frame = struct({
 });
 export type FrameValue = Infer<typeof Frame>;
 
+/**
+ * The band widths and the palette a pooled ink record derives its layer from.
+ *
+ * A record says what is true of the *node* — its geometry, its own half width,
+ * its hot/selected/editable/muted bits — and the band says which layer is being
+ * drawn. What is left between the two is what every band shares and no record
+ * can know: the chrome widths and the colours they are painted in. Those live
+ * here rather than in the records because they are a function of the theme and
+ * the chrome metrics, not of any node, so re-theming the pane rewrites one
+ * uniform and no record at all.
+ *
+ * There is deliberately no `paintHalfPx`: a layer's own half width is the
+ * record's, which is what lets the tool overlay draw these very records at its
+ * own weights (dash caps, arrow shafts, snap rings) without a second schema.
+ */
+export const Chrome = struct({
+  /** Half widths, CSS px: the hot ring, and the paper knockout inside it. */
+  haloHalfPx: f32,
+  knockHalfPx: f32,
+  /** A mark's ring/knockout/rim radius measured *from* its paint radius, CSS px. */
+  pointRingAddPx: f32,
+  pointKnockAddPx: f32,
+  pointOutlineAddPx: f32,
+  /** Ring opacity while hovered, and while selected. */
+  hoverAlpha: f32,
+  selectAlpha: f32,
+  /** The palette a record's state selects from (see `STATE_*`), in the theme's
+   * own terms: `--oblik-ink`, `--oblik-accent`, `--oblik-selected-paint`,
+   * `--oblik-ring`, `--oblik-paper`. */
+  ink: vec3f,
+  accent: vec3f,
+  selectedPaint: vec3f,
+  ring: vec3f,
+  paper: vec3f,
+});
+export type ChromeValue = Infer<typeof Chrome>;
+
+// -- ink layers and record state ---------------------------------------------
+
+/**
+ * The only layer numbering there is.
+ *
+ * Every band, both pooled-record shaders, and every kind that still keeps one
+ * record per layer (circles) names its layers through these five. Two parallel
+ * numberings is how the stroke rest band once asked for layer 0 — a halo width
+ * on a cold stroke — and drew nothing at all; a kind that cannot use a layer
+ * maps it by name (`inkSlotOf` in `bands.ts`) instead of renumbering.
+ */
+export const LAYER_HALO = 0;
+export const LAYER_KNOCKOUT = 1;
+/** A mark's always-on paper rim. Not an SVG chrome layer: the SVG paints it as
+ * the stroke of the mark itself, which is why it is the one layer that sits
+ * between the knockout and the paint. */
+export const LAYER_OUTLINE = 2;
+export const LAYER_PAINT = 3;
+export const LAYER_COUNT = 4;
+
+/**
+ * Bits on a pooled record's `state` word, shared by strokes and marks: the same
+ * bit means the same thing in both shaders, and the colour a bit selects comes
+ * from the frame's `Chrome` uniform, never from the record. So a hover, a
+ * select, an editability flip or a theme switch rewrites at most the state word
+ * — and a theme switch rewrites no record at all.
+ */
+export const STATE_HOT = 1 << 0;
+export const STATE_SELECTED = 1 << 1;
+export const STATE_EDITABLE = 1 << 2;
+export const STATE_MUTED = 1 << 3;
+/** The record's own `color`/`alpha` are the layer's, not a state the shader
+ * derives: the tool overlay's ghosts, previews and dash caps carry colours and
+ * alphas that no state bit and no palette entry express. Scene ink never sets
+ * it, so its colour lane stays empty. */
+export const STATE_EXPLICIT = 1 << 4;
+
+/**
+ * One ink stroke node, as a single record.
+ *
+ * The node's visible run is a two-point segment, so the record carries the run
+ * itself rather than the mirrored-neighbour ctrl points a four-point polyline
+ * needed. Its three chrome layers are no longer three records: the record says
+ * what is true of the node and the band says which layer is drawing, which is
+ * why a stroke builds one record per frame instead of three (`bands.ts`).
+ * Widths are CSS px like every other record here, so a zoom reprojects the
+ * world instead of rewriting it.
+ */
+export const StrokeNode = struct({
+  /** Endpoints of the visible run, in world units. */
+  a: vec2f,
+  b: vec2f,
+  /** Half width of the paint, CSS px. */
+  halfPx: f32,
+  state: u32,
+  /** The layer's own colour: read only when `STATE_EXPLICIT` is set. */
+  color: vec3f,
+  alpha: f32,
+});
+export type StrokeNodeValue = Infer<typeof StrokeNode>;
+
+/** One point/glider mark, as a single record: the four concentric discs the SVG
+ * PointMark composes become four *layers* of one record, each band offsetting
+ * its radius from `markRadiusPx` by a width the frame carries. */
+export const PointNode = struct({
+  center: vec2f,
+  /** The paint disc's radius, CSS px. */
+  markRadiusPx: f32,
+  state: u32,
+  color: vec3f,
+  alpha: f32,
+});
+export type PointNodeValue = Infer<typeof PointNode>;
+
 /** One uniform written per view sync: the grid's integer windows. The vertex
  * shader derives every hairline position from these — the CPU only counts. */
 export const GridSpan = struct({
