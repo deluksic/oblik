@@ -92,21 +92,24 @@ export function createRecordPool<TData extends AnyWgslData>(opts: {
   /** A one-element carrier, reused: serializing a record allocates nothing. */
   const single: Infer<TData>[] = [];
   /** The changed spans, `[start, end)` in records: ascending, disjoint, and
-   * never closer together than `GAP_RECORDS`. Reused across flushes, so a steady
-   * frame allocates nothing here either. */
+   * never closer together than `GAP_RECORDS`. The *array* is reused across
+   * flushes, so a steady frame allocates nothing.
+   *
+   * The spans themselves are handed out fresh, deliberately. A frame needs a
+   * handful of them (one per group of edits, not one per record), and recycling
+   * the objects meant taking one from the slot just past the end of the list —
+   * which is not necessarily dead: removing a span shifts the ones above it down
+   * and leaves the last of them referenced there, so the next insert would mutate
+   * a *live* span and put the same object in the list twice. That is a flush that
+   * writes one span twice and drops another's records. */
   const runs: { start: number; end: number }[] = [];
   let runCount = 0;
   let staged = 0;
 
-  /** Put `[start, end)` at `index`, reusing the object that was beyond the end
-   * of the list when the list last had this many spans. */
+  /** Put a fresh `[start, end)` at `index`, shifting the tail up. */
   function insertRun(index: number, start: number, end: number): void {
-    const spare = runs[runCount];
-    const run = spare ?? { start: 0, end: 0 };
-    runs[runCount] = run;
+    const run = { start, end };
     for (let i = runCount; i > index; i--) runs[i] = runs[i - 1]!;
-    run.start = start;
-    run.end = end;
     runs[index] = run;
     runCount++;
   }

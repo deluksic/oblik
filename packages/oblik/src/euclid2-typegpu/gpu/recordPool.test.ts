@@ -230,6 +230,82 @@ describe("record pool staging", () => {
     expect(spans(runs)).toEqual([[9, 9]]);
   });
 
+  /**
+   * The span list is the one piece of bookkeeping here whose mistakes are
+   * invisible: a span that swallows a change it should have split is a record
+   * that never reaches the GPU, and a span that drops one is a hole in a run.
+   * The hand-picked cases above cover the paths; this drives the tracker with
+   * random edits and checks it against a plain shadow of what each slot last
+   * held, so a wrong merge, a missed insert or a lost span shows up as a value
+   * that never arrived.
+   */
+  test("random edits keep the spans sorted, disjoint and covering", () => {
+    // A deterministic LCG: a failure reproduces from the seed alone.
+    let seed = 20240915;
+    const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff);
+
+    const pool = makePool();
+    /** The last value written per slot, and the slots written since the flush. */
+    const staged = new Map<number, PairArgs>();
+    const sinceFlush = new Map<number, PairArgs>();
+    let flushes = 0;
+    /** The narrowest clean gap between two spans this run ever produced. */
+    let minGap = Number.POSITIVE_INFINITY;
+
+    for (let step = 0; step < 600; step++) {
+      if (next() % 10 < 7) {
+        const slot = next() % CAPACITY;
+        const value = args(next() % 1000, next() % 1000);
+        pool.touch(slot, [value.x, value.y], fillPair, value);
+        staged.set(slot, value);
+        sinceFlush.set(slot, value);
+        continue;
+      }
+      if (sinceFlush.size === 0) continue;
+
+      const runs: RecordRun[] = [];
+      pool.flush((run) => runs.push(run));
+      flushes++;
+
+      // Sorted, disjoint, and never closer together than the gap rule allows —
+      // two spans that close should have been one.
+      const ranges: [number, number][] = [];
+      for (const run of runs) {
+        const first = run.startOffset / STRIDE;
+        const count = run.bytes.byteLength / STRIDE;
+        expect(first).toBeGreaterThanOrEqual(0);
+        expect(first + count).toBeLessThanOrEqual(CAPACITY);
+        const prev = ranges[ranges.length - 1];
+        // Half-open spans: the clean slots between two of them are
+        // `first - prev[1] - 1`, and a gap that small would have merged.
+        if (prev !== undefined) minGap = Math.min(minGap, first - prev[1] - 1);
+        ranges.push([first, first + count - 1]);
+      }
+
+      // Everything changed since the last flush is inside a span and carries
+      // the value it was staged with; every slot the GPU already holds and a
+      // span reaches over still carries its own last value.
+      const back = replay(runs);
+      const covered = (slot: number) => ranges.some(([a, b]) => slot >= a && slot <= b);
+      for (const [slot, value] of sinceFlush) {
+        expect(covered(slot)).toBe(true);
+        expect(back[slot]!.x).toBe(value.x);
+        expect(back[slot]!.y).toBe(value.y);
+      }
+      for (const [slot, value] of staged) {
+        if (!covered(slot)) continue;
+        expect(back[slot]!.x).toBe(value.x);
+        expect(back[slot]!.y).toBe(value.y);
+      }
+      sinceFlush.clear();
+    }
+
+    expect(flushes).toBeGreaterThan(20);
+    // Two spans that close should have been one: the rule merges while the gap is
+    // no wider than `GAP_RECORDS`, so every surviving pair sits above it.
+    expect(minGap).toBeGreaterThan(GAP_RECORDS);
+  });
+
   test("a slot outside the pool is loud, not a write that never happens", () => {
     // The two pools' capacities have to agree; a slot past the end would be
     // dropped by the typed arrays and the record would simply never reach the
