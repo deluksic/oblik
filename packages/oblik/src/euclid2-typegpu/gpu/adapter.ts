@@ -118,12 +118,6 @@ export type AdapterInput = {
   hideSnap: boolean;
 };
 
-export type SlotPatch<T> = {
-  writes: { idx: number; value: T }[];
-  order: Uint32Array;
-  count: number;
-};
-
 /** Records staged through a pool: the spans of the buffer that moved this tick.
  * Only the spans go up — the mirror behind them holds every record's current
  * bytes — so what a frame costs follows what changed, not the buffer's size. */
@@ -326,6 +320,8 @@ export function createAdapter(): Adapter {
   const leafSig = new Float64Array(LEAF_SIG_LANES);
   const quadSig = new Float64Array(QUAD_SIG_LANES);
   const circleSig = new Float64Array(CIRCLE_SIG_LANES);
+  /** The three circle layers' half widths, in record-slot order. */
+  const circleHalf: number[] = [0, 0, 0];
   const circleFill: CircleFill = {
     center: { x: 0, y: 0 },
     radius: 0,
@@ -553,24 +549,22 @@ export function createAdapter(): Adapter {
         writeCircleSig(circleSig, circleFill);
         circleRecords.touch(start + inkSlotOf(layer), circleSig, fillCircle, circleFill);
       };
-      disc(LAYER_HALO, hot ? outlineHalfPx : -1, colors.ring, haloAlpha);
-      disc(LAYER_KNOCKOUT, selected ? knockoutHalfPx : -1, colors.paper, 1);
+      // The three widths, in the record-slot order the layers are stored in.
+      // The staging and the band queue both read *these* numbers, so a layer
+      // cannot be recorded as drawing while the queue counts it out, or the
+      // other way round — the two-numberings bug this file has been bitten by.
+      const haloHalfPx = hot ? outlineHalfPx : -1;
+      const knockHalfPx = selected ? knockoutHalfPx : -1;
+      circleHalf[inkSlotOf(LAYER_HALO)] = haloHalfPx;
+      circleHalf[inkSlotOf(LAYER_KNOCKOUT)] = knockHalfPx;
+      circleHalf[inkSlotOf(LAYER_PAINT)] = halfStrokePx;
+      disc(LAYER_HALO, haloHalfPx, colors.ring, haloAlpha);
+      disc(LAYER_KNOCKOUT, knockHalfPx, colors.paper, 1);
       disc(LAYER_PAINT, halfStrokePx, paintColor, muted ? MUTED_ALPHA : 1);
       for (const band of bandsFor(state, input.showHalos)) {
         for (const layer of CIRCLE_BAND_LAYERS[band]) {
-          // The layer's own half width says whether it draws at all; the sign of
-          // the cull value is never in the record.
-          const halfPx =
-            layer === LAYER_HALO
-              ? hot
-                ? outlineHalfPx
-                : -1
-              : layer === LAYER_KNOCKOUT
-                ? selected
-                  ? knockoutHalfPx
-                  : -1
-                : halfStrokePx;
-          if (halfPx > 0) circleLists[band]!.push(start + inkSlotOf(layer));
+          const slot = inkSlotOf(layer);
+          if (circleHalf[slot]! > 0) circleLists[band]!.push(start + slot);
         }
       }
     };
@@ -938,9 +932,17 @@ type RegionFill = {
  * order the pool compares them, `fillRegion` puts the same inputs in the record.
  * They walk the same fields in the same order and live next to each other so a
  * field added to one is added to the other — a lane the signature does not carry
- * is a record that does not restage when it changes, which is a stale shape on
- * screen rather than a failing test. `recordPool.test.ts`'s replay checks the
- * bytes; `adapter.test.ts` changes each input in turn and checks that it stages.
+ * is a record that never restages when that input changes, which is a stale shape
+ * on screen rather than a failing test.
+ *
+ * What the tests can and cannot see about that: `recordPool.test.ts` replays the
+ * bytes a span carries, and `adapter.test.ts` changes each input in turn and
+ * requires a stage — which catches a signature that ignores a whole input, but
+ * *not* a lane dropped from one that moves alongside others (a select moves
+ * colour, alpha and halo together, and any of them restages the record). These
+ * pairs are therefore a discipline, not a proof. The proof is filling the record
+ * first and comparing its own bytes, at the cost of a serialization per record
+ * per tick — see the review notes in the commit that introduced the pools.
  */
 function writeRegionSig(sig: Float64Array, args: RegionFill): void {
   let i = 0;

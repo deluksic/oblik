@@ -25,24 +25,6 @@ export function toArcValue(e: SpanArc): FillArcValue {
   });
 }
 
-/** Append `segs` as contiguous writes starting at slot `start`. */
-export function pushSegWrites(
-  out: SpanWrite<FillSegValue>[],
-  start: number,
-  segs: readonly SpanSeg[],
-): void {
-  for (let i = 0; i < segs.length; i++) out.push({ idx: start + i, value: toSegValue(segs[i]!) });
-}
-
-/** Append `arcs` as contiguous writes starting at slot `start`. */
-export function pushArcWrites(
-  out: SpanWrite<FillArcValue>[],
-  start: number,
-  arcs: readonly SpanArc[],
-): void {
-  for (let i = 0; i < arcs.length; i++) out.push({ idx: start + i, value: toArcValue(arcs[i]!) });
-}
-
 /**
  * Contiguous writes from slot 0 for a per-frame (overlay) span array, capped at
  * the capacity so a runaway ghost cannot overflow the buffer.

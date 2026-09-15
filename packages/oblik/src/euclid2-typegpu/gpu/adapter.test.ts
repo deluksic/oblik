@@ -21,6 +21,7 @@ import {
   FillArc,
   FillRegion,
   FillSeg,
+  PointNode,
   StrokeNode,
   type StrokeNodeValue,
 } from "./schemas";
@@ -168,6 +169,27 @@ function node<V extends TraceValue>(
   editable = false,
 ): TraceNode {
   return { id, occ: 0, kind: value.kind, value, bind, editable, stack: [] } as TraceNode;
+}
+
+/** The staged records of each kind, for the "does this input stage?" cases. */
+const strokes = (patch: TickPatch): number => staged(patch.strokes, StrokeNode).length;
+const points = (patch: TickPatch): number => staged(patch.points, PointNode).length;
+const circles = (patch: TickPatch): number => staged(patch.circles, CircleInst).length;
+const fills = (patch: TickPatch): number => staged(patch.fills, FillRegion).length;
+const fields = (patch: TickPatch): number => staged(patch.fields.quads, FieldQuad).length;
+
+/** One node per ink and fill kind, so a case can vary exactly one input. */
+function beam(x = -1, editable = false): TraceNode {
+  return node("o_seg", { kind: "segment", a: { x, y: 0 }, b: { x: 1, y: 0 } }, "beam", editable);
+}
+function bead(y = -2, editable = true): TraceNode {
+  return node("o_pt", { kind: "point", x: 2, y } as TraceValue, "dot", editable);
+}
+function drill(r = 1, editable = false): TraceNode {
+  return node("o_circ", { kind: "circle", center: { x: 0, y: 3 }, radius: r }, "drill", editable);
+}
+function shell(dx = 0, editable = false): TraceNode {
+  return node("o_poly", triangleAt(dx), "shell", editable);
 }
 
 /** A raster reference: a rect, a turn and a look, plus the URL it names. */
@@ -458,6 +480,83 @@ describe("adapter fill routing", () => {
     // The carrier moved, the hole did not: half the record kinds re-upload.
     expect(staged(moved.fields.arcs, FillArc)).toHaveLength(1);
     expect(staged(moved.fields.segs, FillSeg)).toHaveLength(0);
+  });
+
+  /**
+   * Every input a record carries, changed one at a time.
+   *
+   * The pool compares a signature *before* it builds, which is what makes an
+   * unchanged node cost nothing — and what would make a lane missing from a
+   * signature a record that silently never restages when that lane moves: a
+   * hover that stages nothing, a move that stages nothing. The replay tests
+   * above check the bytes a span carries; this checks that a change is what puts
+   * it in a span at all.
+   */
+  test("every input a record carries stages it when that input changes", () => {
+    const base = [beam(), bead(), drill(), shell(), csgNode("o_csg")];
+
+    const cases: {
+      name: string;
+      trace?: TraceNode[];
+      over?: Partial<AdapterInput>;
+      stages: (patch: TickPatch) => number;
+    }[] = [
+      // Geometry, one kind at a time.
+      { name: "segment moved", trace: [beam(0.5), bead(), drill(), shell()], stages: strokes },
+      { name: "point moved", trace: [beam(), bead(-1.5), drill(), shell()], stages: points },
+      { name: "circle radius", trace: [beam(), bead(), drill(2), shell()], stages: circles },
+      { name: "polygon moved", trace: [beam(), bead(), drill(), shell(0.5)], stages: fills },
+      {
+        name: "field's circle moved",
+        trace: [beam(), bead(), drill(), shell(), csgNode("o_csg", 0.75)],
+        stages: fields,
+      },
+      // State, which the shaders derive colour, alpha and width from.
+      { name: "segment hovered", over: { hoverKey: "o_seg:0" }, stages: strokes },
+      { name: "segment selected", over: { selectedKey: "o_seg:0" }, stages: strokes },
+      { name: "segment muted", over: { muted: () => true }, stages: strokes },
+      { name: "point hovered", over: { hoverKey: "o_pt:0" }, stages: points },
+      { name: "point selected", over: { selectedKey: "o_pt:0" }, stages: points },
+      { name: "point muted", over: { muted: () => true }, stages: points },
+      { name: "circle hovered", over: { hoverKey: "o_circ:0" }, stages: circles },
+      { name: "circle selected", over: { selectedKey: "o_circ:0" }, stages: circles },
+      { name: "circle muted", over: { muted: () => true }, stages: circles },
+      { name: "polygon hovered", over: { hoverKey: "o_poly:0" }, stages: fills },
+      { name: "polygon selected", over: { selectedKey: "o_poly:0" }, stages: fills },
+      { name: "field hovered", over: { hoverKey: "o_csg:0" }, stages: fields },
+      { name: "field selected", over: { selectedKey: "o_csg:0" }, stages: fields },
+      // Editability reaches the record twice: as a state bit, and as the mark
+      // radius a point carries.
+      {
+        name: "segment becomes editable",
+        trace: [beam(-1, true), bead(), drill(), shell()],
+        stages: strokes,
+      },
+      {
+        name: "point becomes editable",
+        trace: [beam(), bead(-2, false), drill(), shell()],
+        stages: points,
+      },
+      {
+        name: "circle becomes editable",
+        trace: [beam(), bead(), drill(1, true), shell()],
+        stages: circles,
+      },
+      {
+        name: "polygon becomes editable",
+        trace: [beam(), bead(), drill(), shell(0, true)],
+        stages: fills,
+      },
+    ];
+
+    for (const c of cases) {
+      const adapter = createAdapter();
+      // Settle every pool first, then change exactly one input: what stages is
+      // the change, and nothing else can be mistaken for it.
+      adapter.tick(input(base));
+      const patch = adapter.tick(input(c.trace ? [...c.trace, csgNode("o_csg")] : base, c.over));
+      expect(`${c.name}: ${c.stages(patch)}`).not.toBe(`${c.name}: 0`);
+    }
   });
 
   test("slots are keyed by the node, not by the object it arrives in", () => {
