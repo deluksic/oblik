@@ -15,6 +15,7 @@ import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
 import type { StagedRecords } from "./adapter";
 import {
+  CircleInst,
   FieldLeaf,
   FieldQuad,
   FillArc,
@@ -806,7 +807,7 @@ describe("adapter image routing", () => {
     expect(patch.images.draws).toEqual([{ slot: 0, src: "/assets/gear-9f3a2c11.png" }]);
     expect(patch.images.writes).toHaveLength(1);
     expect(patch.strokes.runs).toHaveLength(0);
-    expect(patch.circles.writes).toHaveLength(0);
+    expect(staged(patch.circles, CircleInst)).toHaveLength(0);
     expect(patch.stats.total).toBe(1);
   });
 

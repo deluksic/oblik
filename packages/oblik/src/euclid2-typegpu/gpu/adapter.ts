@@ -75,6 +75,9 @@ import {
   MAX_FILL_SEGS,
   MAX_IMAGES,
   MAX_POINTS,
+  LAYER_HALO,
+  LAYER_KNOCKOUT,
+  LAYER_PAINT,
   MAX_STROKE_DRAWS,
   PointNode,
   STATE_EDITABLE,
@@ -151,7 +154,7 @@ export type TickPatch = {
   /** Pooled ink records: the spans of the record buffer that moved this tick,
    * plus the draw-order bands that address them. */
   strokes: { runs: RecordRun[]; bands: InkBands };
-  circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
+  circles: { runs: RecordRun[]; bands: InkBands };
   fills: StagedDraw;
   /** Boundary spans backing the fill regions — one array per record kind, so the
    * fragment's segment loop never touches a carrier. No draws of their own. */
@@ -292,9 +295,15 @@ export function createAdapter(): Adapter {
     make: makeFillArc,
   });
 
+  const circleRecords = createRecordPool({
+    element: CircleInst,
+    count: MAX_CIRCLES,
+    make: makeCircleInst,
+  });
+
   const strokePool = createSlotPool(MAX_STROKE_DRAWS, retireRun(strokeRecords));
   const pointPool = createSlotPool(MAX_POINTS, retireRun(pointRecords));
-  const circlePool = createSlotPool(MAX_CIRCLES);
+  const circlePool = createSlotPool(MAX_CIRCLES, retireRun(circleRecords));
   const fillPool = createSlotPool(MAX_FILL_REGIONS, retireRun(fillRecords));
   const fillSegPool = createSlotPool(MAX_FILL_SEGS, retireRun(fillSegRecords));
   const fillArcPool = createSlotPool(MAX_FILL_ARCS, retireRun(fillArcRecords));
@@ -316,6 +325,17 @@ export function createAdapter(): Adapter {
   const arcSig = new Float64Array(ARC_SIG_LANES);
   const leafSig = new Float64Array(LEAF_SIG_LANES);
   const quadSig = new Float64Array(QUAD_SIG_LANES);
+  const circleSig = new Float64Array(CIRCLE_SIG_LANES);
+  const circleFill: CircleFill = {
+    center: { x: 0, y: 0 },
+    radius: 0,
+    a0: 0,
+    a1: 0,
+    halfPx: 0,
+    color: [0, 0, 0],
+    alpha: 0,
+    flags: 0,
+  };
   const leafFill: LeafFill = {
     leaf: {
       a: { x: 0, y: 0 },
@@ -349,7 +369,6 @@ export function createAdapter(): Adapter {
   };
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
-  const lastCircle = new Map<string, Upload>();
   const lastFillRegion = new Map<string, Upload>();
   const lastFillSegs = new Map<string, Upload>();
   const lastFillArcs = new Map<string, Upload>();
@@ -362,7 +381,6 @@ export function createAdapter(): Adapter {
   /** Every record above, for the per-tick prune below. Strokes and points are
    * not here: their pools are told about released ranges as they happen. */
   const uploads = [
-    lastCircle,
     lastFillRegion,
     lastFillSegs,
     lastFillArcs,
@@ -439,7 +457,6 @@ export function createAdapter(): Adapter {
     // --- circles within each band so chrome stacks per-state, not per-shape:
     // --- a hovered circle's paint sits under a selected edge's halo.
     const strokeLists = blankLists();
-    const circleWrites: { idx: number; value: CircleInstValue }[] = [];
     const circleLists = blankLists();
 
     const inkBand = splitChrome(ink, (n) => isSelected(n, input.selectedKey), white);
@@ -516,25 +533,44 @@ export function createAdapter(): Adapter {
       if (start === undefined) return;
       const hot = state !== "rest";
       const selected = state === "lifted";
-      const discs = circleInkDiscs(
-        n,
-        colors,
-        halfStrokePx,
-        outlineHalfPx,
-        knockoutHalfPx,
-        hot,
-        selected,
-        input.muted(n) && !hot,
-      );
-      if (diff(lastCircle, nodeKey(n), start, encodeCircles(discs))) {
-        for (let i = 0; i < INK_LAYER_COUNT; i++) {
-          circleWrites.push({ idx: start + i, value: discs[i]! });
-        }
-      }
+      const muted = input.muted(n) && !hot;
+      const v = n.value as Circle;
+      circleFill.center.x = v.center.x;
+      circleFill.center.y = v.center.y;
+      circleFill.radius = Math.abs(v.radius);
+      circleFill.a0 = 0;
+      circleFill.a1 = TAU;
+      const haloAlpha = selected
+        ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
+        : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
+      const paintColor = hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink;
+      /** Stage one layer: its own numbers are the signature, so a circle that did
+       * not move costs three comparisons instead of three built records. */
+      const disc = (layer: number, halfPx: number, color: Rgb, alpha: number): void => {
+        circleFill.halfPx = halfPx;
+        circleFill.color = color;
+        circleFill.alpha = alpha;
+        writeCircleSig(circleSig, circleFill);
+        circleRecords.touch(start + inkSlotOf(layer), circleSig, fillCircle, circleFill);
+      };
+      disc(LAYER_HALO, hot ? outlineHalfPx : -1, colors.ring, haloAlpha);
+      disc(LAYER_KNOCKOUT, selected ? knockoutHalfPx : -1, colors.paper, 1);
+      disc(LAYER_PAINT, halfStrokePx, paintColor, muted ? MUTED_ALPHA : 1);
       for (const band of bandsFor(state, input.showHalos)) {
         for (const layer of CIRCLE_BAND_LAYERS[band]) {
-          const slot = inkSlotOf(layer);
-          if (discs[slot]!.halfPx > 0) circleLists[band]!.push(start + slot);
+          // The layer's own half width says whether it draws at all; the sign of
+          // the cull value is never in the record.
+          const halfPx =
+            layer === LAYER_HALO
+              ? hot
+                ? outlineHalfPx
+                : -1
+              : layer === LAYER_KNOCKOUT
+                ? selected
+                  ? knockoutHalfPx
+                  : -1
+                : halfStrokePx;
+          if (halfPx > 0) circleLists[band]!.push(start + inkSlotOf(layer));
         }
       }
     };
@@ -677,6 +713,7 @@ export function createAdapter(): Adapter {
     const strokeRuns: RecordRun[] = [];
     const pointRuns: RecordRun[] = [];
     const fillRuns: RecordRun[] = [];
+    const circleRuns: RecordRun[] = [];
     const fillSegRuns: RecordRun[] = [];
     const fillArcRuns: RecordRun[] = [];
     const quadRuns: RecordRun[] = [];
@@ -686,6 +723,7 @@ export function createAdapter(): Adapter {
     const strokeStaged = strokeRecords.flush((run) => strokeRuns.push(run));
     const pointStaged = pointRecords.flush((run) => pointRuns.push(run));
     const fillStaged = fillRecords.flush((run) => fillRuns.push(run));
+    const circleStaged = circleRecords.flush((run) => circleRuns.push(run));
     const fillSegStaged = fillSegRecords.flush((run) => fillSegRuns.push(run));
     const fillArcStaged = fillArcRecords.flush((run) => fillArcRuns.push(run));
     const quadStaged = fieldQuadRecords.flush((run) => quadRuns.push(run));
@@ -695,7 +733,7 @@ export function createAdapter(): Adapter {
 
     return {
       strokes: { runs: strokeRuns, bands: bandArrays(strokeLists) },
-      circles: { writes: circleWrites, bands: bandArrays(circleLists) },
+      circles: { runs: circleRuns, bands: bandArrays(circleLists) },
       fills: { runs: fillRuns, order: Uint32Array.from(fillOrder), count: fillOrder.length },
       fillSegs: { runs: fillSegRuns },
       fillArcs: { runs: fillArcRuns },
@@ -713,7 +751,7 @@ export function createAdapter(): Adapter {
       stats: {
         written:
           strokeStaged +
-          circleWrites.length +
+          circleStaged +
           fillStaged +
           fillSegStaged +
           fillArcStaged +
@@ -820,7 +858,7 @@ export function createAdapter(): Adapter {
   }
 
   function destroy() {
-    lastCircle.clear();
+    circleRecords.reset();
     lastFillRegion.clear();
     lastFillSegs.clear();
     lastFillArcs.clear();
@@ -1271,75 +1309,68 @@ function writePointSig(sig: Float64Array, at: Vec2, markRadiusPx: number, state:
   sig[3] = state;
 }
 
-/** The three layered annuli of one circle node (halo ring, knockout, paint),
- * all symmetric about the node's own world radius; inactive layers carry
- * `halfPx = -1` so the vertex shader culls them. The band width is CSS px and
- * the fan's piece count is derived from it and the zoom in the shader, so the
- * record holds no scale. */
-function circleInkDiscs(
-  n: TraceNode,
-  colors: AdapterInput["colors"],
-  halfPx: number,
-  outlineHalfPx: number,
-  knockoutHalfPx: number,
-  hot: boolean,
-  selected: boolean,
-  muted: boolean,
-): CircleInstValue[] {
-  const v = n.value as Circle;
-  const r = Math.abs(v.radius);
-  const cx = v.center.x;
-  const cy = v.center.y;
-  const disc = (band: number, color: Rgb, alpha: number): CircleInstValue =>
-    CircleInst({
-      center: vec2f(cx, cy),
-      radius: r,
-      halfPx: band,
-      a0: 0,
-      a1: TAU,
-      color: vec3f(color[0], color[1], color[2]),
-      alpha,
-      flags: 0,
-    });
-  const haloAlpha = selected
-    ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
-    : DEFAULT_CHROME_METRICS.hoverOutlineOpacity;
-  const paintColor = hot ? colors.selectedPaint : n.editable ? colors.accent : colors.ink;
-  return [
-    disc(hot ? outlineHalfPx : -1, colors.ring, haloAlpha),
-    disc(selected ? knockoutHalfPx : -1, colors.paper, 1),
-    disc(halfPx, paintColor, muted ? MUTED_ALPHA : 1),
-  ];
+// -- pooled circle records ----------------------------------------------------
+
+/** One circle layer's payload: the node's analytic geometry — which every layer
+ * shares — and the layer's own width, colour and alpha. */
+type CircleFill = {
+  center: { x: number; y: number };
+  radius: number;
+  a0: number;
+  a1: number;
+  halfPx: number;
+  color: Rgb;
+  alpha: number;
+  flags: number;
+};
+
+/** The layer's signature and its record, field for field — see
+ * `writeRegionSig` for why the two sit together. */
+function writeCircleSig(sig: Float64Array, args: CircleFill): void {
+  let i = 0;
+  sig[i++] = args.center.x;
+  sig[i++] = args.center.y;
+  sig[i++] = args.radius;
+  sig[i++] = args.halfPx;
+  sig[i++] = args.a0;
+  sig[i++] = args.a1;
+  sig[i++] = args.color[0];
+  sig[i++] = args.color[1];
+  sig[i++] = args.color[2];
+  sig[i++] = args.alpha;
+  sig[i++] = args.flags;
+}
+
+const CIRCLE_SIG_LANES = 11;
+
+function fillCircle(record: CircleInstValue, args: CircleFill): void {
+  record.center.x = args.center.x;
+  record.center.y = args.center.y;
+  record.radius = args.radius;
+  record.halfPx = args.halfPx;
+  record.a0 = args.a0;
+  record.a1 = args.a1;
+  record.color.r = args.color[0];
+  record.color.g = args.color[1];
+  record.color.b = args.color[2];
+  record.alpha = args.alpha;
+  record.flags = args.flags;
+}
+
+function makeCircleInst(): CircleInstValue {
+  return CircleInst({
+    center: vec2f(0, 0),
+    radius: 0,
+    halfPx: 0,
+    a0: 0,
+    a1: 0,
+    color: vec3f(0, 0, 0),
+    alpha: 0,
+    flags: 0,
+  });
 }
 
 // -- payload encoding (canonical float diffs) --------------------------------
-
-function encodeCircle(v: CircleInstValue): Float64Array {
-  const f = new Float64Array(12);
-  f[0] = v.center.x;
-  f[1] = v.center.y;
-  f[2] = v.radius;
-  f[3] = v.halfPx;
-  f[4] = v.a0;
-  f[5] = v.a1;
-  f[6] = v.color.r;
-  f[7] = v.color.g;
-  f[8] = v.color.b;
-  f[9] = v.alpha;
-  f[10] = v.flags;
-  return f;
-}
-
-/** Whole-node payload: the three layered annuli of a circle node. */
-function encodeCircles(discs: readonly CircleInstValue[]): Float64Array {
-  const out = new Float64Array(discs.length * 12);
-  let at = 0;
-  for (const d of discs) {
-    out.set(encodeCircle(d), at);
-    at += 12;
-  }
-  return out;
-}
 
 /** Visible pane rectangle in world units — the clamp for unbounded fields. */
 function visibleWorldBox(cam: Camera2, size: PaneSize): Box {

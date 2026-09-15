@@ -399,7 +399,7 @@ export function createPainter(opts: {
         strokeOrder[band].write(patch.strokes.bands[band]);
         strokeCounts[band] = patch.strokes.bands[band].length;
       }
-      circleBuffer.writePartial(patch.circles.writes);
+      writeRuns(circleBuffer, patch.circles.runs);
       for (const band of INK_BAND_ORDER) {
         circleOrder[band].write(patch.circles.bands[band]);
         circleCounts[band] = patch.circles.bands[band].length;
