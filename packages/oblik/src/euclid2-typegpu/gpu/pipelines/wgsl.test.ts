@@ -1,11 +1,13 @@
 import { tgpu } from "typegpu";
 import { describe, expect, test } from "vitest";
 
+import { INK_BAND_ORDER, POINT_BAND_LAYERS, STROKE_BAND_LAYERS } from "../bands";
+import { LAYER_OUTLINE } from "../schemas";
 import { circleVertex } from "./circles";
-import { markVertexExplicit, markVertexHalo, markVertexPaint } from "./disks";
+import { markVertexExplicit, markVertexFor, markVertexHalo, markVertexPaint } from "./disks";
 import { fillFragment, haloFragment } from "./fills";
 import { imageFragment, imageVertex } from "./images";
-import { strokeVertexHalo, strokeVertexPaint } from "./strokes";
+import { strokeVertexFor, strokeVertexHalo, strokeVertexPaint } from "./strokes";
 
 /**
  * The span-pass fragments, resolved device-free. The interesting property is
@@ -204,6 +206,28 @@ describe("record widths are CSS px", () => {
  * geometry the same thing. And the look is exactly two mixes: desaturate, then
  * toward the paper, with the bitmap's own alpha kept.
  */
+/**
+ * The tables and the shaders have to agree in both directions: a band whose base
+ * layer has no variant is a band that draws nothing, and a variant compiled for a
+ * base no band uses is dead shader code that would silently accept a mistyped
+ * band. `strokeVertexFor`/`markVertexFor` throw rather than default, so this is
+ * the assertion that they never have to.
+ */
+describe("band and shader agreement", () => {
+  test("every band's layers have a stroke and a mark variant", () => {
+    for (const band of INK_BAND_ORDER) {
+      expect(strokeVertexFor(STROKE_BAND_LAYERS[band]!)).toBeDefined();
+      expect(markVertexFor(POINT_BAND_LAYERS[band]!)).toBeDefined();
+    }
+  });
+
+  test("a layer no band is based on has no shader", () => {
+    // A stroke band never replays a mark's rim, and no band is based on the
+    // knockout: the halo pair is.
+    expect(() => strokeVertexFor([LAYER_OUTLINE])).toThrow(/based on layer/);
+  });
+});
+
 describe("image WGSL", () => {
   const code = tgpu.resolve([imageVertex, imageFragment]);
 
