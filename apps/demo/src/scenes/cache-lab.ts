@@ -35,10 +35,14 @@ export default defineScene({
   hint: "Turn on the eval stats chip in Settings. Drag the free bead — built stays at ~2 while the grid, ring layout, and CSG chain replay from the cache.",
   camera: { x: 7.6, y: 3.4, scale: 42 },
   build() {
-    // 100 looped points: the frontier that must hit on every draft tick.
+    // 100 looped points: the frontier that must hit on every draft tick. Each
+    // one also carries a circle, so the circle path holds as many records as the
+    // point path does — the cheapest way to see what a node of it costs on a
+    // frame where nothing has moved.
     for (let i = 0; i < GRID; i++) {
       for (let j = 0; j < GRID; j++) {
-        point(i * 0.7, j * 0.7, "o_lab_grid");
+        const at = point(i * 0.7, j * 0.7, "o_lab_grid");
+        circle(at, 0.2, "o_lab_dot");
       }
     }
 
