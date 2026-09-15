@@ -70,8 +70,9 @@ function makeStrokeVertex(base: number, count: number) {
     const editable = (rec.state & u32(STATE_EDITABLE)) !== u32(0);
     const muted = (rec.state & u32(STATE_MUTED)) !== u32(0);
     const explicit = (rec.state & u32(STATE_EXPLICIT)) !== u32(0);
-    // The record's half width is the paint's; the chrome bands take theirs from
-    // the frame, and a band that is not drawing is a zero width, never a flag.
+    // The record's half width is the paint's; the chrome bands take the frame's
+    // two thicknesses and place them outside it, and a band that is not drawing
+    // is a zero width, never a flag.
     let halfPx = rec.halfPx;
     let color = select(chrome.ink, select(chrome.accent, chrome.selectedPaint, hot), editable);
     let alpha = select(f32(1), chrome.mutedAlpha, muted);
@@ -81,11 +82,16 @@ function makeStrokeVertex(base: number, count: number) {
       color = vec3f(rec.color);
       alpha = f32(rec.alpha);
     } else if (layer === u32(LAYER_HALO)) {
-      halfPx = f32(chrome.haloHalfPx);
+      // A hovered ring hugs the paint; selecting inserts the paper gap between
+      // the two, which pushes the ring out by exactly that gap. The ring's own
+      // thickness never changes, so hovering does not fatten it (the fills'
+      // model, measured outward from the paint instead of inward from a fill).
+      halfPx = rec.halfPx + chrome.ringPx + select(f32(0), chrome.gapPx, selected);
       color = vec3f(chrome.ring);
       alpha = select(chrome.hoverAlpha, chrome.selectAlpha, selected);
     } else if (layer === u32(LAYER_KNOCKOUT)) {
-      halfPx = select(f32(0), chrome.knockHalfPx, selected);
+      // The paper is the band that only a selection has: it is the gap.
+      halfPx = select(f32(0), rec.halfPx + chrome.gapPx, selected);
       color = vec3f(chrome.paper);
       alpha = f32(1);
     }

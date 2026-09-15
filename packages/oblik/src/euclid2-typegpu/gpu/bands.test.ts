@@ -12,7 +12,9 @@ import { chromePasses, splitChrome } from "../../euclid2/view/marks";
 import {
   bandLayers,
   bandsFor,
+  chromeBands,
   CIRCLE_BAND_LAYERS,
+  edgeBandHalves,
   INK_BAND_ORDER,
   INK_LAYER_COUNT,
   inkSlotOf,
@@ -127,7 +129,11 @@ function svgChrome(
 
 /** What the GPU draws for a node in this state, from the band tables and the
  * chrome uniform: `(kind, widthPx, opacity)` triples. A state gates a layer to a
- * zero width rather than to a flag, so a dead band is simply dropped. */
+ * zero width rather than to a flag, so a dead band is simply dropped.
+ *
+ * The widths are placed the way the two shaders place them — an edge from its
+ * paint half width, a mark from its paper rim — so the numbers this reads back
+ * are the ones `pipelines/wgsl.test.ts` pins as generated WGSL. */
 function gpuChrome(
   kind: "strokes" | "points",
   state: InkState,
@@ -136,16 +142,19 @@ function gpuChrome(
 ): { layer: number; kind: ChromeKind; width: number; opacity: number }[] {
   const hot = state !== "rest";
   const selected = state === "lifted";
+  const shared = { gapPx: chrome.gapPx, ringPx: chrome.ringPx };
+  const edges = edgeBandHalves(paintHalfPx, shared, state);
+  const rimPx = paintHalfPx + chrome.pointOutlineAddPx;
+  const points = edgeBandHalves(rimPx, shared, state);
   const out: { layer: number; kind: ChromeKind; width: number; opacity: number }[] = [];
   for (const band of bandsFor(state, true)) {
     for (const layer of bandLayers(kind, band)) {
       if (layer === LAYER_PAINT) {
         out.push({ layer, kind: "paint", width: 2 * paintHalfPx, opacity: 1 });
       } else if (layer === LAYER_OUTLINE) {
-        const half = paintHalfPx + chrome.pointOutlineAddPx;
-        out.push({ layer, kind: "outline", width: 2 * half, opacity: 1 });
+        out.push({ layer, kind: "outline", width: 2 * rimPx, opacity: 1 });
       } else if (layer === LAYER_HALO) {
-        const half = kind === "strokes" ? chrome.haloHalfPx : paintHalfPx + chrome.pointRingAddPx;
+        const half = (kind === "strokes" ? edges : points).haloHalfPx;
         out.push({
           layer,
           kind: "outline",
@@ -153,12 +162,37 @@ function gpuChrome(
           opacity: selected ? chrome.selectAlpha : chrome.hoverAlpha,
         });
       } else {
-        const half = kind === "strokes" ? chrome.knockHalfPx : paintHalfPx + chrome.pointKnockAddPx;
+        const half = (kind === "strokes" ? edges : points).knockHalfPx;
         out.push({ layer, kind: "knockout", width: selected ? 2 * half : 0, opacity: 1 });
       }
     }
   }
   return out.filter((layer) => layer.width > 0);
+}
+
+/** The visible chrome a kind shows, in CSS px from its own paint edge: the two
+ * numbers a viewer reads off the screen. Both kinds are placed by the same helper,
+ * so this is where the "one gap, one ring" claim is checked as geometry rather
+ * than as a uniform's fields. */
+function visibleChrome(
+  kind: "strokes" | "points",
+  state: InkState,
+  chrome: ChromeValue,
+  paintHalfPx: number,
+): { gapPx: number; ringPx: number } {
+  const rimPx = paintHalfPx + chrome.pointOutlineAddPx;
+  const paint = kind === "strokes" ? paintHalfPx : rimPx;
+  // A state that queues no chrome band draws none, so there is nothing to read.
+  if (!bandsFor(state, true).some((band) => band.endsWith("Halo"))) {
+    return { gapPx: 0, ringPx: 0 };
+  }
+  const halves = edgeBandHalves(paint, { gapPx: chrome.gapPx, ringPx: chrome.ringPx }, state);
+  // The ring's inner edge is the paint's, or the paper's when a selection has
+  // inserted the gap between them.
+  const inner = state === "lifted" ? halves.knockHalfPx : paint;
+  // Both bands are measured from the kind's own paint edge — a stroke's half
+  // width, a mark's rim — which is why the two are comparable at all.
+  return { gapPx: halves.knockHalfPx - paint, ringPx: halves.haloHalfPx - inner };
 }
 
 describe("band membership", () => {
@@ -215,32 +249,48 @@ describe("band membership", () => {
 });
 
 describe("chrome widths", () => {
-  test("the frame's chrome is the SVG's recipe, kind for kind", () => {
+  test("the tokens are read as band widths, and the frame carries exactly one pair", () => {
     const chrome = makeChromeValue(COLORS, STROKE_PX);
-    // A 1.5px construction stroke: 7px outline / 4px knockout, halved for the
-    // records, which store half widths (docs/chrome.md).
+    // A 1.5px construction stroke: 7px outline / 4px knockout (docs/chrome.md).
+    // Both tokens are *widths* — the ring across, the gap across — so a band is
+    // half its token. The bug this contract exists for: reading them as the outer
+    // diameters of the bands for edges and marks but as thicknesses for fills
+    // showed a 1.25px gap and a 1.5px ring on a selected line, 3px and 2.5px on a
+    // point, and 2px and 3.5px on a fill — three answers to one question.
     const edges = overlayBands(STROKE_PX, { selected: true });
     expect(edges).toEqual({ outline: 7, knockout: 4 });
-    expect(chrome.haloHalfPx).toBeCloseTo(edges.outline / 2, 9);
-    expect(chrome.knockHalfPx).toBeCloseTo(edges.knockout / 2, 9);
+    const shared = chromeBands(STROKE_PX);
+    expect(shared).toEqual({ gapPx: 2, ringPx: 3.5 });
+
+    // There is no second reading of the tokens: the uniform *is* the pair, so a
+    // kind cannot disagree with another about either number.
+    expect({ gapPx: chrome.gapPx, ringPx: chrome.ringPx }).toEqual(shared);
+    // A mark keeps its own rim, and nothing else of its own chrome.
+    expect(chrome.pointOutlineAddPx).toBeCloseTo(POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX, 9);
+
+    // The palette and opacities are the SVG's, token for token.
     expect(chrome.hoverAlpha).toBe(DEFAULT_CHROME_METRICS.hoverOutlineOpacity);
     expect(chrome.selectAlpha).toBe(DEFAULT_CHROME_METRICS.selectOutlineOpacity);
     expect(chrome.mutedAlpha).toBeCloseTo(MUTED_ALPHA, 6);
   });
 
-  test("a mark's bands are measured from its own radius, not from a stroke's", () => {
+  test("hovering shows the ring alone; selecting inserts the gap and pushes it out", () => {
     const chrome = makeChromeValue(COLORS, STROKE_PX);
-    // Points use a fixed wider halo (14px outline / 9px knockout) instead of
-    // growing with the paint, so their offsets are the point metrics halved.
-    const points = overlayBands(POINT_STROKE_PX, { selected: false, point: true });
-    expect(points).toEqual({ outline: 14, knockout: 9 });
-    expect(chrome.pointRingAddPx).toBeCloseTo(points.outline / 2, 9);
-    expect(chrome.pointKnockAddPx).toBeCloseTo(points.knockout / 2, 9);
-    // The paper rim is the SVG's own paint stroke, widened on the GPU by the
-    // documented half pixel (a rim that reads thin on a 3.5px dot).
-    expect(chrome.pointOutlineAddPx).toBeCloseTo(POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX, 9);
-    // No number is shared between the edge and the mark recipes by accident.
-    expect(chrome.pointRingAddPx).not.toBeCloseTo(chrome.haloHalfPx, 3);
+    const shared = chromeBands(STROKE_PX);
+    for (const kind of ["strokes", "points"] as const) {
+      for (const state of ["hover", "lifted"] as const) {
+        // Every kind, hovered or selected, shows the same two numbers...
+        expect(visibleChrome(kind, state, chrome, PAINT_HALF_PX)).toEqual(shared);
+      }
+      // ...and a hovered ring is not the fat one: it stops where a selected
+      // one's paper starts, because the gap is what separates them.
+      const hover = visibleChrome(kind, "hover", chrome, PAINT_HALF_PX);
+      const lifted = visibleChrome(kind, "lifted", chrome, PAINT_HALF_PX);
+      expect(hover.ringPx).toBeCloseTo(lifted.ringPx, 9);
+      const paintHalf =
+        kind === "strokes" ? PAINT_HALF_PX : PAINT_HALF_PX + chrome.pointOutlineAddPx;
+      expect(paintHalf + hover.ringPx).toBeLessThan(paintHalf + lifted.gapPx + lifted.ringPx);
+    }
   });
 
   test("the palette is carried per token, not mixed up", () => {
@@ -258,7 +308,7 @@ describe("chrome widths", () => {
     expect(() => makeChromeValue({ ...COLORS, ring: [Number.NaN, 0, 0] }, STROKE_PX)).toThrow(
       /ring\.r/,
     );
-    expect(() => makeChromeValue(COLORS, Number.NaN)).toThrow(/haloHalfPx/);
+    expect(() => makeChromeValue(COLORS, Number.NaN)).toThrow(/chrome\.gapPx/);
   });
 });
 
@@ -266,12 +316,23 @@ describe("state and layer numbering", () => {
   test("each state's effective layers are the SVG's chrome recipe", () => {
     const chrome = makeChromeValue(COLORS, STROKE_PX);
     for (const state of ["rest", "hover", "lifted"] as const) {
-      // A stroke: the same widths and opacities the SVG strokes, layer for
-      // layer, in the same order.
+      // A stroke: the SVG's chrome kinds, in its order, at its opacities. The
+      // *widths* are the GPU's own: an SVG band is a stroke centred on the path,
+      // so `outline: 7px, knockout: 4px` leaves a 1.25px gap and a 1.5px ring,
+      // while a record places the bands from the paint edge outward (the same
+      // 2px gap and 3.5px ring a selected fill shows). Which bands appear and how
+      // strong they are is still the SVG's recipe, which is what this asserts.
       const strokeLayers = gpuChrome("strokes", state, chrome, PAINT_HALF_PX).map(
-        ({ kind, width, opacity }) => ({ kind, width, opacity }),
+        ({ kind, opacity }) => ({ kind, opacity }),
       );
-      expect(strokeLayers).toEqual(svgChrome(state, STROKE_PX, false));
+      expect(strokeLayers).toEqual(
+        svgChrome(state, STROKE_PX, false).map(({ kind, opacity }) => ({ kind, opacity })),
+      );
+      // The geometry behind those layers is the shared pair, in every state that
+      // draws chrome at all (a rest node draws none — see `gpuChrome`'s culling).
+      expect(visibleChrome("strokes", state, chrome, PAINT_HALF_PX)).toEqual(
+        state === "rest" ? { gapPx: 0, ringPx: 0 } : chromeBands(STROKE_PX),
+      );
 
       // A mark's halo layers are the SVG's chrome kinds at the same opacities.
       // Their *widths* are not the SVG's: SVG strokes a 14px ring where the GPU

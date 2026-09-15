@@ -151,26 +151,73 @@ function token(colors: InkPalette, name: keyof InkPalette) {
 }
 
 /**
+ * The paper gap and the ring's own thickness, in CSS px — the two numbers every
+ * kind's selection chrome is measured from.
+ *
+ * The metrics state each as the *width* of the band it names (`--oblik-chrome-
+ * outline` is the ring across, `--oblik-chrome-knockout` the gap across), so a
+ * band is half its token. Reading them as widths — rather than as the outer
+ * diameters of the bands — is what makes a hovered fill, edge, circle and mark
+ * show the same ring, and a selected one the same gap: every kind places the
+ * same two thicknesses from its own paint edge, so there is nothing left to
+ * disagree about. `overlayBands` still decides whether a wider construction
+ * stroke grows them.
+ */
+export function chromeBands(
+  strokePx: number,
+  metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
+): { gapPx: number; ringPx: number } {
+  const { outline, knockout } = overlayBands(strokePx, { selected: true }, metrics);
+  return { gapPx: knockout / 2, ringPx: outline / 2 };
+}
+
+/**
+ * Where a stroke-shaped kind's two chrome bands sit, in half widths from the
+ * path: the ring hugs the paint while hovering and a selection inserts the gap
+ * between them, so the ring's own thickness never changes.
+ *
+ * Circles keep a record per layer rather than reading the frame, so they place
+ * their bands here; the stroke shader derives the same two half widths from the
+ * same uniform (pinned as generated WGSL by `pipelines/wgsl.test.ts`), and the
+ * mark shader does it from its paper rim instead of its half width.
+ */
+export function edgeBandHalves(
+  paintHalfPx: number,
+  bands: { gapPx: number; ringPx: number },
+  state: InkState,
+): { haloHalfPx: number; knockHalfPx: number } {
+  const gapPx = state === "lifted" ? bands.gapPx : 0;
+  return {
+    haloHalfPx: paintHalfPx + bands.ringPx + gapPx,
+    knockHalfPx: paintHalfPx + bands.gapPx,
+  };
+}
+
+/**
  * The band widths and palette of one frame.
  *
  * The widths are the SVG's own chrome recipe, taken from `overlayBands` rather
- * than restated, and the point offsets are the same recipe measured from a
- * mark's paint radius: a band's width is a function of the chrome metrics and
- * the construction stroke, never of the node, which is why it can live in a
- * uniform that a theme switch rewrites and no record touches.
+ * than restated, and every kind measures the same gap and the same ring from its
+ * own paint edge: a band's width is a function of the chrome metrics and the
+ * construction stroke, never of the node, which is why it can live in a uniform
+ * that a theme switch rewrites and no record touches.
  */
 export function makeChromeValue(
   colors: InkPalette,
   strokePx: number,
   metrics: ChromeMetrics = DEFAULT_CHROME_METRICS,
 ): ChromeValue {
-  const { outline, knockout } = overlayBands(strokePx, { selected: true }, metrics);
+  const { gapPx, ringPx } = chromeBands(strokePx, metrics);
+  /** A mark's own paper rim: part of its paint (the SVG paint stroke), so the
+   * mark places its bands from the rim rather than from the dot. */
+  const rimPx = POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX;
   return Chrome({
-    haloHalfPx: finite("haloHalfPx", outline / 2),
-    knockHalfPx: finite("knockHalfPx", knockout / 2),
-    pointRingAddPx: finite("pointRingAddPx", metrics.pointOutlinePx / 2),
-    pointKnockAddPx: finite("pointKnockAddPx", metrics.pointKnockoutPx / 2),
-    pointOutlineAddPx: finite("pointOutlineAddPx", POINT_STROKE_PX / 2 + POINT_RIM_EXTRA_PX),
+    gapPx: finite("gapPx", gapPx),
+    ringPx: finite("ringPx", ringPx),
+    // Marks keep the one band a theme tunes for them alone: the rim. Their ring
+    // and gap are the shared pair, so a selected point, edge and fill all show
+    // the same two pixels of paper under the same 3.5px ring.
+    pointOutlineAddPx: finite("pointOutlineAddPx", rimPx),
     hoverAlpha: finite("hoverAlpha", metrics.hoverOutlineOpacity),
     selectAlpha: finite("selectAlpha", metrics.selectOutlineOpacity),
     mutedAlpha: MUTED_ALPHA,

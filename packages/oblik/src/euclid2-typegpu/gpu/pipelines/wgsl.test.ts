@@ -115,16 +115,20 @@ describe("record widths are CSS px", () => {
     expect(paint).not.toContain("polylineVariableWidth");
   });
 
-  test("the chrome bands read their width and colour from the frame", () => {
+  test("the chrome bands place the frame's two thicknesses outside the paint", () => {
     const halo = tgpu.resolve([strokeVertexHalo]);
-    // The halo's width and colour are the frame's, at the state's opacity...
-    expect(halo).toContain("halfPx = (*chrome).haloHalfPx;");
+    // The ring hugs the paint, and the paper gap joins it only when selected:
+    // both come from the record's own paint half width plus the frame's shared
+    // thicknesses, so one pair of numbers serves every kind.
+    expect(halo).toContain(
+      "halfPx = (((*rec).halfPx + (*chrome).ringPx) + select(0f, (*chrome).gapPx, selected));",
+    );
     expect(halo).toContain("color = (*chrome).ring;");
     expect(halo).toContain(
       "alpha = select((*chrome).hoverAlpha, (*chrome).selectAlpha, selected);",
     );
     // ...and a knockout that is not selected is a zero width, not a flag.
-    expect(halo).toContain("halfPx = select(0f, (*chrome).knockHalfPx, selected);");
+    expect(halo).toContain("halfPx = select(0f, ((*rec).halfPx + (*chrome).gapPx), selected);");
     expect(halo).toContain("color = (*chrome).paper;");
     // Scene ink derives its paint from the palette, in the SVG's promotion order.
     const paint = tgpu.resolve([strokeVertexPaint]);
@@ -166,9 +170,14 @@ describe("record widths are CSS px", () => {
     expect(paint).toContain("color = (*chrome).paper;");
 
     expect(halo).toContain("let layer = (0u + (instanceIndex % 2u));");
-    expect(halo).toContain("select(0f, ((*rec).markRadiusPx + (*chrome).pointRingAddPx), hot)");
+    // The mark places the same two thicknesses from its rim, not its radius: the
+    // ring hugs the rim, the paper gap pushes it out when selected.
     expect(halo).toContain(
-      "select(0f, ((*rec).markRadiusPx + (*chrome).pointKnockAddPx), selected)",
+      "select(0f, ((rimPx + (*chrome).ringPx) + select(0f, (*chrome).gapPx, selected)), hot)",
+    );
+    expect(halo).toContain("let rimPx = ((*rec).markRadiusPx + (*chrome).pointOutlineAddPx);");
+    expect(halo).toContain(
+      "select(0f, (((*rec).markRadiusPx + (*chrome).pointOutlineAddPx) + (*chrome).gapPx), selected)",
     );
 
     // One instance per entry, and the record's own colour: a ghost's dot.

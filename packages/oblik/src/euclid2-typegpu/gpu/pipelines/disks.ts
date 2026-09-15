@@ -35,7 +35,9 @@ const toClip = tgpu.fn(
  * The four concentric discs the SVG PointMark composes are this record's four
  * layers, and each layer's radius is the mark's own paint radius plus an offset
  * the frame carries — so the record holds the one number the SVG's chrome recipe
- * measures from and nothing that a band could derive. Like the stroke shader,
+ * measures from and nothing that a band could derive. A mark places its chrome
+ * from its paper rim, the way a stroke places it from its paint half width: the
+ * ring hugs the rim while hovering and the paper gap pushes it out when selected. Like the stroke shader,
  * the base layer and the layer count are baked in and an instance's layer comes
  * from its parity: a mark's paint band is the rim+paint pair, its chrome band the
  * ring+knockout pair.
@@ -67,12 +69,24 @@ function makeMarkVertex(base: number, count: number) {
       radiusPx = rec.markRadiusPx + chrome.pointOutlineAddPx;
       color = vec3f(chrome.paper);
     } else if (layer === u32(LAYER_HALO)) {
-      // A halo is a full disc out to the ring radius, under the dot.
-      radiusPx = select(f32(0), rec.markRadiusPx + chrome.pointRingAddPx, hot);
+      // A halo is a full disc out to the ring, under the rim and the dot, so the
+      // ring is what shows between the rim and the disc's edge: it hugs the rim
+      // while hovering, and a selection pushes it out by the paper gap.
+      const rimPx = rec.markRadiusPx + chrome.pointOutlineAddPx;
+      radiusPx = select(
+        f32(0),
+        rimPx + chrome.ringPx + select(f32(0), chrome.gapPx, selected),
+        hot,
+      );
       color = vec3f(chrome.ring);
       alpha = select(chrome.hoverAlpha, chrome.selectAlpha, selected);
     } else if (layer === u32(LAYER_KNOCKOUT)) {
-      radiusPx = select(f32(0), rec.markRadiusPx + chrome.pointKnockAddPx, selected);
+      // The paper disc, drawn over the halo's middle: the gap itself.
+      radiusPx = select(
+        f32(0),
+        rec.markRadiusPx + chrome.pointOutlineAddPx + chrome.gapPx,
+        selected,
+      );
       color = vec3f(chrome.paper);
       alpha = f32(1);
     }

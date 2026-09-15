@@ -62,12 +62,18 @@ export type FrameValue = Infer<typeof Frame>;
  * own weights (dash caps, arrow shafts, snap rings) without a second schema.
  */
 export const Chrome = struct({
-  /** Half widths, CSS px: the hot ring, and the paper knockout inside it. */
-  haloHalfPx: f32,
-  knockHalfPx: f32,
-  /** A mark's ring/knockout/rim radius measured *from* its paint radius, CSS px. */
-  pointRingAddPx: f32,
-  pointKnockAddPx: f32,
+  /** The two selection bands, as thicknesses in CSS px — the whole of a kind's
+   * chrome geometry, whichever shape it draws:
+   * - `gapPx` is the paper knockout, inserted between the paint and the ring
+   *   only while selected;
+   * - `ringPx` is the ring's own thickness, the same hovered and selected.
+   * A band is placed from each kind's own paint edge — a stroke from its record's
+   * half width, a mark from its rim, a fill inward from its boundary — which is
+   * what makes one pair of numbers enough for all three. */
+  gapPx: f32,
+  ringPx: f32,
+  /** A mark's paper rim, measured *from* its paint radius, CSS px: part of the
+   * mark's paint (the SVG's own paint stroke), so bands are placed from it. */
   pointOutlineAddPx: f32,
   /** Ring opacity while hovered, and while selected. */
   hoverAlpha: f32,

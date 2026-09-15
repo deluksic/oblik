@@ -10,12 +10,14 @@ import { infiniteLineAxis } from "#geom/ops";
 import { infiniteClip, screenToWorld, type Camera2, type PaneSize } from "../../euclid2/camera";
 import { isFiniteTrace } from "../../euclid2/pick";
 import type { Ghost, PlaceHit } from "../../euclid2/tool";
-import { DEFAULT_CHROME_METRICS, overlayBands } from "../../euclid2/view/chrome";
+import { DEFAULT_CHROME_METRICS } from "../../euclid2/view/chrome";
 import { isHot, isSelected, splitChrome } from "../../euclid2/view/marks";
 import { pointMarkRadius } from "../../euclid2/view/pointMark";
 import { imageQuad, imageRect, isImage, type ImageValue } from "../../eval/image";
 import {
   bandsFor,
+  chromeBands,
+  edgeBandHalves,
   CIRCLE_BAND_LAYERS,
   INK_BAND_ORDER,
   INK_LAYER_COUNT,
@@ -460,10 +462,11 @@ export function createAdapter(): Adapter {
     // the frame's zoom (`worldPerPx`), so the records hold nothing the camera
     // can change and zooming reprojects the world instead of rewriting it.
     const halfStrokePx = strokePx / 2;
-    // Chrome bands sit at the same CSS px widths regardless of state (the
-    // selected overlayBands pass is what points/ink chrome share upstream).
-    const outlineHalfPx = overlayBands(strokePx, { selected: true }).outline / 2;
-    const knockoutHalfPx = overlayBands(strokePx, { selected: true }).knockout / 2;
+    // The two selection bands, as the two thicknesses the shaders place from each
+    // kind's own paint edge (`bands.ts`): a fill measures them inward from its
+    // boundary, a stroke outward from its record's half width. Circles keep a
+    // record per layer instead of reading the frame, so they place them here.
+    const { gapPx, ringPx } = chromeBands(strokePx);
 
     // --- references (the backdrop). One slot per node, in tape order; the
     // --- draw list pairs each slot with the source whose texture paints it.
@@ -480,8 +483,8 @@ export function createAdapter(): Adapter {
         isSelected(n, input.selectedKey),
         input.showHalos,
         strokePx,
-        outlineHalfPx,
-        knockoutHalfPx,
+        ringPx,
+        gapPx,
       );
       if (diff(lastImage, key, slot, encodeImage(inst)))
         imageWrites.push({ idx: slot, value: inst });
@@ -553,8 +556,16 @@ export function createAdapter(): Adapter {
       // The staging and the band queue both read *these* numbers, so a layer
       // cannot be recorded as drawing while the queue counts it out, or the
       // other way round — the two-numberings bug this file has been bitten by.
-      const haloHalfPx = hot ? outlineHalfPx : -1;
-      const knockHalfPx = selected ? knockoutHalfPx : -1;
+      // A circle's chrome is placed exactly as an edge's — the shader reads the
+      // frame, so this is the same helper the tests hold the two to. A rest
+      // circle draws neither band, and a dead band is a zero width, not a flag.
+      const { haloHalfPx: hotHaloHalfPx, knockHalfPx: hotKnockHalfPx } = edgeBandHalves(
+        halfStrokePx,
+        { gapPx, ringPx },
+        state,
+      );
+      const haloHalfPx = hot ? hotHaloHalfPx : -1;
+      const knockHalfPx = selected ? hotKnockHalfPx : -1;
       circleHalf[inkSlotOf(LAYER_HALO)] = haloHalfPx;
       circleHalf[inkSlotOf(LAYER_KNOCKOUT)] = knockHalfPx;
       circleHalf[inkSlotOf(LAYER_PAINT)] = halfStrokePx;
@@ -596,7 +607,7 @@ export function createAdapter(): Adapter {
         const alpha = hot ? 0.28 : 0.16;
         const halo =
           input.showHalos && hot
-            ? haloWrites(selected, colors.ring, colors.paper, outlineHalfPx, knockoutHalfPx)
+            ? haloWrites(selected, colors.ring, colors.paper, ringPx, gapPx)
             : NO_HALO;
         // The fill's own outline carries the same state colors as every other
         // ink node (`inkClass`): accent while editable, cream while hot.
@@ -1407,7 +1418,8 @@ function clipBox(box: Box, clip: Box): Box | undefined {
  *
  * A cold reference carries neither. A fill's own outline is always on — ink
  * when cold — because it *is* the fill's ink; a reference has no ink, so a
- * border around every one of them would be noise.
+ * border around every one of them would be noise. `ringPx`/`gapPx` are the
+ * shared chrome numbers, placed like a fill's (inward from the edge).
  */
 function imageInstance(
   value: ImageValue,
@@ -1416,15 +1428,13 @@ function imageInstance(
   selected: boolean,
   showHalos: boolean,
   strokePx: number,
-  outlineHalfPx: number,
-  knockoutHalfPx: number,
+  ringPx: number,
+  gapPx: number,
 ): ImageInstValue {
   const [a, b, c, d] = imageQuad(value);
   const rect = imageRect(value);
   const halo =
-    showHalos && hot
-      ? haloWrites(selected, colors.ring, colors.paper, outlineHalfPx, knockoutHalfPx)
-      : NO_HALO;
+    showHalos && hot ? haloWrites(selected, colors.ring, colors.paper, ringPx, gapPx) : NO_HALO;
   const edge = edgeWrites(hot ? colors.selectedPaint : colors.ink, strokePx);
   return ImageInst({
     a: vec2f(a.x, a.y),
@@ -1513,8 +1523,8 @@ function haloWrites(
   selected: boolean,
   ring: Rgb,
   paper: Rgb,
-  outlineHalfPx: number,
-  knockoutHalfPx: number,
+  ringPx: number,
+  gapPx: number,
 ): HaloFields {
   const alpha = selected
     ? DEFAULT_CHROME_METRICS.selectOutlineOpacity
@@ -1524,7 +1534,7 @@ function haloWrites(
     // The paper color is always carried: the outline band is paper-backed (that
     // is the knockout), and only the band *inside* the ring is conditional.
     knock: vec4f(paper[0], paper[1], paper[2], selected ? 1 : 0),
-    halfPx: vec2f(selected ? knockoutHalfPx : 0, outlineHalfPx),
+    halfPx: vec2f(selected ? gapPx : 0, ringPx),
   };
 }
 

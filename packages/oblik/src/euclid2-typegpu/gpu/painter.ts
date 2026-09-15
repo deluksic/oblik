@@ -616,10 +616,8 @@ function byBand<T>(make: (band: InkBandName) => T): Record<InkBandName, T> {
  */
 function blankChrome(): ChromeValue {
   return Chrome({
-    haloHalfPx: 0,
-    knockHalfPx: 0,
-    pointRingAddPx: 0,
-    pointKnockAddPx: 0,
+    gapPx: 0,
+    ringPx: 0,
     pointOutlineAddPx: 0,
     hoverAlpha: 0,
     selectAlpha: 1,
@@ -641,10 +639,8 @@ function sameRgb(a: v3f, b: v3f): boolean {
  * allocate to discover that nothing about the theme changed. */
 function sameChrome(a: ChromeValue, b: ChromeValue): boolean {
   return (
-    a.haloHalfPx === b.haloHalfPx &&
-    a.knockHalfPx === b.knockHalfPx &&
-    a.pointRingAddPx === b.pointRingAddPx &&
-    a.pointKnockAddPx === b.pointKnockAddPx &&
+    a.gapPx === b.gapPx &&
+    a.ringPx === b.ringPx &&
     a.pointOutlineAddPx === b.pointOutlineAddPx &&
     a.hoverAlpha === b.hoverAlpha &&
     a.selectAlpha === b.selectAlpha &&

@@ -48,6 +48,32 @@ outline'    = max(outline, knockout' + ring extra)
 
 Points use a fixed wider halo instead of this growth: **14px outline / 9px selected knockout**. Construction points: derived `r=3.5` ink, editable `r=5` accent, hover/select cream. The grab handle is an invisible `r=7` hit target (`HANDLE_R`).
 
+### On the GPU the two tokens are widths, for every kind
+
+The WebGPU view reads `--oblik-chrome-outline` and `--oblik-chrome-knockout` as **widths** —
+the ring across, the gap across, so a band is **half its token**: a **3.5px ring** and a
+**2px gap**. It then _places_ those two thicknesses from each kind's own paint edge
+(`bands.ts`, `chromeBands()`), which is what makes a hovered or selected line, circle, point
+and fill look alike:
+
+| kind         | hover                            | selected                                                     |
+| ------------ | -------------------------------- | ------------------------------------------------------------ |
+| edge, circle | ring from the paint edge outward | gap from the paint edge, then the same ring outside it       |
+| point        | ring from its paper rim outward  | gap from the rim, then the same ring outside it              |
+| fill         | ring inward from its boundary    | gap inward from the boundary, then the same ring inside that |
+
+So hovering never fattens the ring: its thickness is `outline / 2` in both states, and
+selecting only **inserts** the gap between the paint and the ring — pushing the ring out by
+`knockout / 2` for an edge, circle or point, and in by the same amount for a fill, which has
+an inside to push into. Reading the tokens as outer diameters instead is the bug this
+replaced: it showed a 1.25px gap and 1.5px ring on a selected line, 3px and 2.5px on a
+point, and 2px and 3.5px on a fill — three answers to one question.
+
+A mark's own tokens (`--oblik-chrome-point-outline`, `--oblik-chrome-point-knockout`) belong
+to the SVG view's mark chrome. On the GPU a mark's ring and gap are the shared pair, and its
+one number of its own is the paper rim under the paint: `POINT_STROKE_PX`, widened by
+`POINT_RIM_EXTRA_PX`.
+
 A **named** point or glider also carries its bind label beside the mark: `--oblik-muted`, 12px, baseline at **`(x + 10, y − 8)` CSS px** from the mark's screen position, faded to 0.32 opacity unless it is hot or selected. That offset is the contract both views hold to — the SVG view draws it as `<text>`, the WebGPU view as positioned HTML.
 
 ## Fills
@@ -120,8 +146,8 @@ On `:root` in `packages/oblik/src/theme.css`. `--oblik-knockout` is the **paper 
 | --------------------------------- | ------- | ----------------------------- |
 | `--oblik-chrome-outline`          | 7px     | Hover and selected ring       |
 | `--oblik-chrome-knockout`         | 4px     | Selected paper gap            |
-| `--oblik-chrome-point-outline`    | 14px    | Point ring                    |
-| `--oblik-chrome-point-knockout`   | 9px     | Point selected gap            |
+| `--oblik-chrome-point-outline`    | 14px    | Point ring (SVG mark chrome)  |
+| `--oblik-chrome-point-knockout`   | 9px     | Point selected gap (SVG)      |
 | `--oblik-chrome-outline-hover`    | 0.5     | Hover ring opacity            |
 | `--oblik-chrome-outline-selected` | 1       | Selected ring opacity         |
 | `--oblik-selected-paint`          | cream   | Construction hover/select ink |

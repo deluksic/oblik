@@ -14,6 +14,7 @@ import { isCircleWalk } from "#geom/region";
 import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
 import type { StagedRecords } from "./adapter";
+import { chromeBands } from "./bands";
 import {
   CircleInst,
   FieldLeaf,
@@ -667,6 +668,65 @@ describe("fill halo chrome", () => {
     );
     expect(patch.fillDraws.map((d) => d.layer)).toEqual(["paint"]);
     expect(staged(patch.fields.quads, FieldQuad)[0]!.value.haloRing.w).toBe(0);
+  });
+});
+
+/**
+ * One hover ring and one selected gap, whichever shape the node has.
+ *
+ * Three record models meet here and nowhere else: an edge reads the frame's two
+ * thicknesses and places them outside its paint, a circle keeps a record per layer
+ * so the adapter places them for it, and a fill measures them *inward* from its own
+ * boundary. `bands.test.ts` holds the reading of the tokens and the placement of
+ * the edge and the mark; `pipelines/wgsl.test.ts` holds the generated WGSL. What
+ * only this test can see is the three agreeing on the pixels.
+ */
+describe("selection chrome across kinds", () => {
+  const PAINT_HALF_PX = 0.75;
+
+  test("a hovered circle shows the ring alone, hugging its paint", () => {
+    const { ringPx } = chromeBands(1.5);
+    const records = staged(
+      createAdapter().tick(input([drill()], { hoverKey: "o_circ:0" })).circles,
+      CircleInst,
+    );
+    // A dead band is a negative half width, not a flag: the knockout record is
+    // staged but culled, which is how the band queue counts it out.
+    expect(records.map((r) => r.value.halfPx)).toEqual([PAINT_HALF_PX + ringPx, -1, PAINT_HALF_PX]);
+  });
+
+  test("a selected circle inserts the gap and pushes the ring out by it", () => {
+    const { gapPx, ringPx } = chromeBands(1.5);
+    const records = staged(
+      createAdapter().tick(input([drill()], { selectedKey: "o_circ:0" })).circles,
+      CircleInst,
+    );
+    expect(records.map((r) => r.value.halfPx)).toEqual([
+      PAINT_HALF_PX + gapPx + ringPx,
+      PAINT_HALF_PX + gapPx,
+      PAINT_HALF_PX,
+    ]);
+  });
+
+  test("a fill shows the same pair, measured inward from its edge", () => {
+    const { gapPx, ringPx } = chromeBands(1.5);
+    // Hovering: the ring alone, its thickness the one the circle's halo shows.
+    const hovered = staged(
+      createAdapter().tick(input([csgNode("o_csg", 0, "pac")], { hoverKey: "o_csg:0" })).fields
+        .quads,
+      FieldQuad,
+    )[0]!.value;
+    expect([hovered.haloHalfPx.x, hovered.haloHalfPx.y]).toEqual([0, ringPx]);
+    expect(hovered.haloKnock.w).toBe(0);
+
+    // Selected: the paper band inside it, at the shared gap.
+    const selected = staged(
+      createAdapter().tick(input([csgNode("o_csg", 0, "pac")], { selectedKey: "o_csg:0" })).fields
+        .quads,
+      FieldQuad,
+    )[0]!.value;
+    expect([selected.haloHalfPx.x, selected.haloHalfPx.y]).toEqual([gapPx, ringPx]);
+    expect(selected.haloKnock.w).toBe(1);
   });
 });
 
