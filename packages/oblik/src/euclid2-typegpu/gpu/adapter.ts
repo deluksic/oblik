@@ -31,14 +31,13 @@ import {
   blockWindows,
   islandGeomOf,
   type Box,
-  type IslandGeom,
   type SpanArc,
   type SpanSeg,
   type SpanWindow,
 } from "./fillSpans";
 import { buildOverlay } from "./overlay";
 import type { OverlayPatch } from "./overlay";
-import { createRecordPool, type RecordRun } from "./recordPool";
+import { createRecordPool, type RecordPool, type RecordRun } from "./recordPool";
 import type {
   ChromeValue,
   CircleInstValue,
@@ -55,7 +54,9 @@ import {
   CircleInst,
   FieldLeaf,
   FieldQuad,
+  FillArc,
   FillRegion,
+  FillSeg,
   ImageInst,
   ImageStyleFields,
   MAX_CIRCLES,
@@ -64,6 +65,7 @@ import {
   MAX_FIELD_QUADS,
   MAX_FIELD_SEGS,
   MAX_FILL_ARCS,
+  MAX_FILL_REGIONS,
   MAX_FILL_SEGS,
   MAX_IMAGES,
   MAX_POINTS,
@@ -76,6 +78,7 @@ import {
   StrokeNode,
 } from "./schemas";
 import { createSlotPool } from "./slots";
+import type { SlotPoolOpts } from "./slots";
 import { pushArcWrites, pushSegWrites, type SpanWrite } from "./spanRecords";
 
 const TAU = Math.PI * 2;
@@ -113,6 +116,16 @@ export type SlotPatch<T> = {
   count: number;
 };
 
+/** Records staged through a pool: the spans of the buffer that moved this tick.
+ * Only the spans go up — the mirror behind them holds every record's current
+ * bytes — so what a frame costs follows what changed, not the buffer's size. */
+export type StagedRecords = { runs: RecordRun[] };
+
+/** A staged kind that is also drawn: spans for the upload, an order list for the
+ * draw. The two are independent — the order list says which records to draw and
+ * in what order, the spans say which bytes moved. */
+export type StagedDraw = StagedRecords & { order: Uint32Array; count: number };
+
 /** One order list per draw-order band. The bands and their order come from
  * `bands.ts`'s table, so the painter plays what the adapter queued and neither
  * side lists the five names twice. */
@@ -134,11 +147,11 @@ export type TickPatch = {
    * plus the draw-order bands that address them. */
   strokes: { runs: RecordRun[]; bands: InkBands };
   circles: { writes: { idx: number; value: CircleInstValue }[]; bands: InkBands };
-  fills: SlotPatch<FillRegionValue>;
+  fills: StagedDraw;
   /** Boundary spans backing the fill regions — one array per record kind, so the
    * fragment's segment loop never touches a carrier. No draws of their own. */
-  fillSegs: { writes: SpanWrite<FillSegValue>[] };
-  fillArcs: { writes: SpanWrite<FillArcValue>[] };
+  fillSegs: StagedRecords;
+  fillArcs: StagedRecords;
   /** CSG fills compiled to GPU fields: an AABB quad per node, the leaf records
    * it reads, and the boundary spans of its region leaves. */
   fields: {
@@ -237,20 +250,28 @@ export function createAdapter(): Adapter {
     make: makePointNode,
   });
 
-  const strokePool = createSlotPool(MAX_STROKE_DRAWS, {
-    onRelease: (_key, run) => {
-      for (let i = 0; i < run.count; i++) strokeRecords.retire(run.start + i);
-    },
+  const fillRecords = createRecordPool({
+    element: FillRegion,
+    count: MAX_FILL_REGIONS,
+    make: makeFillRegion,
   });
-  const pointPool = createSlotPool(MAX_POINTS, {
-    onRelease: (_key, run) => {
-      for (let i = 0; i < run.count; i++) pointRecords.retire(run.start + i);
-    },
+  const fillSegRecords = createRecordPool({
+    element: FillSeg,
+    count: MAX_FILL_SEGS,
+    make: makeFillSeg,
   });
+  const fillArcRecords = createRecordPool({
+    element: FillArc,
+    count: MAX_FILL_ARCS,
+    make: makeFillArc,
+  });
+
+  const strokePool = createSlotPool(MAX_STROKE_DRAWS, retireRun(strokeRecords));
+  const pointPool = createSlotPool(MAX_POINTS, retireRun(pointRecords));
   const circlePool = createSlotPool(MAX_CIRCLES);
-  const fillPool = createSlotPool(256);
-  const fillSegPool = createSlotPool(MAX_FILL_SEGS);
-  const fillArcPool = createSlotPool(MAX_FILL_ARCS);
+  const fillPool = createSlotPool(MAX_FILL_REGIONS, retireRun(fillRecords));
+  const fillSegPool = createSlotPool(MAX_FILL_SEGS, retireRun(fillSegRecords));
+  const fillArcPool = createSlotPool(MAX_FILL_ARCS, retireRun(fillArcRecords));
   const fieldQuadPool = createSlotPool(MAX_FIELD_QUADS);
   const fieldLeafPool = createSlotPool(MAX_FIELD_LEAVES);
   const fieldSegPool = createSlotPool(MAX_FIELD_SEGS);
@@ -264,6 +285,19 @@ export function createAdapter(): Adapter {
   const pointFill: PointFill = { at: { x: 0, y: 0 }, markRadiusPx: 0, state: 0 };
   const strokeSig = new Float64Array(STROKE_SIG_LANES);
   const pointSig = new Float64Array(POINT_SIG_LANES);
+  const fillSig = new Float64Array(FILL_SIG_LANES);
+  const segSig = new Float64Array(SEG_SIG_LANES);
+  const arcSig = new Float64Array(ARC_SIG_LANES);
+  const regionFill: RegionFill = {
+    bounds: { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } },
+    window: { segOffset: 0, segCount: 0, arcOffset: 0, arcCount: 0 },
+    segBase: 0,
+    arcBase: 0,
+    color: [0, 0, 0],
+    alpha: 0,
+    edge: { color: vec4f(0, 0, 0, 0), halfPx: 0 },
+    halo: NO_HALO,
+  };
 
   /** Last uploaded payload per key, for CPU-side byte diffs. */
   const lastCircle = new Map<string, Upload>();
@@ -468,10 +502,7 @@ export function createAdapter(): Adapter {
     // --- two passes are drawn per node in band order (see `fillDraws`), and a
     // --- hot node's halo run is queued *after* its paint run: the halo band
     // --- knocks the fill out rather than being washed by it.
-    const fillWrites: { idx: number; value: FillRegionValue }[] = [];
     const fillOrder: number[] = [];
-    const fillSegWrites: SpanWrite<FillSegValue>[] = [];
-    const fillArcWrites: SpanWrite<FillArcValue>[] = [];
     const fieldQuadWrites: { idx: number; value: FieldQuadValue }[] = [];
     const fieldOrder: number[] = [];
     const fieldLeafWrites: { idx: number; value: FieldLeafValue }[] = [];
@@ -533,7 +564,9 @@ export function createAdapter(): Adapter {
           continue;
         }
         // Blocks concatenate in order, so the per-island windows of one kind are
-        // contiguous runs: one pool allocation per kind, one write sequence.
+        // contiguous runs: one pool allocation per kind, and every record in a
+        // run staged against its own inputs — a node that moved one endpoint
+        // uploads that span, not the polygon.
         const windows = blockWindows(geom.spans);
         const segs = geom.spans.flatMap((block) => block.segs);
         const arcs = geom.spans.flatMap((block) => block.arcs);
@@ -541,42 +574,27 @@ export function createAdapter(): Adapter {
         const arcStart = fillArcPool.alloc(nodeKey(n), arcs.length);
         const regionStart = fillPool.alloc(nodeKey(n), geom.spans.length);
         if (segStart === undefined || arcStart === undefined || regionStart === undefined) continue;
-        if (diff(lastFillSegs, nodeKey(n), segStart, encodeSpanSegs(segs))) {
-          pushSegWrites(fillSegWrites, segStart, segs);
+        for (let i = 0; i < segs.length; i++) {
+          const seg = segs[i]!;
+          writeSegSig(segSig, seg);
+          fillSegRecords.touch(segStart + i, segSig, fillSeg, seg);
         }
-        if (diff(lastFillArcs, nodeKey(n), arcStart, encodeSpanArcs(arcs))) {
-          pushArcWrites(fillArcWrites, arcStart, arcs);
+        for (let i = 0; i < arcs.length; i++) {
+          const arc = arcs[i]!;
+          writeArcSig(arcSig, arc);
+          fillArcRecords.touch(arcStart + i, arcSig, fillArc, arc);
         }
-        if (
-          diff(
-            lastFillRegion,
-            nodeKey(n),
-            regionStart,
-            encodeFillRegions(geom, windows, segStart, arcStart, color, alpha, edge, halo),
-          )
-        ) {
-          geom.bounds.forEach((bounds, i) => {
-            const w = windows[i]!;
-            fillWrites.push({
-              idx: regionStart + i,
-              value: FillRegion({
-                aabbMin: vec2f(bounds.min.x, bounds.min.y),
-                aabbMax: vec2f(bounds.max.x, bounds.max.y),
-                segOffset: segStart + w.segOffset,
-                segCount: w.segCount,
-                arcOffset: arcStart + w.arcOffset,
-                arcCount: w.arcCount,
-                color: vec3f(color[0], color[1], color[2]),
-                alpha,
-                flags: 0,
-                edge: edge.color,
-                edgeWidthPx: edge.halfPx,
-                haloRing: halo.ring,
-                haloKnock: halo.knock,
-                haloHalfPx: halo.halfPx,
-              }),
-            });
-          });
+        for (let i = 0; i < geom.spans.length; i++) {
+          regionFill.bounds = geom.bounds[i]!;
+          regionFill.window = windows[i]!;
+          regionFill.segBase = segStart;
+          regionFill.arcBase = arcStart;
+          regionFill.color = color;
+          regionFill.alpha = alpha;
+          regionFill.edge = edge;
+          regionFill.halo = halo;
+          writeRegionSig(fillSig, regionFill);
+          fillRecords.touch(regionStart + i, fillSig, fillRegion, regionFill);
         }
         const first = fillOrder.length;
         for (let i = 0; i < geom.spans.length; i++) fillOrder.push(regionStart + i);
@@ -625,19 +643,21 @@ export function createAdapter(): Adapter {
     // that moved, one write each, and say how many records those spans carry.
     const strokeRuns: RecordRun[] = [];
     const pointRuns: RecordRun[] = [];
+    const fillRuns: RecordRun[] = [];
+    const fillSegRuns: RecordRun[] = [];
+    const fillArcRuns: RecordRun[] = [];
     const strokeStaged = strokeRecords.flush((run) => strokeRuns.push(run));
     const pointStaged = pointRecords.flush((run) => pointRuns.push(run));
+    const fillStaged = fillRecords.flush((run) => fillRuns.push(run));
+    const fillSegStaged = fillSegRecords.flush((run) => fillSegRuns.push(run));
+    const fillArcStaged = fillArcRecords.flush((run) => fillArcRuns.push(run));
 
     return {
       strokes: { runs: strokeRuns, bands: bandArrays(strokeLists) },
       circles: { writes: circleWrites, bands: bandArrays(circleLists) },
-      fills: {
-        writes: fillWrites,
-        order: Uint32Array.from(fillOrder),
-        count: fillOrder.length,
-      },
-      fillSegs: { writes: fillSegWrites },
-      fillArcs: { writes: fillArcWrites },
+      fills: { runs: fillRuns, order: Uint32Array.from(fillOrder), count: fillOrder.length },
+      fillSegs: { runs: fillSegRuns },
+      fillArcs: { runs: fillArcRuns },
       fields: {
         quads: {
           writes: fieldQuadWrites,
@@ -657,9 +677,9 @@ export function createAdapter(): Adapter {
         written:
           strokeStaged +
           circleWrites.length +
-          fillWrites.length +
-          fillSegWrites.length +
-          fillArcWrites.length +
+          fillStaged +
+          fillSegStaged +
+          fillArcStaged +
           fieldQuadWrites.length +
           fieldLeafWrites.length +
           fieldSegWrites.length +
@@ -822,6 +842,172 @@ function strokeEndpoints(
 }
 
 // -- ink layers: inputs first, then pooled records ---------------------------
+
+/** A released run's slots stop being that key's, so the pool that mirrors them
+ * has to forget what it staged there: the next node to take the range stages
+ * afresh whatever its own inputs are. */
+function retireRun<T>(records: RecordPool<T>): SlotPoolOpts {
+  return {
+    onRelease: (_key, run) => {
+      for (let i = 0; i < run.count; i++) records.retire(run.start + i);
+    },
+  };
+}
+
+/** A span-fill island's payload: the island's box and its two span windows, plus
+ * the colour and the chrome its node gives every island. Reused per island, so
+ * filling and signing one allocate nothing. */
+type RegionFill = {
+  bounds: Box;
+  window: SpanWindow;
+  /** The node's runs in the shared span arrays; the record carries the rebased
+   * windows, so a run that moves restages. */
+  segBase: number;
+  arcBase: number;
+  color: Rgb;
+  alpha: number;
+  edge: EdgeFields;
+  halo: HaloFields;
+};
+
+/**
+ * The two halves of one span-fill record: `writeRegionSig` puts its inputs in the
+ * order the pool compares them, `fillRegion` puts the same inputs in the record.
+ * They walk the same fields in the same order and live next to each other so a
+ * field added to one is added to the other — a lane the signature does not carry
+ * is a record that does not restage when it changes, which is a stale shape on
+ * screen rather than a failing test. `recordPool.test.ts`'s replay checks the
+ * bytes; `adapter.test.ts` changes each input in turn and checks that it stages.
+ */
+function writeRegionSig(sig: Float64Array, args: RegionFill): void {
+  let i = 0;
+  sig[i++] = args.bounds.min.x;
+  sig[i++] = args.bounds.min.y;
+  sig[i++] = args.bounds.max.x;
+  sig[i++] = args.bounds.max.y;
+  sig[i++] = args.segBase + args.window.segOffset;
+  sig[i++] = args.window.segCount;
+  sig[i++] = args.arcBase + args.window.arcOffset;
+  sig[i++] = args.window.arcCount;
+  sig[i++] = args.color[0];
+  sig[i++] = args.color[1];
+  sig[i++] = args.color[2];
+  sig[i++] = args.alpha;
+  i = encodeEdge(sig, i, args.edge);
+  encodeHalo(sig, i, args.halo);
+}
+
+/** The lanes `writeRegionSig` fills: the record's own fields, minus `flags`,
+ * which this path always writes as 0. */
+const FILL_SIG_LANES = 27;
+
+function fillRegion(record: FillRegionValue, args: RegionFill): void {
+  const w = args.window;
+  record.aabbMin.x = args.bounds.min.x;
+  record.aabbMin.y = args.bounds.min.y;
+  record.aabbMax.x = args.bounds.max.x;
+  record.aabbMax.y = args.bounds.max.y;
+  record.segOffset = args.segBase + w.segOffset;
+  record.segCount = w.segCount;
+  record.arcOffset = args.arcBase + w.arcOffset;
+  record.arcCount = w.arcCount;
+  record.color.r = args.color[0];
+  record.color.g = args.color[1];
+  record.color.b = args.color[2];
+  record.alpha = args.alpha;
+  record.flags = 0;
+  record.edge.x = args.edge.color.x;
+  record.edge.y = args.edge.color.y;
+  record.edge.z = args.edge.color.z;
+  record.edge.w = args.edge.color.w;
+  record.edgeWidthPx = args.edge.halfPx;
+  record.haloRing.x = args.halo.ring.x;
+  record.haloRing.y = args.halo.ring.y;
+  record.haloRing.z = args.halo.ring.z;
+  record.haloRing.w = args.halo.ring.w;
+  record.haloKnock.x = args.halo.knock.x;
+  record.haloKnock.y = args.halo.knock.y;
+  record.haloKnock.z = args.halo.knock.z;
+  record.haloKnock.w = args.halo.knock.w;
+  record.haloHalfPx.x = args.halo.halfPx.x;
+  record.haloHalfPx.y = args.halo.halfPx.y;
+}
+
+function makeFillRegion(): FillRegionValue {
+  return FillRegion({
+    aabbMin: vec2f(0, 0),
+    aabbMax: vec2f(0, 0),
+    segOffset: 0,
+    segCount: 0,
+    arcOffset: 0,
+    arcCount: 0,
+    color: vec3f(0, 0, 0),
+    alpha: 0,
+    flags: 0,
+    edge: vec4f(0, 0, 0, 0),
+    edgeWidthPx: 0,
+    haloRing: vec4f(0, 0, 0, 0),
+    haloKnock: vec4f(0, 0, 0, 0),
+    haloHalfPx: vec2f(0, 0),
+  });
+}
+
+/** One boundary span: four numbers, and no carrier — that is the whole reason
+ * segments and arcs are separate record kinds. */
+function writeSegSig(sig: Float64Array, e: SpanSeg): void {
+  sig[0] = e.a.x;
+  sig[1] = e.a.y;
+  sig[2] = e.b.x;
+  sig[3] = e.b.y;
+}
+
+const SEG_SIG_LANES = 4;
+
+function fillSeg(record: FillSegValue, e: SpanSeg): void {
+  record.a.x = e.a.x;
+  record.a.y = e.a.y;
+  record.b.x = e.b.x;
+  record.b.y = e.b.y;
+}
+
+function makeFillSeg(): FillSegValue {
+  return FillSeg({ a: vec2f(0, 0), b: vec2f(0, 0) });
+}
+
+/** One arc boundary span: the endpoints, the carrier and the sweep. */
+function writeArcSig(sig: Float64Array, e: SpanArc): void {
+  sig[0] = e.a.x;
+  sig[1] = e.a.y;
+  sig[2] = e.b.x;
+  sig[3] = e.b.y;
+  sig[4] = e.center.x;
+  sig[5] = e.center.y;
+  sig[6] = e.radius;
+  sig[7] = e.span;
+}
+
+const ARC_SIG_LANES = 8;
+
+function fillArc(record: FillArcValue, e: SpanArc): void {
+  record.a.x = e.a.x;
+  record.a.y = e.a.y;
+  record.b.x = e.b.x;
+  record.b.y = e.b.y;
+  record.center.x = e.center.x;
+  record.center.y = e.center.y;
+  record.radius = e.radius;
+  record.span = e.span;
+}
+
+function makeFillArc(): FillArcValue {
+  return FillArc({
+    a: vec2f(0, 0),
+    b: vec2f(0, 0),
+    center: vec2f(0, 0),
+    radius: 0,
+    span: 0,
+  });
+}
 
 /** The state word a node's record carries. Both pooled shaders read it instead
  * of the geometry the old per-layer records encoded, so a hover, a select or an
@@ -1078,42 +1264,6 @@ function encodeFieldLeaves(leaves: readonly FieldLeafValue[]): Float64Array {
     f[j++] = leaf.segCount;
     f[j++] = leaf.arcOffset;
     f[j] = leaf.arcCount;
-  }
-  return f;
-}
-
-/** Byte-encoded fill regions for the change check: AABB, both span windows,
- * color and halo (a hover recolors the fill *and* lights its ring). */
-function encodeFillRegions(
-  geom: IslandGeom,
-  windows: readonly SpanWindow[],
-  segStart: number,
-  arcStart: number,
-  color: Rgb,
-  alpha: number,
-  edge: EdgeFields,
-  halo: HaloFields,
-): Float64Array {
-  const f = new Float64Array(geom.spans.length * 28);
-  for (let i = 0; i < geom.spans.length; i++) {
-    const b = geom.bounds[i]!;
-    const w = windows[i]!;
-    let j = i * 28;
-    f[j++] = b.min.x;
-    f[j++] = b.min.y;
-    f[j++] = b.max.x;
-    f[j++] = b.max.y;
-    f[j++] = segStart + w.segOffset;
-    f[j++] = w.segCount;
-    f[j++] = arcStart + w.arcOffset;
-    f[j++] = w.arcCount;
-    f[j++] = color[0];
-    f[j++] = color[1];
-    f[j++] = color[2];
-    f[j++] = alpha;
-    f[j++] = 0;
-    j = encodeEdge(f, j, edge);
-    j = encodeHalo(f, j, halo);
   }
   return f;
 }

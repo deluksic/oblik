@@ -1,5 +1,6 @@
 import { readFromArrayBuffer } from "typegpu";
-import { sizeOf } from "typegpu/data";
+import { arrayOf, sizeOf } from "typegpu/data";
+import type { AnyWgslData, Infer } from "typegpu/data";
 import { describe, expect, test } from "vitest";
 
 import type { TraceValue } from "#eval/context";
@@ -12,7 +13,8 @@ import { isCircleWalk } from "#geom/region";
 
 import { imageQuad, type ImageValue } from "../../eval/image";
 import { createAdapter, type AdapterInput, type Rgb, type TickPatch } from "./adapter";
-import { StrokeNode, type StrokeNodeValue } from "./schemas";
+import type { StagedRecords } from "./adapter";
+import { FillArc, FillRegion, FillSeg, StrokeNode, type StrokeNodeValue } from "./schemas";
 
 /**
  * The adapter is pure CPU (no device), so the routing between the compiled-field
@@ -81,6 +83,32 @@ function polygonValue() {
 /** Slot indices a patch wrote, in ascending order. */
 function slotsOf(writes: readonly { idx: number }[]): number[] {
   return writes.map((w) => w.idx).toSorted((p, q) => p - q);
+}
+
+/**
+ * The records a patch stages, decoded back out of the bytes it would send.
+ *
+ * A patch now carries *spans* of the record buffer rather than a list of changed
+ * records — the pool uploads a whole span, and a span may include neighbours the
+ * pool left alone (they ride along because their bytes are already right). So a
+ * decoded span is what the GPU actually receives; the assertions below are about
+ * slots and values, which is what they were always about.
+ */
+function staged<T extends AnyWgslData>(
+  patch: StagedRecords,
+  element: T,
+): { idx: number; value: Infer<T> }[] {
+  const stride = sizeOf(arrayOf(element, 1));
+  const out: { idx: number; value: Infer<T> }[] = [];
+  for (const run of patch.runs) {
+    const first = run.startOffset / stride;
+    const count = run.bytes.byteLength / stride;
+    for (let i = 0; i < count; i++) {
+      const one = run.bytes.slice(i * stride, (i + 1) * stride).buffer;
+      out.push({ idx: first + i, value: readFromArrayBuffer(one, element) });
+    }
+  }
+  return out;
 }
 
 /** The record stride, straight from the schema the buffer is laid out as. */
@@ -198,8 +226,8 @@ describe("adapter fill routing", () => {
 
     // The polygon still lands in the span buffers.
     expect(patch.fills.count).toBe(1);
-    expect(patch.fillSegs.writes).toHaveLength(3);
-    expect(patch.fillArcs.writes).toHaveLength(0);
+    expect(staged(patch.fillSegs, FillSeg)).toHaveLength(3);
+    expect(staged(patch.fillArcs, FillArc)).toHaveLength(0);
   });
 
   test("a region node compiles as a single spans leaf", () => {
@@ -352,15 +380,15 @@ describe("adapter fill routing", () => {
     const b = node("o_b", triangleAt(2), "shell"); // same shape, moved
 
     const first = adapter.tick(input([a]));
-    const firstRegions = slotsOf(first.fills.writes);
-    const firstSegs = slotsOf(first.fillSegs.writes);
+    const firstRegions = slotsOf(staged(first.fills, FillRegion));
+    const firstSegs = slotsOf(staged(first.fillSegs, FillSeg));
     expect(firstRegions.length).toBeGreaterThan(0);
     expect(firstSegs.length).toBeGreaterThan(0);
 
     adapter.tick(input([b]));
     const back = adapter.tick(input([a]));
-    expect(slotsOf(back.fills.writes)).toEqual(firstRegions);
-    expect(slotsOf(back.fillSegs.writes)).toEqual(firstSegs);
+    expect(slotsOf(staged(back.fills, FillRegion))).toEqual(firstRegions);
+    expect(slotsOf(staged(back.fillSegs, FillSeg))).toEqual(firstSegs);
   });
 
   test("dragging a leaf rewrites data; hover only recolors", () => {
@@ -510,7 +538,7 @@ describe("fill halo chrome", () => {
       input([node("o_poly", polygonValue(), "shell")], { hoverKey: "o_poly:0" }),
     );
     expect(hovered.fillDraws.map((d) => d.layer)).toEqual(["paint", "halo"]);
-    const region = hovered.fills.writes[0]!.value;
+    const region = staged(hovered.fills, FillRegion)[0]!.value;
     expect(region.haloRing.w).toBeCloseTo(0.5, 6);
     expect(region.haloHalfPx.y).toBeCloseTo(3.5, 6);
   });
@@ -551,7 +579,7 @@ describe("fill outline (state colors)", () => {
 
   test("the span path carries the same outline", () => {
     const patch = createAdapter().tick(input([node("o_poly", polygonValue(), "shell", true)]));
-    const region = patch.fills.writes[0]!.value;
+    const region = staged(patch.fills, FillRegion)[0]!.value;
     expect([region.edge.x, region.edge.y, region.edge.z]).toEqual([...COLORS.accent]);
     expect(region.edgeWidthPx).toBeCloseTo(strokeWidthPx, 9);
   });
@@ -630,7 +658,7 @@ describe("polar repeat fills", () => {
     expect(patch.fillDraws.map((d) => d.path)).toEqual(["field"]);
     expect(patch.fields.quads.writes).toHaveLength(1);
     expect(patch.fields.segs.writes).toHaveLength(4);
-    expect(patch.fills.writes).toHaveLength(0);
+    expect(staged(patch.fills, FillRegion)).toHaveLength(0);
     const draw = patch.fillDraws[0]!;
     // The shape key names the structure, not the numbers: one tooth, a ring.
     expect(draw.path === "field" && draw.plan.shape).toBe("diff(polarRepeat(region),circle)");
@@ -657,7 +685,7 @@ describe("polar repeat fills", () => {
     expect(patch.fields.leaves.writes).toHaveLength(3);
     expect(patch.fields.quads.writes).toHaveLength(1);
     expect(patch.fields.segs.writes).toHaveLength(0);
-    expect(patch.fills.writes).toHaveLength(0);
+    expect(staged(patch.fills, FillRegion)).toHaveLength(0);
   });
 
   test("a repeat recolors on hover like any other fill", () => {
@@ -741,7 +769,7 @@ describe("zoom and pan write no records", () => {
     // Only the half-plane's quad: the span fill holds still, so this is the
     // whole exception, not a rule.
     expect(zoomed.fields.quads.writes).toHaveLength(1);
-    expect(zoomed.fills.writes).toHaveLength(0);
+    expect(staged(zoomed.fills, FillRegion)).toHaveLength(0);
     expect(zoomed.stats.written).toBe(1);
   });
 });

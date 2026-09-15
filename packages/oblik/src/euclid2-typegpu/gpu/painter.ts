@@ -416,10 +416,10 @@ export function createPainter(opts: {
         chromeBuffer.write(patch.chrome);
         lastChrome = patch.chrome;
       }
-      fillBuffer.writePartial(patch.fills.writes);
+      writeRuns(fillBuffer, patch.fills.runs);
       fillOrderBuffer.write(patch.fills.order);
-      fillSegBuffer.writePartial(patch.fillSegs.writes);
-      fillArcBuffer.writePartial(patch.fillArcs.writes);
+      writeRuns(fillSegBuffer, patch.fillSegs.runs);
+      writeRuns(fillArcBuffer, patch.fillArcs.runs);
       fieldQuadBuffer.writePartial(patch.fields.quads.writes);
       fieldOrderBuffer.write(patch.fields.quads.order);
       fieldLeafBuffer.writePartial(patch.fields.leaves.writes);
