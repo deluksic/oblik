@@ -22,10 +22,17 @@
   display: none;
 }
 
+/* The panel owns the only inset in the panel: the slug and the track sit inside
+ * this one padding, so the rail's ends line up with the title's text and the
+ * value's right edge. */
 .panel {
   pointer-events: auto;
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
   box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
   border-radius: 8px;
   background: var(--oblik-paper);
   border: 1px solid var(--oblik-grid);
@@ -40,7 +47,7 @@
 }
 
 .panel.dragging {
-  /* Keep the resting border while dragging: the grab cursor + knob color say
+  /* Keep the resting border while dragging: the grab cursor + thumb color say
    * enough, and a hover ring would just read as noise mid-drag. */
   cursor: grabbing;
 }
@@ -55,11 +62,12 @@
     0 1px 3px rgb(0 0 0 / 12%);
 }
 
+/* No padding of its own: the panel's padding is the inset, so the title starts
+ * exactly where the rail does and the value ends exactly where it does. */
 .head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: var(--space-2) var(--space-3) 0;
   gap: var(--space-2);
 }
 
@@ -82,59 +90,147 @@
 
 .track {
   position: relative;
-  margin: var(--space-2) var(--space-3) 0;
-  height: 14px;
+  box-sizing: border-box;
+  /* No margins, no padding, no inset variable: the panel's padding is the only
+   * inset in the panel, and the rail, the fill and the input all span the same
+   * box. The input's native thumb keeps its own few pixels of travel inset — a
+   * range does that in every app — rather than the layout bending around it. */
+  margin: 0;
+  padding: 0;
+  height: 18px;
 }
 
 /* Full-length rail so the unfilled portion stays visible past the thumb
- * (paper-on-paper was invisible). The accent fill sits on top of it. */
-.rail {
+ * (paper-on-paper was invisible). The accent fill sits on top of it, out to the
+ * current value — `--slider-frac`, set from the value in JSX. */
+.rail,
+.fill {
   position: absolute;
-  inset-block: var(--space-1);
-  inset-inline: 0;
+  /* Half the rail's own height above and below the track's centre, in the same
+   * box the thumb is centred in. */
+  inset-block: calc(50% - 3px);
   border-radius: 3px;
-  background: var(--oblik-grid);
   pointer-events: none;
+}
+
+.rail {
+  inset-inline: 0;
+  background: var(--oblik-grid);
 }
 
 .fill {
-  position: absolute;
-  inset-block: var(--space-1);
   inset-inline-start: 0;
-  border-radius: 3px;
+  width: var(--slider-frac);
   background: color-mix(in srgb, var(--oblik-accent) 45%, transparent);
-  pointer-events: none;
 }
 
-.knob {
+/* The native range, stripped of every piece of UA chrome except the thumb —
+ * which is the knob. The rail and fill above paint the track, so the track
+ * pseudo-elements are made transparent in every engine's spelling of them: a
+ * leftover painted groove would double the rail, and Firefox's progress fill
+ * would double the fill. */
+.range {
   position: absolute;
-  top: 50%;
-  width: 0;
-  transform: translate(-50%, -50%);
+  /* Fill the track's *content* box. That box is the rail's span exactly, so the
+   * input's edges are the rail's ends — no margin arithmetic, and nothing for
+   * the layout engine to reinterpret. */
+  inset: 0;
+  /* A form control is inline-level by default, so it sits on a text baseline
+   * and the descender space below that line pushes the whole control — thumb
+   * included — down inside its box. Zeroing the line box is what centres the
+   * thumb on the rail; `display: block` alone does not, because the anonymous
+   * line box still reserves strut height for the control. */
+  display: block;
+  line-height: 0;
+  vertical-align: middle;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  /* Kill the UA's own focus ring: keyboard focus is shown by the panel's
+   * `:focus-within` border instead (below). */
+  outline: none;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
   cursor: grab;
 }
 
-.panel.dragging .knob,
-.knob:active {
+.range:active {
   cursor: grabbing;
 }
 
-/* The knob mirrors a point mark: an accent paint dot on a paper outline that
+/* The track pseudo-elements are made transparent, and nothing else: they are
+ * *not* resized. Giving the track a height (or any geometry at all) in Blink
+ * perturbs where the thumb is placed vertically inside the control — with an
+ * explicit track height the thumb rides the top of the input, leaving the rail
+ * along its bottom edge. Left at its native height, the engine's own centring
+ * puts the thumb's centre on the input's centre line, which is where the rail
+ * is drawn. */
+.range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.range::-moz-range-track {
+  background: transparent;
+}
+
+.range::-moz-range-progress {
+  background: transparent;
+}
+
+/* The thumb mirrors a point mark: an accent paint dot on a paper outline that
  * turns to the selected paint and grows a ring halo while hot (hover) or
- * grabbed; the ring is full-opacity while selected. */
-.knobDot {
-  display: block;
+ * grabbed; the ring is full-opacity while selected. Both engines need their own
+ * pseudo-element rules — they cannot be combined in one selector list, because
+ * an unknown pseudo-element invalidates the whole rule.
+ *
+ * No `margin-top` correction here: both engines centre the thumb in the track
+ * box and the track fills the input box (above), so the thumb's centre is the
+ * input's centre — the same line the rail is drawn on. A percent margin would
+ * not say that anyway: vertical percentage margins resolve against the
+ * *containing block's width*, not its height.
+ */
+.range::-webkit-slider-thumb {
+  appearance: none;
+  box-sizing: border-box;
   width: 10px;
   height: 10px;
-  margin-left: -5px;
+  border: 0;
   border-radius: 50%;
   background: var(--oblik-accent);
   box-shadow: 0 0 0 1.5px var(--oblik-paper);
-  pointer-events: none;
   transition: background 80ms linear;
 }
 
-.panel.hot .knobDot {
+.range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--oblik-accent);
+  box-shadow: 0 0 0 1.5px var(--oblik-paper);
+  transition: background 80ms linear;
+}
+
+/* Keyboard focus, on the border the panel already has. Not for a selected
+ * panel: selection draws its own ring in `--oblik-ring`, and a focused selected
+ * panel would otherwise paint both — the selection ring is the stronger signal,
+ * so focus stays quiet there. */
+.panel:focus-within:not(.selected) {
+  border-color: var(--oblik-hover);
+}
+
+.panel.hot .range::-webkit-slider-thumb {
+  background: var(--oblik-selected-paint);
+  box-shadow:
+    0 0 0 1.5px var(--oblik-paper),
+    0 0 0 3px color-mix(in srgb, var(--oblik-ring) 50%, transparent);
+}
+
+.panel.hot .range::-moz-range-thumb {
   background: var(--oblik-selected-paint);
   box-shadow:
     0 0 0 1.5px var(--oblik-paper),
@@ -143,12 +239,24 @@
 
 /* Mid-drag: keep the cream thumb but drop the halo — no hover outline while
  * dragging (hover is also suppressed on the row during a drag). */
-.panel.dragging .knobDot {
+.panel.dragging .range::-webkit-slider-thumb {
   background: var(--oblik-selected-paint);
   box-shadow: 0 0 0 1.5px var(--oblik-paper);
 }
 
-.panel.selected .knobDot {
+.panel.dragging .range::-moz-range-thumb {
+  background: var(--oblik-selected-paint);
+  box-shadow: 0 0 0 1.5px var(--oblik-paper);
+}
+
+.panel.selected .range::-webkit-slider-thumb {
+  background: var(--oblik-selected-paint);
+  box-shadow:
+    0 0 0 1.5px var(--oblik-paper),
+    0 0 0 4px var(--oblik-ring);
+}
+
+.panel.selected .range::-moz-range-thumb {
   background: var(--oblik-selected-paint);
   box-shadow:
     0 0 0 1.5px var(--oblik-paper),

@@ -2,7 +2,14 @@ import { describe, expect, test } from "vitest";
 
 import type { TraceNodeOf } from "#eval/context";
 
-import { hitSlider, layoutSliders, sliderValueFromPointer } from "./sliderHud";
+import {
+  hitSlider,
+  layoutSliders,
+  sliderValueFromPointer,
+  SLIDER_MARGIN,
+  SLIDER_PANEL_H,
+  SLIDER_PANEL_W,
+} from "./sliderHud";
 
 const SLIDER: TraceNodeOf<"slider"> = {
   id: "o_sl",
@@ -17,8 +24,22 @@ const SLIDER: TraceNodeOf<"slider"> = {
 describe("layoutSliders", () => {
   test("stacks panels from the top-left", () => {
     const [L] = layoutSliders([SLIDER]);
-    expect(L?.panel).toEqual({ x: 12, y: 12, w: 200, h: 56 });
-    expect(L?.knobX).toBeCloseTo(12 + 14 + (1.8 / 4) * (200 - 28));
+    expect(L?.panel).toEqual({
+      x: SLIDER_MARGIN,
+      y: SLIDER_MARGIN,
+      w: SLIDER_PANEL_W,
+      h: SLIDER_PANEL_H,
+    });
+    // The track spans the whole panel (the rail is inset from the panel's edge,
+    // the title above it further still), so the knob position is just the
+    // panel's left edge plus the value's fraction of the panel width.
+    expect(L?.track).toEqual({
+      x: SLIDER_MARGIN,
+      y: SLIDER_MARGIN + 36,
+      w: SLIDER_PANEL_W,
+      h: 6,
+    });
+    expect(L?.knobX).toBeCloseTo(SLIDER_MARGIN + (1.8 / 4) * SLIDER_PANEL_W);
   });
 });
 

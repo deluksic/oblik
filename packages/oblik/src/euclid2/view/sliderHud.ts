@@ -3,6 +3,7 @@ import type { TraceNode } from "#eval/context";
 import { isFiniteTrace, snapEligible, type SnapFilter } from "../pick";
 
 const { max, min, round } = Math;
+
 /** HTML slider dock geometry. Kept in sync with `layoutSliders` so the
  * pure-coordinate hit tests (length tool, drag math) keep matching the DOM. */
 export const SLIDER_MARGIN = 12;
@@ -58,8 +59,12 @@ export function layoutSliders(nodes: readonly TraceNode[]): SliderLayout[] {
     if (g.kind !== "slider") throw new Error("expected slider trace");
     const x = MARGIN;
     const y = MARGIN + i * (PANEL_H + STACK_GAP);
-    const trackX = x + 14;
-    const trackW = PANEL_W - 28;
+    // The track runs the panel's full width — the title/value slug above it is
+    // the inset one — so this mirrors the DOM, where the track has no inline
+    // margin. Both sides move together: this is the geometry the canvas-side
+    // hit tests and the length tool map pointer X through.
+    const trackX = x;
+    const trackW = PANEL_W;
     const trackY = y + 36;
     const span = max(1e-9, g.max - g.min);
     const t = min(1, max(0, (g.n - g.min) / span));
@@ -90,6 +95,26 @@ export function hitSlider(
   return undefined;
 }
 
+/**
+ * Pointer fraction along a track to the value it lands on, rounded to two
+ * decimals. The fraction is clamped: a press can land on the panel padding and
+ * a drag can run past the pane, and neither should push the value outside
+ * `min..max`. Drafts and commits share it so a release cannot disagree with the
+ * last move about which number the pointer meant.
+ */
+export function sliderValueAt(
+  fraction: number,
+  minVal: number,
+  maxVal: number,
+  step: number,
+): number {
+  const t = min(1, max(0, fraction));
+  return round(snapEditNumber(minVal + t * (maxVal - minVal), minVal, maxVal, step) * 100) / 100;
+}
+
+/**
+ * Value at a screen-X against this panel's track (`layoutSliders` coordinates).
+ */
 export function sliderValueFromPointer(
   node: TraceNode,
   screenX: number,
@@ -99,7 +124,5 @@ export function sliderValueFromPointer(
   if (g.kind !== "slider") return 0;
   const L = layoutSliders(nodes).find((s) => s.node.id === node.id);
   if (!L) return g.n;
-  const t = (screenX - L.track.x) / L.track.w;
-  const raw = g.min + t * (g.max - g.min);
-  return snapEditNumber(raw, g.min, g.max, g.step);
+  return sliderValueAt((screenX - L.track.x) / L.track.w, g.min, g.max, g.step);
 }

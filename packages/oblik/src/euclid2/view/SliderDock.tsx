@@ -1,26 +1,23 @@
-import { For, createSignal } from "solid-js";
+import { For, createSignal, onCleanup } from "solid-js";
 
 import type { SliderValue, TraceNode } from "#eval/context";
 import { formatNum } from "#source/patch";
 
 import { traceKey } from "../pick";
-import { DragTracker } from "./dragTracker";
-import {
-  setSliderDockScrollTop,
-  SLIDER_MARGIN,
-  SLIDER_PANEL_H,
-  SLIDER_PANEL_W,
-  snapEditNumber,
-} from "./sliderHud";
+import { createDragHandler } from "./createDragHandler";
+import { setSliderDockScrollTop, SLIDER_MARGIN, SLIDER_PANEL_H, SLIDER_PANEL_W } from "./sliderHud";
 
 import styles from "./SliderDock.module.css";
 
-const { max, min, round } = Math;
+const { max, min } = Math;
 
-/** Distance the pointer must travel before a slider draft starts. */
+/** Distance the pointer must travel before a press stops meaning "select this
+ * slider". The value itself is the range input's business — the pane only needs
+ * to know whether the gesture was a pick or a drag of the thumb. */
 const SLIDER_DEAD_ZONE_PX = 2;
-/** Distance past which a slider release commits instead of selecting. */
-const SLIDER_CLICK_TOLERANCE_PX = 4;
+/** A native `<input type="range">` refuses `step="0"`; an unstepped slider gets
+ * the browser's `any` so it can still land between its neighbours. */
+const STEP_ANY = "any";
 
 export type SliderDockProps = {
   nodes: readonly TraceNode[];
@@ -36,9 +33,14 @@ export type SliderDockProps = {
 };
 
 /** HTML slider HUD shared by the SVG and WebGPU panes: a left-edge column of
- * value panels that scrolls when it outgrows the pane. Each panel edits its
- * slider with the same click/drag semantics as the classic canvas handles
- * (live draft while dragging, literal commit on release, click picks). */
+ * value panels that scrolls when it outgrows the pane.
+ *
+ * Each panel is a real `<input type="range">`, so focus, arrow keys,
+ * Home/End/PageUp/PageDown, `role="slider"` and the ARIA value wiring come from
+ * the platform instead of being reimplemented. The pane layers on top only what
+ * a range input has no notion of: a live draft while it is being moved, one
+ * literal write when the gesture ends, and a stationary press picking the
+ * slider's node. */
 export function SliderDock(props: SliderDockProps) {
   // Writable memos over the pane state: <For> memoizes rows on list identity,
   // so hover/selection/placing must reach each row through these signals (read
@@ -47,13 +49,93 @@ export function SliderDock(props: SliderDockProps) {
   const [hotKey] = createSignal(() => props.hotKey);
   const [selectedKey] = createSignal(() => props.selectedKey);
   const [placing] = createSignal(() => props.placing ?? false);
+  /** `id:occ` of the slider being edited, so its panel can render the dragging
+   * state without every row owning a gesture. */
+  const [liveKey, setLiveKey] = createSignal<string | undefined>(undefined);
 
+  let live = false;
+  /** The value the range last reported, held between `input` and the write.
+   * Also the "is there anything to write" latch: `commit` clears it, so the two
+   * paths that can end a gesture cannot write the same value twice. */
+  let last: { id: string; value: number } | undefined;
+
+  // Only the pick verdict is ours: the range input runs its own gesture, and
+  // keeps its own pointer capture, for the value. This handler exists so a
+  // release can ask whether the pointer ever moved — exactly the question a
+  // value cannot answer, since a press that jumps the thumb somewhere is still
+  // a pick. `dragged` latches off the same radius, so a press that twitches by
+  // a pixel still picks.
+  const drag = createDragHandler({
+    preventDefault: false,
+    deadZoneRadius: SLIDER_DEAD_ZONE_PX,
+  });
+
+  function announce(liveNext: boolean) {
+    if (live === liveNext) return;
+    live = liveNext;
+    props.onLiveEdit?.(liveNext);
+  }
+
+  /** Write the pending value, once. Reached from the range's `change` (pointer
+   * release, arrow key, Enter, blur) and, for pointer gestures, from our own
+   * session's end. */
+  function commit() {
+    const pending = last;
+    if (!pending) return;
+    last = undefined;
+    setLiveKey(undefined);
+    announce(false);
+    props.onCommit?.(pending.id, [pending.value]);
+  }
+
+  /** Where the pointer is: `elementFromPoint` is current mid-gesture in a way a
+   * cached `pointerenter` target is not, since a panel can be replaced under a
+   * stationary pointer. */
   function hoverAt(clientX: number, clientY: number) {
     const el = document.elementFromPoint(clientX, clientY);
-    const attr = (el as Element | null)?.closest?.("[data-slider]")?.getAttribute("data-slider");
-    const node = attr ? props.nodes.find((n) => traceKey(n) === attr) : undefined;
-    props.onHoverKey?.(node ? traceKey(node) : undefined);
+    const attr =
+      (el as Element | null)?.closest?.("[data-slider]")?.getAttribute("data-slider") ?? undefined;
+    const key = attr && props.nodes.some((n) => traceKey(n) === attr) ? attr : undefined;
+    props.onHoverKey?.(key);
   }
+
+  function draft(id: string, value: number) {
+    if (last?.id === id && last.value === value) return;
+    last = { id, value };
+    setLiveKey(id);
+    announce(true);
+    props.onDraft?.(id, [value]);
+  }
+
+  /** A press on a panel. The input handles its own value; all the pane takes
+   * from this is the release verdict — a press that never left the dead zone
+   * picks the node, a real drag does not (which is why a drag no longer
+   * selects). */
+  function startPress(e: PointerEvent, node: TraceNode) {
+    if (placing() || e.button !== 0) return;
+    if (drag.phase() !== "not-started") return; // one pointer, one gesture
+    drag.start((init: PointerEvent, target: TraceNode) => {
+      // Focus the range so arrow keys land on it after a pointer press: the
+      // session suppresses the click that would otherwise move focus, and a
+      // slider you cannot nudge from the keyboard after clicking it would give
+      // back part of what the native control buys.
+      (init.target as Element | null)?.closest?.("input")?.focus();
+      return {
+        onDone(end) {
+          // Covers a gesture whose range `change` never fired (a release the
+          // browser swallowed); `commit` is a no-op when `change` got there
+          // first, so the value is still written exactly once.
+          commit();
+          if (end && !end.dragged) props.onPick?.([target]);
+          if (end) hoverAt(end.clientX, end.clientY);
+        },
+      };
+    })(e, node);
+  }
+
+  // A dock that unmounts mid-edit (pane teardown, scene swap) must not leave the
+  // pane reporting a live edit it can never end.
+  onCleanup(() => announce(false));
 
   return (
     <div
@@ -78,12 +160,11 @@ export function SliderDock(props: SliderDockProps) {
             hot={() => hotKey() === traceKey(node())}
             selected={() => selectedKey()?.startsWith(`${node().id}:`) ?? false}
             placing={() => placing()}
+            live={() => liveKey() === traceKey(node())}
             onHoverKey={props.onHoverKey}
-            onPick={props.onPick}
-            onDraft={props.onDraft}
-            onCommit={props.onCommit}
-            onLiveEdit={props.onLiveEdit}
-            onHoverAt={hoverAt}
+            onPointerDown={(e) => startPress(e, node())}
+            onInput={(value) => draft(node().id, value)}
+            onChange={() => commit()}
           />
         )}
       </For>
@@ -96,19 +177,13 @@ function SliderRow(props: {
   hot: () => boolean;
   selected: () => boolean;
   placing: () => boolean;
+  live: () => boolean;
   onHoverKey?: (key: string | undefined) => void;
-  onPick?: (hits: TraceNode[]) => void;
-  onDraft?: (id: string, values: number[]) => void;
-  onCommit?: (id: string, values: number[]) => void;
-  onLiveEdit?: (live: boolean) => void;
-  onHoverAt: (clientX: number, clientY: number) => void;
+  onPointerDown: (e: PointerEvent) => void;
+  onInput: (value: number) => void;
+  onChange: () => void;
 }) {
   const slider = (): SliderValue => props.node().value as SliderValue;
-  const [dragging, setDragging] = createSignal(false);
-
-  let trackEl: HTMLDivElement | undefined;
-  let gesture: DragTracker | undefined;
-  let live = false;
 
   const frac = () => {
     const g = slider();
@@ -116,86 +191,45 @@ function SliderRow(props: {
     return min(1, max(0, (g.n - g.min) / span));
   };
 
-  /** Value at a client-X against this panel's track (same mapping as the SVG
-   * HUD: track x range → min..max, snapped to step, rounded to 2 decimals). */
-  function valueAt(clientX: number): number {
-    const rect = trackEl?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return slider().n;
-    const t = min(1, max(0, (clientX - rect.left) / rect.width));
-    const g = slider();
-    const raw = g.min + t * (g.max - g.min);
-    return round(snapEditNumber(raw, g.min, g.max, g.step) * 100) / 100;
-  }
-
-  function begin(e: PointerEvent) {
-    if (props.placing() || e.button !== 0) return;
-    // Sliders drive their own pointer events on this node, so they keep the
-    // same tracker the canvas gestures use rather than a second rule.
-    gesture = new DragTracker(e, SLIDER_CLICK_TOLERANCE_PX);
-    live = false;
-    setDragging(true);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function move(e: PointerEvent) {
-    if (!dragging()) return;
-    // The dead zone only decides when drafts start; the tracker separately
-    // remembers whether this gesture ever stopped being a click.
-    if (!(gesture?.moved(e, SLIDER_DEAD_ZONE_PX) ?? false)) return;
-    if (!live) {
-      live = true;
-      props.onLiveEdit?.(true);
-    }
-    props.onDraft?.(props.node().id, [valueAt(e.clientX)]);
-  }
-
-  function end(e: PointerEvent) {
-    if (!dragging()) return;
-    setDragging(false);
-    if (live) props.onLiveEdit?.(false);
-    if (e.type !== "pointerup") {
-      props.onHoverAt(e.clientX, e.clientY);
-      return;
-    }
-    if (gesture?.dragged() ?? false) {
-      props.onCommit?.(props.node().id, [valueAt(e.clientX)]);
-    } else {
-      props.onPick?.([props.node()]);
-    }
-    props.onHoverAt(e.clientX, e.clientY);
-  }
-
   return (
     <div
       class={[
         styles.panel,
-        dragging() ? styles.dragging : undefined,
-        props.hot() && !props.selected() && !dragging() ? styles.hot : undefined,
+        props.live() ? styles.dragging : undefined,
+        props.hot() && !props.selected() && !props.live() ? styles.hot : undefined,
         props.selected() ? styles.selected : undefined,
       ]}
       data-slider={traceKey(props.node())}
       style={{ height: `${SLIDER_PANEL_H}px` }}
-      onPointerDown={begin}
-      onPointerMove={move}
-      onPointerUp={end}
-      onPointerCancel={end}
+      onPointerDown={(e) => props.onPointerDown(e)}
       onPointerEnter={() => {
-        if (!props.placing() && !dragging()) props.onHoverKey?.(traceKey(props.node()));
+        if (!props.placing() && !props.live()) props.onHoverKey?.(traceKey(props.node()));
       }}
       onPointerLeave={() => {
-        if (!props.placing() && !dragging()) props.onHoverKey?.(undefined);
+        if (!props.placing() && !props.live()) props.onHoverKey?.(undefined);
       }}
     >
       <div class={styles.head}>
         <span class={styles.label}>{props.node().bind ?? "value"}</span>
         <span class={styles.value}>{formatNum(slider().n)}</span>
       </div>
-      <div class={styles.track} ref={(el) => (trackEl = el)}>
+      {/* The rail and fill are painted under the input: one source of geometry
+       * (this box) that the pure hit tests in `sliderHud` also assume, with the
+       * native control supplying the thumb and the gesture. */}
+      <div class={styles.track} style={{ "--slider-frac": `${frac() * 100}%` }}>
         <span class={styles.rail} />
-        <span class={styles.fill} style={{ width: `${frac() * 100}%` }} />
-        <span class={styles.knob} style={{ left: `${frac() * 100}%` }}>
-          <span class={styles.knobDot} />
-        </span>
+        <span class={styles.fill} />
+        <input
+          class={styles.range}
+          type="range"
+          min={slider().min}
+          max={slider().max}
+          step={slider().step > 0 ? slider().step : STEP_ANY}
+          value={slider().n}
+          aria-label={props.node().bind ?? "value"}
+          onInput={(e) => props.onInput(parseFloat(e.currentTarget.value))}
+          onChange={() => props.onChange()}
+        />
       </div>
     </div>
   );

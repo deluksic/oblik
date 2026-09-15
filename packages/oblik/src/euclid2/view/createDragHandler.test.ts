@@ -308,6 +308,37 @@ describe("createDragHandler", () => {
     dispose();
   });
 
+  test("delivers the release after the capture element is detached", () => {
+    // The slider dock's panels are DOM nodes that a draft can re-render away
+    // mid-drag, and that must not strand the gesture: the listeners are on
+    // `document`, not on the element, so `pointerup` still reaches `onDone`.
+    // A session that released by listening on the element would keep its latch
+    // set and go on applying every later move with the button already up.
+    const doc = install();
+    let detached = false;
+    const done: Array<number | undefined> = [];
+    const { start, dispose } = withHandler(() =>
+      createDragHandler({ deadZoneRadius: 2, preventDefault: false }).start(() => ({
+        onPointerMove() {
+          // The panel is replaced under the pointer (a draft re-render): the
+          // browser drops the capture with the element, so only the document
+          // listeners can still finish this gesture.
+          detached = true;
+        },
+        onDone(end) {
+          done.push(end?.clientX);
+        },
+      })),
+    );
+    start(pointerEvent({ clientX: 0, clientY: 0 }));
+    doc.fire("pointermove", pointerEvent({ clientX: 30, clientY: 0 }));
+    expect(detached).toBe(true);
+    doc.fire("pointerup", pointerEvent({ clientX: 34, clientY: 0 }));
+    expect(done).toEqual([34]);
+    expect(doc.listenerCount("pointermove")).toBe(0);
+    dispose();
+  });
+
   test("ends the session when a second touch starts", () => {
     const doc = install();
     let finished = 0;

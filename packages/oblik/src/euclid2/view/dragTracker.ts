@@ -18,9 +18,9 @@ export type ClientPoint = { clientX: number; clientY: number };
  *   ~1px, while a press that stays within ~4px should still select what it
  *   landed on.
  *
- * `createDragHandler` owns one for each of its sessions; a view that drives its
- * own pointer events (the slider dock, whose drags live on a DOM node) keeps
- * one itself, so both run the same rule.
+ * `createDragHandler` owns one for each of its sessions, the slider dock
+ * included: its panels run the same session machine as the canvas gestures and
+ * only look up which node a press landed on.
  */
 export class DragTracker {
   private readonly down: ClientPoint;
