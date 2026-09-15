@@ -13,8 +13,14 @@ const packageRoot = path.dirname(fileURLToPath(import.meta.url));
  * perturbs unrelated tests, hence the separate project.
  *
  * The pattern is `**\/wgsl.test.ts`, not `**\/*.wgsl.test.ts`: a bare `*.`
- * segment in an include glob matches nothing here (no stem before the dot). */
-const SHADER_TESTS = "**/wgsl.test.ts";
+ * segment in an include glob matches nothing here (no stem before the dot).
+ * `wgsl-validate.test.ts` rides the same project because it needs that resolved
+ * text; it compiles the text with the device's own WGSL compiler instead of
+ * asserting against its shape. */
+const SHADER_TESTS = ["**/wgsl.test.ts", "**/wgsl-validate.test.ts"];
+
+/** The same files, kept out of the unit project (which has no TGSL transform). */
+const UNIT_EXCLUDE = ["**/node_modules/**", ...SHADER_TESTS];
 
 export default defineConfig({
   resolve: {
@@ -29,7 +35,7 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
-          exclude: ["**/node_modules/**", SHADER_TESTS],
+          exclude: UNIT_EXCLUDE,
         },
       },
       {
@@ -39,7 +45,7 @@ export default defineConfig({
         test: {
           name: "shaders",
           environment: "node",
-          include: [SHADER_TESTS],
+          include: SHADER_TESTS,
         },
       },
     ],
